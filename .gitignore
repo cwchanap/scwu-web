@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.DS_Store
+.husky/_/
+scwu-web-handoff/
+public/assets/
+src/game/generated/
+src/game/__fixtures__/
+__pycache__/
+*.pyc

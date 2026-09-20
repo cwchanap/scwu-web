@@ -1,0 +1,8 @@
+node_modules
+dist
+scwu-web-handoff
+public/assets
+src/game/generated
+src/game/__fixtures__
+.husky/_
+bun.lock
