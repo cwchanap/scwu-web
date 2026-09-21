@@ -61,7 +61,7 @@ export function createHud(scene: Phaser.Scene) {
     .setDepth(101);
   const wins = [image(30, 240, 40), image(30, 370, 40)];
   image(26, 30, 443);
-  // Special moves are deferred: show the source EMPTY stock, never fake energy.
+  // Basic specials are meter-free; super stock remains EMPTY until supers exist.
   image(17, 49, 434);
   image(17, 545, 434);
   const digits = [image(47, 300, 16), image(47, 320, 16)];

@@ -21,6 +21,25 @@ function clip(
   return { frames, ticks, loop };
 }
 
+const THROW_GRIP_TICKS = 12;
+const spinTicks = data.clips.throwSpin.map((frame) => frame.duration);
+const spinDuration = spinTicks.reduce((total, ticks) => total + ticks, 0);
+// ponytail: three authored rotations; original object dispatch is not interpreted.
+const throwSpin = Array.from({ length: 3 }, () => data.clips.throwSpin).flat();
+export const THROW_RELEASE_TICK = THROW_GRIP_TICKS + spinDuration * 3;
+
+// Shared by the held fighter's physics and draw order to stay in sync with the turn.
+export function throwHold(age: number) {
+  if (age < THROW_GRIP_TICKS || age >= THROW_RELEASE_TICK)
+    return { x: 90, y: -24, behind: false };
+  const angle = ((age - THROW_GRIP_TICKS) / spinDuration) * Math.PI * 2;
+  return {
+    x: Math.cos(angle) * 90,
+    y: -48 - Math.sin(angle) * 24,
+    behind: Math.sin(angle) > 0,
+  };
+}
+
 // These are authored visual timelines, not execution of non-idle action bytecode.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
@@ -28,12 +47,69 @@ export const animations = {
   backwalk: clip(data.clips.backwalk, true),
   takeoff: clip(data.clips.jump.slice(0, 1)),
   jump: clip(data.clips.jump.slice(1), false, [13, 5, 15, 1]),
+  doubleJump: clip(data.clips.doubleJump, false, [3, 5, 27]),
+  dash: clip(data.clips.dash, false, [5, 5, 5, 8]),
+  backdash: clip(data.clips.backdash, false, [10, 5, 5, 15, 8]),
+  airDash: clip(data.clips.airDash),
+  airBackdash: clip(data.clips.airBackdash),
   land: clip(data.clips.land),
   crouchEnter: clip(data.clips.crouchEnter),
   crouch: clip(data.clips.crouch, true),
   stand: clip(data.clips.stand),
   punch: clip(data.clips.punch),
   kick: clip(data.clips.kick, false, [5, 5, 7, 10, 11]),
+  punch2: clip(data.clips.punch2),
+  punch3: clip(data.clips.punch3, false, [5, 2, 8, 6, 8, 5, 15, 8]),
+  kick2: clip(data.clips.kick2),
+  kick3: clip([
+    ...data.clips.kick3.slice(0, 3),
+    ...Array.from({ length: 8 }, () => data.clips.kick3Repeat).flat(),
+    ...data.clips.kick3.slice(3),
+  ]),
+  drill: clip(data.clips.drill),
+  airDrill: clip(data.clips.airDrill.slice(0, 3)),
+  // Actions 209–211 loop these poses until contact or landing.
+  airDrillSpin: clip(data.clips.airDrillSpin.slice(0, 2), true),
+  // ponytail: a local contact pause includes hit-stop and transition time;
+  // use engine-wide hit-stop only when the original combat VM is reconstructed.
+  airDrillContact: clip(data.clips.airDrillSpin.slice(0, 1), false, [10]),
+  drillLand: clip(data.clips.drillLand),
+  axeThrow: clip(data.clips.axeThrow),
+  axeFlight: clip(data.clips.axeFlight, true),
+  axeHit: clip(data.clips.axeHit),
+  grab: clip(data.clips.grab),
+  throw: clip(
+    [data.clips.throw[0], ...throwSpin, ...data.clips.throw.slice(1)],
+    false,
+    [
+      THROW_GRIP_TICKS,
+      ...throwSpin.map((frame) => frame.duration),
+      18,
+      10,
+      8,
+      8,
+    ],
+  ),
+  grabbed: clip(
+    [
+      data.clips.grabbed[0],
+      ...Array.from({ length: 3 }, () => [
+        data.clips.grabbedSpin[0],
+        data.clips.grabbedSpin[0],
+        data.clips.grabbedSpin[1],
+        data.clips.grabbedSpin[1],
+      ]).flat(),
+    ],
+    false,
+    [THROW_GRIP_TICKS, ...Array.from({ length: 3 }, () => spinTicks).flat()],
+  ),
+  thrown: clip(data.clips.thrown, false, [2, 2, 2, 12, 1]),
+  knockdown: clip(data.clips.knockdown),
+  getUp: clip(data.clips.getUp),
+  hitSpark: clip(data.clips.hitSpark),
+  // Select the first branch; the remaining displays are its mirrored alternative.
+  hitStreak: clip(data.clips.hitStreak.slice(0, 13)),
+  guardSpark: clip(data.clips.guardSpark),
   crouchPunch: clip(data.clips.crouchPunch),
   crouchKick: clip(data.clips.crouchKick),
   airPunch: clip(data.clips.airPunch),

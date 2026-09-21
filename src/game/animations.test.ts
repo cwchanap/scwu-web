@@ -50,6 +50,72 @@ describe('selected core animation assets', () => {
     }
   });
 
+  it('plays the selected mobility and special poses across authored transitions', () => {
+    expect(animationFrame('doubleJump', 0).image).toBe(29);
+    expect(animationFrame('doubleJump', 8).image).toBe(30);
+    expect(animationFrame('airDash', 3).image).toBe(45);
+    expect(animationFrame('drill', 23).image).toBe(121);
+    expect(animationDuration('airDrill')).toBe(22);
+    expect(animationFrame('airDrill', 21).image).toBe(120);
+    expect(
+      [0, 3, 6].map((age) => animationFrame('airDrillSpin', age).image),
+    ).toEqual([136, 137, 136]);
+    expect(animationFrame('airDrillContact', 9).image).toBe(136);
+    expect(animationFrame('drillLand', 13).image).toBe(17);
+    expect(animationFrame('axeThrow', 16).image).toBe(325);
+    expect(
+      [0, 3, 6, 9, 12].map((age) => animationFrame('axeFlight', age).image),
+    ).toEqual([424, 425, 426, 427, 424]);
+  });
+
+  it('plays the recovered hit and guard effects with their display timings', () => {
+    expect(
+      [0, 4, 7, 9, 12, 14, 16, 18].map(
+        (age) => animationFrame('hitSpark', age).image,
+      ),
+    ).toEqual([160, 161, 162, 163, 164, 165, 166, 167]);
+    expect(animationDuration('hitSpark')).toBe(21);
+    expect(animationDuration('guardSpark')).toBe(22);
+    expect(animationFrame('guardSpark', 2).image).toBe(224);
+    expect(animationFrame('guardSpark', 19).image).toBe(229);
+    expect(animationDuration('hitStreak')).toBe(18);
+    expect(animationFrame('hitStreak', 17).image).toBe(192);
+    expect(animations.hitStreak.frames.every((frame) => !frame.flip_x)).toBe(
+      true,
+    );
+  });
+
+  it('plays all eight third-kick strike and recovery pairs before ending', () => {
+    for (const age of [15, 21, 27, 33, 39, 45, 51, 57]) {
+      expect(animationFrame('kick3', age).image).toBe(82);
+      expect(animationFrame('kick3', age + 3).image).toBe(83);
+    }
+    expect(animationFrame('kick3', 63).image).toBe(82);
+    expect(animationFrame('kick3', 78).image).toBe(34);
+    expect(animationDuration('kick3')).toBe(88);
+  });
+
+  it('plays the grab, release, floor impact, and get-up poses', () => {
+    expect(animationFrame('grab', 0).image).toBe(103);
+    expect(animationFrame('throw', 0).image).toBe(106);
+    expect(
+      [12, 17, 22, 27, 32].map((age) => animationFrame('throw', age).image),
+    ).toEqual([107, 108, 107, 110, 107]);
+    expect(animationFrame('throw', 22).flip_x).toBe(true);
+    expect(animationFrame('grabbed', 12).flip_y).toBe(true);
+    expect(animationFrame('throw', 72).image).toBe(111);
+    expect(animationFrame('throw', 108).image).toBe(24);
+    expect(animationFrame('grabbed', 0).image).toBe(47);
+    expect(animationFrame('thrown', 0).image).toBe(52);
+    expect(animationFrame('thrown', 6).image).toBe(60);
+    expect(animationFrame('thrown', 100).image).toBe(61);
+    expect(animationFrame('knockdown', 0).image).toBe(62);
+    expect(animationFrame('knockdown', 10).image).toBe(63);
+    expect(
+      [0, 10, 20].map((age) => animationFrame('getUp', age).image),
+    ).toEqual([68, 69, 70]);
+  });
+
   it('advances on frame boundaries, loops movement, and holds ending poses', () => {
     expect(animationFrame('land', 4).image).toBe(17);
     expect(animationFrame('land', 5).image).toBe(18);

@@ -3,7 +3,7 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, placement } from './standing';
-import { animationFrame } from './animations';
+import { animationDuration, animationFrame, throwHold } from './animations';
 import type { Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, Match, WIDTH } from './match';
 import type { Control, Mode } from './match';
@@ -46,6 +46,11 @@ const keyMap: Record<string, Control> = {
   KeyJ: 'punch',
   KeyK: 'kick',
   KeyL: 'guard',
+  ShiftLeft: 'dash',
+  ShiftRight: 'dash',
+  KeyU: 'drill',
+  KeyI: 'axe',
+  KeyO: 'throw',
 };
 
 export class TrainingScene extends Phaser.Scene {
@@ -56,8 +61,10 @@ export class TrainingScene extends Phaser.Scene {
   private virtual = new Set<Control>();
   private pressed = new Set<Control>();
   private sprites: Phaser.GameObjects.Image[] = [];
+  private shadows: Phaser.GameObjects.Ellipse[] = [];
+  private projectileSprites: Phaser.GameObjects.Image[] = [];
   private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
-  private sparks!: Phaser.GameObjects.Graphics;
+  private impactSprites: Phaser.GameObjects.Image[][] = [];
   private ready = false;
   private error = '';
   private lastStatus = '';
@@ -86,12 +93,20 @@ export class TrainingScene extends Phaser.Scene {
       .setOrigin(0)
       .setScale(1.5);
     for (const f of this.match.fighters) {
-      this.add.ellipse(f.x, GROUND - 1, 94, 13, 0x171311, 0.3);
+      this.shadows.push(
+        this.add.ellipse(f.x, GROUND - 1, 94, 13, 0x171311, 0.3),
+      );
       this.sprites.push(
         this.add.image(f.x, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
       );
     }
-    this.sparks = this.add.graphics();
+    this.projectileSprites = this.match.fighters.map(() =>
+      this.add
+        .image(0, 0, 'ryuko-424')
+        .setScale(ART_SCALE)
+        .setDepth(4)
+        .setVisible(false),
+    );
     this.updateHud = createHud(this);
     this.game.canvas.tabIndex = 0;
     this.game.canvas.setAttribute(
@@ -147,6 +162,7 @@ export class TrainingScene extends Phaser.Scene {
   };
 
   clearInput() {
+    this.match.clearInput();
     this.held.clear();
     this.virtual.clear();
     this.pressed.clear();
@@ -216,36 +232,74 @@ export class TrainingScene extends Phaser.Scene {
         );
         sprite
           .setTexture(`ryuko-${pose.image}`)
+          .setDepth(
+            f.action === 'grabbed' ? (throwHold(f.age).behind ? 1 : 3) : 2,
+          )
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
-        const shadow = this.children.list[
-          1 + i * 2
-        ] as Phaser.GameObjects.Ellipse;
+        const shadow = this.shadows[i];
         shadow
           .setPosition(f.x, GROUND - 1)
           .setAlpha(Math.max(0.1, 0.3 + f.y / 1000));
       });
-      this.sparks.clear();
-      this.updateHud?.(this.match);
-      const impact = this.match.impact;
-      if (impact) {
-        const radius = 12 + impact.age * 2;
-        this.sparks.lineStyle(
-          3,
-          impact.blocked ? 0x76d6eb : 0xe6fa70,
-          1 - impact.age / 15,
+      this.projectileSprites.forEach((sprite, owner) => {
+        const projectile = this.match.projectiles.find(
+          (p) => p.owner === owner,
         );
-        this.sparks.strokeCircle(impact.x, impact.y, radius);
-        for (let i = 0; i < 8; i++) {
-          const angle = (i * Math.PI) / 4;
-          this.sparks.lineBetween(
-            impact.x + Math.cos(angle) * radius,
-            impact.y + Math.sin(angle) * radius,
-            impact.x + Math.cos(angle) * (radius + 12),
-            impact.y + Math.sin(angle) * (radius + 12),
-          );
-        }
+        sprite.setVisible(!!projectile);
+        if (!projectile) return;
+        const pose = animationFrame(
+          projectile.hit ? 'axeHit' : 'axeFlight',
+          projectile.age,
+        );
+        // Projectile flight uses an authored center anchor, independent of fighter offsets.
+        sprite
+          .setTexture(`ryuko-${pose.image}`)
+          .setPosition(projectile.x, GROUND + projectile.y)
+          .setFlipX(projectile.facing === -1);
+      });
+      this.updateHud?.(this.match);
+      while (this.impactSprites.length < this.match.impacts.length) {
+        this.impactSprites.push(
+          [0, 1].map(() =>
+            this.add
+              .image(0, 0, 'ryuko-160')
+              .setOrigin(0)
+              .setScale(ART_SCALE)
+              .setDepth(20)
+              .setBlendMode(Phaser.BlendModes.ADD),
+          ),
+        );
       }
+      this.impactSprites.forEach((layers, index) => {
+        const impact = this.match.impacts[index];
+        layers.forEach((sprite, layer) => {
+          const visible =
+            !!impact &&
+            (layer === 0 ||
+              (!impact.blocked &&
+                impact.heavy &&
+                impact.age < animationDuration('hitStreak')));
+          sprite.setVisible(visible);
+          if (!visible) return;
+          const pose = animationFrame(
+            layer === 0 ? impact.effect : 'hitStreak',
+            impact.age,
+          );
+          const p = placement(
+            pose,
+            pose.width,
+            pose.height,
+            impact.x / ART_SCALE,
+            impact.y / ART_SCALE,
+            impact.facing === -1,
+          );
+          sprite
+            .setTexture(`ryuko-${pose.image}`)
+            .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
+            .setFlip(p.flip_x, p.flip_y);
+        });
+      });
       this.report();
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);

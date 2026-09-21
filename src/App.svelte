@@ -28,6 +28,10 @@
     { control: 'punch', label: 'Punch', symbol: 'J' },
     { control: 'kick', label: 'Kick', symbol: 'K' },
     { control: 'guard', label: 'Guard', symbol: 'L' },
+    { control: 'dash', label: 'Dash', symbol: '⇧' },
+    { control: 'drill', label: 'Drill punch', symbol: 'U' },
+    { control: 'axe', label: 'Axe throw', symbol: 'I' },
+    { control: 'throw', label: 'Throw', symbol: 'O' },
   ];
 
   onMount(() => {
@@ -110,7 +114,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump, S to crouch, J to punch, K to kick, L to guard. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, L to guard, Shift or double-tap left/right to dash, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -200,7 +204,13 @@
   <div class="touch-controls" aria-label="Touch controls">
     {#each touchControls as item (item.control)}
       <button
-        class:attack-control={['punch', 'kick'].includes(item.control)}
+        class:attack-control={[
+          'punch',
+          'kick',
+          'drill',
+          'axe',
+          'throw',
+        ].includes(item.control)}
         aria-label={item.label}
         disabled={!status.ready || status.paused || !!status.winner}
         onpointerdown={(event) => press(event, item.control)}
@@ -226,7 +236,9 @@
     <span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd> Jump</span
     ><span><kbd>S</kbd> Crouch</span><span><kbd>J</kbd> Punch</span><span
       ><kbd>K</kbd> Kick</span
-    ><span><kbd>L</kbd> Guard</span>
+    ><span><kbd>L</kbd> Guard</span><span><kbd>Shift</kbd> Dash</span><span
+      ><kbd>U</kbd> Drill</span
+    ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span>
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -240,8 +252,32 @@
         </p>
         <p>
           Hold <kbd>S</kbd> or the down arrow to crouch. Punch, kick, and guard change
-          with your stance: try them while crouching or in the air. Each attack plays
-          once per tap; landing ends an aerial attack.
+          with your stance: try them while crouching or in the air. Tap punch or kick
+          again during a standing attack to queue its next attack, up to three. Early
+          taps are remembered, and the recovery pose gives you extra time for a follow-up.
+          The second punch and jumping kick each strike three times; the third standing
+          kick strikes eight times. Holding a button never repeats an attack.
+        </p>
+        <p>
+          Hold left or right when jumping to travel in that direction; releasing
+          it keeps your momentum. Tap jump again in the air for a double jump,
+          choosing a new direction. Double-tap left or right to dash, including
+          on touch. You can also press <kbd>Shift</kbd> or the Dash button for a forward
+          hop, or hold away to backdash. You can dash once in the air before landing.
+        </p>
+        <p>
+          Press <kbd>U</kbd> for a six-hit Drill Punch on the ground, or an
+          aerial drill while jumping. Aerial drill follows each hit or block
+          with a weaker strike while you stay in range. Landing ends it with its
+          recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
+          Only one axe per fighter can be out at a time. These basic specials do not
+          spend super stock.
+        </p>
+        <p>
+          Press <kbd>O</kbd> close to a grounded opponent to grab and throw them,
+          even through guard. A miss leaves you recovering. The opponent tumbles,
+          lands, then gets up; they cannot act or be hit again during this recovery.
+          Jumping avoids a grab, and a strike can interrupt its startup.
         </p>
         <p>
           Free practice gives you a stationary partner and no timer. Vs. CPU

@@ -46,12 +46,21 @@ def main():
     # Authored pose clips are not a reconstruction of these actions' bytecode.
     actions = {
         "idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,
+        "doubleJump": 10, "dash": 13, "backdash": 14,
+        "airDash": 16, "airBackdash": 17,
         "crouchEnter": 18, "crouch": 19, "stand": 20,
         "guard": 149, "crouchGuard": 151, "airGuard": 153,
         "blockHeavy": 154, "crouchBlockHeavy": 156, "airBlockHeavy": 158,
         "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76,
         "punch": 178, "kick": 186, "crouchPunch": 185, "crouchKick": 194,
         "airPunch": 182, "airKick": 191,
+        "punch2": 180, "punch3": 181, "kick2": 188, "kick3": 189, "kick3Repeat": 190,
+        "drill": 207, "airDrill": 208, "airDrillSpin": 209, "drillLand": 212,
+        "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
+        "grab": 196, "throw": 197, "throwSpin": 199,
+        "grabbed": 128, "grabbedSpin": 130, "thrown": 132,
+        "knockdown": 146, "getUp": 145,
+        "hitSpark": 345, "hitStreak": 348, "guardSpark": 370,
         "ko": 60, "down": 62, "win": 57, "draw": 65,
     }
     clips = {}
