@@ -28,6 +28,7 @@ export function createHud(scene: Phaser.Scene) {
   const image = (index: number, x: number, y: number) =>
     scene.add
       .image(x * scale, y * scale, `ui-${index}`)
+      .setScrollFactor(0)
       .setOrigin(0)
       .setScale(scale)
       .setDepth(100);
@@ -39,11 +40,13 @@ export function createHud(scene: Phaser.Scene) {
   image(41, 472, 37);
   scene.add
     .image(31 * scale, 36 * scale, 'ryuko-2001')
+    .setScrollFactor(0)
     .setOrigin(0)
     .setScale(scale)
     .setDepth(101);
   scene.add
     .image(539 * scale, 36 * scale, 'ryuko-2001')
+    .setScrollFactor(0)
     .setOrigin(0)
     .setScale(scale)
     .setFlipX(true)
@@ -51,11 +54,13 @@ export function createHud(scene: Phaser.Scene) {
   // Name placement is authored; portrait anchors above come from actions 72/73.
   scene.add
     .image(106 * scale, 38 * scale, 'ryuko-464')
+    .setScrollFactor(0)
     .setOrigin(0)
     .setScale(scale * 0.7)
     .setDepth(101);
   scene.add
     .image(474 * scale, 38 * scale, 'ryuko-464')
+    .setScrollFactor(0)
     .setOrigin(0)
     .setScale(scale * 0.7)
     .setDepth(101);
@@ -73,6 +78,7 @@ export function createHud(scene: Phaser.Scene) {
       stroke: '#10283b',
       strokeThickness: 3,
     })
+    .setScrollFactor(0)
     .setOrigin(0.5)
     .setDepth(101);
   const ko = image(97, 183, 126).setDepth(110).setVisible(false);
@@ -85,6 +91,7 @@ export function createHud(scene: Phaser.Scene) {
       stroke: '#555555',
       strokeThickness: 8,
     })
+    .setScrollFactor(0)
     .setOrigin(0.5)
     .setDepth(110)
     .setVisible(false);

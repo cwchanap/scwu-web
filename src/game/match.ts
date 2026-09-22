@@ -9,6 +9,7 @@ export type Control =
   | 'crouch'
   | 'punch'
   | 'kick'
+  | 'hitUp'
   | 'guard'
   | 'dash'
   | 'drill'
@@ -18,6 +19,8 @@ export type Input = Partial<Record<Control, boolean>>;
 export type Mode = 'practice' | 'cpu';
 export const TICK_MS = 10;
 export const WIDTH = 960;
+// The source camera views 640 pixels of a 1280-pixel stage.
+export const STAGE_WIDTH = 1920;
 export const HEIGHT = 720;
 export const GROUND = 636;
 // Reserve the extended air dash (181.5px) and throw/recovery poses, including rounding.
@@ -33,6 +36,7 @@ export const ATTACKS = {
   punch2: { startup: 18, active: 18, range: 205, damage: 10 },
   punch3: { startup: 29, active: 20, range: 235, damage: 16 },
   kick2: { startup: 13, active: 16, range: 205, damage: 14 },
+  hitUp: { startup: 15, active: 10, range: 165, damage: 15 },
   kick3: { startup: 15, active: 48, range: 225, damage: 17 },
   drill: { startup: 23, active: 36, range: 310, damage: 18 },
   // The short diagonal drill reaches ~125px, plus the opponent's ~55px body.
@@ -51,6 +55,28 @@ const multiHits: Partial<
   kick3: { interval: 6, active: 3, count: 8 },
   drill: { interval: 6, active: 3, count: 6 },
 };
+// Ryuko opcode 0x17 selects the victim response; its opcode 0x1a adds
+// hit-stop to BOTH fighters. These are contact pauses, not active-frame gaps.
+// SCWU.KGT's base hit/guard pause is zero. See README's recovered timing table.
+// ponytail: other attacks retain MVP knockback; only Hit Up executes the
+// recovered launch responses until their callers are reconstructed too.
+const hitResponses = {
+  punch: { stop: 10, kind: 'light' },
+  kick: { stop: 10, kind: 'light' },
+  crouchPunch: { stop: 15, kind: 'heavy' },
+  crouchKick: { stop: 13, kind: 'heavy' },
+  airPunch: { stop: 15, kind: 'heavy' },
+  airKick: { stop: 15, kind: 'heavy' },
+  punch2: { stop: 10, kind: 'light' },
+  punch3: { stop: 15, kind: 'heavy' },
+  kick2: { stop: 15, kind: 'heavy' },
+  hitUp: { stop: 13, kind: 'heavy' },
+  kick3: { stop: 0, kind: 'rapid' },
+  drill: { stop: 15, kind: 'heavy' },
+  // Aerial drill pauses are applied by the attacker's contact branch instead.
+  airDrill: { stop: 0, kind: 'heavy' },
+  airDrillSpin: { stop: 0, kind: 'heavy' },
+} as const;
 const followUps = {
   punch: 'punch2',
   punch2: 'punch3',
@@ -69,7 +95,8 @@ const AIR_DRILL_DAMAGE = [16, 5, 3, 1];
 // Convert the recovered source velocities to the web's 1.5-scale arena.
 const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
 // Opcode 1 acceleration uses floor(0x3c0000 / 100²) in the same 16.16 units.
-const JUMP_GRAVITY = 80 * (393 / 65536) * 1.5;
+const SOURCE_ACCELERATION_SCALE = (393 / 65536) * 1.5;
+const JUMP_GRAVITY = 80 * SOURCE_ACCELERATION_SCALE;
 const DOUBLE_TAP_TICKS = 20;
 export const AXE_RELEASE_TICK = 16;
 export { THROW_RELEASE_TICK } from './animations';
@@ -86,6 +113,9 @@ const blocks = new Set<Action>([
   'crouchBlockHeavy',
   'airBlock',
   'airBlockHeavy',
+  'blockRapid',
+  'crouchBlockRapid',
+  'airBlockRapid',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
 const reactions = new Set<Action>([
@@ -93,13 +123,19 @@ const reactions = new Set<Action>([
   'hitHeavy',
   'airHit',
   'airHitHeavy',
+  'hitRapid',
+  'airHitRapid',
+  'launchUp',
+  'launchAway',
   ...blocks,
 ]);
 const groundReactions: Partial<Record<Action, AnimatedAction>> = {
   airHit: 'hit',
   airHitHeavy: 'hitHeavy',
+  airHitRapid: 'hitRapid',
   airBlock: 'block',
   airBlockHeavy: 'blockHeavy',
+  airBlockRapid: 'blockRapid',
 };
 const protectedReactions = new Set<Action>([
   'grabbed',
@@ -118,6 +154,7 @@ export interface Fighter {
   action: Action;
   age: number;
   airAge: number;
+  hitStop: number;
   connected: boolean;
   airDrillStage: number;
   hits: number;
@@ -125,6 +162,7 @@ export interface Fighter {
   doubleJumped: boolean;
   airDashed: boolean;
   nextAttack: keyof typeof ATTACKS | null;
+  nextJump: boolean;
 }
 export interface Projectile {
   owner: number;
@@ -154,6 +192,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   action: 'idle',
   age: 0,
   airAge: 0,
+  hitStop: 0,
   connected: false,
   airDrillStage: 0,
   hits: 0,
@@ -161,9 +200,10 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   doubleJumped: false,
   airDashed: false,
   nextAttack: null,
+  nextJump: false,
 });
 const clampX = (x: number) =>
-  Math.max(FIGHTER_MARGIN, Math.min(WIDTH - FIGHTER_MARGIN, x));
+  Math.max(FIGHTER_MARGIN, Math.min(STAGE_WIDTH - FIGHTER_MARGIN, x));
 function gravity(f: Fighter) {
   f.x = clampX(f.x + f.vx);
   f.vy += f.gravity;
@@ -180,6 +220,16 @@ function launchJump(f: Fighter, double = false) {
   f.vy = -speed * SOURCE_VELOCITY_SCALE;
   f.gravity = JUMP_GRAVITY;
   f.airAge = 0;
+}
+
+function launchHitUpJump(f: Fighter) {
+  // Action 202 prepares for eight ticks, then follows the launched opponent.
+  if (f.action === 'hitUpJump' && f.age === 8) {
+    f.vx = f.facing * 320 * SOURCE_VELOCITY_SCALE;
+    f.vy = -1530 * SOURCE_VELOCITY_SCALE;
+    f.gravity = 42 * SOURCE_ACCELERATION_SCALE;
+    f.airAge = 0;
+  }
 }
 
 export class Match {
@@ -218,10 +268,23 @@ export class Match {
     return dash;
   }
 
+  get cameraX() {
+    // Authored player lock, including round endings. Stage bounds are recovered.
+    return Math.max(
+      0,
+      Math.min(STAGE_WIDTH - WIDTH, this.fighters[0].x - WIDTH / 2),
+    );
+  }
+
   get seconds() {
     return this.mode === 'practice'
       ? Infinity
       : Math.max(0, 60 - Math.floor(this.ticks / 100));
+  }
+
+  get cameraY() {
+    // Keep the court framed until the player rises above the vertical dead zone.
+    return Math.max(-HEIGHT, Math.min(0, this.fighters[0].y + 250));
   }
 
   get resultReady() {
@@ -235,8 +298,10 @@ export class Match {
     f.connected = false;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
+    f.nextJump = false;
     if (
-      dashes.has(action) ||
+      action === 'dash' ||
+      action === 'backdash' ||
       aerialDrills.has(action) ||
       ['grabbed', 'thrown', 'down'].includes(action)
     ) {
@@ -248,9 +313,13 @@ export class Match {
   private showResultPose(f: Fighter, index: number) {
     if (
       f.hp === 0 ||
+      f.hitStop > 0 ||
       f.y < 0 ||
       f.vy < 0 ||
       f.action === 'knockdown' ||
+      f.action === 'launchUp' ||
+      f.action === 'launchAway' ||
+      (f.action === 'hitUpJump' && f.age < 8) ||
       ((f.action === 'land' ||
         f.action === 'drillLand' ||
         f.action === 'getUp' ||
@@ -277,13 +346,37 @@ export class Match {
       this.action(f, 'getUp');
   }
 
-  private resolveThrows() {
+  private moveLaunch(f: Fighter) {
+    if (f.action !== 'launchUp' && f.action !== 'launchAway') return false;
+    const up = f.action === 'launchUp';
+    const launchTick = up ? 25 : 6;
+    // Victim actions 81/80 hold the impact pose before their motion command.
+    if (f.age === launchTick) {
+      f.vx = -f.facing * (up ? 160 : 600) * SOURCE_VELOCITY_SCALE;
+      f.vy = -(up ? 1700 : 1220) * SOURCE_VELOCITY_SCALE;
+      f.gravity = (up ? 60 : 90) * SOURCE_ACCELERATION_SCALE;
+      f.airAge = 0;
+    }
+    if (f.age >= launchTick) {
+      f.airAge++;
+      gravity(f);
+      if (f.y === 0) {
+        f.doubleJumped = f.airDashed = false;
+        this.action(f, 'knockdown');
+      }
+    }
+    return true;
+  }
+
+  private resolveThrows(frozen: boolean[]) {
     // Strikes resolve first; simultaneous grab attempts both miss.
     const attempts = this.fighters.filter((f, index) => {
       const target = this.fighters[1 - index];
       const distance = (target.x - f.x) * f.facing;
       return (
         f.action === 'grab' &&
+        !frozen[index] &&
+        f.hitStop === 0 &&
         f.age === THROW_STARTUP &&
         f.hp > 0 &&
         target.hp > 0 &&
@@ -351,15 +444,37 @@ export class Match {
     previous: Input,
     doubleTap: boolean,
   ) {
-    f.age++;
+    if (f.hitStop === 0) f.age++;
+    const followUp = followUps[f.action as keyof typeof followUps];
+    const followUpOpen =
+      followUp &&
+      isAttack(f.action) &&
+      f.age < animationDuration(f.action) + FOLLOW_UP_GRACE_TICKS;
+    if (followUpOpen) {
+      const control = f.action.startsWith('punch') ? 'punch' : 'kick';
+      if (input[control] && !previous[control]) f.nextAttack = followUp;
+    }
+    if (
+      (f.action === 'hitUp' || (f.action === 'hitUpRecover' && f.age < 25)) &&
+      input.jump &&
+      !previous.jump
+    )
+      f.nextJump = true;
+    if (f.hitStop > 0) {
+      f.hitStop--;
+      return;
+    }
     if (f.action === 'grabbed') return;
+    if (this.moveLaunch(f)) return;
+    launchHitUpJump(f);
+    if (f.action === 'hitUpJump' && f.age < 8) return;
     if (f.y < 0 || f.vy < 0) {
       f.airAge++;
       if (aerialDrills.has(f.action)) {
         if (f.action === 'airDrill' && f.age < animationDuration('airDrill'))
           f.vy = 0;
-        // Contact holds for eight ticks, then plays two moving transition ticks.
-        else if (f.action !== 'airDrillContact' || f.age >= 8) {
+        // Hit-stop is separate; the contact clip contains two transition ticks.
+        else {
           if (
             f.action !== 'airDrillContact' ||
             f.age >= animationDuration('airDrillContact')
@@ -372,12 +487,20 @@ export class Match {
         }
       } else if (f.action === 'doubleJump' && f.age <= 3) {
         if (f.age === 3) launchJump(f, true);
-      } else if (
-        (f.action === 'airDash' || f.action === 'airBackdash') &&
-        f.age < animationDuration(f.action)
-      )
-        f.vy = 0;
-      else gravity(f);
+      } else if (f.action === 'airDash' || f.action === 'airBackdash') {
+        const backwards = f.action === 'airBackdash';
+        // Actions 16/17 keep incoming motion until PCs 205/223 at age 3.
+        // PCs 211/227 restore gravity after 30/20 level ticks; flag 0x02
+        // retains horizontal velocity through recovery and action 7's fall.
+        if (f.age === 3) {
+          f.vx = f.facing * (backwards ? -800 : 800) * SOURCE_VELOCITY_SCALE;
+          f.vy = 0;
+          f.gravity = JUMP_GRAVITY;
+        }
+        if (f.age >= 3 && f.age < (backwards ? 23 : 33))
+          f.x = clampX(f.x + f.vx);
+        else gravity(f);
+      } else gravity(f);
       if (f.y === 0) {
         f.doubleJumped = false;
         f.airDashed = false;
@@ -408,6 +531,15 @@ export class Match {
       return;
     }
     if (f.action === 'doubleJump' && f.age < 3) return;
+    if (f.action === 'hitUpRecover') {
+      // Action 201 opens command 202 after its first five-tick display.
+      // Early Jump taps are buffered using the training mode's input policy.
+      if (f.age >= 5 && f.age < 25 && f.nextJump) {
+        this.action(f, 'hitUpJump');
+        return;
+      }
+      if (f.age < animationDuration('hitUpRecover')) return;
+    }
     if (aerialDrills.has(f.action)) {
       if (
         f.action !== 'airDrillSpin' &&
@@ -415,15 +547,6 @@ export class Match {
       )
         this.action(f, 'airDrillSpin');
       return;
-    }
-    const followUp = followUps[f.action as keyof typeof followUps];
-    const followUpOpen =
-      followUp &&
-      isAttack(f.action) &&
-      f.age < animationDuration(f.action) + FOLLOW_UP_GRACE_TICKS;
-    if (followUpOpen) {
-      const control = f.action.startsWith('punch') ? 'punch' : 'kick';
-      if (input[control] && !previous[control]) f.nextAttack = followUp;
     }
     if (
       f.action !== 'idle' &&
@@ -440,6 +563,14 @@ export class Match {
         f.x = clampX(
           f.x + f.facing * (f.age < 59 ? 900 : 100) * SOURCE_VELOCITY_SCALE,
         );
+      // Action 200: six accelerating ticks, then stop before the kick.
+      if (f.action === 'hitUp' && f.age >= 2 && f.age < 8)
+        f.x = clampX(
+          f.x +
+            f.facing *
+              (600 * SOURCE_VELOCITY_SCALE +
+                (f.age - 1) * 350 * SOURCE_ACCELERATION_SCALE),
+        );
       return;
     }
     if (f.nextAttack) {
@@ -454,22 +585,17 @@ export class Match {
         const startup = backwards ? 10 : 5;
         if (f.age < startup) return;
         if (f.age === startup) {
-          f.vy = backwards ? -4.5 : -3.5;
+          // PCs 169/182 set the whole hop; use the shared integrator thereafter.
+          f.vx = f.facing * (backwards ? -500 : 900) * SOURCE_VELOCITY_SCALE;
+          f.vy = (backwards ? -900 : -500) * SOURCE_VELOCITY_SCALE;
+          f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
           f.airAge = 0;
+          gravity(f);
         }
         // The source dash holds its final airborne pose until landing.
-        f.x = clampX(f.x + f.facing * (backwards ? -5 : 9));
         return;
       }
-      if (f.age < animationDuration(f.action)) {
-        const backwards = f.action === 'airBackdash';
-        f.x = clampX(f.x + f.facing * (backwards ? -4.2 : 6));
-        return;
-      }
-      if (f.y === 0) {
-        this.action(f, 'land');
-        return;
-      }
+      if (f.age < animationDuration(f.action)) return;
     }
     const airborne = f.y < 0 || f.vy < 0;
     const direction =
@@ -498,8 +624,11 @@ export class Match {
         return;
       }
     }
+    const directionalDash = airborne
+      ? direction !== 0 && !previous[direction === 1 ? 'right' : 'left']
+      : doubleTap;
     if (
-      ((input.dash && !previous.dash) || doubleTap) &&
+      ((input.dash && !previous.dash) || directionalDash) &&
       (!airborne || !f.airDashed)
     ) {
       const backwards = direction !== 0 && direction !== f.facing;
@@ -513,10 +642,7 @@ export class Match {
             ? 'backdash'
             : 'dash',
       );
-      if (airborne) {
-        f.airDashed = true;
-        f.vy = 0;
-      }
+      if (airborne) f.airDashed = true;
       return;
     }
     if (input.drill && !previous.drill) {
@@ -544,6 +670,10 @@ export class Match {
       );
       return;
     }
+    if (!airborne && input.hitUp && !previous.hitUp) {
+      this.action(f, 'hitUp', true);
+      return;
+    }
     if (input.kick && !previous.kick) {
       this.action(
         f,
@@ -566,8 +696,9 @@ export class Match {
     this.action(
       f,
       airborne
-        ? f.action === 'doubleJump' && f.age < animationDuration('doubleJump')
-          ? 'doubleJump'
+        ? (f.action === 'doubleJump' || f.action === 'hitUpJump') &&
+          f.age < animationDuration(f.action)
+          ? f.action
           : 'jump'
         : direction
           ? direction === f.facing
@@ -584,8 +715,38 @@ export class Match {
     );
     if (this.winner) {
       this.endingTicks++;
+      let koStop = 0;
       this.fighters.forEach((f, index) => {
+        if (f.hitStop > 0) {
+          f.hitStop--;
+          return;
+        }
         f.age++;
+        if (f.action === 'down') {
+          // Action 60: PC 611 holds both fighters for 40 ticks. The four
+          // opening displays total 14 action ticks, then PC 617 launches.
+          if (f.age === 5) koStop += 40;
+          if (f.age === 14) {
+            f.vx = -f.facing * 500 * SOURCE_VELOCITY_SCALE;
+            f.vy = -1520 * SOURCE_VELOCITY_SCALE;
+            f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
+            f.airAge = 0;
+          }
+          if (f.age >= 14) {
+            f.airAge++;
+            gravity(f);
+            if (f.y === 0) this.action(f, 'koLand');
+          }
+          return;
+        }
+        if (f.action === 'koLand') {
+          // Action 62, PCs 641–644: ten ticks of backward slide, then rest.
+          if (f.age <= 10)
+            f.x = clampX(f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+          return;
+        }
+        if (this.moveLaunch(f)) return;
+        launchHitUpJump(f);
         if (f.y < 0 || f.vy < 0) {
           f.airAge++;
           gravity(f);
@@ -596,10 +757,13 @@ export class Match {
         this.recoverKnockdown(f);
         this.showResultPose(f, index);
       });
+      // Apply together after frame entry so a double KO is iteration-independent.
+      for (const f of this.fighters) f.hitStop += koStop;
       return;
     }
     this.ticks++;
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
+    const frozen = this.fighters.map((f) => f.hitStop > 0);
     this.fighters.forEach((f, i) => {
       this.move(
         f,
@@ -619,10 +783,14 @@ export class Match {
       p.age++;
       if (p.hit) return p.age < animationDuration('axeHit');
       p.x += p.facing * 7;
-      return p.age < 180 && p.x >= -80 && p.x <= WIDTH + 80;
+      return p.age < 180 && p.x >= -80 && p.x <= STAGE_WIDTH + 80;
     });
     this.fighters.forEach((f, owner) => {
-      if (f.action === 'axeThrow' && f.age === AXE_RELEASE_TICK)
+      if (
+        !frozen[owner] &&
+        f.action === 'axeThrow' &&
+        f.age === AXE_RELEASE_TICK
+      )
         this.projectiles.push({
           owner,
           x: f.x + f.facing * 140,
@@ -645,14 +813,18 @@ export class Match {
       const sign = a.x <= b.x ? 1 : -1;
       const mid = Math.max(
         FIGHTER_MARGIN + 45,
-        Math.min(WIDTH - FIGHTER_MARGIN - 45, (a.x + b.x) / 2),
+        Math.min(STAGE_WIDTH - FIGHTER_MARGIN - 45, (a.x + b.x) / 2),
       );
-      a.x = mid - sign * 45;
-      b.x = mid + sign * 45;
+      if (frozen[0] && !frozen[1]) b.x = clampX(a.x + sign * 90);
+      else if (frozen[1] && !frozen[0]) a.x = clampX(b.x - sign * 90);
+      else if (!frozen[0] && !frozen[1]) {
+        a.x = mid - sign * 45;
+        b.x = mid + sign * 45;
+      }
     }
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
-      if (!isAttack(f.action)) return [];
+      if (frozen[i] || !isAttack(f.action)) return [];
       const attack = ATTACKS[f.action];
       const cycle = multiHits[f.action];
       const airDrill = f.action === 'airDrillSpin';
@@ -669,6 +841,30 @@ export class Match {
           (finisher ? attack.damage % count : 0);
       const target = this.fighters[1 - i];
       if (protectedReactions.has(target.action)) return [];
+      const blocked = guards.has(target.action) && target.facing !== f.facing;
+      const response = hitResponses[f.action];
+      const launch: 'launchUp' | 'launchAway' | null =
+        f.action === 'hitUp' && !blocked
+          ? target.y < 0 || target.vy < 0
+            ? 'launchAway'
+            : 'launchUp'
+          : null;
+      const heavy =
+        response.kind === 'heavy' ||
+        (f.action === 'punch2' && finisher && !blocked);
+      const hitStop = airDrill
+        ? 0
+        : blocked
+          ? response.kind === 'rapid'
+            ? 0
+            : 10
+          : launch === 'launchUp'
+            ? 10
+            : f.action === 'drill' && finisher
+              ? 13
+              : f.action === 'punch2' && finisher
+                ? 15
+                : response.stop;
       const distance = (target.x - f.x) * f.facing;
       return !f.connected &&
         f.age >= attack.startup &&
@@ -683,8 +879,11 @@ export class Match {
               target,
               damage,
               finisher,
-              heavy: airDrill ? damage >= 13 : finisher && attack.damage >= 13,
+              heavy,
+              rapid: response.kind === 'rapid',
+              hitStop,
               airDrill,
+              launch,
               facing: f.facing,
               x: target.x - f.facing * 42,
               y:
@@ -695,7 +894,7 @@ export class Match {
                   ? 75
                   : 145),
               projectile: null as Projectile | null,
-              blocked: guards.has(target.action) && target.facing !== f.facing,
+              blocked,
             },
           ]
         : [];
@@ -715,7 +914,16 @@ export class Match {
           damage: 16,
           finisher: true,
           heavy: true,
+          rapid: false,
+          // Action 227 selects FB on ground (no stop), strong hit in air.
+          hitStop:
+            guards.has(target.action) && target.facing !== projectile.facing
+              ? 10
+              : target.y < 0 || target.vy < 0
+                ? 15
+                : 0,
           airDrill: false,
+          launch: null,
           facing: projectile.facing,
           x: target.x - projectile.facing * 42,
           y: GROUND + projectile.y,
@@ -730,7 +938,9 @@ export class Match {
       damage: strength,
       finisher,
       heavy,
-      airDrill,
+      rapid,
+      hitStop,
+      launch,
       facing,
       x,
       y,
@@ -744,19 +954,27 @@ export class Match {
       const damage = blocked ? 0 : strength;
       target.hp = Math.max(0, target.hp - damage);
       f.damage += damage;
+      f.hitStop += launch === 'launchUp' ? 33 : hitStop;
+      target.hitStop += hitStop;
       const airborne = target.y < 0 || target.vy < 0;
       if (blocked) {
-        const reaction = airborne
-          ? heavy
-            ? 'airBlockHeavy'
-            : 'airBlock'
-          : target.action.startsWith('crouch')
+        const reaction = rapid
+          ? airborne
+            ? 'airBlockRapid'
+            : target.action.startsWith('crouch')
+              ? 'crouchBlockRapid'
+              : 'blockRapid'
+          : airborne
             ? heavy
-              ? 'crouchBlockHeavy'
-              : 'crouchBlock'
-            : heavy
-              ? 'blockHeavy'
-              : 'block';
+              ? 'airBlockHeavy'
+              : 'airBlock'
+            : target.action.startsWith('crouch')
+              ? heavy
+                ? 'crouchBlockHeavy'
+                : 'crouchBlock'
+              : heavy
+                ? 'blockHeavy'
+                : 'block';
         this.action(target, reaction, true);
       } else {
         f.hits++;
@@ -764,18 +982,29 @@ export class Match {
           target,
           target.hp === 0
             ? 'down'
-            : airborne
-              ? heavy
-                ? 'airHitHeavy'
-                : 'airHit'
-              : heavy
-                ? 'hitHeavy'
-                : 'hit',
+            : launch
+              ? launch
+              : rapid
+                ? airborne
+                  ? 'airHitRapid'
+                  : 'hitRapid'
+                : airborne
+                  ? heavy
+                    ? 'airHitHeavy'
+                    : 'airHit'
+                  : heavy
+                    ? 'hitHeavy'
+                    : 'hit',
           true,
         );
-        if (target.hp === 0) target.vy = -3.5;
+        if (target.hp === 0 || launch) {
+          // Launch/KO actions stop incoming motion before their impact hold.
+          target.vx = target.vy = 0;
+          target.facing = facing === 1 ? -1 : 1;
+        }
       }
-      if (finisher) target.x = clampX(target.x + facing * (blocked ? 8 : 22));
+      if (finisher && target.hp > 0 && !launch)
+        target.x = clampX(target.x + facing * (blocked ? 8 : 22));
       this.impacts.push({
         x,
         y,
@@ -785,17 +1014,31 @@ export class Match {
         facing,
         effect: blocked ? 'guardSpark' : 'hitSpark',
       });
-      // A simultaneous strike may already have interrupted this attacker.
+    }
+    // Run contact branches after all hits: an interrupted aerial drill must not
+    // apply its own stop or restart, regardless of fighter update order.
+    for (const { f, target, airDrill, blocked, launch } of contacts) {
+      if (launch && f.action === 'hitUp' && target.hp > 0) {
+        const nextJump = f.nextJump;
+        this.action(f, 'hitUpRecover');
+        f.nextJump = nextJump;
+      }
       if (airDrill && f.action === 'airDrillSpin') {
+        f.hitStop += 8;
+        target.hitStop += blocked ? 3 : 9;
         f.airDrillStage = Math.min(3, f.airDrillStage + 1);
         this.action(f, 'airDrillContact');
       }
     }
-    this.resolveThrows();
+    this.resolveThrows(frozen);
     if (a.hp === 0 || b.hp === 0 || this.seconds === 0) {
       this.projectiles = [];
       this.winner =
         a.hp === b.hp ? 'draw' : a.hp > b.hp ? 'player' : 'opponent';
+      this.fighters.forEach((f, index) => {
+        // KO action 60, PC 607 adds ten stop ticks to the other fighter.
+        if (f.action === 'down') this.fighters[1 - index].hitStop += 10;
+      });
       this.fighters.forEach((f, index) => {
         if (f.action === 'grabbed') this.action(f, 'airHit');
         this.showResultPose(f, index);

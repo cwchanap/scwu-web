@@ -45,6 +45,7 @@ const keyMap: Record<string, Control> = {
   KeyS: 'crouch',
   KeyJ: 'punch',
   KeyK: 'kick',
+  KeyH: 'hitUp',
   KeyL: 'guard',
   ShiftLeft: 'dash',
   ShiftRight: 'dash',
@@ -88,10 +89,13 @@ export class TrainingScene extends Phaser.Scene {
 
   create() {
     if (this.error) return;
-    this.add
-      .image(0, HEIGHT - 960 * 1.5, 'court')
-      .setOrigin(0)
-      .setScale(1.5);
+    // Mirror the single-screen court to extend it without a hard tile seam.
+    for (const x of [0, WIDTH])
+      this.add
+        .image(x, HEIGHT - 960 * 1.5, 'court')
+        .setOrigin(0)
+        .setScale(1.5)
+        .setFlipX(x !== 0);
     for (const f of this.match.fighters) {
       this.shadows.push(
         this.add.ellipse(f.x, GROUND - 1, 94, 13, 0x171311, 0.3),
@@ -210,15 +214,22 @@ export class TrainingScene extends Phaser.Scene {
             ...[...this.held].map((key) => keyMap[key]),
           ]);
           this.pressed.clear();
+          const frozen = this.match.fighters.map((f) => f.hitStop > 0);
           this.match.step(
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
           this.idle.forEach((vm, i) => {
-            if (this.match.fighters[i].action !== 'idle') return;
+            if (
+              frozen[i] ||
+              this.match.fighters[i].action !== 'idle' ||
+              this.match.fighters[i].hitStop > 0
+            )
+              return;
             if (vm.ended) this.idle[i] = new StandingVM(data.idle, vm.seed);
             this.idle[i].tick();
           });
         });
+      this.cameras.main.setScroll(this.match.cameraX, this.match.cameraY);
       this.sprites.forEach((sprite, i) => {
         const f = this.match.fighters[i];
         const pose = this.pose(i);

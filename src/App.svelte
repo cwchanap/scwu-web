@@ -32,6 +32,7 @@
     { control: 'drill', label: 'Drill punch', symbol: 'U' },
     { control: 'axe', label: 'Axe throw', symbol: 'I' },
     { control: 'throw', label: 'Throw', symbol: 'O' },
+    { control: 'hitUp', label: 'Hit Up', symbol: 'H' },
   ];
 
   onMount(() => {
@@ -114,7 +115,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, L to guard, Shift or double-tap left/right to dash, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -210,6 +211,7 @@
           'drill',
           'axe',
           'throw',
+          'hitUp',
         ].includes(item.control)}
         aria-label={item.label}
         disabled={!status.ready || status.paused || !!status.winner}
@@ -238,7 +240,9 @@
       ><kbd>K</kbd> Kick</span
     ><span><kbd>L</kbd> Guard</span><span><kbd>Shift</kbd> Dash</span><span
       ><kbd>U</kbd> Drill</span
-    ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span>
+    ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span><span
+      ><kbd>H</kbd> Hit Up</span
+    >
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -261,9 +265,14 @@
         <p>
           Hold left or right when jumping to travel in that direction; releasing
           it keeps your momentum. Tap jump again in the air for a double jump,
-          choosing a new direction. Double-tap left or right to dash, including
-          on touch. You can also press <kbd>Shift</kbd> or the Dash button for a forward
-          hop, or hold away to backdash. You can dash once in the air before landing.
+          choosing a new direction. Double-tap left or right for a ground dash;
+          in the air, tap either direction once to dash that way. This also
+          works on touch. Holding a direction through takeoff keeps your normal
+          jump; release and press again for an air dash. You can also press <kbd
+            >Shift</kbd
+          >
+          or the Dash button to dash forward, or hold away to backdash. You can dash
+          once in the air before landing.
         </p>
         <p>
           Press <kbd>U</kbd> for a six-hit Drill Punch on the ground, or an
@@ -272,6 +281,12 @@
           recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
           Only one axe per fighter can be out at a time. These basic specials do not
           spend super stock.
+        </p>
+        <p>
+          Press <kbd>H</kbd> or Hit Up on the ground for an upward kick. On a hit,
+          tap Jump during the impact pause or early recovery to chase the opponent
+          into the air, then use an aerial attack. Early Jump taps are remembered;
+          a blocked or missed kick cannot trigger the chase.
         </p>
         <p>
           Press <kbd>O</kbd> close to a grounded opponent to grab and throw them,

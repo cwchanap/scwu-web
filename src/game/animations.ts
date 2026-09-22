@@ -61,6 +61,12 @@ export const animations = {
   punch2: clip(data.clips.punch2),
   punch3: clip(data.clips.punch3, false, [5, 2, 8, 6, 8, 5, 15, 8]),
   kick2: clip(data.clips.kick2),
+  hitUp: clip(data.clips.hitUp),
+  hitUpRecover: clip(data.clips.hitUpRecover),
+  hitUpJump: clip(data.clips.hitUpJump, false, [8, 13, 5, 15, 1]),
+  // The long final displays wait for landing, rather than ending the reaction.
+  launchUp: clip(data.clips.launchUp, false, [25, 30, 10, 1]),
+  launchAway: clip(data.clips.launchAway, false, [2, 2, 2, 25, 1]),
   kick3: clip([
     ...data.clips.kick3.slice(0, 3),
     ...Array.from({ length: 8 }, () => data.clips.kick3Repeat).flat(),
@@ -70,9 +76,8 @@ export const animations = {
   airDrill: clip(data.clips.airDrill.slice(0, 3)),
   // Actions 209–211 loop these poses until contact or landing.
   airDrillSpin: clip(data.clips.airDrillSpin.slice(0, 2), true),
-  // ponytail: a local contact pause includes hit-stop and transition time;
-  // use engine-wide hit-stop only when the original combat VM is reconstructed.
-  airDrillContact: clip(data.clips.airDrillSpin.slice(0, 1), false, [10]),
+  // Actions 209–211: eight ticks of hit-stop, then this two-tick transition.
+  airDrillContact: clip(data.clips.airDrillSpin.slice(0, 1), false, [2]),
   drillLand: clip(data.clips.drillLand),
   axeThrow: clip(data.clips.axeThrow),
   axeFlight: clip(data.clips.axeFlight, true),
@@ -123,15 +128,22 @@ export const animations = {
   blockHeavy: clip(data.clips.blockHeavy),
   crouchBlockHeavy: clip(data.clips.crouchBlockHeavy),
   airBlockHeavy: clip(data.clips.airBlockHeavy),
+  blockRapid: clip(data.clips.blockRapid),
+  crouchBlockRapid: clip(data.clips.crouchBlockRapid),
+  airBlockRapid: clip(data.clips.airBlockRapid),
   hit: clip(data.clips.hit),
   hitHeavy: clip(data.clips.hitHeavy),
   airHit: clip(data.clips.airHit),
   airHitHeavy: clip(data.clips.airHitHeavy),
+  hitRapid: clip(data.clips.hitRapid),
+  airHitRapid: clip(data.clips.airHitRapid),
+  // Action 60's last display waits for landing; action 62 then slides and holds.
   down: clip(
-    [...data.clips.ko, ...data.clips.down],
+    data.clips.ko,
     false,
-    [5, 5, 2, 2, 12, 10, 10, 50],
+    data.clips.ko.map((frame) => frame.duration || 1),
   ),
+  koLand: clip(data.clips.down),
   win: clip(data.clips.win, false, [10, 10, 1]),
   // The source loss action is a blank screen. Use the recovered seated draw pose.
   lose: clip(data.clips.draw),

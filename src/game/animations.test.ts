@@ -85,6 +85,32 @@ describe('selected core animation assets', () => {
     );
   });
 
+  it('aligns Hit Up strike, recovery, chase and launch poses with their source boundaries', () => {
+    expect(
+      [0, 14, 15, 24, 25, 50, 65].map(
+        (age) => animationFrame('hitUp', age).image,
+      ),
+    ).toEqual([112, 115, 117, 117, 116, 114, 113]);
+    expect(animationDuration('hitUp')).toBe(75);
+    expect(
+      [0, 5, 25, 40].map((age) => animationFrame('hitUpRecover', age).image),
+    ).toEqual([117, 116, 114, 113]);
+    expect(animationDuration('hitUpRecover')).toBe(50);
+    expect(
+      [0, 8, 21, 26, 41].map((age) => animationFrame('hitUpJump', age).image),
+    ).toEqual([12, 13, 14, 15, 16]);
+    expect(animationFrame('launchUp', 24).dy).toBe(-10);
+    expect(animationFrame('launchUp', 25).dy).toBe(-10);
+    expect(animationFrame('launchUp', 55).image).toBe(60);
+    expect(animationFrame('launchUp', 10000)).toMatchObject({
+      image: 102,
+      flip_y: true,
+    });
+    expect(animationFrame('launchAway', 5).image).toBe(52);
+    expect(animationFrame('launchAway', 6).image).toBe(60);
+    expect(animationFrame('launchAway', 10000).image).toBe(61);
+  });
+
   it('plays all eight third-kick strike and recovery pairs before ending', () => {
     for (const age of [15, 21, 27, 33, 39, 45, 51, 57]) {
       expect(animationFrame('kick3', age).image).toBe(82);
@@ -127,7 +153,14 @@ describe('selected core animation assets', () => {
     );
     expect(animationFrame('win', 20).image).toBe(366);
     expect(animationFrame('win', 10000).image).toBe(366);
-    expect(animationFrame('down', 10000).image).toBe(63);
+    // Action 60 holds its falling pose until action 62 is entered on landing.
+    expect(animationFrame('down', 13).image).toBe(52);
+    expect(animationFrame('down', 14).image).toBe(60);
+    expect(animationFrame('down', 38).image).toBe(60);
+    expect(animationFrame('down', 10000).image).toBe(61);
+    expect(animationFrame('koLand', 0).image).toBe(62);
+    expect(animationFrame('koLand', 10).image).toBe(63);
+    expect(animationFrame('koLand', 10000).image).toBe(63);
     for (const action of Object.keys(
       animations,
     ) as (keyof typeof animations)[]) {
