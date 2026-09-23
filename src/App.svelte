@@ -33,6 +33,7 @@
     { control: 'axe', label: 'Axe throw', symbol: 'I' },
     { control: 'throw', label: 'Throw', symbol: 'O' },
     { control: 'hitUp', label: 'Hit Up', symbol: 'H' },
+    { control: 'iori', label: 'IORI', symbol: 'F' },
   ];
 
   onMount(() => {
@@ -115,7 +116,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -212,6 +213,7 @@
           'axe',
           'throw',
           'hitUp',
+          'iori',
         ].includes(item.control)}
         aria-label={item.label}
         disabled={!status.ready || status.paused || !!status.winner}
@@ -242,7 +244,7 @@
       ><kbd>U</kbd> Drill</span
     ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span><span
       ><kbd>H</kbd> Hit Up</span
-    >
+    ><span><kbd>F</kbd> IORI</span>
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -287,6 +289,12 @@
           tap Jump during the impact pause or early recovery to chase the opponent
           into the air, then use an aerial attack. Early Jump taps are remembered;
           a blocked or missed kick cannot trigger the chase.
+        </p>
+        <p>
+          Press <kbd>F</kbd> or IORI on the ground for an advancing strike. Tap again
+          to queue the second strike, then once more for the knockdown finisher. Early
+          taps are remembered; each follow-up begins after the current strike. Holding
+          the button performs only one stage.
         </p>
         <p>
           Press <kbd>O</kbd> close to a grounded opponent to grab and throw them,

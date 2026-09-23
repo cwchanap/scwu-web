@@ -46,6 +46,7 @@ const keyMap: Record<string, Control> = {
   KeyJ: 'punch',
   KeyK: 'kick',
   KeyH: 'hitUp',
+  KeyF: 'iori',
   KeyL: 'guard',
   ShiftLeft: 'dash',
   ShiftRight: 'dash',

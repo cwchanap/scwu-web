@@ -208,6 +208,264 @@ describe('Hit Up launcher', () => {
   });
 });
 
+describe('IORI chain', () => {
+  it.each([1, -1] as const)(
+    'plays all three strikes and the knockdown facing %i',
+    (facing) => {
+      for (const blocked of [false, true]) {
+        const match = new Match();
+        const [f, target] = match.fighters;
+        f.x = facing === 1 ? 440 : 1480;
+        target.x = f.x + facing * 220;
+        const contacts: number[] = [];
+        const actions = new Set<string>();
+        for (let tick = 0; tick < 320; tick++) {
+          match.step(
+            {
+              iori:
+                tick === 0 ||
+                ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+            },
+            { guard: blocked },
+          );
+          actions.add(f.action);
+          if (match.impacts.some((impact) => impact.age === 0))
+            contacts.push(match.ticks);
+        }
+        expect(actions).toEqual(new Set(['iori', 'iori2', 'iori3', 'idle']));
+        expect(contacts).toEqual(blocked ? [22, 63, 102] : [22, 68, 112]);
+        expect(f).toMatchObject({
+          hits: blocked ? 0 : 3,
+          damage: blocked ? 0 : 38,
+          nextAttack: null,
+        });
+        expect(target).toMatchObject({
+          hp: blocked ? 100 : 62,
+          y: 0,
+          action: blocked ? 'guard' : 'idle',
+        });
+      }
+    },
+  );
+
+  it.each([1, -1] as const)(
+    'preserves the three source lunge distances on whiff facing %i',
+    (facing) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      f.x = facing === 1 ? 185 : 1735;
+      target.x = facing === 1 ? 1735 : 185;
+      const start = f.x;
+      const stages: number[] = [];
+      let previous = f.action;
+      for (let tick = 0; tick < 140; tick++) {
+        match.step({
+          iori:
+            tick === 0 ||
+            ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+        });
+        if (
+          f.action !== previous &&
+          ['iori2', 'iori3', 'idle'].includes(f.action)
+        )
+          stages.push((f.x - start) * facing);
+        previous = f.action;
+      }
+      expect(stages[0]).toBeCloseTo(95.947266, 5);
+      expect(stages[1] - stages[0]).toBeCloseTo(157.413483, 5);
+      expect(stages[2] - stages[1]).toBeCloseTo(155.914307, 5);
+      expect(f.action).toBe('idle');
+      expect(f.hits).toBe(0);
+      expect(match.impacts).toHaveLength(0);
+    },
+  );
+
+  it('buffers during hit-stop and opens the next stage only after the active display', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    f.x = 440;
+    ticks(match, 22, { iori: true });
+    expect(f).toMatchObject({ action: 'iori', age: 21, hitStop: 15 });
+    const positions = [f.x, target.x];
+    match.step();
+    match.step({ iori: true });
+    ticks(match, 13);
+    expect(f).toMatchObject({ age: 21, hitStop: 0, nextAttack: 'iori2' });
+    expect([f.x, target.x]).toEqual(positions);
+    ticks(match, 7);
+    expect(f).toMatchObject({ action: 'iori', age: 28 });
+    match.step();
+    expect(f).toMatchObject({ action: 'iori2', age: 0, nextAttack: null });
+  });
+
+  it('accepts late recovery input, but a held button never chains or repeats', () => {
+    for (const late of [false, true]) {
+      const match = new Match();
+      match.fighters[1].x = 1700;
+      ticks(match, 58, { iori: true });
+      expect(match.fighters[0]).toMatchObject({ action: 'iori', age: 57 });
+      if (late) {
+        match.step();
+        // The finite recovery has ended: this is a new stage one, not stage two.
+        match.step({ iori: true });
+        expect(match.fighters[0]).toMatchObject({ action: 'iori', age: 0 });
+      } else {
+        ticks(match, 100, { iori: true });
+        expect(match.fighters[0]).toMatchObject({
+          action: 'idle',
+          nextAttack: null,
+        });
+      }
+    }
+    const late = new Match();
+    late.fighters[1].x = 1700;
+    late.step({ iori: true });
+    ticks(late, 57);
+    late.step({ iori: true });
+    expect(late.fighters[0]).toMatchObject({ action: 'iori2', age: 0 });
+  });
+
+  it.each([1, -1] as const)(
+    'pulls the second-hit victim inward after its hold facing %i',
+    (facing) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      Object.assign(f, { x: 960, facing, action: 'iori2', age: 22 });
+      target.x = f.x + facing * 200;
+      match.step();
+      expect(target).toMatchObject({ action: 'hitPull', hitStop: 15 });
+      const start = target.x;
+      ticks(match, 23);
+      expect(target).toMatchObject({ age: 8, x: start });
+      match.step();
+      expect((target.x - start) * facing).toBeCloseTo(-9.654694, 5);
+    },
+  );
+
+  it('slams an airborne finisher into a bounce, floor recovery, and get-up', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    Object.assign(f, { x: 530, action: 'iori3', age: 20 });
+    Object.assign(target, {
+      action: 'jump',
+      y: -80,
+      vy: 0,
+      gravity: 0,
+      airDashed: true,
+    });
+    match.step();
+    expect(target).toMatchObject({ action: 'launchDown', hitStop: 15, hp: 84 });
+    ticks(match, 23);
+    expect(target).toMatchObject({ age: 8, y: -80, vx: 0, vy: 0 });
+    match.step();
+    expect(target.y).toBeCloseTo(-49.116974, 5);
+    ticks(match, 2);
+    expect(target).toMatchObject({
+      action: 'slamBounce',
+      y: 0,
+      airDashed: false,
+    });
+    ticks(match, 9);
+    expect(target.y).toBe(0);
+    match.step();
+    expect(target.y).toBeCloseTo(-9.864578, 5);
+    const seen = new Set<string>();
+    for (let tick = 0; tick < 180; tick++) {
+      seen.add(target.action);
+      match.step({}, { jump: true, punch: true });
+    }
+    expect(seen).toEqual(
+      new Set(['slamBounce', 'bounceDown', 'getUp', 'idle']),
+    );
+    expect(target).toMatchObject({ y: 0, hp: 84 });
+  });
+
+  it.each([false, true])(
+    'clears buffered follow-ups on interruption (trade=%s)',
+    (trade) => {
+      const match = new Match();
+      const f = match.fighters[0];
+      f.x = 530;
+      for (let tick = 0; tick < 23; tick++)
+        match.step(
+          { iori: tick === 0 || tick === 2 },
+          { kick: tick === (trade ? 11 : 0) },
+        );
+      expect(f.action).toBe('hit');
+      expect(f.nextAttack).toBeNull();
+      expect(f.hits).toBe(trade ? 1 : 0);
+      ticks(match, 160);
+      expect(f.action).toBe('idle');
+    },
+  );
+
+  it('rejects airborne starts and uses the normal KO path on a lethal finisher', () => {
+    const match = new Match();
+    match.step({ jump: true });
+    ticks(match, 20);
+    match.step({ iori: true });
+    expect(match.fighters[0].action).toBe('jump');
+    const ko = new Match();
+    Object.assign(ko.fighters[0], { x: 530, action: 'iori3', age: 20 });
+    ko.fighters[1].hp = 16;
+    ko.step();
+    expect(ko.fighters[1]).toMatchObject({ action: 'down', hp: 0 });
+    ticks(ko, ROUND_END_TICKS);
+    expect(ko.fighters[1]).toMatchObject({ action: 'koLand', y: 0 });
+  });
+
+  it.each([1, -1] as const)(
+    'keeps the chain visible and bounded at the stage wall facing %i',
+    (facing) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = facing === 1 ? STAGE_WIDTH - FIGHTER_MARGIN : FIGHTER_MARGIN;
+      f.x = target.x - facing * 130;
+      for (let tick = 0; tick < 220; tick++) {
+        match.step({
+          iori:
+            tick === 0 ||
+            ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+        });
+        expect(f.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
+        expect(f.x).toBeLessThanOrEqual(STAGE_WIDTH - FIGHTER_MARGIN);
+        if (f.action !== 'iori' && f.action !== 'iori2' && f.action !== 'iori3')
+          continue;
+        const pose = animationFrame(f.action, f.age);
+        const p = placement(
+          pose,
+          pose.width,
+          pose.height,
+          (f.x - match.cameraX) / 1.5,
+          0,
+          f.facing === -1,
+        );
+        expect(p.left * 1.5).toBeGreaterThanOrEqual(0);
+        expect((p.left + pose.width) * 1.5).toBeLessThanOrEqual(WIDTH);
+      }
+      expect(f.hits).toBe(3);
+    },
+  );
+
+  it('finishes the airborne slam and bounce recovery after timeout', () => {
+    const match = new Match('cpu');
+    Object.assign(match.fighters[0], { x: 530, action: 'iori3', age: 20 });
+    Object.assign(match.fighters[1], {
+      action: 'jump',
+      y: -80,
+      vy: 0,
+      gravity: 0,
+    });
+    match.ticks = 5999;
+    match.step({}, {});
+    expect(match.winner).toBe('player');
+    expect(match.fighters[1].action).toBe('launchDown');
+    ticks(match, ROUND_END_TICKS);
+    expect(match.fighters[1]).toMatchObject({ action: 'lose', y: 0 });
+    expect(match.resultReady).toBe(true);
+  });
+});
+
 describe('prototype training rules', () => {
   it.each([1, -1] as const)(
     'plays the catching attack before releasing the opponent facing %i',

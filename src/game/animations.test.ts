@@ -85,6 +85,35 @@ describe('selected core animation assets', () => {
     );
   });
 
+  it('aligns IORI strikes and recoveries with the source displays', () => {
+    expect(
+      [0, 13, 21, 29, 49, 54].map((age) => animationFrame('iori', age).image),
+    ).toEqual([12, 432, 433, 434, 435, 321]);
+    expect(
+      [0, 8, 23, 31, 51, 56].map((age) => animationFrame('iori2', age).image),
+    ).toEqual([435, 437, 439, 440, 441, 321]);
+    expect(
+      [0, 8, 21, 26, 34, 61, 66].map(
+        (age) => animationFrame('iori3', age).image,
+      ),
+    ).toEqual([440, 443, 445, 446, 447, 436, 31]);
+    expect(
+      ['iori', 'iori2', 'iori3'].map((action) =>
+        animationDuration(action as 'iori' | 'iori2' | 'iori3'),
+      ),
+    ).toEqual([59, 61, 71]);
+    expect(animationFrame('launchDown', 8).image).toBe(60);
+    expect(animationFrame('launchDown', 1000)).toMatchObject({
+      image: 52,
+      flip_x: true,
+      flip_y: true,
+    });
+    expect(animationFrame('slamBounce', 9).image).toBe(62);
+    expect(animationFrame('slamBounce', 10).image).toBe(61);
+    expect(animationFrame('slamBounce', 1000).image).toBe(60);
+    expect(animationDuration('bounceDown')).toBe(90);
+  });
+
   it('aligns Hit Up strike, recovery, chase and launch poses with their source boundaries', () => {
     expect(
       [0, 14, 15, 24, 25, 50, 65].map(

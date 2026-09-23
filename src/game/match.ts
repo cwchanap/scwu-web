@@ -10,6 +10,7 @@ export type Control =
   | 'punch'
   | 'kick'
   | 'hitUp'
+  | 'iori'
   | 'guard'
   | 'dash'
   | 'drill'
@@ -37,6 +38,9 @@ export const ATTACKS = {
   punch3: { startup: 29, active: 20, range: 235, damage: 16 },
   kick2: { startup: 13, active: 16, range: 205, damage: 14 },
   hitUp: { startup: 15, active: 10, range: 165, damage: 15 },
+  iori: { startup: 21, active: 8, range: 180, damage: 10 },
+  iori2: { startup: 23, active: 8, range: 220, damage: 12 },
+  iori3: { startup: 21, active: 5, range: 195, damage: 16 },
   kick3: { startup: 15, active: 48, range: 225, damage: 17 },
   drill: { startup: 23, active: 36, range: 310, damage: 18 },
   // The short diagonal drill reaches ~125px, plus the opponent's ~55px body.
@@ -58,8 +62,8 @@ const multiHits: Partial<
 // Ryuko opcode 0x17 selects the victim response; its opcode 0x1a adds
 // hit-stop to BOTH fighters. These are contact pauses, not active-frame gaps.
 // SCWU.KGT's base hit/guard pause is zero. See README's recovered timing table.
-// ponytail: other attacks retain MVP knockback; only Hit Up executes the
-// recovered launch responses until their callers are reconstructed too.
+// ponytail: other attacks retain MVP knockback; Hit Up and IORI execute the
+// selected response motion until the remaining callers are reconstructed too.
 const hitResponses = {
   punch: { stop: 10, kind: 'light' },
   kick: { stop: 10, kind: 'light' },
@@ -71,6 +75,9 @@ const hitResponses = {
   punch3: { stop: 15, kind: 'heavy' },
   kick2: { stop: 15, kind: 'heavy' },
   hitUp: { stop: 13, kind: 'heavy' },
+  iori: { stop: 15, kind: 'heavy' },
+  iori2: { stop: 15, kind: 'heavy' },
+  iori3: { stop: 13, kind: 'heavy' },
   kick3: { stop: 0, kind: 'rapid' },
   drill: { stop: 15, kind: 'heavy' },
   // Aerial drill pauses are applied by the attacker's contact branch instead.
@@ -82,6 +89,8 @@ const followUps = {
   punch2: 'punch3',
   kick: 'kick2',
   kick2: 'kick3',
+  iori: 'iori2',
+  iori2: 'iori3',
 } as const;
 const FOLLOW_UP_GRACE_TICKS = 15;
 const dashes = new Set<Action>(['dash', 'backdash', 'airDash', 'airBackdash']);
@@ -97,6 +106,19 @@ const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
 // Opcode 1 acceleration uses floor(0x3c0000 / 100²) in the same 16.16 units.
 const SOURCE_ACCELERATION_SCALE = (393 / 65536) * 1.5;
 const JUMP_GRAVITY = 80 * SOURCE_ACCELERATION_SCALE;
+// Source actions 75/121/159/161: nine impact ticks, then 25/23 moving ticks.
+const reactionSlides = {
+  hitSlide: { velocity: -650, acceleration: 10 },
+  hitPull: { velocity: 650, acceleration: -10 },
+  blockStop: { velocity: -250, acceleration: 8 },
+  crouchBlockStop: { velocity: -250, acceleration: 8 },
+};
+const launchMotion = {
+  launchUp: { tick: 25, vx: -160, vy: -1700, gravity: 60 },
+  launchAway: { tick: 6, vx: -600, vy: -1220, gravity: 90 },
+  launchDown: { tick: 9, vx: -500, vy: 2000, gravity: 100 },
+  slamBounce: { tick: 10, vx: -400, vy: -700, gravity: 70 },
+};
 const DOUBLE_TAP_TICKS = 20;
 export const AXE_RELEASE_TICK = 16;
 export { THROW_RELEASE_TICK } from './animations';
@@ -116,6 +138,8 @@ const blocks = new Set<Action>([
   'blockRapid',
   'crouchBlockRapid',
   'airBlockRapid',
+  'blockStop',
+  'crouchBlockStop',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
 const reactions = new Set<Action>([
@@ -125,8 +149,9 @@ const reactions = new Set<Action>([
   'airHitHeavy',
   'hitRapid',
   'airHitRapid',
-  'launchUp',
-  'launchAway',
+  ...(Object.keys(launchMotion) as (keyof typeof launchMotion)[]),
+  'hitSlide',
+  'hitPull',
   ...blocks,
 ]);
 const groundReactions: Partial<Record<Action, AnimatedAction>> = {
@@ -141,6 +166,8 @@ const protectedReactions = new Set<Action>([
   'grabbed',
   'thrown',
   'knockdown',
+  'slamBounce',
+  'bounceDown',
   'getUp',
 ]);
 export interface Fighter {
@@ -317,8 +344,8 @@ export class Match {
       f.y < 0 ||
       f.vy < 0 ||
       f.action === 'knockdown' ||
-      f.action === 'launchUp' ||
-      f.action === 'launchAway' ||
+      f.action === 'bounceDown' ||
+      Object.hasOwn(launchMotion, f.action) ||
       (f.action === 'hitUpJump' && f.age < 8) ||
       ((f.action === 'land' ||
         f.action === 'drillLand' ||
@@ -339,33 +366,55 @@ export class Match {
 
   private recoverKnockdown(f: Fighter) {
     if (
-      f.action === 'knockdown' &&
+      (f.action === 'knockdown' || f.action === 'bounceDown') &&
       f.hp > 0 &&
-      f.age >= animationDuration('knockdown')
+      f.age >= animationDuration(f.action)
     )
       this.action(f, 'getUp');
   }
 
   private moveLaunch(f: Fighter) {
-    if (f.action !== 'launchUp' && f.action !== 'launchAway') return false;
-    const up = f.action === 'launchUp';
-    const launchTick = up ? 25 : 6;
-    // Victim actions 81/80 hold the impact pose before their motion command.
-    if (f.age === launchTick) {
-      f.vx = -f.facing * (up ? 160 : 600) * SOURCE_VELOCITY_SCALE;
-      f.vy = -(up ? 1700 : 1220) * SOURCE_VELOCITY_SCALE;
-      f.gravity = (up ? 60 : 90) * SOURCE_ACCELERATION_SCALE;
+    const motion = launchMotion[f.action as keyof typeof launchMotion];
+    if (!motion) return false;
+    // Victim actions hold their impact pose before the motion command.
+    if (f.age === motion.tick) {
+      f.vx = f.facing * motion.vx * SOURCE_VELOCITY_SCALE;
+      f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
+      f.gravity = motion.gravity * SOURCE_ACCELERATION_SCALE;
       f.airAge = 0;
     }
-    if (f.age >= launchTick) {
+    if (f.age >= motion.tick) {
       f.airAge++;
       gravity(f);
       if (f.y === 0) {
         f.doubleJumped = f.airDashed = false;
-        this.action(f, 'knockdown');
+        this.action(
+          f,
+          f.action === 'launchDown'
+            ? 'slamBounce'
+            : f.action === 'slamBounce'
+              ? 'bounceDown'
+              : 'knockdown',
+        );
       }
     }
     return true;
+  }
+
+  private slideReaction(f: Fighter) {
+    const slide = reactionSlides[f.action as keyof typeof reactionSlides];
+    if (slide) {
+      if (f.age >= animationDuration(f.action as AnimatedAction)) f.vx = 0;
+      else if (f.age >= 9) {
+        f.vx =
+          f.facing *
+          (slide.velocity * SOURCE_VELOCITY_SCALE +
+            (f.age - 8) * slide.acceleration * SOURCE_ACCELERATION_SCALE);
+        f.x = clampX(f.x + f.vx);
+      }
+    }
+    if (f.action === 'bounceDown' && f.age <= 10)
+      f.x = clampX(f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
   }
 
   private resolveThrows(frozen: boolean[]) {
@@ -446,12 +495,19 @@ export class Match {
   ) {
     if (f.hitStop === 0) f.age++;
     const followUp = followUps[f.action as keyof typeof followUps];
+    const ioriFollowUp = f.action === 'iori' || f.action === 'iori2';
     const followUpOpen =
       followUp &&
       isAttack(f.action) &&
-      f.age < animationDuration(f.action) + FOLLOW_UP_GRACE_TICKS;
+      f.age <
+        animationDuration(f.action) +
+          (ioriFollowUp ? 0 : FOLLOW_UP_GRACE_TICKS);
     if (followUpOpen) {
-      const control = f.action.startsWith('punch') ? 'punch' : 'kick';
+      const control = ioriFollowUp
+        ? 'iori'
+        : f.action.startsWith('punch')
+          ? 'punch'
+          : 'kick';
       if (input[control] && !previous[control]) f.nextAttack = followUp;
     }
     if (
@@ -466,6 +522,7 @@ export class Match {
     }
     if (f.action === 'grabbed') return;
     if (this.moveLaunch(f)) return;
+    this.slideReaction(f);
     launchHitUpJump(f);
     if (f.action === 'hitUpJump' && f.age < 8) return;
     if (f.y < 0 || f.vy < 0) {
@@ -523,7 +580,12 @@ export class Match {
       }
     }
     this.recoverKnockdown(f);
-    if (f.action === 'thrown' || f.action === 'knockdown') return;
+    if (
+      f.action === 'thrown' ||
+      f.action === 'knockdown' ||
+      f.action === 'bounceDown'
+    )
+      return;
     if (f.action === 'takeoff') {
       if (f.age < animationDuration('takeoff')) return;
       launchJump(f);
@@ -549,6 +611,15 @@ export class Match {
       return;
     }
     if (
+      ioriFollowUp &&
+      f.nextAttack &&
+      f.age >= (f.action === 'iori' ? 29 : 31)
+    ) {
+      // Actions 246/247 open follow-up commands after their active display.
+      this.action(f, f.nextAttack, true);
+      return;
+    }
+    if (
       f.action !== 'idle' &&
       (isAttack(f.action) ||
         f.action === 'axeThrow' ||
@@ -570,6 +641,17 @@ export class Match {
             f.facing *
               (600 * SOURCE_VELOCITY_SCALE +
                 (f.age - 1) * 350 * SOURCE_ACCELERATION_SCALE),
+        );
+      if (
+        (f.action === 'iori' && f.age >= 13 && f.age < 21) ||
+        (f.action === 'iori2' && f.age >= 8 && f.age < 23) ||
+        (f.action === 'iori3' && f.age >= 8 && f.age < 21)
+      )
+        f.x = clampX(
+          f.x +
+            f.facing *
+              (f.action === 'iori2' ? 700 : 800) *
+              SOURCE_VELOCITY_SCALE,
         );
       return;
     }
@@ -647,6 +729,10 @@ export class Match {
     }
     if (input.drill && !previous.drill) {
       this.action(f, airborne ? 'airDrill' : 'drill', true);
+      return;
+    }
+    if (!airborne && input.iori && !previous.iori) {
+      this.action(f, 'iori', true);
       return;
     }
     if (!airborne && input.throw && !previous.throw) {
@@ -746,6 +832,7 @@ export class Match {
           return;
         }
         if (this.moveLaunch(f)) return;
+        this.slideReaction(f);
         launchHitUpJump(f);
         if (f.y < 0 || f.vy < 0) {
           f.airAge++;
@@ -843,12 +930,25 @@ export class Match {
       if (protectedReactions.has(target.action)) return [];
       const blocked = guards.has(target.action) && target.facing !== f.facing;
       const response = hitResponses[f.action];
-      const launch: 'launchUp' | 'launchAway' | null =
+      const airborne = target.y < 0 || target.vy < 0;
+      const reaction: AnimatedAction | null =
         f.action === 'hitUp' && !blocked
-          ? target.y < 0 || target.vy < 0
+          ? airborne
             ? 'launchAway'
             : 'launchUp'
-          : null;
+          : f.action === 'iori3' && !blocked
+            ? airborne
+              ? 'launchDown'
+              : 'launchAway'
+            : (f.action === 'iori' || f.action === 'iori2') && !airborne
+              ? blocked
+                ? target.action.startsWith('crouch')
+                  ? 'crouchBlockStop'
+                  : 'blockStop'
+                : f.action === 'iori'
+                  ? 'hitSlide'
+                  : 'hitPull'
+              : null;
       const heavy =
         response.kind === 'heavy' ||
         (f.action === 'punch2' && finisher && !blocked);
@@ -858,13 +958,15 @@ export class Match {
           ? response.kind === 'rapid'
             ? 0
             : 10
-          : launch === 'launchUp'
+          : reaction === 'launchUp'
             ? 10
-            : f.action === 'drill' && finisher
-              ? 13
-              : f.action === 'punch2' && finisher
-                ? 15
-                : response.stop;
+            : reaction === 'launchDown'
+              ? 15
+              : f.action === 'drill' && finisher
+                ? 13
+                : f.action === 'punch2' && finisher
+                  ? 15
+                  : response.stop;
       const distance = (target.x - f.x) * f.facing;
       return !f.connected &&
         f.age >= attack.startup &&
@@ -883,7 +985,7 @@ export class Match {
               rapid: response.kind === 'rapid',
               hitStop,
               airDrill,
-              launch,
+              reaction,
               facing: f.facing,
               x: target.x - f.facing * 42,
               y:
@@ -923,7 +1025,7 @@ export class Match {
                 ? 15
                 : 0,
           airDrill: false,
-          launch: null,
+          reaction: null,
           facing: projectile.facing,
           x: target.x - projectile.facing * 42,
           y: GROUND + projectile.y,
@@ -940,7 +1042,7 @@ export class Match {
       heavy,
       rapid,
       hitStop,
-      launch,
+      reaction,
       facing,
       x,
       y,
@@ -954,11 +1056,11 @@ export class Match {
       const damage = blocked ? 0 : strength;
       target.hp = Math.max(0, target.hp - damage);
       f.damage += damage;
-      f.hitStop += launch === 'launchUp' ? 33 : hitStop;
+      f.hitStop += reaction === 'launchUp' ? 33 : hitStop;
       target.hitStop += hitStop;
       const airborne = target.y < 0 || target.vy < 0;
       if (blocked) {
-        const reaction = rapid
+        const blockReaction = rapid
           ? airborne
             ? 'airBlockRapid'
             : target.action.startsWith('crouch')
@@ -975,15 +1077,15 @@ export class Match {
               : heavy
                 ? 'blockHeavy'
                 : 'block';
-        this.action(target, reaction, true);
+        this.action(target, reaction ?? blockReaction, true);
       } else {
         f.hits++;
         this.action(
           target,
           target.hp === 0
             ? 'down'
-            : launch
-              ? launch
+            : reaction
+              ? reaction
               : rapid
                 ? airborne
                   ? 'airHitRapid'
@@ -997,13 +1099,13 @@ export class Match {
                     : 'hit',
           true,
         );
-        if (target.hp === 0 || launch) {
-          // Launch/KO actions stop incoming motion before their impact hold.
-          target.vx = target.vy = 0;
-          target.facing = facing === 1 ? -1 : 1;
-        }
       }
-      if (finisher && target.hp > 0 && !launch)
+      if (target.hp === 0 || reaction) {
+        // Scripted reactions stop incoming motion before their impact hold.
+        target.vx = target.vy = 0;
+        target.facing = facing === 1 ? -1 : 1;
+      }
+      if (finisher && target.hp > 0 && !reaction)
         target.x = clampX(target.x + facing * (blocked ? 8 : 22));
       this.impacts.push({
         x,
@@ -1017,8 +1119,8 @@ export class Match {
     }
     // Run contact branches after all hits: an interrupted aerial drill must not
     // apply its own stop or restart, regardless of fighter update order.
-    for (const { f, target, airDrill, blocked, launch } of contacts) {
-      if (launch && f.action === 'hitUp' && target.hp > 0) {
+    for (const { f, target, airDrill, blocked, reaction } of contacts) {
+      if (reaction && f.action === 'hitUp' && target.hp > 0) {
         const nextJump = f.nextJump;
         this.action(f, 'hitUpRecover');
         f.nextJump = nextJump;
