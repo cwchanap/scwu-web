@@ -3,7 +3,14 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, placement } from './standing';
-import { animationDuration, animationFrame, throwHold } from './animations';
+import {
+  animationDuration,
+  animationFrame,
+  dstHold,
+  heldFrame,
+  isBlank,
+  throwHold,
+} from './animations';
 import type { Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, Match, WIDTH } from './match';
 import type { Control, Mode } from './match';
@@ -53,6 +60,12 @@ const keyMap: Record<string, Control> = {
   KeyU: 'drill',
   KeyI: 'axe',
   KeyO: 'throw',
+  KeyG: 'dst',
+  Digit1: 'getterBeam',
+  Digit2: 'musashi',
+  Digit3: 'changeAttack',
+  Digit4: 'blackRush',
+  Digit5: 'megaBeam',
 };
 
 export class TrainingScene extends Phaser.Scene {
@@ -65,6 +78,7 @@ export class TrainingScene extends Phaser.Scene {
   private sprites: Phaser.GameObjects.Image[] = [];
   private shadows: Phaser.GameObjects.Ellipse[] = [];
   private projectileSprites: Phaser.GameObjects.Image[] = [];
+  private effectSprites: Phaser.GameObjects.Image[] = [];
   private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
   private impactSprites: Phaser.GameObjects.Image[][] = [];
   private ready = false;
@@ -105,13 +119,6 @@ export class TrainingScene extends Phaser.Scene {
         this.add.image(f.x, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
       );
     }
-    this.projectileSprites = this.match.fighters.map(() =>
-      this.add
-        .image(0, 0, 'ryuko-424')
-        .setScale(ART_SCALE)
-        .setDepth(4)
-        .setVisible(false),
-    );
     this.updateHud = createHud(this);
     this.game.canvas.tabIndex = 0;
     this.game.canvas.setAttribute(
@@ -186,12 +193,49 @@ export class TrainingScene extends Phaser.Scene {
     this.report();
   }
   reset(mode: Mode) {
-    this.match = new Match(mode);
+    // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
+    this.match = new Match(mode, mode === 'cpu');
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
     this.idle.forEach((vm) => vm.tick());
     this.paused = false;
     this.clearInput();
     this.report();
+  }
+
+  // Grow a hidden sprite pool to the current object count.
+  private pool(sprites: Phaser.GameObjects.Image[], count: number) {
+    while (sprites.length < count)
+      sprites.push(
+        this.add
+          .image(0, 0, 'ryuko-424')
+          .setScale(ART_SCALE)
+          .setDepth(4)
+          .setVisible(false),
+      );
+    return sprites;
+  }
+
+  private place(
+    sprite: Phaser.GameObjects.Image,
+    pose: Pose,
+    x: number,
+    y: number,
+    facing: -1 | 1,
+  ) {
+    const p = placement(
+      pose,
+      pose.width,
+      pose.height,
+      x / ART_SCALE,
+      y / ART_SCALE,
+      facing === -1,
+    );
+    sprite
+      .setOrigin(0)
+      .setVisible(!isBlank(pose))
+      .setTexture(isBlank(pose) ? sprite.texture.key : `ryuko-${pose.image}`)
+      .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
+      .setFlip(p.flip_x, p.flip_y);
   }
 
   private pose(index: number): Pose {
@@ -201,6 +245,8 @@ export class TrainingScene extends Phaser.Scene {
       const image = data.images.find((image) => image.index === frame.image)!;
       return { ...frame, width: image.width, height: image.height };
     }
+    if (f.action === 'superHeld' && f.held?.pose)
+      return heldFrame(f.held.pose, f.held.flags);
     return animationFrame(f.action, f.action === 'jump' ? f.airAge : f.age);
   }
 
@@ -242,33 +288,77 @@ export class TrainingScene extends Phaser.Scene {
           (GROUND + f.y) / ART_SCALE,
           f.facing === -1,
         );
+        const holder = this.match.fighters[1 - i];
+        const behind =
+          f.action === 'grabbed'
+            ? throwHold(f.age).behind
+            : f.action === 'dstHeld'
+              ? dstHold(holder.age)?.behind
+              : f.action === 'superHeld'
+                ? ((f.held?.flags ?? 0) & 1) !== 0
+                : undefined;
+        // Op 0x23 mode 4 fades the display by fade/32.
         sprite
-          .setTexture(`ryuko-${pose.image}`)
-          .setDepth(
-            f.action === 'grabbed' ? (throwHold(f.age).behind ? 1 : 3) : 2,
-          )
+          .setVisible(!isBlank(pose))
+          .setAlpha(1 - f.fade / 32)
+          .setDepth(behind === undefined ? 2 : behind ? 1 : 3)
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
+        if (!isBlank(pose)) sprite.setTexture(`ryuko-${pose.image}`);
         const shadow = this.shadows[i];
         shadow
           .setPosition(f.x, GROUND - 1)
           .setAlpha(Math.max(0.1, 0.3 + f.y / 1000));
       });
-      this.projectileSprites.forEach((sprite, owner) => {
-        const projectile = this.match.projectiles.find(
-          (p) => p.owner === owner,
+      const { projectiles, effects } = this.match;
+      this.pool(this.projectileSprites, projectiles.length).forEach(
+        (sprite, index) => {
+          const projectile = projectiles[index];
+          sprite.setVisible(!!projectile);
+          if (!projectile) return;
+          if (projectile.kind === 'missile') {
+            const pose = animationFrame('dstMissile', projectile.age);
+            this.place(
+              sprite,
+              pose,
+              projectile.x,
+              GROUND + projectile.y,
+              projectile.facing,
+            );
+            return;
+          }
+          const pose = animationFrame(
+            projectile.hit ? 'axeHit' : 'axeFlight',
+            projectile.age,
+          );
+          // Axe flight uses an authored center anchor, independent of fighter offsets.
+          sprite
+            .setOrigin(0.5)
+            .setTexture(`ryuko-${pose.image}`)
+            .setPosition(projectile.x, GROUND + projectile.y)
+            .setFlip(projectile.facing === -1, false);
+        },
+      );
+      this.pool(this.effectSprites, effects.length).forEach((sprite, index) => {
+        const effect = effects[index];
+        sprite.setVisible(!!effect);
+        if (!effect) return;
+        // Viewport objects (op 0x04 flag 0x40) ignore the camera.
+        this.place(
+          sprite
+            .setDepth(effect.screen ? 5 : effect.front ? 4 : 1)
+            .setScrollFactor(effect.screen ? 0 : 1)
+            .setBlendMode(
+              effect.mode === 2
+                ? Phaser.BlendModes.ADD
+                : Phaser.BlendModes.NORMAL,
+            )
+            .setAlpha(1 - effect.fade / 32),
+          animationFrame(effect.clip, effect.age),
+          effect.x,
+          effect.screen ? effect.y : GROUND + effect.y,
+          effect.facing,
         );
-        sprite.setVisible(!!projectile);
-        if (!projectile) return;
-        const pose = animationFrame(
-          projectile.hit ? 'axeHit' : 'axeFlight',
-          projectile.age,
-        );
-        // Projectile flight uses an authored center anchor, independent of fighter offsets.
-        sprite
-          .setTexture(`ryuko-${pose.image}`)
-          .setPosition(projectile.x, GROUND + projectile.y)
-          .setFlipX(projectile.facing === -1);
       });
       this.updateHud?.(this.match);
       while (this.impactSprites.length < this.match.impacts.length) {

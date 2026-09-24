@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { DESPERATION_HP, POWER_PER_STOCK } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -20,6 +21,27 @@ export function healthCrop(hp: number, right: boolean) {
   const width = Math.round((254 * Math.max(0, Math.min(100, hp))) / 100);
   return { x: right ? 254 - width : 0, width };
 }
+
+// Object types 20/21 (0x40de1b/0x40de44) draw power × 126 / 100 pixels of the
+// bar. Both keep the texture's right-hand columns; 2P shows them mirrored.
+export function gaugeCrop(power: number) {
+  const width = Math.floor((126 * Math.max(0, power)) / POWER_PER_STOCK);
+  return { x: 126 - width, width };
+}
+
+// KGT actions 69/70: image 31 for 50 ticks, then shimmer frames 32–38.
+export function gaugeImage(tick: number) {
+  const time = tick % 85;
+  return time < 50 ? 31 : 32 + Math.floor((time - 50) / 5);
+}
+
+// KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
+const STOCK_OFFSETS = [
+  [0, 0],
+  [0, -1],
+  [-4, -1],
+  [-2, -2],
+];
 
 export function createHud(scene: Phaser.Scene) {
   // SCWU.KGT actions 60, 71–77, 103, 106–112 use a 640 × 480 screen.
@@ -66,9 +88,15 @@ export function createHud(scene: Phaser.Scene) {
     .setDepth(101);
   const wins = [image(30, 240, 40), image(30, 370, 40)];
   image(26, 30, 443);
-  // Basic specials are meter-free; super stock remains EMPTY until supers exist.
-  image(17, 49, 434);
-  image(17, 545, 434);
+  const gauges = [image(31, 99, 443), image(31, 414, 443).setFlipX(true)];
+  // Stock anchors come from KGT actions 74/75.
+  const stocks = [image(17, 49, 434), image(17, 545, 434)];
+  // KGT actions 104/105 blink image 135 over the low remaining life. The port's
+  // life bars drain toward their outer edges, so it mirrors to those ends.
+  const underPower = [
+    image(135, 22, 20).setFlipX(true),
+    image(135, 544, 20),
+  ].map((bar) => bar.setBlendMode('ADD').setVisible(false));
   const digits = [image(47, 300, 16), image(47, 320, 16)];
   const infinity = scene.add
     .text(320 * scale, 27 * scale, '∞', {
@@ -97,6 +125,20 @@ export function createHud(scene: Phaser.Scene) {
     .setVisible(false);
 
   return (match: Match) => {
+    match.fighters.forEach((f, index) => {
+      const crop = gaugeCrop(f.power);
+      gauges[index]
+        .setTexture(`ui-${gaugeImage(match.ticks)}`)
+        .setCrop(crop.x, 0, crop.width, 20)
+        .setVisible(crop.width > 0);
+      const [dx, dy] = STOCK_OFFSETS[f.stock];
+      stocks[index]
+        .setTexture(`ui-${17 + f.stock}`)
+        .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
+      underPower[index]
+        .setVisible(f.hp > 0 && f.hp <= DESPERATION_HP)
+        .setAlpha(Math.floor(match.ticks / 15) % 2 ? 0.45 : 0.9);
+    });
     life.forEach((bar, index) => {
       const crop = healthCrop(match.fighters[index].hp, index === 1);
       bar.setCrop(crop.x, 0, crop.width, 14).setVisible(crop.width > 0);

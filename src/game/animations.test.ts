@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import data from './generated/assets.json';
-import { animationDuration, animationFrame, animations } from './animations';
+import {
+  animationDuration,
+  animationFrame,
+  animations,
+  DST_TOSS_TICK,
+  dstHold,
+  eventsAt,
+  heldFrame,
+  isBlank,
+  RESPONSES,
+  script,
+} from './animations';
 
 describe('selected core animation assets', () => {
   it('exports the backward, crouching, airborne, and ending pose sequences', () => {
@@ -83,6 +94,103 @@ describe('selected core animation assets', () => {
     expect(animations.hitStreak.frames.every((frame) => !frame.flip_x)).toBe(
       true,
     );
+  });
+
+  it('expands DST calls and holds the victim in the recovered held pose', () => {
+    expect(animationDuration('dst')).toBe(58);
+    expect(
+      [0, 4, 5, 13, 53].map((age) => animationFrame('dst', age).image),
+    ).toEqual([103, 103, 104, 105, 104]);
+    // 106, three 20-tick spins (199), ten 12-tick spins (217), then the toss.
+    expect(DST_TOSS_TICK).toBe(185);
+    expect(animationDuration('dstHit')).toBe(368);
+    expect(
+      [0, 5, 10, 15, 20, 65, 68, 71, 74, 185, 268, 358].map(
+        (age) => animationFrame('dstHit', age).image,
+      ),
+    ).toEqual([106, 107, 108, 107, 110, 107, 108, 107, 110, 111, 237, 24]);
+    expect(animationFrame('dstHit', 15).flip_x).toBe(true);
+    expect(animationDuration('dstHeld')).toBe(185);
+    expect(animationFrame('dstHeld', 0)).toMatchObject({ image: 47, dx: -13 });
+    expect(animationFrame('dstHeld', 5)).toMatchObject({
+      image: 47,
+      dx: -84,
+      dy: -159,
+      flip_x: true,
+    });
+    expect(animationFrame('dstHeld', 184).flip_x).toBe(false);
+    expect([4, 5, 64, 65, 184, 185].map((age) => dstHold(age))).toEqual([
+      { x: 60, same: false, behind: false },
+      { x: 60, same: true, behind: true },
+      { x: 0, same: false, behind: false },
+      { x: 60, same: true, behind: true },
+      { x: 0, same: false, behind: false },
+      null,
+    ]);
+    // Numeric loops replay only the source loop target, not the entry pose.
+    expect(animationFrame('dstToss', 2)).toMatchObject({
+      flip_x: true,
+      flip_y: true,
+    });
+    expect(animationFrame('dstToss', 3)).toMatchObject({
+      flip_x: false,
+      flip_y: true,
+    });
+    expect(animationFrame('dstToss', 11)).toEqual(animationFrame('dstToss', 3));
+    expect(animationFrame('twist', 9).image).toBe(52);
+    expect(
+      [10, 13, 16, 19, 34].map((age) => animationFrame('twist', age).image),
+    ).toEqual([102, 233, 61, 234, 102]);
+    expect(animationFrame('tossBounce', 0).image).toBe(62);
+    expect(animationFrame('dstMissile', 1000).image).toBe(239);
+  });
+
+  it('flattens super timelines with inlined calls, loops and entry checks', () => {
+    // Action 264: 24, 304, 305, 306, twenty calls of 266, then 306, 24, 31.
+    expect(
+      [0, 30, 75, 80, 95, 350, 365].map(
+        (age) => animationFrame('getterBeam', age).image,
+      ),
+    ).toEqual([24, 304, 305, 306, 306, 24, 31]);
+    expect(eventsAt(264, 0)).toEqual(
+      expect.arrayContaining([
+        { t: 0, op: 'stock', target: 251, min: 0, add: -1 },
+        { t: 0, op: 'life', target: 278, below: true, value: 153 },
+        { t: 0, op: 'stop', self: 0, other: 10 },
+      ]),
+    );
+    expect(eventsAt(292, 0)).toContainEqual({
+      t: 0,
+      op: 'stock',
+      target: 251,
+      min: 2,
+      add: -3,
+    });
+    // Object 269 re-arms its hit box every 10 ticks through 19 calls of 270.
+    expect(
+      script(269).events.filter((e) => e.op === 'box' && e.slot === 0),
+    ).toHaveLength(20);
+    // Action 257 jumps to FLY NO HIT (97), which loops 98 until landing.
+    expect(script(257)).toMatchObject({ end: 'jump', next: 97 });
+    expect(animationDuration('musashiHit')).toBe(578);
+    expect(script(97)).toMatchObject({ end: 'loop', loop: 3 });
+    expect(animationFrame('fly', 6).image).toBe(102);
+    expect(animationFrame('fly', 22)).toEqual(animationFrame('fly', 6));
+    // Objects play by source action; 296 only spawns children.
+    expect(animationDuration(371)).toBe(65);
+    expect(animationDuration(296)).toBe(0);
+    expect(animationFrame(269, 0)).toSatisfy(isBlank);
+    // Response ids select victim actions: grab, toss, shock, fly and FBH.
+    expect([30, 31, 33, 43, 58].map((id) => RESPONSES[id])).toEqual([
+      128, 129, 88, 97, 112,
+    ]);
+    expect(heldFrame(2, 4)).toMatchObject({
+      image: 102,
+      dx: -45,
+      dy: -53,
+      flip_x: true,
+      flip_y: false,
+    });
   });
 
   it('aligns IORI strikes and recoveries with the source displays', () => {
@@ -180,8 +288,17 @@ describe('selected core animation assets', () => {
     expect(animationFrame('crouch', animationDuration('crouch') + 6)).toEqual(
       animationFrame('crouch', 6),
     );
-    expect(animationFrame('win', 20).image).toBe(366);
+    // WIN STAND (action 58) plays for 115 ticks before action 57's own poses.
+    expect(
+      [0, 30, 114, 115, 125, 134, 135].map(
+        (age) => animationFrame('win', age).image,
+      ),
+    ).toEqual([295, 1, 1, 295, 31, 31, 366]);
     expect(animationFrame('win', 10000).image).toBe(366);
+    expect(animationFrame('draw', 114).image).toBe(1);
+    expect(animationFrame('draw', 115).image).toBe(24);
+    expect(animationFrame('draw', 10000).image).toBe(420);
+    expect(animationFrame('lose', 0).image).toBe(24);
     // Action 60 holds its falling pose until action 62 is entered on landing.
     expect(animationFrame('down', 13).image).toBe(52);
     expect(animationFrame('down', 14).image).toBe(60);

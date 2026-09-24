@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode } from './game/match';
   import type { GameStatus, createGame } from './game/scene';
 
@@ -34,7 +35,14 @@
     { control: 'throw', label: 'Throw', symbol: 'O' },
     { control: 'hitUp', label: 'Hit Up', symbol: 'H' },
     { control: 'iori', label: 'IORI', symbol: 'F' },
+    { control: 'dst', label: 'Daisetsuzan', symbol: 'G' },
+    { control: 'getterBeam', label: 'Getter Beam', symbol: '1' },
+    { control: 'musashi', label: 'Musashi', symbol: '2' },
+    { control: 'changeAttack', label: 'Change Attack', symbol: '3' },
+    { control: 'blackRush', label: 'Black Rush', symbol: '4' },
+    { control: 'megaBeam', label: 'Mega Beam', symbol: '5' },
   ];
+  const supers = new Set<Control>(SUPER_CONTROLS);
 
   onMount(() => {
     let disposed = false;
@@ -116,7 +124,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, 1 to 5 for the supers. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -214,7 +222,9 @@
           'throw',
           'hitUp',
           'iori',
+          'dst',
         ].includes(item.control)}
+        class:super-control={supers.has(item.control)}
         aria-label={item.label}
         disabled={!status.ready || status.paused || !!status.winner}
         onpointerdown={(event) => press(event, item.control)}
@@ -244,7 +254,9 @@
       ><kbd>U</kbd> Drill</span
     ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span><span
       ><kbd>H</kbd> Hit Up</span
-    ><span><kbd>F</kbd> IORI</span>
+    ><span><kbd>F</kbd> IORI</span><span><kbd>G</kbd> Daisetsuzan</span><span
+      ><kbd>1</kbd>–<kbd>5</kbd> Supers</span
+    >
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -301,6 +313,25 @@
           even through guard. A miss leaves you recovering. The opponent tumbles,
           lands, then gets up; they cannot act or be hit again during this recovery.
           Jumping avoids a grab, and a strike can interrupt its startup.
+        </p>
+        <p>
+          Press <kbd>G</kbd> or Daisetsuzan for Ryuko's longer-reaching command throw.
+          Ryuko transforms, spins the opponent overhead, hurls them into the sky,
+          then fires two missiles that can catch them as they fall. A miss leaves
+          a long recovery.
+        </p>
+        <p>
+          Landing hits, blocking, and taking damage fill the power gauge at the
+          bottom of the screen. Each full gauge becomes one stock, up to three.
+          Keys <kbd>1</kbd>
+          to <kbd>5</kbd> spend it on Ryuko's supers: <kbd>1</kbd> Getter Beam
+          (also in the air), <kbd>2</kbd> Musashi, <kbd>3</kbd> Getter Change
+          Attack, and <kbd>5</kbd> Mega Getter Beam, which needs all three
+          stocks. Musashi and the Change Attack grab at close range.
+          <kbd>4</kbd> throws an axe until your health falls below 30%, then becomes
+          the Black Getter Mega Rush. Without enough stock, Ryuko shouts NO SUPER
+          and gains a little power instead. At 30% health or less, Getter Beam also
+          takes its stronger form.
         </p>
         <p>
           Free practice gives you a stationary partner and no timer. Vs. CPU

@@ -269,6 +269,11 @@ kbd {
   border-color: #5e839e;
   color: #c2eaff;
 }
+.touch-controls .super-control {
+  background: #3d3020;
+  border-color: #a4834f;
+  color: #ffe2a8;
+}
 .help-panel {
   padding: 20px 0;
   display: flex;

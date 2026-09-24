@@ -1,7 +1,14 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import ui from './generated/ui.json';
-import { koFrame, KO_TICKS, ROUND_END_TICKS, healthCrop } from './hud';
+import {
+  gaugeCrop,
+  gaugeImage,
+  koFrame,
+  KO_TICKS,
+  ROUND_END_TICKS,
+  healthCrop,
+} from './hud';
 import { Match } from './match';
 
 it('plays the recovered KO displays through the squash-out before showing rematch', () => {
@@ -25,6 +32,17 @@ it('crops opposing life bars toward their outside edges without stretching the g
   expect(healthCrop(50, true)).toEqual({ x: 127, width: 127 });
   expect(healthCrop(0, true)).toEqual({ x: 254, width: 0 });
   expect(healthCrop(100, false)).toEqual({ x: 0, width: 254 });
+});
+
+it('anchors power bars at their inner ends and cycles the recovered shimmer', () => {
+  expect(gaugeCrop(0)).toEqual({ x: 126, width: 0 });
+  expect(gaugeCrop(40)).toEqual({ x: 76, width: 50 });
+  expect(gaugeCrop(99)).toEqual({ x: 2, width: 124 });
+  expect([0, 49, 50, 55, 84, 85].map(gaugeImage)).toEqual([
+    31, 31, 32, 33, 38, 31,
+  ]);
+  for (const index of [17, 18, 19, 20, 31, 38, 135])
+    expect(ui.images.some((image) => image.index === index)).toBe(true);
 });
 
 it('exports every HUD and KO texture at its original dimensions', () => {

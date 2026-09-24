@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addPower,
   AXE_RELEASE_TICK,
   THROW_RELEASE_TICK,
   FIGHTER_MARGIN,
@@ -205,6 +206,505 @@ describe('Hit Up launcher', () => {
       expect(match.fighters[0]).toMatchObject({ action: 'win', y: 0 });
       expect(match.fighters[1]).toMatchObject({ action: 'lose', y: 0 });
     }
+  });
+});
+
+describe('recovered neutral and round animations', () => {
+  it('turns a standing fighter for ten ticks, then walks, and lets attacks interrupt', () => {
+    const match = new Match();
+    const [f, other] = match.fighters;
+    other.x = f.x - 200;
+    match.step({ right: true });
+    expect(f).toMatchObject({ action: 'turn', facing: -1, age: 0 });
+    const x = f.x;
+    ticks(match, animationDuration('turn') - 1, { right: true });
+    expect(f).toMatchObject({ action: 'turn', x });
+    match.step({ right: true });
+    expect(f.action).toBe('backwalk');
+    expect(f.x).toBeGreaterThan(x);
+    other.x = f.x + 200;
+    match.step();
+    expect(f).toMatchObject({ action: 'turn', facing: 1 });
+    match.step({ punch: true });
+    expect(f.action).toBe('punch');
+  });
+
+  it('uses the crouching turn while crouched and stays down afterwards', () => {
+    const match = new Match();
+    const [f, other] = match.fighters;
+    ticks(match, 10, { crouch: true });
+    expect(f.action).toBe('crouch');
+    other.x = f.x - 200;
+    match.step({ crouch: true });
+    expect(f).toMatchObject({ action: 'crouchTurn', facing: -1 });
+    expect(animationFrame('crouchTurn', 0)).toMatchObject({
+      image: 25,
+      flip_x: true,
+    });
+    ticks(match, animationDuration('crouchTurn'), { crouch: true });
+    expect(f.action).toBe('crouch');
+  });
+
+  it('does not turn in the air, and turns after landing on the far side', () => {
+    const match = new Match();
+    const [f, other] = match.fighters;
+    match.step({ jump: true });
+    ticks(match, 10);
+    other.x = f.x - 200;
+    match.step();
+    expect(f).toMatchObject({ action: 'jump', facing: -1 });
+    for (let i = 0; i < 200 && f.action !== 'land'; i++) match.step();
+    ticks(match, animationDuration('land'));
+    expect(f.action).toBe('idle');
+  });
+
+  it.each([1, -1] as const)(
+    'sweeps a standing target into the action 79 pop and knockdown facing %i',
+    (facing) => {
+      const match = new Match();
+      const [attacker, target] = match.fighters;
+      attacker.x = facing === 1 ? 440 : 1100;
+      attacker.facing = facing;
+      target.x = attacker.x + facing * 150;
+      target.facing = facing === 1 ? -1 : 1;
+      ticks(match, 19, { crouch: true, kick: true });
+      expect(target).toMatchObject({ action: 'sweep', hitStop: 13, hp: 87 });
+      expect(attacker.hitStop).toBe(13);
+      const startX = target.x;
+      ticks(match, 13 + 6);
+      expect(target).toMatchObject({ action: 'sweep', age: 6 });
+      let apex = 0;
+      const seen = new Set<string>();
+      for (let tick = 0; tick < 200; tick++) {
+        seen.add(target.action);
+        apex = Math.min(apex, target.y);
+        match.step();
+      }
+      // Raw −300/−1020 with gravity 90: 18 rising steps and 37 in the air.
+      expect(apex).toBeCloseTo(-136.8148, 3);
+      expect((target.x - startX) * facing).toBeCloseTo(
+        37 * 300 * (655 / 65536) * 1.5,
+        3,
+      );
+      expect(seen).toEqual(new Set(['sweep', 'knockdown', 'getUp', 'idle']));
+    },
+  );
+
+  it('walks both fighters in for the recovered intro before the clock starts', () => {
+    const match = new Match('cpu', true);
+    const [player, cpu] = match.fighters;
+    expect(animationDuration('intro')).toBe(199);
+    expect(
+      [0, 50, 70, 120, 152, 162, 167, 172, 198].map(
+        (age) => animationFrame('intro', age).image,
+      ),
+    ).toEqual([353, 356, 358, 359, 295, 364, 365, 295, 295]);
+    expect(match.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
+    ticks(match, 50, { punch: true, right: true });
+    expect(player.x).toBeCloseTo(780, 3);
+    expect(cpu.x).toBeCloseTo(1140, 3);
+    ticks(match, 148, { punch: true });
+    expect(player).toMatchObject({ action: 'intro', x: player.x });
+    expect(match).toMatchObject({ ticks: 0, seconds: 60 });
+    match.step({ punch: true });
+    expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
+    match.step({ punch: true });
+    expect(player.action).toBe('idle');
+    expect(match.ticks).toBe(1);
+    match.step({});
+    match.step({ punch: true });
+    expect(player.action).toBe('punch');
+  });
+});
+
+describe('Daisetsuzan Oroshi command throw', () => {
+  it.each([1, -1] as const)(
+    'grabs at long range, spins, tosses, and catches the fall with missiles facing %i',
+    (facing) => {
+      const match = new Match();
+      const [attacker, target] = match.fighters;
+      attacker.x = facing === 1 ? 600 : 1300;
+      target.x = attacker.x + facing * 190;
+      ticks(match, 4, { dst: true });
+      expect(attacker).toMatchObject({ action: 'dst', age: 3 });
+      match.step();
+      expect(attacker).toMatchObject({ action: 'dstHit', age: 0 });
+      expect(target).toMatchObject({
+        action: 'dstHeld',
+        x: attacker.x + facing * 90,
+      });
+      const offsets = new Set<number>();
+      for (let tick = 0; tick < 185; tick++) {
+        match.step();
+        if (target.action === 'dstHeld')
+          offsets.add(Math.round((target.x - attacker.x) * facing));
+      }
+      // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
+      expect([...offsets]).toEqual([90, -15, -90, 0]);
+      expect(attacker.age).toBe(185);
+      expect(target).toMatchObject({
+        action: 'dstToss',
+        x: attacker.x + facing * 21,
+        y: -144,
+        facing: -facing,
+        hp: 90,
+      });
+      const tossX = attacker.x;
+      ticks(match, 83);
+      expect(attacker.age).toBe(268);
+      expect(match.projectiles.map((p) => p.kind)).toEqual([
+        'missile',
+        'missile',
+      ]);
+      expect(match.effects.map((e) => e.clip)).toEqual(
+        expect.arrayContaining(['dstFire', 'dstMissileSmoke', 'dashSmoke']),
+      );
+      ticks(match, 18);
+      expect(target.action).toBe('dstToss');
+      match.step();
+      // Both missiles connect 19 ticks after launch, as the source geometry does.
+      expect(target).toMatchObject({ action: 'twist', hitStop: 13, hp: 74 });
+      expect(attacker).toMatchObject({ age: 287, hitStop: 0, hits: 3 });
+      expect((tossX - attacker.x) * facing).toBeCloseTo(
+        20 * 400 * (655 / 65536) * 1.5,
+        3,
+      );
+      const seen = new Set<string>();
+      for (let tick = 0; tick < 300; tick++) {
+        seen.add(target.action);
+        match.step();
+      }
+      expect(seen).toEqual(
+        new Set(['twist', 'twistBounce', 'knockdown', 'getUp', 'idle']),
+      );
+      expect(attacker.action).toBe('idle');
+      expect(match.projectiles).toEqual([]);
+    },
+  );
+
+  it('whiffs outside its range or against an airborne target with a long recovery', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 600 + 210;
+    match.step({ dst: true });
+    ticks(match, animationDuration('dst') - 1);
+    expect(attacker.action).toBe('dst');
+    match.step();
+    expect(attacker.action).toBe('idle');
+    expect(target.hp).toBe(100);
+    target.x = 600 + 150;
+    ticks(match, 10, {}, { jump: true });
+    expect(target.y).toBeLessThan(0);
+    ticks(match, 10, { dst: true });
+    expect(attacker.action).toBe('dst');
+    expect(target.action).not.toBe('dstHeld');
+  });
+
+  it('protects the held victim and releases it on timeout without the toss', () => {
+    const match = new Match('cpu');
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 700;
+    match.ticks = 5990;
+    ticks(match, 5, { dst: true }, {});
+    expect(target.action).toBe('dstHeld');
+    match.projectiles.push({
+      owner: 0,
+      kind: 'axe',
+      x: target.x,
+      y: -125,
+      vx: 0,
+      vy: 0,
+      facing: 1,
+      age: 0,
+      hit: false,
+    });
+    match.step({}, {});
+    expect(target).toMatchObject({ action: 'dstHeld', hp: 100 });
+    ticks(match, 10, {}, {});
+    expect(match.winner).toBe('draw');
+    expect(target.action).not.toBe('dstHeld');
+    ticks(match, 5, {}, {});
+    expect(attacker.action).toBe('draw');
+  });
+
+  it('finishes a lethal toss and the rest of the move before celebrating', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 700;
+    target.hp = 10;
+    ticks(match, 5 + 185, { dst: true });
+    expect(target).toMatchObject({ action: 'dstToss', hp: 0 });
+    expect(match.winner).toBe('player');
+    ticks(match, 150);
+    expect(match.projectiles).toEqual([]);
+    expect(attacker.action).toBe('dstHit');
+    ticks(match, 40);
+    expect(attacker.action).toBe('win');
+    expect(target.action).toBe('knockdown');
+  });
+});
+
+describe('recovered power gauge', () => {
+  it('carries into up to three stocks and borrows back from them', () => {
+    const f = new Match().fighters[0];
+    addPower(f, 95);
+    expect(f).toMatchObject({ power: 95, stock: 0 });
+    addPower(f, 10);
+    expect(f).toMatchObject({ power: 5, stock: 1 });
+    addPower(f, 250);
+    expect(f).toMatchObject({ power: 0, stock: 3 });
+    addPower(f, -1);
+    expect(f).toMatchObject({ power: 99, stock: 2 });
+    addPower(f, -250);
+    expect(f).toMatchObject({ power: 49, stock: 0 });
+    addPower(f, -60);
+    expect(f).toMatchObject({ power: 0, stock: 0 });
+  });
+
+  it('credits the attack and both sides of each hit or block reaction', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 750;
+    // Action 246 adds 8; each strong hit (75) adds 5 to the victim, 3 to Ryuko.
+    match.step({ iori: true });
+    expect(attacker.power).toBe(8);
+    ticks(match, 30);
+    expect(target).toMatchObject({ action: 'hitSlide', power: 5 });
+    expect(attacker.power).toBe(11);
+    const blocker = new Match();
+    blocker.fighters[1].x = blocker.fighters[0].x + 100;
+    ticks(blocker, 10, { punch: true }, { guard: true });
+    // Weak guard (149) adds 1 to the defender only; punch 1 adds nothing.
+    expect(blocker.fighters[1]).toMatchObject({ action: 'block', power: 1 });
+    expect(blocker.fighters[0].power).toBe(0);
+  });
+
+  it('credits only the thrower for a grounded axe hit and both sides of a throw', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 500;
+    target.x = 900;
+    match.step({ axe: true });
+    for (let i = 0; i < 100 && target.action === 'idle'; i++) match.step();
+    expect(target).toMatchObject({ action: 'hitHeavy', power: 0 });
+    expect(attacker.power).toBe(10);
+    const thrower = new Match();
+    thrower.fighters[1].x = thrower.fighters[0].x + 100;
+    ticks(thrower, 8 + THROW_RELEASE_TICK, { throw: true });
+    expect(thrower.fighters[1].action).toBe('thrown');
+    expect(thrower.fighters[0].power).toBe(5);
+    expect(thrower.fighters[1].power).toBe(13);
+  });
+});
+
+describe('recovered supers', () => {
+  function superMatch(gap: number, stock = 3, facing: 1 | -1 = 1) {
+    const match = new Match();
+    const [ryuko, target] = match.fighters;
+    ryuko.x = facing === 1 ? 500 : 1400;
+    target.x = ryuko.x + facing * gap;
+    ryuko.stock = stock;
+    return { match, ryuko, target };
+  }
+  function until(match: Match, done: () => boolean, limit = 2000) {
+    for (let i = 0; i < limit && !done(); i++) match.step();
+    expect(done()).toBe(true);
+  }
+
+  it.each([1, -1] as const)(
+    'fires Getter Beam for one stock: freeze, 19 rapid hits, then a launch, facing %i',
+    (facing) => {
+      const { match, ryuko, target } = superMatch(250, 2, facing);
+      match.step({ getterBeam: true });
+      expect(ryuko).toMatchObject({ action: 'getterBeam', stock: 1 });
+      // Action 264 spawns SUPER STAR (371) and stops the opponent 10 + 65 ticks.
+      expect(match.effects.map((e) => e.clip)).toEqual([371]);
+      expect(match.effects[0].x - ryuko.x).toBeCloseTo(facing * 21 * 1.5);
+      until(match, () => ryuko.age === 73);
+      expect(target.hitStop).toBe(1);
+      match.step();
+      expect(target.hitStop).toBe(0);
+      until(match, () => ryuko.age === 94);
+      expect(target.hp).toBe(100);
+      // Muzzle 271, beam 273 and hitbox 269 spawn at age 95; 269 hits at once.
+      match.step();
+      expect(
+        match.effects.filter((e) => [271, 273, 269].includes(e.clip as number)),
+      ).toHaveLength(3);
+      expect(target).toMatchObject({ action: 'hitRapid', hp: 99 });
+      until(match, () => ryuko.age === 284);
+      expect(target).toMatchObject({ action: 'hitRapid', hp: 81 });
+      // Its final box selects response 58: FBH (112) → action 80.
+      match.step();
+      expect(target).toMatchObject({ action: 'launchAway', hp: 80 });
+      expect(ryuko).toMatchObject({ hits: 20, damage: 20, power: 13 });
+      until(match, () => ryuko.action !== 'getterBeam');
+      expect(ryuko).toMatchObject({ action: 'idle', age: 0, stock: 1 });
+      expect(animationDuration('getterBeam')).toBe(375);
+    },
+  );
+
+  it('guards Getter Beam with rapid blocks and takes no damage', () => {
+    const { match, ryuko, target } = superMatch(250);
+    match.step({ getterBeam: true }, { guard: true });
+    while (ryuko.age < 95) match.step({}, { guard: true });
+    expect(target).toMatchObject({ action: 'blockRapid', hp: 100 });
+    for (let i = 0; i < 300 && ryuko.action === 'getterBeam'; i++)
+      match.step({}, { guard: true });
+    expect(target.hp).toBe(100);
+  });
+
+  it('shouts NO SUPER without stock and gains its power, on the ground and in the air', () => {
+    const { match, ryuko } = superMatch(250, 0);
+    match.step({ getterBeam: true });
+    // Op 0x10 finds no stock and enters action 251, which spawns the NO SUPER
+    // lettering (392) and adds 10 power after its five 252 calls.
+    expect(ryuko).toMatchObject({ action: 'noSuper', stock: 0, power: 0 });
+    expect(match.effects.map((e) => e.clip)).toEqual([392]);
+    until(match, () => ryuko.age === 30);
+    expect(ryuko.power).toBe(10);
+    until(match, () => ryuko.action !== 'noSuper');
+    expect(ryuko.age).toBe(0);
+    expect(animationDuration('noSuper')).toBe(40);
+    const air = superMatch(250, 0);
+    air.match.step({ jump: true });
+    ticks(air.match, 20);
+    air.match.step({ getterBeam: true });
+    const y = air.ryuko.y;
+    expect(air.ryuko.action).toBe('airNoSuper');
+    ticks(air.match, 39);
+    expect(air.ryuko.y).toBe(y);
+    // Action 250 hovers, then jumps to the fall (action 7).
+    air.match.step();
+    expect(air.ryuko.action).toBe('jump');
+    until(air.match, () => air.ryuko.action === 'land');
+  });
+
+  it('hovers during the air Getter Beam, then falls from age 150 to a landing', () => {
+    const { match, ryuko, target } = superMatch(200);
+    match.step({ jump: true });
+    ticks(match, 20);
+    match.step({ getterBeam: true });
+    const y = ryuko.y;
+    expect(ryuko.action).toBe('airGetterBeam');
+    until(match, () => ryuko.age === 150);
+    expect(ryuko.y).toBe(y);
+    expect(target.hp).toBeLessThan(100);
+    until(match, () => ryuko.action === 'land');
+    expect(ryuko.y).toBe(0);
+  });
+
+  it('switches to the desperation beam at 30% health, with a stronger finish', () => {
+    const { match, ryuko, target } = superMatch(250);
+    ryuko.hp = 30;
+    match.step({ getterBeam: true });
+    // Op 0x11 enters G BEAM EVIL (278) at 153 of 510 life or less.
+    expect(ryuko).toMatchObject({ action: 'evilBeam', stock: 2 });
+    until(match, () => ryuko.action !== 'evilBeam');
+    // Nineteen 5-damage hits and action 282's 25-damage finish.
+    expect(target.hp).toBe(100 - 19 - 5);
+  });
+
+  it('grabs with Musashi, lifts and slams the opponent, then both fly', () => {
+    const { match, ryuko, target } = superMatch(130);
+    match.step({ musashi: true });
+    expect(ryuko).toMatchObject({ action: 'musashi', stock: 2 });
+    until(match, () => ryuko.action === 'musashiHit');
+    // Action 256's grab box opens at age 52; its hit handler enters 257.
+    expect(target).toMatchObject({ action: 'superHeld', hp: 100 });
+    ticks(match, 20);
+    // Op 0x07 lifts held pose 2 (image 102) overhead at (105, −210).
+    expect(target.held).toMatchObject({ pose: 2, x: 105, y: -210 });
+    expect(target.x - ryuko.x).toBeCloseTo(105 * 1.5);
+    expect(target.y).toBeCloseTo(-315);
+    until(match, () => target.action === 'fly');
+    // Op 0x15 takes 120 of 510 life; the box adds 30 more.
+    until(match, () => ryuko.action === 'fly');
+    expect(target.hp).toBe(100 - 24 - 6);
+    until(match, () => ryuko.action === 'getUp');
+    expect(target.action).not.toBe('superHeld');
+  });
+
+  it('misses Musashi out of reach and still spends the stock', () => {
+    const { match, ryuko, target } = superMatch(300);
+    match.step({ musashi: true });
+    until(match, () => ryuko.action !== 'musashi');
+    expect(ryuko).toMatchObject({ action: 'idle', stock: 2 });
+    expect(target.hp).toBe(100);
+    expect(animationDuration('musashi')).toBe(140);
+  });
+
+  it('throws an axe with the hidden command until desperation, then rushes', () => {
+    const axe = superMatch(250);
+    axe.match.step({ blackRush: true });
+    // Action 286 jumps to the axe throw (226) at 153 of 510 life or more.
+    expect(axe.ryuko).toMatchObject({ action: 'axeThrow', stock: 3 });
+    const { match, ryuko, target } = superMatch(200);
+    ryuko.hp = 29;
+    match.step({ blackRush: true });
+    expect(ryuko).toMatchObject({ action: 'blackRush', stock: 2 });
+    until(match, () => ryuko.action !== 'blackRush');
+    // Strikes of 30, 13, 13, 13, 13, 13 and 30 source damage.
+    expect(ryuko.hits).toBe(7);
+    expect(target.hp).toBe(100 - 6 - 3 * 5 - 6);
+    expect(animationDuration('blackRush')).toBe(270);
+  });
+
+  it('needs all three stocks for the Mega Getter Beam cinematic', () => {
+    const short = superMatch(150, 2);
+    short.match.step({ megaBeam: true });
+    expect(short.ryuko).toMatchObject({ action: 'noSuper', stock: 2 });
+    const { match, ryuko, target } = superMatch(150);
+    match.step({ megaBeam: true });
+    until(match, () => ryuko.action === 'megaBeamHit');
+    // Response 33 holds the victim in HIT SHOCK INFIN (88) during action 294.
+    expect(target.action).toBe('shock');
+    expect(ryuko.stock).toBe(0);
+    until(match, () => target.action === 'fly');
+    until(match, () => ryuko.action !== 'megaBeamHit');
+    // One shock hit, 39 hits from object 303, and its 40-damage finish.
+    expect(target.hp).toBe(100 - 1 - 39 - 8);
+    expect(animationDuration('megaBeamHit')).toBe(823);
+  });
+
+  it('carries the Getter Change Attack through toss, air catch, throw and beam', () => {
+    const { match, ryuko, target } = superMatch(120);
+    match.step({ changeAttack: true });
+    until(match, () => ryuko.action === 'changeAttackHit');
+    expect(ryuko.age).toBe(0);
+    expect(target.action).toBe('superHeld');
+    // The DST spins (199, 217) end with response 31's toss at age 185.
+    until(match, () => target.action === 'dstToss');
+    expect(ryuko.age).toBe(185);
+    until(match, () => target.action === 'superHeld');
+    expect(ryuko.y).toBeLessThan(-700);
+    until(match, () => target.action === 'launchAway');
+    expect(target.hp).toBe(100 - 8);
+    until(match, () => ryuko.action === 'land');
+    expect(target.hp).toBeLessThan(92);
+  });
+
+  it('loses the beam objects when Ryuko is hit, and releases a held opponent', () => {
+    const { match, ryuko, target } = superMatch(250);
+    match.step({ getterBeam: true });
+    // Behind Ryuko, the opponent is out of the beam and punches after the freeze.
+    target.x = ryuko.x - 100;
+    until(match, () => ryuko.age === 100);
+    expect(match.effects.some((e) => e.slot === 7)).toBe(true);
+    ticks(match, 1, {}, { punch: true });
+    until(match, () => ryuko.action !== 'getterBeam', 20);
+    expect(match.effects.filter((e) => e.slot >= 7 && e.slot <= 9)).toEqual([]);
+    const held = superMatch(130);
+    held.match.step({ musashi: true });
+    until(held.match, () => held.target.action === 'superHeld');
+    // Any interruption of the holder's script lets go of the victim.
+    held.ryuko.action = 'hit';
+    held.match.step();
+    expect(held.target.action).toBe('hit');
   });
 });
 
@@ -648,6 +1148,9 @@ describe('prototype training rules', () => {
       ticks(match, 8 + age, { throw: true });
       match.projectiles.push({
         owner: 1,
+        kind: 'axe',
+        vx: -7,
+        vy: 0,
         x: attacker.x + 50,
         y: -140,
         facing: -1,
@@ -692,6 +1195,9 @@ describe('prototype training rules', () => {
       match.projectiles = [
         {
           owner: 0,
+          kind: 'axe',
+          vx: 7,
+          vy: 0,
           x: target.x,
           y: target.y - 125,
           facing: 1,
@@ -1997,7 +2503,10 @@ describe('prototype training rules', () => {
     for (let i = 0; i < 100 && match.fighters[0].action !== 'drillLand'; i++)
       match.step();
     expect(match.fighters[0].action).toBe('drillLand');
+    // The drill crossed over, so action 23 plays before standing again.
     ticks(match, animationDuration('drillLand'));
+    expect(match.fighters[0]).toMatchObject({ action: 'turn', facing: -1 });
+    ticks(match, animationDuration('turn'));
     expect(match.fighters[0].action).toBe('idle');
   });
 
