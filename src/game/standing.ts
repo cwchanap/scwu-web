@@ -47,6 +47,26 @@ export function placement(
   };
 }
 
+// Held path 0x40d6a0..0x40d76d, taken while op 0x07 has set the victim's +0x40
+// to -1 (0x41303a): offsets are from the image's corner, mirrored by the
+// holder's facing XOR the record's flip_x, and negated with flip_y.
+export function heldPlacement(
+  frame: Frame,
+  width: number,
+  height: number,
+  x: number,
+  y: number,
+  holderFacingLeft: boolean,
+) {
+  const mirrored = holderFacingLeft !== frame.flip_x;
+  return {
+    left: Math.trunc(x) + (mirrored ? -frame.dx - width : frame.dx),
+    top: Math.trunc(y) + (frame.flip_y ? -frame.dy - height : frame.dy),
+    flip_x: mirrored,
+    flip_y: frame.flip_y,
+  };
+}
+
 export class StandingVM {
   pc: number;
   timer = 0;

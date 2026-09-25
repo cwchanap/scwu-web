@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import data from './generated/assets.json';
 import cases from './__fixtures__/idle-oracle.json';
 import timeline from './__fixtures__/handoff-timeline.json';
-import { placement, StandingVM, timingScale } from './standing';
+import { heldFrame } from './animations';
+import { heldPlacement, placement, StandingVM, timingScale } from './standing';
 
 describe('recovered idle interpreter', () => {
   it.each(cases)(
@@ -61,6 +62,29 @@ describe('recovered idle interpreter', () => {
         true,
       ),
     ).toEqual({ left: -47, top: -203, flip_x: true, flip_y: false });
+  });
+
+  it('draws op 0x07 held poses from their corner offsets, mirrored by the holder', () => {
+    // Musashi's overhead pose 2: image 102 (94 x 205) at offset -45/-53.
+    const pose = heldFrame(2, 4);
+    expect([pose.image, pose.dx, pose.dy, pose.width, pose.height]).toEqual([
+      102, -45, -53, 94, 205,
+    ]);
+    expect(heldPlacement(pose, 94, 205, 100.5, -0.5, false)).toEqual({
+      left: 51,
+      top: -53,
+      flip_x: true,
+      flip_y: false,
+    });
+    expect(heldPlacement(pose, 94, 205, 100.5, -0.5, true)).toEqual({
+      left: 55,
+      top: -53,
+      flip_x: false,
+      flip_y: false,
+    });
+    expect(heldPlacement(heldFrame(2, 8), 94, 205, 100.5, -0.5, false)).toEqual(
+      { left: 55, top: -152, flip_x: false, flip_y: true },
+    );
   });
 
   it.each([

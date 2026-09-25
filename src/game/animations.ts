@@ -1,7 +1,8 @@
 import data from './generated/assets.json';
 import type { Frame } from './standing';
 
-export type Pose = Frame & { width: number; height: number };
+// `held` marks an op 0x07 held-pose display, drawn by heldPlacement.
+export type Pose = Frame & { width: number; height: number; held?: boolean };
 interface Clip {
   frames: Pose[];
   ticks: number[];
@@ -186,6 +187,7 @@ export function heldFrame(pose: number, flags: number): Pose {
     ignore_facing: false,
     packed_image: data.held[pose].image,
     extra_bytes: '',
+    held: true,
   };
 }
 

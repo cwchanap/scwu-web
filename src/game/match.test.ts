@@ -664,8 +664,23 @@ describe('recovered supers', () => {
     // Response 33 holds the victim in HIT SHOCK INFIN (88) during action 294.
     expect(target.action).toBe('shock');
     expect(ryuko.stock).toBe(0);
-    until(match, () => target.action === 'fly');
-    until(match, () => ryuko.action !== 'megaBeamHit');
+    // Every object left between ticks must be drawable; anime beam 296 has no
+    // displays and only spawns 297 and 299.
+    const seen = new Set<unknown>();
+    const drawable = () => {
+      match.effects.forEach((e) => seen.add(e.clip));
+      expect(match.effects.filter((e) => !animationDuration(e.clip))).toEqual(
+        [],
+      );
+      return false;
+    };
+    until(match, () => drawable() || target.action === 'fly');
+    until(match, () => drawable() || ryuko.action !== 'megaBeamHit');
+    expect([296, 297, 299].map((clip) => seen.has(clip))).toEqual([
+      false,
+      true,
+      true,
+    ]);
     // One shock hit, 39 hits from object 303, and its 40-damage finish.
     expect(target.hp).toBe(100 - 1 - 39 - 8);
     expect(animationDuration('megaBeamHit')).toBe(823);

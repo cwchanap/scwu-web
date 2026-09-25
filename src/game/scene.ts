@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
-import { StandingVM, placement } from './standing';
+import { StandingVM, heldPlacement, placement } from './standing';
 import {
   animationDuration,
   animationFrame,
@@ -280,15 +280,15 @@ export class TrainingScene extends Phaser.Scene {
       this.sprites.forEach((sprite, i) => {
         const f = this.match.fighters[i];
         const pose = this.pose(i);
-        const p = placement(
+        const holder = this.match.fighters[1 - i];
+        const p = (pose.held ? heldPlacement : placement)(
           pose,
           pose.width,
           pose.height,
           f.x / ART_SCALE,
           (GROUND + f.y) / ART_SCALE,
-          f.facing === -1,
+          (pose.held ? holder : f).facing === -1,
         );
-        const holder = this.match.fighters[1 - i];
         const behind =
           f.action === 'grabbed'
             ? throwHold(f.age).behind

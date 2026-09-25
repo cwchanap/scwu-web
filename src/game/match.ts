@@ -1090,7 +1090,9 @@ export class Match {
       slot: event.slot,
       screen,
     });
-    this.effects.push(child);
+    // A script without displays never advances, so its events all fire at t=0
+    // (anime beam 296 only spawns 297 and 299); nothing is left to draw.
+    if (animationDuration(event.action)) this.effects.push(child);
     this.fireEffect(child);
   }
 
