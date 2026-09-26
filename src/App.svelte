@@ -1,12 +1,27 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { SUPER_CONTROLS } from './game/match';
-  import type { Control, Mode } from './game/match';
+  import type { Control, Mode, PracticeOptions } from './game/match';
+  import { DUMMY_BEHAVIORS } from './game/dummy';
+  import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
 
   let host: HTMLDivElement;
   let session: ReturnType<typeof createGame> | undefined;
   let mode = $state<Mode>('practice');
+  let practice = $state<PracticeOptions>({
+    partner: 'stand',
+    maxStock: false,
+    lowHealth: false,
+  });
+  const partnerLabels: Record<DummyBehavior, string> = {
+    stand: 'Stand',
+    guard: 'Guard',
+    crouchGuard: 'Crouch guard',
+    airGuard: 'Air guard',
+    attack: 'Attack',
+    jumpIn: 'Jump in',
+  };
   let status = $state<GameStatus>({
     ready: false,
     paused: false,
@@ -68,6 +83,11 @@
   function reset(next = mode) {
     mode = next;
     session?.scene.reset(mode);
+    focusArena();
+  }
+  function setPractice(changes: Partial<PracticeOptions>) {
+    practice = { ...practice, ...changes };
+    session?.scene.setPractice(practice);
     focusArena();
   }
   function pause() {
@@ -195,6 +215,47 @@
           ><strong>{status.hits}</strong> HITS <span>·</span>
           <strong>{status.damage}</strong> DAMAGE</span
         >
+      {/if}
+      {#if mode === 'practice'}
+        <div
+          class="practice-options"
+          role="group"
+          aria-label="Practice settings"
+        >
+          <label
+            >Partner
+            <select
+              value={practice.partner}
+              disabled={!status.ready}
+              onchange={(event) =>
+                setPractice({
+                  partner: event.currentTarget.value as DummyBehavior,
+                })}
+            >
+              {#each DUMMY_BEHAVIORS as behavior (behavior)}
+                <option value={behavior}>{partnerLabels[behavior]}</option>
+              {/each}
+            </select></label
+          >
+          <label
+            ><input
+              type="checkbox"
+              checked={practice.maxStock}
+              disabled={!status.ready}
+              onchange={(event) =>
+                setPractice({ maxStock: event.currentTarget.checked })}
+            /> Max stock</label
+          >
+          <label
+            ><input
+              type="checkbox"
+              checked={practice.lowHealth}
+              disabled={!status.ready}
+              onchange={(event) =>
+                setPractice({ lowHealth: event.currentTarget.checked })}
+            /> Low health</label
+          >
+        </div>
       {/if}
       <div class="match-actions">
         <button
@@ -340,10 +401,13 @@
           <kbd>H</kbd> to spend it on COUNTER HIT.
         </p>
         <p>
-          Free practice gives you a stationary partner and no timer. Vs. CPU
-          adds an opponent that approaches, blocks, and attacks. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes
-          starts a fresh match.
+          Free practice has no timer. Below the arena, choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, or jumping in. Max stock refills your supers
+          whenever you stand idle, and Low health keeps Ryuko at 30% for her
+          desperation moves. Vs. CPU adds an opponent that approaches, blocks,
+          and attacks. Reduce their health to zero, or lead on health when time
+          runs out. Changing modes starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

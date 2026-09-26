@@ -13,7 +13,7 @@ import {
 } from './animations';
 import type { Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, Match, WIDTH } from './match';
-import type { Control, Mode } from './match';
+import type { Control, Mode, PracticeOptions } from './match';
 
 export interface GameStatus {
   ready: boolean;
@@ -70,6 +70,8 @@ const keyMap: Record<string, Control> = {
 
 export class TrainingScene extends Phaser.Scene {
   match = new Match();
+  // Kept across resets and mode changes; only free practice reads them.
+  private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
   private clock = new FixedClock();
   private held = new Set<string>();
@@ -192,9 +194,14 @@ export class TrainingScene extends Phaser.Scene {
     this.clearInput();
     this.report();
   }
+  setPractice(options: PracticeOptions) {
+    this.practice = { ...options };
+    this.match.practice = { ...options };
+  }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
     this.match = new Match(mode, mode === 'cpu');
+    this.match.practice = { ...this.practice };
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
     this.idle.forEach((vm) => vm.tick());
     this.paused = false;

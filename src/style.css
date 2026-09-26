@@ -209,6 +209,34 @@ h1 span {
   display: flex;
   gap: 8px;
 }
+.practice-options {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.practice-options label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.practice-options select {
+  font: inherit;
+  color: #e2e7ed;
+  background: #252d35;
+  border: 1px solid #57626c;
+  border-radius: 2px;
+  padding: 4px 6px;
+}
+.practice-options input {
+  accent-color: var(--accent);
+  margin: 0;
+}
+.practice-options :disabled {
+  opacity: 0.45;
+}
 .match-actions button {
   padding: 6px 10px;
   font-size: 11px;
@@ -313,6 +341,15 @@ kbd {
 @media (max-width: 700px) {
   .app-shell {
     padding: 0 10px;
+  }
+  .match-footer {
+    flex-wrap: wrap;
+  }
+  .practice-options {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px 12px;
   }
   .game-toolbar {
     gap: 10px;

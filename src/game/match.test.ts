@@ -10,7 +10,8 @@ import {
   WIDTH,
   STAGE_WIDTH,
 } from './match';
-import type { Input } from './match';
+import type { Fighter, Input } from './match';
+import type { DummyBehavior } from './dummy';
 import { ROUND_END_TICKS } from './hud';
 import { animationDuration, animationFrame } from './animations';
 import { placement } from './standing';
@@ -485,6 +486,120 @@ describe('Daisetsuzan Oroshi command throw', () => {
     ticks(match, 40);
     expect(attacker.action).toBe('win');
     expect(target.action).toBe('knockdown');
+  });
+});
+
+describe('practice partner', () => {
+  // Without an explicit opponent input, practice mode asks the partner.
+  function partner(behavior: DummyBehavior, gap = 120) {
+    const match = new Match();
+    match.practice.partner = behavior;
+    const [ryuko, target] = match.fighters;
+    target.x = ryuko.x + gap;
+    return { match, ryuko, target };
+  }
+  function strike(ryuko: Fighter, action: keyof typeof ATTACKS) {
+    ryuko.action = action;
+    ryuko.age = ATTACKS[action].startup - 1;
+  }
+
+  it('stands still by default', () => {
+    const { match, target } = partner('stand');
+    for (let tick = 0; tick < 200; tick++) match.step();
+    expect(target).toMatchObject({
+      action: 'idle',
+      x: match.fighters[0].x + 120,
+    });
+  });
+
+  it.each([
+    ['guard', 'guard', 'block'],
+    ['crouchGuard', 'crouchGuard', 'crouchBlock'],
+  ] as const)('holds a %s', (behavior, guard, block) => {
+    const { match, ryuko, target } = partner(behavior);
+    match.step();
+    expect(target.action).toBe(guard);
+    strike(ryuko, 'punch');
+    match.step();
+    expect(target).toMatchObject({ action: block, hp: 100 });
+  });
+
+  it('crouch-guards against air attacks, which hit it as overheads', () => {
+    const { match, ryuko, target } = partner('crouchGuard');
+    match.step();
+    ryuko.y = -60;
+    strike(ryuko, 'airPunch');
+    match.step();
+    expect(target).toMatchObject({ action: 'jumpHit', hp: 92 });
+  });
+
+  it.each([
+    ['punch', 0, 'airHit', 92],
+    ['airPunch', 1, 'airBlockHeavy', 100],
+  ] as const)(
+    'jumps and guards in the air: %s (airborne %i) selects %s',
+    (attack, airborne, reaction, hp) => {
+      const { match, ryuko, target } = partner('airGuard');
+      for (let tick = 0; tick < 100 && target.action !== 'airGuard'; tick++)
+        match.step();
+      expect(target.y).toBeLessThan(0);
+      if (airborne) ryuko.y = target.y;
+      strike(ryuko, attack);
+      match.step();
+      expect(target).toMatchObject({ action: reaction, hp });
+    },
+  );
+
+  it('punches in range once a second, so the player can block and counter', () => {
+    const { match, ryuko, target } = partner('attack', 130);
+    match.practice.maxStock = true;
+    const seen = new Set<string>();
+    for (let tick = 0; tick < 250; tick++) {
+      // Block 149 checks for Hit Up at age 8; press three ticks after the stop.
+      const counter =
+        ryuko.action === 'block' && ryuko.age === 3 && ryuko.hitStop === 0;
+      match.step({ guard: !counter, hitUp: counter });
+      seen.add(ryuko.action);
+    }
+    expect([...seen]).toEqual(expect.arrayContaining(['block', 'counterHit']));
+    expect(target.hp).toBeLessThan(100);
+  });
+
+  it('jumps in from a distance with an air kick', () => {
+    const { match, ryuko, target } = partner('jumpIn', 400);
+    const seen = new Set<string>();
+    for (let tick = 0; tick < 300; tick++) {
+      match.step();
+      seen.add(target.action);
+    }
+    expect([...seen]).toEqual(expect.arrayContaining(['jump', 'airKick']));
+    expect(ryuko.hp).toBeLessThan(100);
+  });
+
+  it('tops up stock while idle with Max stock, in practice only', () => {
+    const { match, ryuko } = partner('stand', 250);
+    match.practice.maxStock = true;
+    match.step();
+    expect(ryuko.stock).toBe(3);
+    match.step({ getterBeam: true });
+    expect(ryuko).toMatchObject({ action: 'getterBeam', stock: 2 });
+    for (let tick = 0; tick < 500 && ryuko.action !== 'idle'; tick++)
+      match.step();
+    match.step();
+    expect(ryuko.stock).toBe(3);
+    const cpu = new Match('cpu');
+    cpu.practice.maxStock = true;
+    cpu.step();
+    expect(cpu.fighters[0].stock).toBe(0);
+  });
+
+  it('holds Ryuko at 30% with Low health, for the desperation moves', () => {
+    const { match, ryuko } = partner('stand', 150);
+    match.practice.lowHealth = true;
+    match.step();
+    expect(ryuko.hp).toBe(30);
+    match.step({ dst: true });
+    expect(ryuko.action).toBe('evilDst');
   });
 });
 

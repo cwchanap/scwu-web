@@ -17,6 +17,8 @@ import type {
   ScriptedAction,
   ScriptEvent,
 } from './animations';
+import { dummyInput } from './dummy';
+import type { DummyBehavior } from './dummy';
 import { ROUND_END_TICKS } from './hud';
 export const SUPER_CONTROLS = [
   'getterBeam',
@@ -44,6 +46,13 @@ export type Control =
   | SuperControl;
 export type Input = Partial<Record<Control, boolean>>;
 export type Mode = 'practice' | 'cpu';
+// Free-practice settings (authored): the partner's behavior, stock topped up
+// to three whenever a fighter is idle, and Ryuko's health held at 30%.
+export interface PracticeOptions {
+  partner: DummyBehavior;
+  maxStock: boolean;
+  lowHealth: boolean;
+}
 export const TICK_MS = 10;
 export const WIDTH = 960;
 // The source camera views 640 pixels of a 1280-pixel stage.
@@ -773,6 +782,11 @@ export class Match {
   impacts: Impact[] = [];
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
+  practice: PracticeOptions = {
+    partner: 'stand',
+    maxStock: false,
+    lowHealth: false,
+  };
   private previous: [Input, Input] = [{}, {}];
   private history: [InputFrame[], InputFrame[]] = [[], []];
   private directionTaps: ({ direction: number; tick: number } | null)[] = [
@@ -1439,8 +1453,9 @@ export class Match {
   }
 
   private ai(): Input {
-    if (this.mode === 'practice') return {};
     const [player, cpu] = this.fighters;
+    if (this.mode === 'practice')
+      return dummyInput(this.practice.partner, cpu, player, this.ticks);
     const distance = Math.abs(player.x - cpu.x);
     const attacking = isAttack(player.action);
     if (attacking && distance < 200 && this.ticks % 180 < 90)
@@ -1927,6 +1942,15 @@ export class Match {
       return;
     }
     this.ticks++;
+    if (this.mode === 'practice') {
+      for (const f of this.fighters)
+        if (this.practice.maxStock && f.action === 'idle') {
+          f.stock = MAX_STOCK;
+          f.power = 0;
+        }
+      if (this.practice.lowHealth)
+        this.fighters[0].hp = Math.min(this.fighters[0].hp, DESPERATION_HP);
+    }
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     // The engine records every tick of input, including frozen ones.
     this.history.forEach((history, i) => {
