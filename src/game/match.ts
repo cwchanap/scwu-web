@@ -85,40 +85,175 @@ const multiHits: Partial<
   kick3: { interval: 6, active: 3, count: 8 },
   drill: { interval: 6, active: 3, count: 6 },
 };
-// Ryuko opcode 0x17 selects the victim response; its opcode 0x1a adds
-// hit-stop to BOTH fighters. These are contact pauses, not active-frame gaps.
-// SCWU.KGT's base hit/guard pause is zero. See README's recovered timing table.
-// ponytail: other attacks retain MVP knockback; Hit Up and IORI execute the
-// selected response motion until the remaining callers are reconstructed too.
-const hitResponses = {
-  punch: { stop: 10, kind: 'light' },
-  kick: { stop: 10, kind: 'light' },
-  crouchPunch: { stop: 15, kind: 'heavy' },
-  crouchKick: { stop: 13, kind: 'heavy' },
-  airPunch: { stop: 15, kind: 'heavy' },
-  airKick: { stop: 15, kind: 'heavy' },
-  punch2: { stop: 10, kind: 'light' },
-  punch3: { stop: 15, kind: 'heavy' },
-  kick2: { stop: 15, kind: 'heavy' },
-  hitUp: { stop: 13, kind: 'heavy' },
-  iori: { stop: 15, kind: 'heavy' },
-  iori2: { stop: 15, kind: 'heavy' },
-  iori3: { stop: 13, kind: 'heavy' },
-  kick3: { stop: 0, kind: 'rapid' },
-  drill: { stop: 15, kind: 'heavy' },
-  // Aerial drill pauses are applied by the attacker's contact branch instead.
-  airDrill: { stop: 0, kind: 'heavy' },
-  airDrillSpin: { stop: 0, kind: 'heavy' },
-} as const;
-const followUps = {
-  punch: 'punch2',
-  punch2: 'punch3',
-  kick: 'kick2',
-  kick2: 'kick3',
-  iori: 'iori2',
-  iori2: 'iori3',
-} as const;
-const FOLLOW_UP_GRACE_TICKS = 15;
+// Ryuko's op 0x17 selects the victim response by stance: standing, crouching,
+// airborne, then the same three while guarding. Each response names a victim
+// action (RESPONSE_REACTIONS), whose op 0x1a pauses both fighters. These are
+// contact pauses, not active-frame gaps; SCWU.KGT's base pause is zero. Punch 2
+// and the drill switch sets before their last strike (`last`).
+const ATTACK_RESPONSES: Record<
+  keyof typeof ATTACKS,
+  { ids: number[]; last?: number[] }
+> = {
+  punch: { ids: [1, 1, 2, 22, 23, 2] }, // PC 2366
+  kick: { ids: [1, 1, 2, 22, 23, 2] }, // PC 2558
+  crouchPunch: { ids: [3, 3, 4, 25, 26, 4] }, // PC 2540
+  crouchKick: { ids: [7, 7, 7, 25, 26, 7] }, // PC 2731
+  // Air attacks hit a crouching guard (response 5/6) and push a standing one.
+  airPunch: { ids: [5, 5, 4, 28, 5, 27] }, // PC 2476
+  airKick: { ids: [6, 6, 11, 28, 6, 27] }, // PC 2648
+  punch2: { ids: [8, 8, 9, 22, 23, 9], last: [10, 10, 11, 22, 23, 11] }, // PCs 2400/2413
+  punch3: { ids: [77, 77, 77, 25, 77, 27] }, // PC 2453
+  kick2: { ids: [3, 3, 4, 25, 26, 4] }, // PC 2594
+  kick3: { ids: [20, 20, 21, 34, 35, 36] }, // PC 2631 (action 190)
+  hitUp: { ids: [19, 19, 17, 25, 26, 17] }, // PC 2823
+  iori: { ids: [3, 3, 4, 28, 29, 27] }, // PC 3619
+  iori2: { ids: [71, 71, 4, 28, 29, 27] }, // PC 3655
+  iori3: { ids: [18, 18, 77, 25, 26, 27] }, // PC 3689
+  drill: { ids: [10, 10, 11, 25, 26, 27], last: [18, 18, 18, 28, 29, 27] }, // PCs 2920/2941
+  // Action 208 has no response of its own; its spins (209–211) strike.
+  airDrill: { ids: [56, 56, 56, 34, 35, 80] },
+  airDrillSpin: { ids: [56, 56, 56, 34, 35, 80] }, // PCs 2984/3014
+};
+// Authored impact effect weight: heavy impacts add the 348 streak.
+const heavyImpacts = new Set<Action>([
+  'crouchPunch',
+  'crouchKick',
+  'airPunch',
+  'airKick',
+  'punch3',
+  'kick2',
+  'hitUp',
+  'iori',
+  'iori2',
+  'iori3',
+  'drill',
+  'airDrill',
+  'airDrillSpin',
+]);
+const followUps = { iori: 'iori2', iori2: 'iori3' } as const;
+// Op 0x24 (handler 0x413a50) at these action ages runs the command check at
+// 0x410a50 over the last `window` ticks of input: the newest fresh P (checked
+// first) or K press, preceded by a neutral frame. A match enters that attack.
+const CHAINS: Partial<
+  Record<
+    Action,
+    {
+      checks: [age: number, window: number][];
+      next: [AnimatedAction, AnimatedAction];
+    }
+  >
+> = {
+  punchHit: { checks: [[8, 20]], next: ['punch2', 'kick2'] }, // PCs 2380–2381
+  kickHit: { checks: [[8, 25]], next: ['punch2', 'kick2'] }, // PCs 2572–2573
+  // PCs 2403–2404, 2409–2410 and 2416–2417, after each strike.
+  punch2: {
+    checks: [
+      [21, 10],
+      [27, 10],
+      [33, 30],
+    ],
+    next: ['punch3', 'kick3'],
+  },
+  kick2: { checks: [[26, 30]], next: ['punch3', 'kick3'] }, // PCs 2597–2598
+};
+// Op 0x1e cancel windows, read at 0x41193a: from `age` (until `until`), a
+// command whose action level (header byte 2: normals 21–22, specials 31,
+// supers 41, Mega Getter Beam 42, double jump 255) lies in [min, max] cancels
+// the action, always or once the action's own box has connected (`contact`:
+// the counter at player +0xdf85 that op 0x18 arms and a contact raises to 2).
+const cancelRange = (
+  min: number,
+  max: number,
+  contact = true,
+  age = 0,
+  until?: number,
+) => ({ min, max, contact, age, until });
+const CANCELS: Partial<Record<Action, ReturnType<typeof cancelRange>>> = {
+  punch: cancelRange(30, 50), // 178
+  kick: cancelRange(30, 50), // 186
+  crouchPunch: cancelRange(30, 50), // 185
+  crouchKick: cancelRange(30, 50), // 194
+  punch2: cancelRange(30, 50), // 180
+  kick2: cancelRange(30, 50), // 188
+  punchHit: cancelRange(30, 50, false), // 179
+  kickHit: cancelRange(30, 50, false), // 187
+  airPunch: cancelRange(22, 255), // 182
+  airKick: cancelRange(30, 255), // 191
+  // IORI's stages accept supers (41) but not specials or the Mega Getter Beam.
+  iori: cancelRange(32, 41), // 246
+  iori2: cancelRange(32, 41), // 247
+  iori3: cancelRange(32, 41), // 248
+  airDash: cancelRange(20, 50, false, 3), // 16
+  airBackdash: cancelRange(20, 50, false, 3), // 17
+  counterHit: cancelRange(30, 50, true, 0, 50), // 174
+};
+const IORI = new Set<Action>(['iori', 'iori2', 'iori3']);
+// A super entered while op 0x1f player variable 6 is 100 (set during each IORI
+// stage, PCs 3606/3638/3673) takes its super-cancel path. Getter Beam checks
+// it itself (PC 3972 → 265); the others go through action 254, which needs
+// two stocks (else NO SUPER), spends them and spawns GENGAI! (253). The hidden
+// super's entry (254 + 9) also enters NO SUPER at 150 life or more.
+const SUPER_CANCELS: Partial<
+  Record<
+    SuperControl,
+    { action: ScriptedAction; via254: boolean; life?: number }
+  >
+> = {
+  getterBeam: { action: 'scGetterBeam', via254: false },
+  musashi: { action: 'scMusashi', via254: true }, // 254 + 0 → 260
+  changeAttack: { action: 'scChangeAttack', via254: true }, // 254 + 14 → 318
+  blackRush: { action: 'blackRush', via254: true, life: 150 }, // 254 + 9 → 286 + 5
+};
+// Op 0x24 in the standing and crouching guard reactions: with a stock (their
+// op 0x10 otherwise enters a twin without these checks), a fresh Hit Up
+// button press (0x2020) in the last `window` ticks enters COUNTER HIT (174).
+const guardChecks = (first: number): [age: number, window: number][] =>
+  first === 8
+    ? [
+        [0, 8],
+        [8, 10],
+        [18, 10],
+      ]
+    : [
+        [0, 10],
+        [3, 10],
+        [6, 10],
+        [9, 10],
+        [19, 13],
+      ];
+const GUARD_COUNTERS: Partial<Record<Action, [number, number][]>> = {
+  block: guardChecks(8), // 149, PCs 2016/2018/2021
+  crouchBlock: guardChecks(8), // 151, PCs 2040/2042/2045
+  blockHeavy: guardChecks(10), // 154, PCs 2073–2083
+  crouchBlockHeavy: guardChecks(10), // 156, PCs 2105–2115
+  blockStop: guardChecks(10), // 159, PCs 2146–2156
+  crouchBlockStop: guardChecks(10), // 161, PCs 2177–2187
+  blockRapid: guardChecks(10), // 163, PCs 2207–2217
+  crouchBlockRapid: guardChecks(10), // 165, PCs 2237–2247
+};
+// The input history those checks read: direction and fresh buttons per tick.
+interface InputFrame {
+  neutral: boolean;
+  punch: boolean;
+  kick: boolean;
+  hitUp: boolean;
+}
+const HISTORY_TICKS = 30;
+// Newest fresh press first, then (for two-step commands) an earlier neutral frame.
+function commanded(
+  history: InputFrame[],
+  button: 'punch' | 'kick' | 'hitUp',
+  window: number,
+  afterNeutral = true,
+) {
+  let pressed = false;
+  for (let i = history.length - 1; i >= history.length - window && i >= 0; i--)
+    if (!pressed) {
+      pressed = history[i][button];
+      if (pressed && !afterNeutral) return true;
+    } else if (history[i].neutral) return true;
+  return false;
+}
 const dashes = new Set<Action>(['dash', 'backdash', 'airDash', 'airBackdash']);
 const aerialDrills = new Set<Action>([
   'airDrill',
@@ -132,12 +267,28 @@ const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
 // Opcode 1 acceleration uses floor(0x3c0000 / 100²) in the same 16.16 units.
 const SOURCE_ACCELERATION_SCALE = (393 / 65536) * 1.5;
 const JUMP_GRAVITY = 80 * SOURCE_ACCELERATION_SCALE;
-// Source actions 75/121/159/161: nine impact ticks, then 25/23 moving ticks.
-const reactionSlides = {
-  hitSlide: { velocity: -650, acceleration: 10 },
-  hitPull: { velocity: 650, acceleration: -10 },
-  blockStop: { velocity: -250, acceleration: 8 },
-  crouchBlockStop: { velocity: -250, acceleration: 8 },
+// Op 0x01 in each grounded reaction: raw velocity and acceleration from its
+// first moving tick (after the impact displays), until `until` or its end.
+const slide = (start: number, velocity: number, acceleration = 0) => ({
+  start,
+  velocity,
+  acceleration,
+});
+const reactionSlides: Partial<
+  Record<Action, ReturnType<typeof slide> & { until?: number }>
+> = {
+  hit: { ...slide(5, -280), until: 25 }, // 73, PCs 758–760
+  hitHeavy: slide(9, -650, 10), // 75, PC 800
+  jumpHit: slide(9, -250, 10), // 77, PC 845
+  hitPull: slide(9, 650, -10), // 121, PC 1602
+  block: slide(8, -320), // 149, PC 2019
+  crouchBlock: slide(8, -320), // 151, PC 2043
+  blockHeavy: slide(9, -650, 8), // 154, PC 2081
+  crouchBlockHeavy: slide(9, -650, 8), // 156, PC 2113
+  blockStop: slide(9, -250, 8), // 159, PC 2154
+  crouchBlockStop: slide(9, -250, 8), // 161, PC 2185
+  blockRapid: slide(9, -650, 8), // 163, PC 2215
+  crouchBlockRapid: slide(9, -650, 8), // 165, PC 2245
 };
 // Motion starts at the listed action age; landing enters the next action.
 // Commands before a reaction's first display apply on its first moving tick.
@@ -158,6 +309,8 @@ const launchMotion: Partial<
   // Crouching kick response 7 selects action 79: a lower pop into knockdown.
   sweep: { tick: 6, vx: -300, vy: -1020, gravity: 90, land: 'knockdown' },
   launchDown: { tick: 9, vx: -500, vy: 2000, gravity: 100, land: 'slamBounce' },
+  // Air Drill response 56 → action 135 (PC 1841); its landing branch enters 124.
+  drillDown: { tick: 1, vx: -800, vy: 2000, gravity: 100, land: 'slamBounce' },
   slamBounce: { tick: 10, vx: -400, vy: -700, gravity: 70, land: 'bounceDown' },
   // DST response 31 → action 129 (PC 1747); its landing branch at PC 1756.
   dstToss: { tick: 1, vx: -200, vy: -3000, gravity: 90, land: 'tossBounce' },
@@ -168,6 +321,8 @@ const launchMotion: Partial<
   // Response 43 → action 97 (PC 1186), spinning in 98 until its landing → 146.
   fly: { tick: 6, vx: -100, vy: -2400, gravity: 90, land: 'knockdown' },
 };
+const hasMotion = (action: Action) =>
+  Object.hasOwn(reactionSlides, action) || Object.hasOwn(launchMotion, action);
 // Ryuko's parameter block (file offset 0x157a1d9): 100 power per stock, three
 // stocks, none at the start. Routine 0x40e6f0 carries and borrows between them.
 export const POWER_PER_STOCK = 100;
@@ -191,6 +346,7 @@ const ATTACK_POWER: Partial<Record<Action, number>> = {
   iori2: 3,
   iori3: 3,
   dst: 8,
+  evilDst: 8,
 };
 // Victim reaction scripts add opcode 0x15 power to themselves and the attacker.
 const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
@@ -213,16 +369,18 @@ const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
 for (const action of [
   'hitHeavy',
   'airHitHeavy',
+  'jumpHit',
   'launchUp',
   'launchAway',
   'sweep',
-  'hitSlide',
   'hitPull',
   'launchDown',
   'twist',
   'fly',
 ] as const)
   REACTION_POWER[action] = [5, 3];
+// Action 135 credits only the victim.
+REACTION_POWER.drillDown = [5, 0];
 const DOUBLE_TAP_TICKS = 20;
 // Action 33 walks at raw velocity 200 until PC 339, after its first 50 ticks.
 const INTRO_WALK_TICKS = 50;
@@ -234,6 +392,8 @@ const THROW_RANGE = 115;
 const THROW_DAMAGE = 18;
 // Action 214's one-tick grab box reaches 137 source pixels, versus 76 for the
 // normal grab (196). Its range and both damages are training rules.
+// PC 3082 (op 0x11) enters EVIL DST (221) at 153 of 510 life or less; its box
+// and timing match 214's.
 const DST_STARTUP = 4;
 const DST_RANGE = THROW_RANGE + (137 - 76) * 1.5;
 const DST_DAMAGE = 10;
@@ -245,8 +405,13 @@ const DST_SLIDE_TICKS = 25;
 const grabs = {
   grab: { startup: THROW_STARTUP, range: THROW_RANGE, hold: 'throw' },
   dst: { startup: DST_STARTUP, range: DST_RANGE, hold: 'dstHit' },
+  evilDst: { startup: DST_STARTUP, range: DST_RANGE, hold: 'evilDstHit' },
 } as const;
-const held = { throw: 'grabbed', dstHit: 'dstHeld' } as const;
+const held = {
+  throw: 'grabbed',
+  dstHit: 'dstHeld',
+  evilDstHit: 'superHeld',
+} as const;
 // Spawns from actions 199, 217 and 215 by DST action age (op 0x04): source
 // offsets, draw order from flag bit 0, and the spawned action's own velocity.
 function dstEffects(age: number) {
@@ -296,15 +461,33 @@ const SOURCE_ACTIONS: Record<number, Action> = {
   97: 'fly',
   226: 'axeThrow',
 };
-// Victim actions reached through the response table, with their op 0x1a stops.
+// Victim actions reached through the response table, with their op 0x1a stops
+// for the victim and, where they differ, the attacker.
 const RESPONSE_REACTIONS: Record<
   number,
-  { action: AnimatedAction; stop: number }
+  { action: AnimatedAction; stop: number; attackerStop?: number }
 > = {
+  73: { action: 'hit', stop: 10 },
+  74: { action: 'airHit', stop: 10 },
+  75: { action: 'hitHeavy', stop: 15 },
+  76: { action: 'airHitHeavy', stop: 15 },
+  77: { action: 'jumpHit', stop: 15 },
+  79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
+  // PC 932: ten ticks for the victim, 33 for the attacker.
+  81: { action: 'launchUp', stop: 10, attackerStop: 33 },
   83: { action: 'hitRapid', stop: 0 },
+  84: { action: 'airHitRapid', stop: 0 },
   88: { action: 'shock', stop: 0 },
   97: { action: 'fly', stop: 13 },
+  121: { action: 'hitPull', stop: 15 },
+  123: { action: 'launchDown', stop: 15 },
+  135: { action: 'drillDown', stop: 0 },
+  149: { action: 'block', stop: 10 },
+  151: { action: 'crouchBlock', stop: 10 },
+  153: { action: 'airBlock', stop: 10 },
+  159: { action: 'blockStop', stop: 10 },
+  161: { action: 'crouchBlockStop', stop: 10 },
   // FBB and FBH jump to 83 and 80; FBH first adds 10 power to the attacker.
   111: { action: 'hitRapid', stop: 0 },
   112: { action: 'launchAway', stop: 13 },
@@ -356,7 +539,7 @@ const reactions = new Set<Action>([
   'hitRapid',
   'airHitRapid',
   ...(Object.keys(launchMotion) as Action[]),
-  'hitSlide',
+  'jumpHit',
   'hitPull',
   'shock',
   ...blocks,
@@ -412,6 +595,12 @@ export interface Fighter {
   fade: number;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
+  // An air reaction switched to its ground pose on landing finishes in place.
+  settled: boolean;
+  // This action's own attack or box has connected (hit or block).
+  contact: boolean;
+  // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
+  jumpVariable: number;
 }
 export interface ScriptBox {
   x: number;
@@ -514,6 +703,9 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   onHit: 0,
   fade: 0,
   held: null,
+  settled: false,
+  contact: false,
+  jumpVariable: 0,
 });
 const clampX = (x: number) =>
   Math.max(FIGHTER_MARGIN, Math.min(STAGE_WIDTH - FIGHTER_MARGIN, x));
@@ -582,6 +774,7 @@ export class Match {
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
   private previous: [Input, Input] = [{}, {}];
+  private history: [InputFrame[], InputFrame[]] = [[], []];
   private directionTaps: ({ direction: number; tick: number } | null)[] = [
     null,
     null,
@@ -602,6 +795,7 @@ export class Match {
 
   clearInput() {
     this.previous = [{}, {}];
+    this.history = [[], []];
     this.directionTaps = [null, null];
   }
 
@@ -647,9 +841,16 @@ export class Match {
   private action(f: Fighter, action: Action, restart = false) {
     if (f.action === action && !restart) return;
     addPower(f, ATTACK_POWER[action] ?? 0);
+    // Variable 1: set by actions 10–12 and 16–17 (PCs 119/199/217); an air
+    // dash's end (op 0x0a into action 7 + 0) clears it.
+    if (action === 'doubleJump') f.jumpVariable = 10;
+    else if (action === 'airDash' || action === 'airBackdash')
+      f.jumpVariable = 20;
+    else if (action === 'jump' && dashes.has(f.action)) f.jumpVariable = 0;
     f.action = action;
     f.age = 0;
     f.connected = false;
+    f.contact = false;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
     f.nextJump = false;
@@ -659,6 +860,7 @@ export class Match {
     f.responses = [];
     f.onHit = 0;
     f.fade = 0;
+    f.settled = false;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (isScripted(action) || action === 'superHeld' || action === 'shock') {
@@ -674,6 +876,12 @@ export class Match {
       f.vx = 0;
       f.gravity = 0.24;
     }
+    // 183/192 (entered in an air dash) fall at acceleration 45 (PCs 2489/2668).
+    if (
+      (action === 'airPunch' || action === 'airKick') &&
+      f.jumpVariable === 20
+    )
+      f.gravity = 45 * SOURCE_ACCELERATION_SCALE;
   }
 
   private showResultPose(f: Fighter, index: number) {
@@ -731,6 +939,7 @@ export class Match {
       gravity(f);
       if (f.y === 0) {
         f.doubleJumped = f.airDashed = false;
+        f.jumpVariable = 0;
         this.action(f, motion.land);
       }
     }
@@ -738,14 +947,19 @@ export class Match {
   }
 
   private slideReaction(f: Fighter) {
-    const slide = reactionSlides[f.action as keyof typeof reactionSlides];
-    if (slide) {
-      if (f.age >= animationDuration(f.action as AnimatedAction)) f.vx = 0;
-      else if (f.age >= 9) {
+    const slide = reactionSlides[f.action];
+    if (slide && !f.settled) {
+      if (
+        f.age >= (slide.until ?? animationDuration(f.action as AnimatedAction))
+      )
+        f.vx = 0;
+      else if (f.age >= slide.start) {
         f.vx =
           f.facing *
           (slide.velocity * SOURCE_VELOCITY_SCALE +
-            (f.age - 8) * slide.acceleration * SOURCE_ACCELERATION_SCALE);
+            (f.age - slide.start + 1) *
+              slide.acceleration *
+              SOURCE_ACCELERATION_SCALE);
         f.x = clampX(f.x + f.vx);
       }
     }
@@ -781,6 +995,8 @@ export class Match {
       const hold = grabs[attacker.action as keyof typeof grabs].hold;
       this.action(attacker, hold);
       this.action(target, held[hold]);
+      // A scripted hold (EVIL DST's 222) applies its response at once.
+      this.fireEvents(attacker);
     }
     this.fighters.forEach((target, index) => {
       const attacker = this.fighters[1 - index];
@@ -885,11 +1101,41 @@ export class Match {
     );
   }
 
+  // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
+  private counter(f: Fighter, history: InputFrame[]) {
+    const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
+    if (!check || !f.stock || !commanded(history, 'hitUp', check[1], false))
+      return false;
+    this.action(f, 'counterHit', true);
+    this.fireEvents(f);
+    return true;
+  }
+
   // Ops 0x11 (life) and 0x10 (stock) precede each super's first display. Check
   // them in script order: a branch enters its target, a pass spends the stock.
   private startSuper(f: Fighter, control: SuperControl, airborne: boolean) {
     const command = SUPER_COMMANDS[control];
-    let action: Action | undefined = airborne ? command.air : command.ground;
+    const cancel = IORI.has(f.action) ? SUPER_CANCELS[control] : undefined;
+    if (cancel?.via254) {
+      const life = (f.hp * SOURCE_LIFE) / 100;
+      const enter =
+        f.stock >= 2 && (cancel.life === undefined || life < cancel.life);
+      if (enter) f.stock -= 2;
+      this.action(f, enter ? cancel.action : 'noSuper', true);
+      if (enter)
+        this.spawnObject(f, this.fighters.indexOf(f), {
+          flags: 5,
+          action: 253,
+          x: 0,
+          y: -80,
+          slot: 0,
+        });
+      this.fireEvents(f);
+      return true;
+    }
+    let action: Action | undefined = airborne
+      ? command.air
+      : (cancel?.action ?? command.ground);
     const entered = new Set<Action>();
     while (action && isScripted(action) && !entered.has(action)) {
       entered.add(action);
@@ -1110,6 +1356,7 @@ export class Match {
     if (airborne && f.y === 0) {
       f.vx = f.vy = 0;
       f.doubleJumped = f.airDashed = false;
+      f.jumpVariable = 0;
       this.action(f, 'land');
       return true;
     }
@@ -1117,7 +1364,12 @@ export class Match {
     if (end === 'hold' || end === 'loop' || f.age < animationDuration(action))
       return true;
     if (next === 97) this.action(f, 'fly');
-    else if (f.y < 0) {
+    else if (next === 215) {
+      // Action 222 continues into DST Hit, which re-applies response 30.
+      const target = this.fighters[1 - this.fighters.indexOf(f)];
+      this.action(f, 'dstHit');
+      if (target.action === 'superHeld') this.action(target, 'dstHeld');
+    } else if (f.y < 0) {
       // Op 0x0a into action 7: the ordinary fall.
       this.action(f, 'jump');
       f.gravity = JUMP_GRAVITY;
@@ -1169,10 +1421,10 @@ export class Match {
         damage: blocked || !box.damage ? 0 : sourceDamage(box.damage),
         finisher: true,
         heavy: true,
-        rapid: false,
         hitStop: reaction.stop,
         // Objects, like DST's missiles, pause without pausing Ryuko.
-        attackerStop: source === attacker ? reaction.stop : 0,
+        attackerStop:
+          source === attacker ? (reaction.attackerStop ?? reaction.stop) : 0,
         airDrill: false,
         reaction: reaction.action as AnimatedAction | null,
         facing: source.facing,
@@ -1198,30 +1450,109 @@ export class Match {
     return { punch: this.ticks % 95 === 0, kick: this.ticks % 137 === 0 };
   }
 
+  private doubleJump(f: Fighter, direction: number) {
+    f.doubleJumped = true;
+    f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
+    f.vy = 0;
+    f.airAge = 0;
+    this.action(f, 'doubleJump');
+  }
+
+  // Command entry. Each command carries its action's level (header byte 2);
+  // a cancel window passes only the levels it accepts.
+  private command(
+    f: Fighter,
+    input: Input,
+    previous: Input,
+    airborne: boolean,
+    ok: (level: number) => boolean = () => true,
+  ) {
+    const fresh = (control: Control) => !!input[control] && !previous[control];
+    const start = (action: Action) => {
+      this.action(f, action, true);
+      return true;
+    };
+    for (const control of SUPER_CONTROLS)
+      if (
+        fresh(control) &&
+        ok(control === 'megaBeam' ? 42 : 41) &&
+        this.startSuper(f, control, airborne)
+      )
+        return true;
+    if (fresh('drill') && ok(31)) return start(airborne ? 'airDrill' : 'drill');
+    if (airborne) {
+      if (fresh('punch') && ok(21)) return start('airPunch');
+      if (fresh('kick') && ok(22)) return start('airKick');
+      return false;
+    }
+    if (fresh('iori') && ok(31)) return start('iori');
+    if (fresh('throw') && ok(21)) return start('grab');
+    // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
+    if (fresh('dst') && ok(31))
+      return start(f.hp <= DESPERATION_HP ? 'evilDst' : 'dst');
+    if (
+      fresh('axe') &&
+      ok(31) &&
+      !this.projectiles.some(
+        (p) => p.kind === 'axe' && this.fighters[p.owner] === f,
+      )
+    )
+      return start('axeThrow');
+    if (fresh('punch') && ok(21))
+      return start(input.crouch ? 'crouchPunch' : 'punch');
+    if (fresh('hitUp') && ok(21)) return start('hitUp');
+    if (fresh('kick') && ok(21))
+      return start(input.crouch ? 'crouchKick' : 'kick');
+    return false;
+  }
+
+  // Op 0x1e windows (CANCELS), read on every tick, contact stops included.
+  private cancel(f: Fighter, input: Input, previous: Input) {
+    const range = CANCELS[f.action];
+    if (
+      !range ||
+      f.age < range.age ||
+      f.age >= (range.until ?? Infinity) ||
+      (range.contact && !f.contact)
+    )
+      return false;
+    // 183/184 and 192/193 cap their range at 50: no double jump cancel.
+    const max =
+      f.jumpVariable && (f.action === 'airPunch' || f.action === 'airKick')
+        ? 50
+        : range.max;
+    const ok = (level: number) => level >= range.min && level <= max;
+    const airborne = f.y < 0 || f.vy < 0;
+    if (
+      airborne &&
+      ok(255) &&
+      input.jump &&
+      !previous.jump &&
+      !f.doubleJumped
+    ) {
+      this.doubleJump(
+        f,
+        Number(Boolean(input.right)) - Number(Boolean(input.left)),
+      );
+      return true;
+    }
+    return this.command(f, input, previous, airborne, ok);
+  }
+
   private move(
     f: Fighter,
     other: Fighter,
     input: Input,
     previous: Input,
     doubleTap: boolean,
+    history: InputFrame[],
   ) {
     if (f.hitStop === 0) f.age++;
+    if (this.cancel(f, input, previous)) return;
     const followUp = followUps[f.action as keyof typeof followUps];
-    const ioriFollowUp = f.action === 'iori' || f.action === 'iori2';
-    const followUpOpen =
-      followUp &&
-      isAttack(f.action) &&
-      f.age <
-        animationDuration(f.action) +
-          (ioriFollowUp ? 0 : FOLLOW_UP_GRACE_TICKS);
-    if (followUpOpen) {
-      const control = ioriFollowUp
-        ? 'iori'
-        : f.action.startsWith('punch')
-          ? 'punch'
-          : 'kick';
-      if (input[control] && !previous[control]) f.nextAttack = followUp;
-    }
+    const ioriFollowUp =
+      !!followUp && f.age < animationDuration(f.action as 'iori' | 'iori2');
+    if (ioriFollowUp && input.iori && !previous.iori) f.nextAttack = followUp;
     if (
       (f.action === 'hitUp' || (f.action === 'hitUpRecover' && f.age < 25)) &&
       input.jump &&
@@ -1239,6 +1570,20 @@ export class Match {
       f.action === 'shock'
     )
       return;
+    const chain = CHAINS[f.action];
+    const check = chain?.checks.find(([age]) => age === f.age);
+    if (chain && check) {
+      const next = commanded(history, 'punch', check[1])
+        ? chain.next[0]
+        : commanded(history, 'kick', check[1])
+          ? chain.next[1]
+          : null;
+      if (next) {
+        this.action(f, next, true);
+        return;
+      }
+    }
+    if (this.counter(f, history)) return;
     if (isScripted(f.action) && this.moveScripted(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
@@ -1280,6 +1625,7 @@ export class Match {
       if (f.y === 0) {
         f.doubleJumped = false;
         f.airDashed = false;
+        f.jumpVariable = 0;
         if (f.action === 'thrown') {
           this.action(f, 'knockdown');
           return;
@@ -1289,8 +1635,10 @@ export class Match {
           const remaining = animationDuration(f.action) - f.age;
           if (remaining > 0) {
             this.action(f, groundReaction);
-            // Switch poses without restarting or shortening the hit/block recovery.
+            // Switch poses without restarting or shortening the hit/block
+            // recovery, and without the ground reaction's own slide.
             f.age = animationDuration(groundReaction) - remaining;
+            f.settled = true;
             return;
           }
         }
@@ -1327,6 +1675,13 @@ export class Match {
         f.age >= animationDuration(f.action as AnimatedAction)
       )
         this.action(f, 'airDrillSpin');
+      // A whole spin of action 211 without contact jumps back to 210 (PC 3060).
+      else if (
+        f.action === 'airDrillSpin' &&
+        f.airDrillStage === 3 &&
+        f.age === animationDuration('airDrillSpin')
+      )
+        f.airDrillStage = 2;
       return;
     }
     if (
@@ -1344,12 +1699,15 @@ export class Match {
         f.action === 'axeThrow' ||
         reactions.has(f.action) ||
         [
+          'punchHit',
+          'kickHit',
           'land',
           'drillLand',
           'stand',
           'grab',
           'throw',
           'dst',
+          'evilDst',
           'dstHit',
           'getUp',
         ].includes(f.action)) &&
@@ -1361,6 +1719,13 @@ export class Match {
         f.x = clampX(
           f.x + f.facing * (f.age < 59 ? 900 : 100) * SOURCE_VELOCITY_SCALE,
         );
+      // Actions 180/188 lunge at raw velocity 600: from their first moving
+      // tick until PC 2393 (13 ticks), and from PC 2584 until PC 2592.
+      if (
+        (f.action === 'punch2' && f.age >= 1 && f.age <= 13) ||
+        (f.action === 'kick2' && f.age >= 2 && f.age < 13)
+      )
+        f.x = clampX(f.x + f.facing * 600 * SOURCE_VELOCITY_SCALE);
       // Action 200: six accelerating ticks, then stop before the kick.
       if (f.action === 'hitUp' && f.age >= 2 && f.age < 8)
         f.x = clampX(
@@ -1382,12 +1747,6 @@ export class Match {
         );
       return;
     }
-    if (f.nextAttack) {
-      this.action(f, f.nextAttack, true);
-      return;
-    }
-    // Hold the final pose for late input; queued attacks skip this extra recovery.
-    if (followUpOpen) return;
     if (dashes.has(f.action) && f.action !== 'idle') {
       if (f.action === 'dash' || f.action === 'backdash') {
         const backwards = f.action === 'backdash';
@@ -1427,11 +1786,7 @@ export class Match {
         return;
       }
       if (!f.doubleJumped) {
-        f.doubleJumped = true;
-        f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
-        f.vy = 0;
-        f.airAge = 0;
-        this.action(f, 'doubleJump');
+        this.doubleJump(f, direction);
         return;
       }
     }
@@ -1456,60 +1811,7 @@ export class Match {
       if (airborne) f.airDashed = true;
       return;
     }
-    for (const control of SUPER_CONTROLS)
-      if (
-        input[control] &&
-        !previous[control] &&
-        this.startSuper(f, control, airborne)
-      )
-        return;
-    if (input.drill && !previous.drill) {
-      this.action(f, airborne ? 'airDrill' : 'drill', true);
-      return;
-    }
-    if (!airborne && input.iori && !previous.iori) {
-      this.action(f, 'iori', true);
-      return;
-    }
-    if (!airborne && input.throw && !previous.throw) {
-      this.action(f, 'grab', true);
-      return;
-    }
-    if (!airborne && input.dst && !previous.dst) {
-      this.action(f, 'dst', true);
-      return;
-    }
-    if (
-      !airborne &&
-      input.axe &&
-      !previous.axe &&
-      !this.projectiles.some(
-        (p) => p.kind === 'axe' && this.fighters[p.owner] === f,
-      )
-    ) {
-      this.action(f, 'axeThrow', true);
-      return;
-    }
-    if (input.punch && !previous.punch) {
-      this.action(
-        f,
-        airborne ? 'airPunch' : input.crouch ? 'crouchPunch' : 'punch',
-        true,
-      );
-      return;
-    }
-    if (!airborne && input.hitUp && !previous.hitUp) {
-      this.action(f, 'hitUp', true);
-      return;
-    }
-    if (input.kick && !previous.kick) {
-      this.action(
-        f,
-        airborne ? 'airKick' : input.crouch ? 'crouchKick' : 'kick',
-        true,
-      );
-      return;
-    }
+    if (this.command(f, input, previous, airborne)) return;
     // Actions 23/24: a grounded fighter turns before walking or idling again.
     // Any other input interrupts the turn, as it does standing.
     if (
@@ -1626,6 +1928,17 @@ export class Match {
     }
     this.ticks++;
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
+    // The engine records every tick of input, including frozen ones.
+    this.history.forEach((history, i) => {
+      const [input, previous] = [inputs[i], this.previous[i]];
+      history.push({
+        neutral: !input.left && !input.right && !input.jump && !input.crouch,
+        punch: !!input.punch && !previous.punch,
+        kick: !!input.kick && !previous.kick,
+        hitUp: !!input.hitUp && !previous.hitUp,
+      });
+      if (history.length > HISTORY_TICKS) history.shift();
+    });
     const frozen = this.fighters.map((f) => f.hitStop > 0);
     this.fighters.forEach((f, i) => {
       this.move(
@@ -1634,6 +1947,7 @@ export class Match {
         inputs[i],
         this.previous[i],
         this.doubleTap(inputs[i], i),
+        this.history[i],
       );
       if (
         !['idle', 'walk', 'backwalk', 'turn', 'jump', 'doubleJump'].includes(
@@ -1747,47 +2061,27 @@ export class Match {
           (finisher ? attack.damage % count : 0);
       const target = this.fighters[1 - i];
       if (protectedReactions.has(target.action)) return [];
-      const blocked = guards.has(target.action) && target.facing !== f.facing;
-      const response = hitResponses[f.action];
-      const airborne = target.y < 0 || target.vy < 0;
-      const reaction: AnimatedAction | null =
-        f.action === 'hitUp' && !blocked
-          ? airborne
-            ? 'launchAway'
-            : 'launchUp'
-          : f.action === 'iori3' && !blocked
-            ? airborne
-              ? 'launchDown'
-              : 'launchAway'
-            : (f.action === 'iori' || f.action === 'iori2') && !airborne
-              ? blocked
-                ? target.action.startsWith('crouch')
-                  ? 'crouchBlockStop'
-                  : 'blockStop'
-                : f.action === 'iori'
-                  ? 'hitSlide'
-                  : 'hitPull'
-              : f.action === 'crouchKick' && !blocked
-                ? 'sweep'
-                : null;
+      const guarding = guards.has(target.action) && target.facing !== f.facing;
+      const stance =
+        target.y < 0 || target.vy < 0
+          ? 2
+          : target.action.startsWith('crouch')
+            ? 1
+            : 0;
+      const { ids, last } = ATTACK_RESPONSES[f.action];
+      const response =
+        RESPONSE_REACTIONS[
+          RESPONSES[
+            (finisher && last ? last : ids)[(guarding ? 3 : 0) + stance]
+          ]
+        ];
+      const reaction = response.action;
+      const blocked = blocks.has(reaction);
       const heavy =
-        response.kind === 'heavy' ||
+        heavyImpacts.has(f.action) ||
         (f.action === 'punch2' && finisher && !blocked);
-      const hitStop = airDrill
-        ? 0
-        : blocked
-          ? response.kind === 'rapid'
-            ? 0
-            : 10
-          : reaction === 'launchUp'
-            ? 10
-            : reaction === 'launchDown'
-              ? 15
-              : f.action === 'drill' && finisher
-                ? 13
-                : f.action === 'punch2' && finisher
-                  ? 15
-                  : response.stop;
+      // Aerial drill pauses are applied by the attacker's contact branch instead.
+      const hitStop = airDrill ? 0 : response.stop;
       const distance = (target.x - f.x) * f.facing;
       return !f.connected &&
         f.age >= attack.startup &&
@@ -1803,9 +2097,10 @@ export class Match {
               damage,
               finisher,
               heavy,
-              rapid: response.kind === 'rapid',
-              hitStop: hitStop as number,
-              attackerStop: reaction === 'launchUp' ? 33 : hitStop,
+              hitStop,
+              attackerStop: airDrill
+                ? 0
+                : (response.attackerStop ?? response.stop),
               airDrill,
               reaction: reaction as AnimatedAction | null,
               facing: f.facing,
@@ -1852,7 +2147,6 @@ export class Match {
             damage: MISSILE_DAMAGE,
             finisher: true,
             heavy: true,
-            rapid: false,
             // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
             // The missile, not Ryuko, pauses.
             hitStop: contacts.some(
@@ -1890,7 +2184,6 @@ export class Match {
           damage: 16,
           finisher: true,
           heavy: true,
-          rapid: false,
           hitStop,
           attackerStop: hitStop,
           airDrill: false,
@@ -1912,7 +2205,6 @@ export class Match {
       damage: strength,
       finisher,
       heavy,
-      rapid,
       hitStop,
       attackerStop,
       reaction,
@@ -1929,6 +2221,8 @@ export class Match {
         projectile.age = 0;
       } else if (source) source.connected = true;
       else f.connected = true;
+      // The contact handler (0x40eec4) raises the attacker's cancel counter.
+      if (!projectile && (!source || source === f)) f.contact = true;
       // Hit reactions delete the victim's objects with ids 7–9 (op 0x04, action 0).
       if (!blocked) {
         const victim = this.fighters.indexOf(target);
@@ -1943,44 +2237,26 @@ export class Match {
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
       const airborne = target.y < 0 || target.vy < 0;
-      if (blocked) {
-        const blockReaction = rapid
-          ? airborne
-            ? 'airBlockRapid'
-            : target.action.startsWith('crouch')
-              ? 'crouchBlockRapid'
-              : 'blockRapid'
-          : airborne
-            ? heavy
+      // Only the axe leaves its reaction to stance: action 227's strong
+      // responses (50 → FB → 75, 4, 25–27).
+      if (blocked)
+        this.action(
+          target,
+          reaction ??
+            (airborne
               ? 'airBlockHeavy'
-              : 'airBlock'
-            : target.action.startsWith('crouch')
-              ? heavy
+              : target.action.startsWith('crouch')
                 ? 'crouchBlockHeavy'
-                : 'crouchBlock'
-              : heavy
-                ? 'blockHeavy'
-                : 'block';
-        this.action(target, reaction ?? blockReaction, true);
-      } else {
+                : 'blockHeavy'),
+          true,
+        );
+      else {
         f.hits++;
         this.action(
           target,
           target.hp === 0
             ? 'down'
-            : reaction
-              ? reaction
-              : rapid
-                ? airborne
-                  ? 'airHitRapid'
-                  : 'hitRapid'
-                : airborne
-                  ? heavy
-                    ? 'airHitHeavy'
-                    : 'airHit'
-                  : heavy
-                    ? 'hitHeavy'
-                    : 'hit',
+            : (reaction ?? (airborne ? 'airHitHeavy' : 'hitHeavy')),
           true,
         );
       }
@@ -1991,12 +2267,16 @@ export class Match {
           : (REACTION_POWER[target.action] ?? [0, 0]);
       addPower(target, victimPower);
       addPower(f, attackerPower);
-      if (target.hp === 0 || reaction) {
-        // Scripted reactions stop incoming motion before their impact hold.
+      // Reactions with recovered motion (and every super response) stop
+      // incoming motion before their impact hold.
+      const moved = source !== null || hasMotion(target.action);
+      if (target.hp === 0 || moved) {
         target.vx = target.vy = 0;
         target.facing = facing === 1 ? -1 : 1;
       }
-      if (finisher && target.hp > 0 && !reaction)
+      // ponytail: airborne and rapid reactions keep the MVP push until their
+      // own motion is reconstructed.
+      if (finisher && target.hp > 0 && !moved)
         target.x = clampX(target.x + facing * (blocked ? 8 : 22));
       this.impacts.push({
         x,
@@ -2007,15 +2287,35 @@ export class Match {
         facing,
         effect: blocked ? 'guardSpark' : 'hitSpark',
       });
+      // The guard reaction's first op 0x24 runs before its first display.
+      if (blocked)
+        this.counter(target, this.history[this.fighters.indexOf(target)]);
     }
     // Run contact branches after all hits: an interrupted aerial drill must not
     // apply its own stop or restart, regardless of fighter update order.
-    for (const { f, target, airDrill, blocked, reaction, source } of contacts) {
-      if (reaction && f.action === 'hitUp' && target.hp > 0) {
+    for (const {
+      f,
+      target,
+      airDrill,
+      blocked,
+      projectile,
+      source,
+    } of contacts) {
+      // Action 200's hit handler enters 201 (a blocked kick does not).
+      if (
+        f.action === 'hitUp' &&
+        !blocked &&
+        !projectile &&
+        !source &&
+        target.hp > 0
+      ) {
         const nextJump = f.nextJump;
         this.action(f, 'hitUpRecover');
         f.nextJump = nextJump;
       }
+      // Op 0x02 slots 2 and 3 (hit, guard) enter 179/187 at contact.
+      if ((f.action === 'punch' || f.action === 'kick') && !projectile)
+        this.action(f, f.action === 'punch' ? 'punchHit' : 'kickHit');
       if (airDrill && f.action === 'airDrillSpin') {
         f.hitStop += 8;
         target.hitStop += blocked ? 3 : 9;

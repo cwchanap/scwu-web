@@ -270,11 +270,12 @@
         </p>
         <p>
           Hold <kbd>S</kbd> or the down arrow to crouch. Punch, kick, and guard change
-          with your stance: try them while crouching or in the air. Tap punch or kick
-          again during a standing attack to queue its next attack, up to three. Early
-          taps are remembered, and the recovery pose gives you extra time for a follow-up.
+          with your stance: try them while crouching or in the air. When a standing
+          punch or kick hits or is blocked, tap punch or kick again for the next attack,
+          up to three; the two chains can cross. A missed attack has no follow-up.
           The second punch and jumping kick each strike three times; the third standing
-          kick strikes eight times. Holding a button never repeats an attack.
+          kick strikes eight times. Holding a button never repeats an attack. Jumping
+          attacks break a crouching guard.
         </p>
         <p>
           Hold left or right when jumping to travel in that direction; releasing
@@ -318,7 +319,8 @@
           Press <kbd>G</kbd> or Daisetsuzan for Ryuko's longer-reaching command throw.
           Ryuko transforms, spins the opponent overhead, hurls them into the sky,
           then fires two missiles that can catch them as they fall. A miss leaves
-          a long recovery.
+          a long recovery. At 30% health or less it becomes EVIL DST, striking the
+          held opponent five times first.
         </p>
         <p>
           Landing hits, blocking, and taking damage fill the power gauge at the
@@ -328,10 +330,14 @@
           (also in the air), <kbd>2</kbd> Musashi, <kbd>3</kbd> Getter Change
           Attack, and <kbd>5</kbd> Mega Getter Beam, which needs all three
           stocks. Musashi and the Change Attack grab at close range.
-          <kbd>4</kbd> throws an axe until your health falls below 30%, then becomes
-          the Black Getter Mega Rush. Without enough stock, Ryuko shouts NO SUPER
-          and gains a little power instead. At 30% health or less, Getter Beam also
-          takes its stronger form.
+          <kbd>4</kbd> throws an axe until your health falls below 30%, then
+          becomes the Black Getter Mega Rush. Without enough stock, Ryuko shouts
+          NO SUPER and gains a little power instead. At 30% health or less,
+          Getter Beam also takes its stronger form. Once a punch or kick hits or
+          is blocked, a special or super can cancel it. A super that cancels
+          IORI takes a faster form for two stocks. While blocking with a stock,
+          press
+          <kbd>H</kbd> to spend it on COUNTER HIT.
         </p>
         <p>
           Free practice gives you a stationary partner and no timer. Vs. CPU

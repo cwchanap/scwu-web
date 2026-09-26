@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addPower,
+  ATTACKS,
   AXE_RELEASE_TICK,
   THROW_RELEASE_TICK,
   FIGHTER_MARGIN,
@@ -382,6 +383,46 @@ describe('Daisetsuzan Oroshi command throw', () => {
     },
   );
 
+  it('switches to EVIL DST at 30% health: five held strikes, then the DST spin', () => {
+    const normal = new Match();
+    normal.fighters[0].hp = 31;
+    normal.step({ dst: true });
+    expect(normal.fighters[0].action).toBe('dst');
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 790;
+    attacker.hp = 30;
+    ticks(match, 4, { dst: true });
+    // PC 3082 (op 0x11) enters action 221 at 153 of 510 life or less.
+    expect(attacker).toMatchObject({ action: 'evilDst', age: 3, power: 8 });
+    match.step();
+    // Hit branch 222 applies response 30 at 60 source pixels.
+    expect(attacker).toMatchObject({ action: 'evilDstHit', age: 0 });
+    expect(target).toMatchObject({ action: 'superHeld', x: attacker.x + 90 });
+    const poses = new Set<number>();
+    const objects = new Set<unknown>();
+    for (let tick = 0; tick < 165; tick++) {
+      match.step();
+      if (target.action === 'superHeld') poses.add(target.held!.pose);
+      match.effects.forEach((e) => objects.add(e.clip));
+    }
+    // Op 0x07 held poses; each of the five 223 strikes spawns HP hit (340,
+    // playing 346 and its sparks) and landing smoke (400), credits 5 power
+    // and takes no life.
+    expect([...poses]).toEqual([0, 1, 8, 12, 6]);
+    expect([...objects]).toEqual(expect.arrayContaining([340, 400]));
+    expect(attacker).toMatchObject({ action: 'dstHit', age: 0, power: 33 });
+    expect(target).toMatchObject({
+      action: 'dstHeld',
+      x: attacker.x + 90,
+      y: 0,
+      hp: 100,
+    });
+    ticks(match, 185);
+    expect(target).toMatchObject({ action: 'dstToss', hp: 90 });
+  });
+
   it('whiffs outside its range or against an airborne target with a long recovery', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
@@ -447,6 +488,268 @@ describe('Daisetsuzan Oroshi command throw', () => {
   });
 });
 
+describe('recovered victim responses', () => {
+  const S = (655 / 65536) * 1.5;
+  const A = (393 / 65536) * 1.5;
+  function strike(
+    action: keyof typeof ATTACKS,
+    defense: Input,
+    target: { y?: number } = {},
+  ) {
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 120;
+    victim.y = target.y ?? 0;
+    if (action.startsWith('air')) f.y = -60;
+    f.action = action;
+    f.age = ATTACKS[action].startup - 1;
+    match.step({}, defense);
+    return { match, f, victim };
+  }
+
+  it.each([
+    ['airPunch', {}, 'jumpHit', 92],
+    ['airPunch', { guard: true }, 'blockStop', 100],
+    ['airPunch', { guard: true, crouch: true }, 'jumpHit', 92],
+    ['airKick', { guard: true, crouch: true }, 'jumpHit', 96],
+  ] as const)(
+    'makes %s an overhead: %j selects %s',
+    (action, defense, reaction, hp) => {
+      // Responses 5/6 (action 77) for standing and crouch-guarding victims.
+      const { match, victim } = strike(action, defense);
+      expect(victim).toMatchObject({ action: reaction, hp });
+      const x = victim.x;
+      ticks(match, 15 + 39);
+      // The air kick's next strikes restart 77 before it slides.
+      if (reaction === 'jumpHit' && action === 'airPunch')
+        // PC 845: raw −250 with +10 per tick from age 9 to the end (38).
+        expect(victim.x - x).toBeCloseTo(
+          30 * 250 * S - (10 * A * 30 * 31) / 2,
+          3,
+        );
+    },
+  );
+
+  it.each([
+    ['punch', 'airHit', 92],
+    ['crouchKick', 'sweep', 87],
+    ['hitUp', 'launchAway', 85],
+    ['iori', 'airBlockHeavy', 100],
+    ['drill', 'airBlockHeavy', 100],
+    ['punch3', 'airBlockHeavy', 100],
+  ] as const)(
+    'lets an air guard stop only its air-guard responses: %s selects %s',
+    (action, reaction, hp) => {
+      const { victim } = strike(action, { guard: true }, { y: -40 });
+      expect(victim).toMatchObject({ action: reaction, hp });
+    },
+  );
+
+  it('slams any grounded victim of punch 3 into a floor bounce', () => {
+    for (const defense of [{}, { guard: true, crouch: true }]) {
+      // Response 77 → action 123, including through a crouching guard.
+      const { match, victim } = strike('punch3', defense);
+      expect(victim).toMatchObject({ action: 'launchDown', hp: 84 });
+      const seen = new Set<string>();
+      for (let i = 0; i < 300; i++) {
+        match.step();
+        seen.add(victim.action);
+      }
+      expect(seen).toEqual(
+        new Set(['launchDown', 'slamBounce', 'bounceDown', 'getUp', 'idle']),
+      );
+    }
+    const { victim } = strike('punch3', { guard: true });
+    expect(victim).toMatchObject({ action: 'blockHeavy', hp: 100 });
+  });
+});
+
+describe('recovered guard counter', () => {
+  // Punch 1 is blocked at tick 7; block 149 checks at ages 0, 8 and 18.
+  function blocked(stock: number, press: (tick: number) => boolean) {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 130;
+    target.stock = stock;
+    const seen = new Set<string>();
+    for (let tick = 0; tick < 120; tick++) {
+      match.step(
+        { punch: tick === 0 },
+        { guard: tick <= 7, hitUp: press(tick) },
+      );
+      seen.add(target.action);
+      if (target.action === 'counterHit' && !seen.has('start'))
+        seen.add('start').add(`at ${tick}`);
+    }
+    return { match, f, target, seen };
+  }
+
+  it('spends a stock on COUNTER HIT (174), which launches the attacker', () => {
+    // A press at tick 19 falls in the age-8 check's window (ticks 16–25).
+    const { f, target, seen } = blocked(1, (tick) => tick === 19);
+    expect(seen.has('at 25')).toBe(true);
+    // Guard 149 adds 1 power; op 0x15 then takes 100, borrowing the stock,
+    // and the launch (80) credits the counter 3 more.
+    expect(target).toMatchObject({ stock: 0, power: 4 });
+    // Its box selects response 17 (action 80) for 10 source damage.
+    expect(seen.has('counterHit')).toBe(true);
+    expect(f.hp).toBe(98);
+    expect(f.hits).toBe(0);
+    expect(target.hits).toBe(1);
+  });
+
+  it('reads presses up to eight ticks before the block, but needs a stock', () => {
+    expect(blocked(1, (tick) => tick === 0).seen.has('at 7')).toBe(true);
+    expect(blocked(1, (tick) => tick === -1).seen.has('counterHit')).toBe(
+      false,
+    );
+    const empty = blocked(0, (tick) => tick === 19);
+    expect(empty.seen.has('counterHit')).toBe(false);
+    expect(empty.target).toMatchObject({ stock: 0, power: 1 });
+  });
+
+  it('has no counter from an air guard', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    target.y = -40;
+    target.stock = 1;
+    f.action = 'iori';
+    f.age = ATTACKS.iori.startup - 1;
+    match.step({}, { guard: true, hitUp: true });
+    expect(target.action).toBe('airBlockHeavy');
+    ticks(match, 30, {}, { guard: true, hitUp: true });
+    expect(target.stock).toBe(1);
+  });
+});
+
+describe('recovered cancels', () => {
+  it('cancels a connected normal into a special or super, but not a whiff', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 130;
+    f.stock = 1;
+    match.step({ punch: true });
+    ticks(match, 3);
+    // Op 0x1e mode 1: punch 1 accepts levels 30–50 only after contact.
+    match.step({ drill: true });
+    expect(f.action).toBe('punch');
+    while (f.action === 'punch') match.step();
+    // 179 accepts them always; the drill waits out the contact stop.
+    match.step({ drill: true });
+    expect(f).toMatchObject({ action: 'drill', age: 0 });
+    expect(f.hitStop).toBeGreaterThan(0);
+    const beam = new Match();
+    beam.fighters[1].x = beam.fighters[0].x + 130;
+    beam.fighters[0].stock = 1;
+    beam.step({ punch: true });
+    ticks(beam, 8);
+    beam.step({ getterBeam: true });
+    expect(beam.fighters[0]).toMatchObject({ action: 'getterBeam', stock: 0 });
+    const whiff = new Match();
+    whiff.fighters[1].x = whiff.fighters[0].x + 400;
+    whiff.step({ punch: true });
+    for (let tick = 1; tick < animationDuration('punch'); tick++)
+      whiff.step({ drill: tick === 10 });
+    expect(whiff.fighters[0].action).toBe('punch');
+    whiff.step();
+    expect(whiff.fighters[0].action).toBe('idle');
+  });
+
+  it.each([
+    [2, 100, 'musashi', 'scMusashi', 0],
+    [2, 100, 'getterBeam', 'scGetterBeam', 0],
+    [2, 29, 'getterBeam', 'scEvilBeam', 0],
+    [2, 100, 'changeAttack', 'scChangeAttack', 0],
+    [2, 29, 'blackRush', 'blackRush', 0],
+    [2, 100, 'blackRush', 'noSuper', 2],
+    [1, 100, 'musashi', 'noSuper', 1],
+    [1, 100, 'getterBeam', 'noSuper', 1],
+  ] as const)(
+    'super-cancels IORI with %i stocks at %i health: %s enters %s',
+    (stock, hp, control, action, left) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 150;
+      f.stock = stock;
+      f.hp = hp;
+      match.step({ iori: true });
+      while (!f.contact) match.step();
+      match.step({ [control]: true });
+      expect(f).toMatchObject({ action, stock: left });
+      // Action 254 and 265 spawn GENGAI! (253); NO SUPER does not.
+      expect(match.effects.some((e) => e.clip === 253)).toBe(
+        action !== 'noSuper',
+      );
+    },
+  );
+
+  it('keeps specials, the Mega Getter Beam and a whiffed IORI uncancelled', () => {
+    for (const control of ['drill', 'dst', 'axe', 'megaBeam'] as const) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 150;
+      f.stock = 3;
+      match.step({ iori: true });
+      while (!f.contact) match.step();
+      match.step({ [control]: true });
+      expect(f.action).toBe('iori');
+    }
+    const whiff = new Match();
+    whiff.fighters[1].x = whiff.fighters[0].x + 500;
+    whiff.fighters[0].stock = 2;
+    whiff.step({ iori: true });
+    ticks(whiff, 30);
+    whiff.step({ musashi: true });
+    expect(whiff.fighters[0]).toMatchObject({ action: 'iori', stock: 2 });
+  });
+
+  it('cancels a connected air attack into the air kick or a double jump', () => {
+    function airPunch(setup: (f: Match['fighters'][0]) => void = () => {}) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 120;
+      f.y = target.y = -80;
+      setup(f);
+      f.action = 'airPunch';
+      f.age = ATTACKS.airPunch.startup - 1;
+      match.step();
+      expect(f.contact).toBe(true);
+      return { match, f };
+    }
+    const kick = airPunch();
+    kick.match.step({ kick: true });
+    expect(kick.f.action).toBe('airKick');
+    const jump = airPunch();
+    jump.match.step({ jump: true });
+    expect(jump.f.action).toBe('doubleJump');
+    // After an air dash (variable 1 = 20), 183 caps the range at 50.
+    const dashed = airPunch((f) => (f.jumpVariable = 20));
+    dashed.match.step({ jump: true });
+    expect(dashed.f.action).toBe('airPunch');
+    dashed.match.step({ kick: true });
+    expect(dashed.f.action).toBe('airKick');
+  });
+
+  it('attacks out of an air dash from its third tick with the floatier variant', () => {
+    const match = new Match();
+    const f = match.fighters[0];
+    match.step({ jump: true });
+    ticks(match, 20);
+    match.step({ dash: true });
+    expect(f).toMatchObject({ action: 'airDash', jumpVariable: 20 });
+    match.step({ punch: true });
+    expect(f.action).toBe('airDash');
+    match.step();
+    match.step({ punch: true });
+    // Window from age 3 (PC 207), levels 20–50; 183 sets acceleration 45.
+    expect(f).toMatchObject({ action: 'airPunch', jumpVariable: 20 });
+    expect(f.gravity).toBeCloseTo(45 * (393 / 65536) * 1.5);
+    while (f.y < 0) match.step();
+    expect(f.jumpVariable).toBe(0);
+  });
+});
+
 describe('recovered power gauge', () => {
   it('carries into up to three stocks and borrows back from them', () => {
     const f = new Match().fighters[0];
@@ -473,7 +776,7 @@ describe('recovered power gauge', () => {
     match.step({ iori: true });
     expect(attacker.power).toBe(8);
     ticks(match, 30);
-    expect(target).toMatchObject({ action: 'hitSlide', power: 5 });
+    expect(target).toMatchObject({ action: 'hitHeavy', power: 5 });
     expect(attacker.power).toBe(11);
     const blocker = new Match();
     blocker.fighters[1].x = blocker.fighters[0].x + 100;
@@ -982,6 +1285,8 @@ describe('IORI chain', () => {
 });
 
 describe('prototype training rules', () => {
+  // Action 180 lunges 13 ticks at raw velocity 600 before its first strike.
+  const LUNGE = 13 * 600 * (655 / 65536) * 1.5;
   it.each([1, -1] as const)(
     'plays the catching attack before releasing the opponent facing %i',
     (facing) => {
@@ -1289,12 +1594,16 @@ describe('prototype training rules', () => {
             effect: blocked ? 'guardSpark' : 'hitSpark',
           },
         ]);
-        expect(target.x).not.toBe(contactX + facing * 42);
+        // Reactions 73/149 slide only after their stop and impact display.
+        expect(target.x).toBe(contactX + facing * 42);
         const duration = animationDuration(blocked ? 'guardSpark' : 'hitSpark');
         ticks(match, duration - 1);
         expect(match.impacts).toHaveLength(1);
+        expect(match.impacts[0].x).toBe(contactX);
         ticks(match, 1);
         expect(match.impacts).toHaveLength(0);
+        ticks(match, 20);
+        expect((target.x - contactX) * facing).toBeGreaterThan(60);
       }
     }
   });
@@ -1941,110 +2250,125 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('queues punch and kick follow-ups on fresh presses, then returns to idle', () => {
+  // Chains follow op 0x24: punch 1 and kick 1 enter 179/187 on contact, which
+  // check for P or K at their eighth tick; punch 2 and kick 2 check after
+  // their strikes. Each check needs a fresh press after a neutral frame.
+  function chainMatch(gap = 130) {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + gap;
+    return { match, f, target };
+  }
+
+  it('chains punch 1 or kick 1 into either second attack only after contact', () => {
+    for (const first of ['punch', 'kick'] as const)
+      for (const second of ['punch', 'kick'] as const)
+        for (const guard of [false, true]) {
+          const { match, f } = chainMatch();
+          match.step({ [first]: true }, { guard });
+          while (f.action === first) match.step({}, { guard });
+          // Op 0x02 slots 2 and 3 enter the branch on a hit or a block.
+          expect(f).toMatchObject({ action: `${first}Hit`, age: 0 });
+          const contact = match.ticks;
+          match.step({ [second]: true }, { guard });
+          while (f.action === `${first}Hit`) match.step({}, { guard });
+          // After the 10-tick contact stop and the branch's 8-tick display.
+          expect(f).toMatchObject({ action: `${second}2`, age: 0 });
+          expect(match.ticks - contact).toBe(18);
+        }
+    // A whiff has no branch, so the same presses do nothing.
+    const { match, f } = chainMatch(400);
+    match.step({ punch: true });
+    for (let tick = 1; tick <= animationDuration('punch'); tick++)
+      match.step({ punch: tick % 4 === 0 && tick < 25 });
+    expect(f.action).toBe('idle');
+  });
+
+  it.each([
+    ['on the check', (t: number) => ({ punch: t === 18 }), true],
+    ['after the check', (t: number) => ({ punch: t === 19 }), false],
+    ['at contact', (t: number) => ({ punch: t === 0 }), true],
+    // The window's first tick has no earlier neutral frame inside it.
+    ['a tick before contact', (t: number) => ({ punch: t === -1 }), false],
+    [
+      'holding forward',
+      (t: number) => ({ right: true, punch: t === 5 }),
+      false,
+    ],
+    ['after neutral', (t: number) => ({ right: t < 3, punch: t === 5 }), true],
+  ] as const)(
+    'reads a chain press %s against the 20-tick window of 179',
+    (_, input, chains) => {
+      // Punch 1 connects at tick 7; 179 checks 18 ticks later.
+      const { match, f } = chainMatch();
+      const seen = new Set<string>();
+      for (let tick = 0; tick < 40; tick++) {
+        const pressed = input(tick - 7);
+        match.step({ ...pressed, punch: tick === 0 || pressed.punch });
+        seen.add(f.action);
+      }
+      expect(seen.has('punchHit')).toBe(true);
+      expect(seen.has('punch2')).toBe(chains);
+    },
+  );
+
+  it.each([
+    // Press 13 falls in the first 10-tick window; press 12 has no neutral
+    // frame inside it, so only the 30-tick check at 33 accepts it.
+    ['punch2', 13, 21],
+    ['punch2', 12, 33],
+    ['punch2', 27, 27],
+    ['kick2', 26, 26],
+    ['kick2', 27, null],
+  ] as const)(
+    'cancels %s into punch 3 or kick 3 for a press at age %i, hit or miss',
+    (first, press, switchAge) => {
+      for (const second of ['punch', 'kick'] as const) {
+        const { match, f } = chainMatch(600);
+        f.action = first;
+        let switched: number | null = null;
+        for (let age = 1; age <= 60 && f.action === first; age++) {
+          match.step({ [second]: age === press });
+          if (f.action === `${second}3`) switched = age;
+        }
+        expect(switched).toBe(switchAge);
+      }
+    },
+  );
+
+  it('plays a full punch string on hit with the recovered timing', () => {
+    const { match, f, target } = chainMatch();
+    const sequence: [number, string][] = [];
+    let previous = 'idle';
+    for (let tick = 0; tick < 200; tick++) {
+      match.step([0, 10, 50].includes(tick) ? { punch: true } : {});
+      if (f.action !== previous) sequence.push([tick, f.action]);
+      previous = f.action;
+    }
+    // The lunge of 180 carries punch 2 back into range after 73's slide.
+    expect(sequence).toEqual([
+      [0, 'punch'],
+      [7, 'punchHit'],
+      [25, 'punch2'],
+      [56, 'punch3'],
+      // Punch 3's 57 ticks plus the 15-tick stop of its slam (123).
+      [128, 'idle'],
+    ]);
+    expect(f.hits).toBe(3);
+    expect(target.hp).toBe(100 - 8 - 3 - 16);
+  });
+
+  it('returns to idle after a whiff without repeating a held button', () => {
     for (const control of ['punch', 'kick'] as const) {
-      const match = new Match();
-      const f = match.fighters[0];
+      const { match, f } = chainMatch(400);
       match.step({ [control]: true });
-      ticks(match, 20);
+      ticks(match, animationDuration(control) - 1, { [control]: true });
+      expect(f.action).toBe(control);
       match.step({ [control]: true });
-      ticks(match, animationDuration(control) - f.age);
-      expect(f.action).toBe(`${control}2`);
-      ticks(match, 20);
-      match.step({ [control]: true });
-      ticks(match, animationDuration(`${control}2`) - f.age);
-      expect(f.action).toBe(`${control}3`);
-      ticks(match, animationDuration(`${control}3`) + 20, { [control]: true });
+      expect(f.action).toBe('idle');
+      ticks(match, 100, { [control]: true });
       expect(f.action).toBe('idle');
     }
-  });
-
-  it('plays all three attacks for taps at 0, 200, and 400 ms', () => {
-    for (const control of ['punch', 'kick'] as const) {
-      const match = new Match();
-      const sequence: [number, string][] = [];
-      let previous = 'idle';
-      for (let tick = 0; tick < 200; tick++) {
-        match.step([0, 20, 40].includes(tick) ? { [control]: true } : {}, {});
-        const action = match.fighters[0].action;
-        if (action !== previous) sequence.push([tick * 10, action]);
-        previous = action;
-      }
-      expect(sequence).toEqual(
-        control === 'punch'
-          ? [
-              [0, 'punch'],
-              [270, 'punch2'],
-              [780, 'punch3'],
-              [1350, 'idle'],
-            ]
-          : [
-              [0, 'kick'],
-              [380, 'kick2'],
-              [840, 'kick3'],
-              [1720, 'idle'],
-            ],
-      );
-    }
-  });
-
-  it('accepts early and late follow-ups, then closes the extra 150 ms window', () => {
-    for (const [control, age, follows] of [
-      ['punch', 6, true],
-      ['punch', 30, true],
-      ['punch', 41, true],
-      ['punch', 42, false],
-      ['kick', 6, true],
-      ['kick', 45, true],
-      ['kick', 52, true],
-      ['kick', 53, false],
-    ] as const) {
-      const match = new Match();
-      const f = match.fighters[0];
-      match.step({ [control]: true });
-      ticks(match, age - 1);
-      match.step({ [control]: true });
-      if (age < animationDuration(control)) {
-        expect(f.nextAttack).toBe(`${control}2`);
-        ticks(match, animationDuration(control) - f.age);
-      }
-      expect(f.action).toBe(follows ? `${control}2` : control);
-    }
-  });
-
-  it('holds the recovery pose longer without adding active hits or auto-chaining', () => {
-    for (const [control, end] of [
-      ['punch', 42],
-      ['kick', 53],
-    ] as const) {
-      const match = new Match();
-      match.step({ [control]: true });
-      ticks(match, animationDuration(control), { [control]: true });
-      expect(match.fighters[0].action).toBe(control);
-      match.fighters[0].x = 530;
-      ticks(match, end - 1 - match.fighters[0].age, { [control]: true });
-      expect(match.fighters[0].action).toBe(control);
-      expect(match.fighters[1].hp).toBe(100);
-      match.step({ [control]: true });
-      expect(match.fighters[0].action).toBe('idle');
-      ticks(match, 100, { [control]: true });
-      expect(match.fighters[0].action).toBe('idle');
-      expect(match.fighters[1].hp).toBe(100);
-    }
-  });
-
-  it('clears a buffered follow-up when the fighter is hit', () => {
-    const match = new Match();
-    match.step({ punch: true });
-    ticks(match, 13);
-    match.step({ punch: true });
-    expect(match.fighters[0].nextAttack).toBe('punch2');
-    match.fighters[0].x = 530;
-    ticks(match, 8, {}, { punch: true });
-    expect(match.fighters[0].action).toBe('hit');
-    expect(match.fighters[0].nextAttack).toBeNull();
-    ticks(match, 60);
-    expect(match.fighters[0].action).toBe('idle');
   });
 
   it.each([false, true])(
@@ -2135,22 +2459,6 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('buffers a fresh follow-up during contact freeze', () => {
-    const match = new Match();
-    const f = match.fighters[0];
-    f.x = 530;
-    ticks(match, 8, { punch: true });
-    match.step();
-    match.step({ punch: true });
-    expect(f.age).toBe(7);
-    ticks(match, 8);
-    expect(f.age).toBe(7);
-    ticks(match, animationDuration('punch') - 7);
-    expect(f.action).toBe('punch2');
-    ticks(match, 180);
-    expect(f.action).toBe('idle');
-  });
-
   it('keeps a missed drill on its original clock', () => {
     const match = new Match();
     const [f, target] = match.fighters;
@@ -2186,19 +2494,22 @@ describe('prototype training rules', () => {
   );
 
   it.each([
-    ['punch2', [18, 24, 30], 36, 10],
-    ['airKick', [15, 23, 31], 87, 13],
-    ['kick3', [15, 21, 27, 33, 39, 45, 51, 57], 82, 17],
+    // Hit 73 slides from its fifth tick, so punch 2 drifts between strikes;
+    // its last strike selects 75. Guards 149/163 slide after the last strike.
+    ['punch2', [18, 24, 30], 36, 10, [0, 8.395], 231.173, 95.947],
+    // ponytail: airborne and rapid hit reactions keep the MVP push.
+    ['airKick', [15, 23, 31], 87, 13, [], 22, 8],
+    ['kick3', [15, 21, 27, 33, 39, 45, 51, 57], 82, 17, [], 22, 204.266],
   ] as const)(
-    'gives %s one contact per strike, with knockback only at the end',
-    (action, ages, image, damage) => {
+    'gives %s one contact per strike, then its reaction motion',
+    (action, ages, image, damage, drift, hitShift, guardShift) => {
       for (const facing of [1, -1] as const)
         for (const guarded of [false, true]) {
           const match = new Match();
           const [f, target] = match.fighters;
-          f.x = facing === 1 ? 420 : 540;
+          f.x = facing === 1 ? 420 : 1500;
           f.facing = facing;
-          target.x = f.x + facing * 140;
+          target.x = f.x + facing * (140 + (action === 'punch2' ? LUNGE : 0));
           const targetX = target.x;
           f.action = action;
           if (action === 'airKick') {
@@ -2210,17 +2521,24 @@ describe('prototype training rules', () => {
             match.step({}, { guard: guarded });
             const impact = match.impacts.find((impact) => impact.age === 0);
             if (impact) {
+              if (contacts.length < ages.length - 1)
+                expect((target.x - targetX) * facing).toBeCloseTo(
+                  guarded ? 0 : (drift[contacts.length] ?? 0),
+                  3,
+                );
               contacts.push(f.age);
               expect(animationFrame(action, f.age).image).toBe(image);
               expect(impact.blocked).toBe(guarded);
             }
-            if (contacts.length < ages.length) expect(target.x).toBe(targetX);
           }
           expect(contacts).toEqual(ages);
           expect(f.hits).toBe(guarded ? 0 : ages.length);
           expect(f.damage).toBe(guarded ? 0 : damage);
           expect(target.hp).toBe(guarded ? 100 : 100 - damage);
-          expect(target.x).toBe(targetX + facing * (guarded ? 8 : 22));
+          expect((target.x - targetX) * facing).toBeCloseTo(
+            guarded ? guardShift : hitShift,
+            3,
+          );
         }
     },
   );
@@ -2235,7 +2553,7 @@ describe('prototype training rules', () => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.action = action;
-      target.x = f.x + range + 2;
+      target.x = f.x + range + 2 + (action === 'punch2' ? LUNGE : 0);
       if (action === 'airKick') {
         f.y = target.y = -80;
         f.vy = target.vy = -8;
@@ -2332,8 +2650,11 @@ describe('prototype training rules', () => {
       const transitionY = f.y;
       match.step({}, { guard: guarded });
       expect(f.y - transitionY).toBeCloseTo(22.48764, 5);
-      expect(f.action).toBe('airDrillContact');
-      expect(target.hp).toBe(guarded ? 100 : 79);
+      // Response 56 → action 135 slams a grounded victim into the floor
+      // bounce (124) before the spin returns; guard 163 is struck again.
+      expect(f.action).toBe(guarded ? 'airDrillContact' : 'airDrillSpin');
+      expect(target.action).toBe(guarded ? 'blockRapid' : 'slamBounce');
+      expect(target.hp).toBe(guarded ? 100 : 84);
     },
   );
 
@@ -2379,7 +2700,11 @@ describe('prototype training rules', () => {
       expect(f.action).toBe(action === 'drill' ? 'hit' : 'airHit');
       const interruptedX = f.x;
       ticks(match, 120);
-      expect(f.x).toBe(interruptedX);
+      // Only hit 73's own slide (−280 for 20 ticks) moves the grounded drill.
+      expect(interruptedX - f.x).toBeCloseTo(
+        action === 'drill' ? 20 * 280 * (655 / 65536) * 1.5 : 0,
+        3,
+      );
       expect(f.action).toBe('idle');
     },
   );
@@ -2410,15 +2735,11 @@ describe('prototype training rules', () => {
               expect(animationFrame('airDrillContact', f.age).image).toBe(136);
             }
           }
-          // The victim falls for one tick between successful contacts, seven
-          // between blocks. With the MVP gravity, the hit victim leaves range
-          // after the third contact; blocks remain in range until landing.
+          // Response 56 → action 135 drives a hit victim down, but its nine
+          // stop ticks hold it in reach of each stage; blocks stay in range
+          // too. Both are struck until they land.
           expect(contacts).toEqual(
-            height === -40
-              ? [1]
-              : guarded
-                ? [1, 11, 21, 31, 41, 51, 61]
-                : [1, 11, 21],
+            height === -40 ? [1] : [1, 11, 21, 31, 41, 51, 61],
           );
           expect(damage).toEqual(
             guarded
@@ -2427,7 +2748,7 @@ describe('prototype training rules', () => {
                 : [0, 0, 0, 0, 0, 0, 0]
               : height === -40
                 ? [16]
-                : [16, 5, 3],
+                : [16, 5, 3, 1, 1, 1, 1],
           );
           expect(f.hits).toBe(guarded ? 0 : contacts.length);
           expect(f.action).toBe('idle');
@@ -2435,6 +2756,25 @@ describe('prototype training rules', () => {
         }
     },
   );
+
+  it('returns a third-stage spin (211) that passes without contact to 210', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    f.y = -300;
+    f.action = 'airDrillSpin';
+    f.airDrillStage = 3;
+    target.x = f.x + 600;
+    ticks(match, animationDuration('airDrillSpin') - 1);
+    expect(f.airDrillStage).toBe(3);
+    match.step();
+    expect(f.airDrillStage).toBe(2);
+    // 210's box deals 3 again, rather than 211's 1.
+    target.x = f.x + 130;
+    target.y = f.y;
+    match.step();
+    expect(target.hp).toBe(97);
+    expect(f.airDrillStage).toBe(3);
+  });
 
   it('holds aerial drill startup, keeps missed spins armed, and recovers only on landing', () => {
     const match = new Match();
@@ -2511,6 +2851,10 @@ describe('prototype training rules', () => {
     expect(match.fighters[1].hp).toBe(82);
     expect(match.fighters[0].hits).toBe(6);
     expect(match.fighters[0].action).toBe('idle');
+    // The finisher launched the opponent (response 18 → 80); bring it back.
+    for (let i = 0; i < 200 && match.fighters[1].action !== 'idle'; i++)
+      match.step();
+    match.fighters[1].x = match.fighters[0].x + 112;
     match.step({ jump: true });
     ticks(match, 40);
     match.step({ drill: true });
@@ -2526,7 +2870,7 @@ describe('prototype training rules', () => {
   });
 
   it.each([1, -1] as const)(
-    'times six drill contacts to the spin poses, blocks all six, and knocks back only on the finisher facing %i',
+    'times six drill contacts to the spin poses, blocks all six, and launches on the finisher facing %i',
     (facing) => {
       for (const guarded of [false, true]) {
         const match = new Match();
@@ -2535,25 +2879,32 @@ describe('prototype training rules', () => {
         target.x = f.x + facing * 270;
         const targetX = target.x;
         const contacts: number[] = [];
+        const reactions = new Set<string>();
         match.step({ drill: true }, { guard: guarded });
         for (let tick = 0; tick < 210; tick++) {
           match.step({ drill: true }, { guard: guarded });
+          reactions.add(target.action);
           const impact = match.impacts.find((impact) => impact.age === 0);
           if (impact) {
             contacts.push(f.age);
             expect(animationFrame('drill', f.age).image).toBe(121);
             expect(impact.blocked).toBe(guarded);
             expect(impact.heavy).toBe(true);
-            // The lunge pushes bodies together. Only the final strike adds
-            // attack knockback beyond the normal 90px body separation.
+            // The lunge pushes bodies together; the strikes come faster than
+            // the reactions' slides, which start on their tenth tick.
             if (contacts.length === 1) expect(target.x).toBe(targetX);
-            else
-              expect((target.x - f.x) * facing).toBeCloseTo(
-                contacts.length === 6 ? (guarded ? 98 : 112) : 90,
-              );
+            else expect((target.x - f.x) * facing).toBeCloseTo(90);
           }
         }
         expect(contacts).toEqual([23, 29, 35, 41, 47, 53]);
+        // The last strike selects 18 → 80 (launch), or guard 28/29 → 159/161.
+        expect(
+          [...reactions].filter((a) => !['idle', 'turn', 'guard'].includes(a)),
+        ).toEqual(
+          guarded
+            ? ['blockHeavy', 'blockStop']
+            : ['hitHeavy', 'launchAway', 'knockdown'],
+        );
         expect(
           (f.x - (facing === 1 ? FIGHTER_MARGIN : WIDTH - FIGHTER_MARGIN)) *
             facing,
@@ -2569,14 +2920,16 @@ describe('prototype training rules', () => {
   it.each([1, -1] as const)(
     'makes aerial drill miss across a gap but hit or block on visible contact facing %i',
     (facing) => {
-      for (const [distance, guarded, hp, hits] of [
-        [228, false, 100, 0],
-        [180, false, 84, 1],
-        [180, true, 100, 0],
+      // A hit slams the victim (135) into its floor bounce (124, 147); a block
+      // slides it back (163).
+      for (const [distance, guarded, hp, hits, shift] of [
+        [228, false, 100, 0, 0],
+        [180, false, 84, 1, 239.868],
+        [180, true, 100, 0, 204.266],
       ] as const) {
         const match = new Match();
         const [f, target] = match.fighters;
-        f.x = facing === 1 ? 432 : 528;
+        f.x = facing === 1 ? 432 : 1488;
         target.x = f.x + facing * distance;
         const targetX = target.x;
         match.step({ jump: true }, {});
@@ -2592,7 +2945,7 @@ describe('prototype training rules', () => {
         }
         expect(target.hp).toBe(hp);
         expect(f.hits).toBe(hits);
-        expect(target.x).toBe(targetX);
+        expect((target.x - targetX) * facing).toBeCloseTo(shift, 3);
         expect(f.action).toBe('idle');
       }
     },
@@ -2892,7 +3245,8 @@ describe('prototype training rules', () => {
     match.fighters[1].hp = 8;
     ticks(match, 8, { punch: true });
     expect(match.winner).toBe('player');
-    expect(match.fighters[0].action).toBe('punch');
+    // The lethal hit still enters punch 1's hit branch (179).
+    expect(match.fighters[0].action).toBe('punchHit');
     expect(match.fighters[1].action).toBe('down');
     const end = match.ticks;
     const age = match.fighters[1].age;
@@ -2987,13 +3341,14 @@ describe('prototype training rules', () => {
     expect(match.fighters[0].action).toBe('airHit');
   });
 
+  // An air guard cannot block these: their guard-air responses are 2 and 4.
   it.each([
     ['punch', false, 'airHit', 'hit'],
     ['kick', false, 'airHit', 'hit'],
-    ['punch', true, 'airBlock', 'block'],
-    ['kick', true, 'airBlock', 'block'],
+    ['punch', true, 'airHit', 'hit'],
+    ['kick', true, 'airHit', 'hit'],
     ['crouchPunch', false, 'airHitHeavy', 'hitHeavy'],
-    ['crouchPunch', true, 'airBlockHeavy', 'blockHeavy'],
+    ['crouchPunch', true, 'airHitHeavy', 'hitHeavy'],
   ] as const)(
     'preserves recovery after landing from %s with guard=%s',
     (attack, guard, airReaction, groundReaction) => {
@@ -3011,7 +3366,7 @@ describe('prototype training rules', () => {
       expect(player.y).toBeLessThan(0);
       const duration = animationDuration(airReaction);
       const contactHeight = player.y;
-      ticks(match, attack === 'crouchPunch' && !guard ? 15 : 10);
+      ticks(match, attack === 'crouchPunch' ? 15 : 10);
       expect(player.y).toBe(contactHeight);
       ticks(match, 2);
       expect(player.y).toBe(0);
@@ -3082,6 +3437,8 @@ describe('prototype training rules', () => {
     expect(match.fighters[1].hp).toBe(100);
     expect(match.impacts.at(-1)?.blocked).toBe(true);
     ticks(match, 50);
+    // Guard 149 slid the defender out of punch range.
+    match.fighters[1].x = match.fighters[0].x + 130;
     ticks(match, 8, { punch: true });
     expect(match.fighters[1].action).toBe('hit');
     match.step({}, { kick: true });

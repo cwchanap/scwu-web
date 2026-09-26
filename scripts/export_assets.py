@@ -64,13 +64,14 @@ def decode_event(record):
     return None
 
 
-def flatten(p, c, index):
+def flatten(p, c, index, played=()):
     """Linearize one action for playback by the match.
 
     Inlines op 0x09 calls with their repeat counts and follows op 0x0a jumps. A
     jump back to an executed PC marks a loop; a jump from a super into a basic
-    action (below 250) ends the timeline with `next`. Conditions (0x10, 0x11,
-    0x16, 0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
+    action (below 250), or into an action the match plays as its own clip
+    (`played`), ends the timeline with `next`. Conditions (0x10, 0x11, 0x16,
+    0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
     path is the super's normal path.
     """
     frames, events = [], []
@@ -114,7 +115,7 @@ def flatten(p, c, index):
             if not stack and dest in seen:
                 result.update(loop=seen[dest], end="loop")
                 break
-            if target < 250 <= index:
+            if target < 250 <= index or target in played:
                 result.update(end="jump", next=target, offset=record[3])
                 break
             action, pc = target, dest
@@ -162,18 +163,20 @@ def main():
         "intro": 33,
         "guard": 149, "crouchGuard": 151, "airGuard": 153,
         "blockHeavy": 154, "crouchBlockHeavy": 156, "airBlockHeavy": 158,
-        "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76,
+        "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76, "jumpHit": 77, "drillDown": 135,
         "hitRapid": 83, "airHitRapid": 84,
         "blockRapid": 163, "crouchBlockRapid": 165, "airBlockRapid": 167,
         "punch": 178, "kick": 186, "crouchPunch": 185, "crouchKick": 194,
         "airPunch": 182, "airKick": 191,
         "punch2": 180, "punch3": 181, "kick2": 188, "kick3": 189, "kick3Repeat": 190,
+        "punchHit": 179, "kickHit": 187,
         "drill": 207, "airDrill": 208, "airDrillSpin": 209, "drillLand": 212,
         "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
         "grab": 196, "throw": 197, "throwSpin": 199,
         "hitUp": 200, "hitUpRecover": 201, "hitUpJump": 202,
         "iori": 246, "iori2": 247, "iori3": 248,
         "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218, "dstMissileSmoke": 219,
+        "evilDst": 221,
         "dstFire": 385, "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
         "twist": 85, "twisting": 86, "twisting2": 87,
         "smokeRight": 394, "smokeLeft": 395, "dashSmoke": 396, "hisaSmoke": 398, "hisaSmokeBack": 399,
@@ -213,14 +216,19 @@ def main():
     # The 83-entry response table before it: the victim action for each response id.
     response_offset = held_offset - 4 - 83 * 4
     responses = [u16(data, response_offset + 4 * i) for i in range(83)]
-    # Super timelines, their hit branches (handler slot 2) and every spawned object.
+    # Super timelines, their hit branches (handler slot 2) and every spawned object,
+    # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
+    # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
+    # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253).
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    scripts, queue = {}, [88, 97, 250, 251, 256, 263, 264, 278, 280, 286, 292, 319]
+    scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
+                          279, 280, 286, 292, 318, 319]
+    played = set(actions.values())
     while queue:
         index = queue.pop()
         if index in scripts:
             continue
-        script = scripts[index] = flatten(p, c, index)
+        script = scripts[index] = flatten(p, c, index, played)
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         for event in script["events"]:
             if (event["op"] == "spawn" and event["action"]) or (event["op"] == "handler" and event["slot"] == 2):

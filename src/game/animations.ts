@@ -214,6 +214,9 @@ export const animations = {
   intro: clip(data.clips.intro.slice(2)),
   punch: clip(data.clips.punch),
   kick: clip(data.clips.kick, false, [5, 5, 7, 10, 11]),
+  // Punch 1 and kick 1 enter 179/187 on contact (op 0x02 slots 2 and 3).
+  punchHit: clip(data.clips.punchHit),
+  kickHit: clip(data.clips.kickHit),
   punch2: clip(data.clips.punch2),
   punch3: clip(data.clips.punch3, false, [5, 2, 8, 6, 8, 5, 15, 8]),
   kick2: clip(data.clips.kick2),
@@ -223,8 +226,11 @@ export const animations = {
   iori: clip(data.clips.iori),
   iori2: clip(data.clips.iori2),
   iori3: clip(data.clips.iori3),
-  hitSlide: clip(data.clips.hitHeavy),
   hitPull: clip(data.clips.hitPull),
+  // Response 5/6 (air punch and kick against a grounded opponent) → action 77.
+  jumpHit: clip(data.clips.jumpHit),
+  // Air Drill response 56 → action 135: slammed down until landing enters 124.
+  drillDown: clip(data.clips.drillDown, false, [1]),
   blockStop: clip(data.clips.blockStop),
   crouchBlockStop: clip(data.clips.crouchBlockStop),
   launchDown: clip(data.clips.launchDown, false, [3, 3, 3, 1]),
@@ -247,6 +253,8 @@ export const animations = {
   airDrillContact: clip(data.clips.airDrillSpin.slice(0, 1), false, [2]),
   drillLand: clip(data.clips.drillLand),
   dst: clip(data.clips.dst),
+  // Action 221 repeats DST's grab and 58-tick miss with its own images.
+  evilDst: clip(data.clips.evilDst),
   dstHit: clip([
     data.clips.dstHit[0],
     ...dstSpins,
@@ -361,6 +369,16 @@ export const animations = {
   megaBeamHit: scriptClip(294),
   changeAttack: scriptClip(319),
   changeAttackHit: scriptClip(320),
+  // EVIL DST's hit branch (222) strikes the held opponent five times, then
+  // jumps into DST Hit (215) at PC 3104.
+  evilDstHit: scriptClip(222),
+  // A guard reaction's op 0x24 enters COUNTER HIT (174), spending a stock.
+  counterHit: scriptClip(174),
+  // Super-cancel versions, entered when a super cancels IORI.
+  scMusashi: scriptClip(260),
+  scGetterBeam: scriptClip(265),
+  scEvilBeam: scriptClip(279),
+  scChangeAttack: scriptClip(318),
   // Responses 43 (action 97, looping 98 until landing) and 33 (88, looping 90).
   fly: scriptClip(97),
   shock: scriptClip(88),
@@ -384,6 +402,12 @@ export const SCRIPTED = {
   megaBeamHit: 294,
   changeAttack: 319,
   changeAttackHit: 320,
+  evilDstHit: 222,
+  counterHit: 174,
+  scMusashi: 260,
+  scGetterBeam: 265,
+  scEvilBeam: 279,
+  scChangeAttack: 318,
 } satisfies Partial<Record<Action, number>>;
 export type ScriptedAction = keyof typeof SCRIPTED;
 export const isScripted = (action: Action): action is ScriptedAction =>
