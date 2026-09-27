@@ -7,6 +7,7 @@ import {
   FIGHTER_MARGIN,
   FixedClock,
   Match,
+  reach,
   WIDTH,
   STAGE_WIDTH,
 } from './match';
@@ -502,7 +503,7 @@ describe('practice partner', () => {
   }
   function strike(ryuko: Fighter, action: keyof typeof ATTACKS) {
     ryuko.action = action;
-    ryuko.age = ATTACKS[action].startup - 1;
+    ryuko.age = ATTACKS[action].strikes[0].from - 1;
   }
 
   it('plays the original CPU, guard roll included', () => {
@@ -624,6 +625,49 @@ describe('practice partner', () => {
   });
 });
 
+describe('recovered attack boxes', () => {
+  // Whether the attack, at this age, hurts a standing victim `gap` ahead.
+  function contact(action: keyof typeof ATTACKS, age: number, gap: number) {
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + gap;
+    if (action.startsWith('air')) f.y = -60;
+    f.action = action;
+    f.age = age - 1;
+    match.step();
+    return victim.hp < 100;
+  }
+
+  it.each([
+    ['punch', 7, 74, 63], // PC 2367
+    ['kick', 7, 92, 60], // PC 2559
+    ['crouchPunch', 14, 96, 60], // PC 2541
+    ['airKick', 15, 10, 53], // PC 2649
+    ['kick3', 15, 169, 163], // PC 2632
+  ] as const)(
+    'reaches with %s (age %i) as far as its op 0x18 box: x %i, ±%i',
+    (action, age, x, w) => {
+      // The victim's body (−1, ±37) faces back: its centre sits 1 px nearer.
+      const edge = (x + w + 37 - 1) * 1.5;
+      expect(contact(action, age, edge - 1)).toBe(true);
+      expect(contact(action, age, edge + 1)).toBe(false);
+    },
+  );
+
+  it.each([
+    ['kick', 7, 12], // PCs 2559/2562
+    ['kick2', 16, 26],
+    ['crouchKick', 18, 28],
+    ['airPunch', 18, 33],
+    ['punch3', 36, 41], // PCs 2454/2459
+  ] as const)('opens %s from age %i until %i', (action, from, to) => {
+    expect(contact(action, from - 1, 150)).toBe(false);
+    expect(contact(action, from, 150)).toBe(true);
+    expect(contact(action, to - 1, 150)).toBe(true);
+    expect(contact(action, to, 150)).toBe(false);
+  });
+});
+
 describe('recovered victim responses', () => {
   const S = (655 / 65536) * 1.5;
   const A = (393 / 65536) * 1.5;
@@ -638,7 +682,7 @@ describe('recovered victim responses', () => {
     victim.y = target.y ?? 0;
     if (action.startsWith('air')) f.y = -60;
     f.action = action;
-    f.age = ATTACKS[action].startup - 1;
+    f.age = ATTACKS[action].strikes[0].from - 1;
     match.step({}, defense);
     return { match, f, victim };
   }
@@ -751,7 +795,7 @@ describe('recovered guard counter', () => {
     target.y = -40;
     target.stock = 1;
     f.action = 'iori';
-    f.age = ATTACKS.iori.startup - 1;
+    f.age = ATTACKS.iori.strikes[0].from - 1;
     match.step({}, { guard: true, hitUp: true });
     expect(target.action).toBe('airBlockHeavy');
     ticks(match, 30, {}, { guard: true, hitUp: true });
@@ -848,7 +892,7 @@ describe('recovered cancels', () => {
       f.y = target.y = -80;
       setup(f);
       f.action = 'airPunch';
-      f.age = ATTACKS.airPunch.startup - 1;
+      f.age = ATTACKS.airPunch.strikes[0].from - 1;
       match.step();
       expect(f.contact).toBe(true);
       return { match, f };
@@ -1385,7 +1429,7 @@ describe('IORI chain', () => {
       for (let tick = 0; tick < 23; tick++)
         match.step(
           { iori: tick === 0 || tick === 2 },
-          { kick: tick === (trade ? 11 : 0) },
+          { kick: tick === (trade ? 14 : 0) },
         );
       expect(f.action).toBe('hit');
       expect(f.nextAttack).toBeNull();
@@ -1760,7 +1804,7 @@ describe('prototype training rules', () => {
         attacker.x = facing === 1 ? 530 : 660;
         target.x = facing === 1 ? 660 : 530;
         const contactX = target.x - facing * 42;
-        ticks(match, 11, { kick: true }, { guard: blocked });
+        ticks(match, 8, { kick: true }, { guard: blocked });
         expect(match.impacts).toEqual([
           {
             x: contactX,
@@ -2541,7 +2585,7 @@ describe('prototype training rules', () => {
     expect(Math.min(...heights.slice(0, 11))).toBeCloseTo(-15.2015, 3);
     const raw = (655 / 65536) * 1.5;
     expect(f.x - x).toBeCloseTo(20 * 300 * raw + 13 * 500 * raw, 3);
-    expect(ATTACKS.punch3.startup).toBe(12 + 2 + 8 + 6 + 8);
+    expect(ATTACKS.punch3.strikes[0].from).toBe(12 + 2 + 8 + 6 + 8);
   });
 
   it('plays a full punch string on hit with the recovered timing', () => {
@@ -2648,7 +2692,8 @@ describe('prototype training rules', () => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.action = action;
-      target.x = f.x + 140;
+      // An air-hit victim drifts 13 px per strike; the air kick reaches 148.5.
+      target.x = f.x + (action === 'airKick' ? 120 : 140);
       if (action === 'airKick') {
         f.y = target.y = -80;
         f.vy = target.vy = -8;
@@ -2745,7 +2790,11 @@ describe('prototype training rules', () => {
           const [f, target] = match.fighters;
           f.x = facing === 1 ? 420 : 1500;
           f.facing = facing;
-          target.x = f.x + facing * (140 + (action === 'punch2' ? LUNGE : 0));
+          target.x =
+            f.x +
+            facing *
+              ((action === 'airKick' ? 120 : 140) +
+                (action === 'punch2' ? LUNGE : 0));
           const targetX = target.x;
           f.action = action;
           if (action === 'airKick') {
@@ -2780,16 +2829,16 @@ describe('prototype training rules', () => {
   );
 
   it.each([
-    ['punch2', 21, 205, 24],
-    ['airKick', 19, 180, 23],
-    ['kick3', 18, 225, 21],
+    ['punch2', 21, 24],
+    ['airKick', 19, 23],
+    ['kick3', 18, 21],
   ] as const)(
     'does not hit during the gaps in %s',
-    (action, gapAge, range, nextAge) => {
+    (action, gapAge, nextAge) => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.action = action;
-      target.x = f.x + range + 2 + (action === 'punch2' ? LUNGE : 0);
+      target.x = f.x + reach(action) + 2 + (action === 'punch2' ? LUNGE : 0);
       if (action === 'airKick') {
         f.y = target.y = -80;
         f.vy = target.vy = -8;
@@ -2975,21 +3024,21 @@ describe('prototype training rules', () => {
             }
           }
           // Response 56 → action 135 drives a hit victim down, but its nine
-          // stop ticks hold it in reach of each stage. An air guard selects
-          // 80 → 172, which falls from rest at gravity 70 (PC 2323) and lands
-          // sooner. Both are struck until they land.
+          // stop ticks hold it in reach of each stage until it lands. An air
+          // guard selects 80 → 172, which falls from rest at gravity 70 (PC
+          // 2323): its body box reaches the diving box until the drill lands.
           expect(contacts).toEqual(
             height === -40
               ? [1]
               : guarded
-                ? [1, 11, 21, 31]
+                ? [1, 11, 21, 31, 41, 51]
                 : [1, 11, 21, 31, 41, 51, 61],
           );
           expect(damage).toEqual(
             guarded
               ? height === -40
                 ? [0]
-                : [0, 0, 0, 0]
+                : [0, 0, 0, 0, 0, 0]
               : height === -40
                 ? [16]
                 : [16, 5, 3, 1, 1, 1, 1],
@@ -3604,7 +3653,7 @@ describe('prototype training rules', () => {
           { jump: tick === 0, guard: guard && tick > 0 },
           attack === 'crouchPunch'
             ? { crouch: tick === 52, punch: tick === 52 }
-            : { [attack]: tick === (attack === 'punch' ? 59 : 56) },
+            : { [attack]: tick === 59 },
         );
       expect(player.action).toBe(airReaction);
       expect(player.y).toBeLessThan(0);
@@ -3818,7 +3867,7 @@ describe('recovered CPU', () => {
   // Ryuko's punch becomes active on the next tick; the CPU supplies its input.
   function punch(match: Match, ryuko: Fighter) {
     ryuko.action = 'punch';
-    ryuko.age = ATTACKS.punch.startup - 1;
+    ryuko.age = ATTACKS.punch.strikes[0].from - 1;
     match.step();
   }
 
@@ -3855,7 +3904,7 @@ describe('recovered CPU', () => {
       Object.assign(cpu, { action, age, ...airborne });
       Object.assign(ryuko, {
         action: 'airPunch',
-        age: ATTACKS.airPunch.startup - 1,
+        age: ATTACKS.airPunch.strikes[0].from - 1,
         ...airborne,
       });
       match.step();
@@ -3883,7 +3932,7 @@ describe('recovered CPU', () => {
   it('leaves a supplied opponent input and the practice partner to their own guard', () => {
     const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
     ryuko.action = 'punch';
-    ryuko.age = ATTACKS.punch.startup - 1;
+    ryuko.age = ATTACKS.punch.strikes[0].from - 1;
     match.step({}, {});
     expect(cpu.action).toBe('hit');
     const practice = new Match();

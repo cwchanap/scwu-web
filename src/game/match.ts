@@ -64,37 +64,65 @@ export const GROUND = 636;
 // Reserve the extended air dash (181.5px) and throw/recovery poses, including rounding.
 // Keep one wall for every state so changing pose never relocates a fighter.
 export const FIGHTER_MARGIN = 185;
+// Op 0x18 attack boxes: centre and half size in source pixels from the
+// attacker's origin, x toward its facing, active for ages [from, to).
+const strike = (
+  from: number,
+  to: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+) => ({ from, to, box: { x, y, w, h } });
+// Strikes that repeat every `interval` ticks, as op 0x09 calls and loops do.
+const strikes = (
+  count: number,
+  interval: number,
+  first: ReturnType<typeof strike>,
+) =>
+  Array.from({ length: count }, (_, k) => ({
+    ...first,
+    from: first.from + k * interval,
+    to: first.to + k * interval,
+  }));
+// Authored: damage, the total for a complete move.
 export const ATTACKS = {
-  punch: { startup: 7, active: 5, range: 145, damage: 8 },
-  kick: { startup: 10, active: 7, range: 190, damage: 13 },
-  crouchPunch: { startup: 14, active: 10, range: 175, damage: 8 },
-  crouchKick: { startup: 18, active: 15, range: 195, damage: 13 },
-  airPunch: { startup: 18, active: 19, range: 150, damage: 8 },
-  airKick: { startup: 15, active: 24, range: 180, damage: 13 },
-  punch2: { startup: 18, active: 18, range: 205, damage: 10 },
-  punch3: { startup: 36, active: 20, range: 235, damage: 16 },
-  kick2: { startup: 13, active: 16, range: 205, damage: 14 },
-  hitUp: { startup: 15, active: 10, range: 165, damage: 15 },
-  iori: { startup: 21, active: 8, range: 180, damage: 10 },
-  iori2: { startup: 23, active: 8, range: 220, damage: 12 },
-  iori3: { startup: 21, active: 5, range: 195, damage: 16 },
-  kick3: { startup: 15, active: 48, range: 225, damage: 17 },
-  drill: { startup: 23, active: 36, range: 310, damage: 18 },
-  // The short diagonal drill reaches ~125px, plus the opponent's ~55px body.
-  airDrill: { startup: 22, active: 0, range: 180, damage: 16 },
-  airDrillSpin: { startup: 0, active: Infinity, range: 180, damage: 16 },
-};
-// Recovered strike/gap cycles. Damage above is the total for a complete move.
-const multiHits: Partial<
-  Record<
-    keyof typeof ATTACKS,
-    { interval: number; active: number; count: number }
-  >
-> = {
-  punch2: { interval: 6, active: 3, count: 3 },
-  airKick: { interval: 8, active: 4, count: 3 },
-  kick3: { interval: 6, active: 3, count: 8 },
-  drill: { interval: 6, active: 3, count: 6 },
+  punch: { damage: 8, strikes: [strike(7, 12, 74, -114, 63, 27)] }, // PC 2367
+  kick: { damage: 13, strikes: [strike(7, 12, 92, -91, 60, 31)] }, // PC 2559
+  crouchPunch: { damage: 8, strikes: [strike(14, 24, 96, -89, 60, 24)] }, // PC 2541
+  crouchKick: { damage: 13, strikes: [strike(18, 28, 99, -70, 70, 53)] }, // PC 2732
+  airPunch: { damage: 8, strikes: [strike(18, 33, 25, -43, 54, 38)] }, // PC 2477
+  // PCs 2649/2653/2657.
+  airKick: {
+    damage: 13,
+    strikes: strikes(3, 8, strike(15, 19, 10, -51, 53, 27)),
+  },
+  // PCs 2401/2407/2414.
+  punch2: {
+    damage: 10,
+    strikes: strikes(3, 6, strike(18, 21, 69, -118, 61, 32)),
+  },
+  // PC 2454, after the two landing-timed hops (12 + 2 + 8) and PCs 2446/2450.
+  punch3: { damage: 16, strikes: [strike(36, 41, 66, -102, 82, 83)] },
+  kick2: { damage: 14, strikes: [strike(16, 26, 60, -118, 53, 68)] }, // PC 2595
+  hitUp: { damage: 15, strikes: [strike(15, 25, 33, -152, 40, 45)] }, // PC 2824
+  iori: { damage: 10, strikes: [strike(21, 29, 80, -98, 53, 29)] }, // PC 3620
+  iori2: { damage: 12, strikes: [strike(23, 31, 103, -104, 61, 29)] }, // PC 3656
+  iori3: { damage: 16, strikes: [strike(21, 26, 79, -121, 58, 59)] }, // PC 3690
+  // PC 2619 calls action 190 eight times: its beam box (PC 2632) for 3 of 6 ticks.
+  kick3: {
+    damage: 17,
+    strikes: strikes(8, 6, strike(15, 18, 169, -115, 163, 25)),
+  },
+  // PCs 2921–2942.
+  drill: {
+    damage: 18,
+    strikes: strikes(6, 6, strike(23, 26, 132, -108, 60, 31)),
+  },
+  // Action 208 has no box; its spins (209–211, PCs 2985/3015/3036/3057) keep
+  // one, re-armed by their contact stages rather than by age.
+  airDrill: { damage: 16, strikes: [] },
+  airDrillSpin: { damage: 16, strikes: [strike(0, Infinity, 29, -54, 60, 39)] },
 };
 // Ryuko's op 0x17 selects the victim response by stance: standing, crouching,
 // airborne, then the same three while guarding. Each response names a victim
@@ -557,6 +585,31 @@ const sourceDamage = (life: number) =>
   Math.max(1, Math.round((life * 100) / SOURCE_LIFE));
 // Op 0x19 body box of the victim reactions (83, NO SUPER), in source pixels.
 const BODY = { x: -1, y: -92, w: 37, h: 102 };
+type Box = { x: number; y: number; w: number; h: number };
+// A box from `origin` meets the target's body box when both axes overlap.
+function reaches(
+  origin: { x: number; y: number },
+  facing: number,
+  box: Box,
+  target: Fighter,
+) {
+  return (
+    Math.abs(
+      origin.x +
+        facing * box.x * 1.5 -
+        (target.x + target.facing * BODY.x * 1.5),
+    ) <
+      (box.w + BODY.w) * 1.5 &&
+    Math.abs(origin.y + box.y * 1.5 - (target.y + BODY.y * 1.5)) <
+      (box.h + BODY.h) * 1.5
+  );
+}
+// The farthest centre distance at which an attack's first box meets a victim
+// facing it (for the authored practice partners).
+export function reach(action: keyof typeof ATTACKS) {
+  const { box } = ATTACKS[action].strikes[0];
+  return (box.x + box.w + BODY.w + BODY.x) * 1.5;
+}
 export function isAttack(action: Action): action is keyof typeof ATTACKS {
   return Object.hasOwn(ATTACKS, action);
 }
@@ -1470,14 +1523,7 @@ export class Match {
             y: source.y + this.cameraY - GROUND,
           }
         : source;
-    const x = origin.x + source.facing * box.x * 1.5;
-    const y = origin.y + box.y * 1.5;
-    if (
-      Math.abs(x - (target.x + target.facing * BODY.x * 1.5)) >=
-        (box.w + BODY.w) * 1.5 ||
-      Math.abs(y - (target.y + BODY.y * 1.5)) >= (box.h + BODY.h) * 1.5
-    )
-      return [];
+    if (!reaches(origin, source.facing, box, target)) return [];
     const guarding = this.guarding(target, source);
     const stance =
       target.y < 0 || target.vy < 0
@@ -2172,31 +2218,27 @@ export class Match {
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
       if (frozen[i] || !isAttack(f.action)) return [];
-      const attack = ATTACKS[f.action];
-      const cycle = multiHits[f.action];
+      const { damage: total, strikes } = ATTACKS[f.action];
+      const index = strikes.findIndex(
+        ({ from, to }) => f.age >= from && f.age < to,
+      );
+      const strike = strikes[index];
+      if (!strike) return [];
+      // Each later strike is a fresh box that can connect again.
+      if (index > 0 && f.age === strike.from) f.connected = false;
       const airDrill = f.action === 'airDrillSpin';
-      const activeAge = f.age - attack.startup;
-      if (cycle && activeAge >= 0 && activeAge % cycle.interval === 0)
-        f.connected = false;
       const finisher = airDrill
         ? f.airDrillStage === 3
-        : !cycle || Math.floor(activeAge / cycle.interval) === cycle.count - 1;
-      const count = cycle?.count ?? 1;
+        : index === strikes.length - 1;
       const damage = airDrill
         ? AIR_DRILL_DAMAGE[f.airDrillStage]
-        : Math.floor(attack.damage / count) +
-          (finisher ? attack.damage % count : 0);
+        : Math.floor(total / strikes.length) +
+          (finisher ? total % strikes.length : 0);
       const target = this.fighters[1 - i];
-      const distance = (target.x - f.x) * f.facing;
       if (
         protectedReactions.has(target.action) ||
         f.connected ||
-        f.age < attack.startup ||
-        f.age >= attack.startup + attack.active ||
-        (cycle && activeAge % cycle.interval >= cycle.active) ||
-        distance < 0 ||
-        distance > attack.range ||
-        Math.abs(f.y - target.y) >= 110
+        !reaches(f, f.facing, strike.box, target)
       )
         return [];
       // Decided on contact only: a CPU victim draws its guard roll here.
