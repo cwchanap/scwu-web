@@ -607,15 +607,6 @@ const reactions = new Set<Action>([
   'shock',
   ...blocks,
 ]);
-const groundReactions: Partial<Record<Action, AnimatedAction>> = {
-  airHit: 'hit',
-  airHitHeavy: 'hitHeavy',
-  airHitRapid: 'hitRapid',
-  airBlock: 'block',
-  airBlockHeavy: 'blockHeavy',
-  airTimeStopGuard: 'timeStopGuard',
-  airBlockRapid: 'blockRapid',
-};
 const protectedReactions = new Set<Action>([
   'grabbed',
   'dstHeld',
@@ -660,7 +651,6 @@ export interface Fighter {
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // An air reaction switched to its ground pose on landing finishes in place.
-  settled: boolean;
   // This action's own attack or box has connected (hit or block).
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
@@ -767,7 +757,6 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   onHit: 0,
   fade: 0,
   held: null,
-  settled: false,
   contact: false,
   jumpVariable: 0,
 });
@@ -961,7 +950,6 @@ export class Match {
     f.responses = [];
     f.onHit = 0;
     f.fade = 0;
-    f.settled = false;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (isScripted(action) || action === 'superHeld' || action === 'shock') {
@@ -1053,7 +1041,7 @@ export class Match {
 
   private slideReaction(f: Fighter) {
     const slide = reactionSlides[f.action];
-    if (slide && !f.settled) {
+    if (slide) {
       if (
         f.age >= (slide.until ?? animationDuration(f.action as AnimatedAction))
       )
@@ -1737,22 +1725,16 @@ export class Match {
           this.action(f, 'knockdown');
           return;
         }
-        const groundReaction = groundReactions[f.action];
-        if (groundReaction && f.action !== 'idle') {
-          const remaining = animationDuration(f.action) - f.age;
-          if (remaining > 0) {
-            this.action(f, groundReaction);
-            // Switch poses without restarting or shortening the hit/block
-            // recovery, and without the ground reaction's own slide.
-            f.age = animationDuration(groundReaction) - remaining;
-            f.settled = true;
-            return;
-          }
-        }
+        // 0x411810: landing without a slot-1 handler ends the action, and the
+        // free state reads commands on the same tick. The air reactions have
+        // none.
+        if (AIR_REACTIONS[f.action]) this.action(f, 'idle');
         // Punch 3's landing handlers (slot 1, PCs 2433/2439) continue it.
-        if (f.action === 'punch3') return;
-        this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
-        return;
+        else if (f.action === 'punch3') return;
+        else {
+          this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
+          return;
+        }
       }
     }
     this.recoverKnockdown(f);
@@ -1882,6 +1864,14 @@ export class Match {
       if (f.age < animationDuration(f.action)) return;
     }
     const airborne = f.y < 0 || f.vy < 0;
+    // 0x411a80: an air reaction that ends airborne enters action 7 (+0x7586),
+    // whose op 0x01 (PC 99, flags 0xe) keeps vx, vy and ax and sets gravity 80.
+    if (airborne && AIR_REACTIONS[f.action]) {
+      const { ax } = f;
+      this.action(f, 'jump');
+      f.ax = ax;
+      f.gravity = JUMP_GRAVITY;
+    }
     const direction =
       Number(Boolean(input.right)) - Number(Boolean(input.left));
     const crouched = f.action.startsWith('crouch');

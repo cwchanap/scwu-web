@@ -2692,7 +2692,7 @@ describe('prototype training rules', () => {
       87,
       13,
       [0, 13.439, 26.877],
-      196.083,
+      195.265,
       243.271,
       [15],
     ],
@@ -2917,9 +2917,10 @@ describe('prototype training rules', () => {
       const interruptedX = f.x;
       ticks(match, 120);
       // Only the reaction moves the drill: hit 73's slide (−280 for 20 ticks),
-      // or air hit 74's flight (−300 with ax 1 from age 5, kept in the fall).
+      // or air hit 74's flight (−300 with ax 1 from age 5), kept through
+      // action 7's gravity-80 fall.
       expect(interruptedX - f.x).toBeCloseTo(
-        action === 'drill' ? 20 * 280 * (655 / 65536) * 1.5 : 152.69,
+        action === 'drill' ? 20 * 280 * (655 / 65536) * 1.5 : 147.56,
         2,
       );
       expect(f.action).toBe('idle');
@@ -3603,30 +3604,26 @@ describe('prototype training rules', () => {
     },
   );
 
-  it("finishes an air guard's recovery in place when it lands mid-reaction", () => {
-    const match = new Match();
-    const player = match.fighters[0];
-    Object.assign(player, { action: 'airBlock', age: 0, y: -10, vy: 0 });
-    // 153 falls from rest at gravity 70 and restarts the fall at age 3.
-    ticks(match, 6);
-    expect(player).toMatchObject({ action: 'airBlock', age: 6 });
-    match.step();
-    expect(player).toMatchObject({ action: 'block', y: 0 });
-    const remaining = animationDuration('block') - player.age;
-    expect(remaining).toBe(animationDuration('airBlock') - 7);
-    const x = player.x;
-    ticks(match, remaining - 1, {
-      right: true,
-      punch: true,
-      jump: true,
-      dash: true,
-      drill: true,
-    });
-    expect(player).toMatchObject({ action: 'block', x, y: 0 });
-    match.step();
-    match.step({ punch: true });
-    expect(player.action).toBe('punch');
-  });
+  it.each([false, true])(
+    'ends an air guard on landing, free at once (0x411810), punch=%s',
+    (punch) => {
+      const match = new Match();
+      const player = match.fighters[0];
+      Object.assign(player, { action: 'airBlock', age: 0, y: -10, vy: 0 });
+      // 153 falls from rest at gravity 70 and restarts the fall at age 3.
+      ticks(match, 6);
+      expect(player).toMatchObject({ action: 'airBlock', age: 6 });
+      // No landing handler: motion stops, the action ends, and the free state
+      // reads commands on the landing tick itself.
+      match.step({ punch });
+      expect(player).toMatchObject({
+        action: punch ? 'punch' : 'idle',
+        y: 0,
+        vx: 0,
+        vy: 0,
+      });
+    },
+  );
 
   it('shows win/loss or draw poses when time expires with both fighters alive', () => {
     for (const hp of [92, 100]) {
@@ -4029,6 +4026,20 @@ describe('recovered air and rapid reaction motion', () => {
       );
     },
   );
+
+  it('falls as action 7 once a reaction ends airborne, keeping ax (0x411a80)', () => {
+    const { match, target } = place('airBlock', -400);
+    ticks(match, animationDuration('airBlock'));
+    expect(target.action).toBe('jump');
+    const { vx, vy } = target;
+    match.step({}, {});
+    // Action 7's op 0x01 (PC 99, flags 0xe) keeps vx, vy and ax; gravity 80.
+    expect(target.vx - vx).toBeCloseTo(15 * acc, 9);
+    expect(target.vy - vy).toBeCloseTo(80 * acc, 9);
+    for (let tick = 0; tick < 200 && target.y < 0; tick++) match.step({}, {});
+    // Its landing handler (slot 1, PC 95) enters LEND (9).
+    expect(target.action).toBe('land');
+  });
 
   it('pushes the beam hit back at raw 150, then drifts it in at +10 (83)', () => {
     const { match, target } = place('hitRapid', 0);
