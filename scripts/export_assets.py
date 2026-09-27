@@ -216,13 +216,34 @@ def main():
     # The 83-entry response table before it: the victim action for each response id.
     response_offset = held_offset - 4 - 83 * 4
     responses = [u16(data, response_offset + 4 * i) for i in range(83)]
+    # The CPU table 10 bytes after the held-pose table: 100 entries of 111 bytes
+    # (name, +0x20 flags, +0x21 probability, +0x22/+0x24 distance, ten 7-byte
+    # steps at +0x2a), played by the CPU routine at 0x411270. Keep entries up to
+    # the last used one; the engine still rolls for every slot.
+    cpu_offset = held_offset + 15 * 6 + 10
+    if data[cpu_offset:cpu_offset + 6] != "登録1\0".encode("cp932"):
+        sys.exit("Unexpected CPU table layout; refusing to export.")
+    cpu = []
+    for i in range(100):
+        entry = cpu_offset + 111 * i
+        steps = []
+        for k in range(10):
+            direction, command, duration = struct.unpack_from("<HHH", data, entry + 0x2a + 7 * k)
+            if not direction & 0x2000:
+                break
+            steps.append(dict(direction=direction & 15, command=command, duration=duration))
+        cpu.append(dict(flags=data[entry + 0x20], probability=data[entry + 0x21],
+                        min=u16(data, entry + 0x22), max=u16(data, entry + 0x24), steps=steps))
+    while cpu and not cpu[-1]["probability"]:
+        cpu.pop()
     # Super timelines, their hit branches (handler slot 2) and every spawned object,
     # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
-    # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253).
+    # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
+    # IORI (410, which jumps through 411 into iori3).
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
-                          279, 280, 286, 292, 318, 319]
+                          279, 280, 286, 292, 318, 319, 410]
     played = set(actions.values())
     while queue:
         index = queue.pop()
@@ -249,7 +270,7 @@ def main():
             path.unlink()
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, clips=clips, held=held,
-        responses=responses, scripts={str(k): scripts[k] for k in sorted(scripts)},
+        responses=responses, cpu=cpu, scripts={str(k): scripts[k] for k in sorted(scripts)},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()
     # Python is an independent oracle. Keep fixtures out of the browser bundle.

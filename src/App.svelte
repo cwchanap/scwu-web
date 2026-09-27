@@ -405,9 +405,9 @@
           behaves: standing, guarding high or low, guarding in the air,
           attacking in range, or jumping in. Max stock refills your supers
           whenever you stand idle, and Low health keeps Ryuko at 30% for her
-          desperation moves. Vs. CPU adds an opponent that approaches, blocks,
-          and attacks. Reduce their health to zero, or lead on health when time
-          runs out. Changing modes starts a fresh match.
+          desperation moves. Vs. CPU is the original game's CPU, playing Ryuko's
+          own moves, specials and supers. Reduce their health to zero, or lead
+          on health when time runs out. Changing modes starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

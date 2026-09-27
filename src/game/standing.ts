@@ -67,6 +67,12 @@ export function heldPlacement(
   };
 }
 
+// MSVC rand (engine 0x417a22): the next 32-bit seed and its 15-bit result.
+export function rand(seed: number): [number, number] {
+  const next = (Math.imul(seed, 214013) + 2531011) >>> 0;
+  return [next, (next >>> 16) & 32767];
+}
+
 export class StandingVM {
   pc: number;
   timer = 0;
@@ -181,8 +187,8 @@ export class StandingVM {
           continue;
         }
       } else if (op === 32) {
-        this.seed = (Math.imul(this.seed, 214013) + 2531011) >>> 0;
-        const random = (this.seed >>> 16) & 32767;
+        const [seed, random] = rand(this.seed);
+        this.seed = seed;
         const remainder = random % (u16(r, 1) + 1);
         const taken = remainder > u16(r, 3) && u16(r, 6) !== 0;
         this.branches.push({

@@ -374,6 +374,8 @@ export const animations = {
   evilDstHit: scriptClip(222),
   // A guard reaction's op 0x24 enters COUNTER HIT (174), spending a stock.
   counterHit: scriptClip(174),
+  // Command 22 (CPU IORI): action 410 jumps to 411, which jumps to iori3 (248).
+  cpuIori: scriptClip(410),
   // Super-cancel versions, entered when a super cancels IORI.
   scMusashi: scriptClip(260),
   scGetterBeam: scriptClip(265),
@@ -404,6 +406,7 @@ export const SCRIPTED = {
   changeAttackHit: 320,
   evilDstHit: 222,
   counterHit: 174,
+  cpuIori: 410,
   scMusashi: 260,
   scGetterBeam: 265,
   scEvilBeam: 279,

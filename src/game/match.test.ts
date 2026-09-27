@@ -12,6 +12,8 @@ import {
 } from './match';
 import type { Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
+import { CpuVM } from './cpu';
+import type { CpuEntry } from './cpu';
 import { ROUND_END_TICKS } from './hud';
 import { animationDuration, animationFrame } from './animations';
 import { placement } from './standing';
@@ -3574,10 +3576,7 @@ describe('prototype training rules', () => {
     expect(match.ticks).toBe(end);
   });
 
-  it('runs a CPU opponent and resolves the 60-second time limit', () => {
-    const cpu = new Match('cpu');
-    for (let i = 0; i < 500; i++) cpu.step();
-    expect(cpu.fighters[0].hp).toBeLessThan(100);
+  it('resolves the 60-second time limit', () => {
     const match = new Match('cpu');
     match.fighters[1].hp = 92;
     ticks(match, 6000);
@@ -3606,4 +3605,139 @@ it('uses fixed ticks regardless of render partition and drops suspended time', (
   clock.reset();
   clock.advance(1, () => count++);
   expect(count).toBe(0);
+});
+
+describe('CPU IORI', () => {
+  it('plays 410 and 411, then continues into iori3', () => {
+    const match = new Match('cpu');
+    const [ryuko, cpu] = match.fighters;
+    cpu.x = ryuko.x + 1000; // out of reach: timing only
+    match.step({}, { cpuIori: true });
+    expect(cpu).toMatchObject({ action: 'cpuIori', age: 0 });
+    // 410's displays (5 + 8 + 8 + 8 + 3) and 411's (3 + 5 + 5 + 10 + 8 + 3).
+    expect(animationDuration('cpuIori')).toBe(66);
+    ticks(match, 65);
+    expect(cpu.action).toBe('cpuIori');
+    expect(cpu.x).toBeLessThan(ryuko.x + 1000);
+    match.step({}, {});
+    expect(cpu).toMatchObject({ action: 'iori3', age: 0 });
+  });
+
+  it('hits with response 3 for source damage 10', () => {
+    const match = new Match('cpu');
+    const [ryuko, cpu] = match.fighters;
+    cpu.x = ryuko.x + 150;
+    match.step({}, { cpuIori: true });
+    for (let tick = 0; tick < 40 && ryuko.action !== 'hitHeavy'; tick++)
+      match.step({}, {});
+    expect(ryuko.action).toBe('hitHeavy'); // response 3 → action 75
+    expect(ryuko.hp).toBe(98); // 10 source life × 100 / 510
+  });
+});
+
+describe('recovered CPU', () => {
+  // An empty table leaves only the guard roll acting.
+  function vsCpu(vm: CpuVM, gap = 120) {
+    const match = new Match('cpu');
+    match.cpu = vm;
+    const [ryuko, cpu] = match.fighters;
+    cpu.x = ryuko.x + gap;
+    return { match, ryuko, cpu };
+  }
+  // Ryuko's punch becomes active on the next tick; the CPU supplies its input.
+  function punch(match: Match, ryuko: Fighter) {
+    ryuko.action = 'punch';
+    ryuko.age = ATTACKS.punch.startup - 1;
+    match.step();
+  }
+
+  it('guards a neutral CPU on rand % 100 < level, ignoring its input', () => {
+    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
+    punch(match, ryuko);
+    expect(cpu.action).toBe('block');
+    const never = vsCpu(new CpuVM([], 0));
+    punch(never.match, never.ryuko);
+    expect(never.cpu.action).toBe('hit');
+  });
+
+  it('does not roll while the CPU attacks or reacts', () => {
+    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
+    Object.assign(cpu, { action: 'noSuper', age: 0 });
+    punch(match, ryuko);
+    expect(cpu.action).toBe('hit');
+  });
+
+  it('keeps guarding through a guard reaction', () => {
+    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 0));
+    Object.assign(cpu, { action: 'block', age: 0 });
+    punch(match, ryuko);
+    expect(cpu.action).toBe('block');
+  });
+
+  it('rolls only when a hit lands', () => {
+    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 0), 400);
+    punch(match, ryuko);
+    for (let tick = 0; tick < 10; tick++) match.step();
+    expect(match.cpu.seed).toBe(0);
+    cpu.x = ryuko.x + 120;
+    punch(match, ryuko);
+    expect(cpu.action).toBe('hit');
+    expect(match.cpu.seed).not.toBe(0);
+  });
+
+  it('leaves a supplied opponent input and the practice partner to their own guard', () => {
+    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
+    ryuko.action = 'punch';
+    ryuko.age = ATTACKS.punch.startup - 1;
+    match.step({}, {});
+    expect(cpu.action).toBe('hit');
+    const practice = new Match();
+    practice.cpu = new CpuVM([], 100);
+    const [player, partner] = practice.fighters;
+    partner.x = player.x + 120;
+    punch(practice, player);
+    expect(partner.action).toBe('hit');
+  });
+
+  it('dashes only through its DASH commands', () => {
+    const jumpToward: CpuEntry = {
+      flags: 1,
+      probability: 100,
+      min: 0,
+      max: 2000,
+      steps: [{ direction: 9, command: 0, duration: 5 }],
+    };
+    const spent = {
+      action: 'jump',
+      y: -200,
+      vy: 0,
+      doubleJumped: true,
+    } as const;
+    const { match, cpu } = vsCpu(new CpuVM([jumpToward], 100), 400);
+    Object.assign(cpu, spent);
+    match.step();
+    expect(cpu).toMatchObject({ action: 'jump', airDashed: false });
+    // The same press from a player-driven opponent takes the air-dash shortcut.
+    const player = vsCpu(new CpuVM([], 100), 400);
+    Object.assign(player.cpu, spent);
+    player.match.step({}, { left: true, jump: true });
+    expect(player.cpu.action).toBe('airDash');
+  });
+
+  it('plays from the recovered table against an idle player', () => {
+    const match = new Match('cpu');
+    const [ryuko, cpu] = match.fighters;
+    const actions = new Set<string>();
+    for (let tick = 0; tick < 3000 && !match.winner; tick++) {
+      match.step({});
+      actions.add(cpu.action);
+    }
+    expect(actions.size).toBeGreaterThan(3);
+    expect(actions.has('jump')).toBe(true);
+    expect(ryuko.hp).toBeLessThan(100);
+  });
+
+  it('seeds the CPU from the match', () => {
+    expect(new Match('cpu', false, 7).cpu.seed).toBe(7);
+  });
 });

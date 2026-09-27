@@ -17,6 +17,7 @@ import type {
   ScriptedAction,
   ScriptEvent,
 } from './animations';
+import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
 import { ROUND_END_TICKS } from './hud';
@@ -43,6 +44,7 @@ export type Control =
   | 'axe'
   | 'throw'
   | 'dst'
+  | 'cpuIori'
   | SuperControl;
 export type Input = Partial<Record<Control, boolean>>;
 export type Mode = 'practice' | 'cpu';
@@ -540,6 +542,19 @@ const blocks = new Set<Action>([
   'crouchBlockStop',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
+// Where move() lets a fighter start guarding: the authored stand-in for the
+// engine's object flags +0x15e & 0xc, under which a CPU victim rolls a guard.
+const neutral = new Set<Action>([
+  'idle',
+  'walk',
+  'backwalk',
+  'turn',
+  'crouchTurn',
+  'crouch',
+  'crouchEnter',
+  'jump',
+  'doubleJump',
+]);
 const reactions = new Set<Action>([
   'hit',
   'hitHeavy',
@@ -787,6 +802,9 @@ export class Match {
     maxStock: false,
     lowHealth: false,
   };
+  cpu: CpuVM;
+  // This tick's Vs. CPU opponent input comes from the CPU (none was supplied).
+  private cpuDriven = false;
   private previous: [Input, Input] = [{}, {}];
   private history: [InputFrame[], InputFrame[]] = [[], []];
   private directionTaps: ({ direction: number; tick: number } | null)[] = [
@@ -797,7 +815,9 @@ export class Match {
   constructor(
     public mode: Mode = 'practice',
     intro = false,
+    seed = 0,
   ) {
+    this.cpu = new CpuVM(RYUKO_CPU, CPU_LEVEL, seed);
     if (!intro) return;
     // Authored start: both walk-ins end 360 pixels apart around the stage center.
     this.fighters = [
@@ -1378,6 +1398,9 @@ export class Match {
     if (end === 'hold' || end === 'loop' || f.age < animationDuration(action))
       return true;
     if (next === 97) this.action(f, 'fly');
+    // CPU IORI: 411 jumps into iori3 at PC 5888. ponytail: op 0x20 at PC 5887
+    // recovers one time in six instead; add the roll with that recovery clip.
+    else if (next === 248) this.action(f, 'iori3');
     else if (next === 215) {
       // Action 222 continues into DST Hit, which re-applies response 30.
       const target = this.fighters[1 - this.fighters.indexOf(f)];
@@ -1416,8 +1439,7 @@ export class Match {
       Math.abs(y - (target.y + BODY.y * 1.5)) >= (box.h + BODY.h) * 1.5
     )
       return [];
-    const guarding =
-      guards.has(target.action) && target.facing !== source.facing;
+    const guarding = this.guarding(target, source);
     const stance =
       target.y < 0 || target.vy < 0
         ? 2
@@ -1453,16 +1475,23 @@ export class Match {
   }
 
   private ai(): Input {
-    const [player, cpu] = this.fighters;
+    const [player, opponent] = this.fighters;
     if (this.mode === 'practice')
-      return dummyInput(this.practice.partner, cpu, player, this.ticks);
-    const distance = Math.abs(player.x - cpu.x);
-    const attacking = isAttack(player.action);
-    if (attacking && distance < 200 && this.ticks % 180 < 90)
-      return { guard: true };
-    if (distance > 150)
-      return { left: player.x < cpu.x, right: player.x > cpu.x };
-    return { punch: this.ticks % 95 === 0, kick: this.ticks % 137 === 0 };
+      return dummyInput(this.practice.partner, opponent, player, this.ticks);
+    return this.cpu.input(opponent, player);
+  }
+
+  // 0x40f3a2: a CPU victim ignores its input. In a neutral state it guards on
+  // rand % 100 < level; in a guard reaction it keeps guarding.
+  private guarding(target: Fighter, source: { facing: number }) {
+    if (guards.has(target.action) && target.facing !== source.facing)
+      return true;
+    return (
+      this.cpuDriven &&
+      target === this.fighters[1] &&
+      neutral.has(target.action) &&
+      this.cpu.guards()
+    );
   }
 
   private doubleJump(f: Fighter, direction: number) {
@@ -1501,6 +1530,13 @@ export class Match {
       return false;
     }
     if (fresh('iori') && ok(31)) return start('iori');
+    // Command 22 enters CPU IORI (410, level 31) on button 0x40, which only
+    // the CPU injects.
+    if (fresh('cpuIori') && ok(31)) {
+      this.action(f, 'cpuIori', true);
+      this.fireEvents(f);
+      return true;
+    }
     if (fresh('throw') && ok(21)) return start('grab');
     // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
     if (fresh('dst') && ok(31))
@@ -1805,9 +1841,14 @@ export class Match {
         return;
       }
     }
-    const directionalDash = airborne
-      ? direction !== 0 && !previous[direction === 1 ? 'right' : 'left']
-      : doubleTap;
+    // The dash shortcuts are keyboard/touch input choices; the CPU dashes only
+    // through its DASH commands.
+    const shortcuts = !(this.cpuDriven && f === this.fighters[1]);
+    const directionalDash =
+      shortcuts &&
+      (airborne
+        ? direction !== 0 && !previous[direction === 1 ? 'right' : 'left']
+        : doubleTap);
     if (
       ((input.dash && !previous.dash) || directionalDash) &&
       (!airborne || !f.airDashed)
@@ -1951,6 +1992,7 @@ export class Match {
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(this.fighters[0].hp, DESPERATION_HP);
     }
+    this.cpuDriven = this.mode === 'cpu' && !opponent;
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     // The engine records every tick of input, including frozen ones.
     this.history.forEach((history, i) => {
@@ -2084,8 +2126,20 @@ export class Match {
         : Math.floor(attack.damage / count) +
           (finisher ? attack.damage % count : 0);
       const target = this.fighters[1 - i];
-      if (protectedReactions.has(target.action)) return [];
-      const guarding = guards.has(target.action) && target.facing !== f.facing;
+      const distance = (target.x - f.x) * f.facing;
+      if (
+        protectedReactions.has(target.action) ||
+        f.connected ||
+        f.age < attack.startup ||
+        f.age >= attack.startup + attack.active ||
+        (cycle && activeAge % cycle.interval >= cycle.active) ||
+        distance < 0 ||
+        distance > attack.range ||
+        Math.abs(f.y - target.y) >= 110
+      )
+        return [];
+      // Decided on contact only: a CPU victim draws its guard roll here.
+      const guarding = this.guarding(target, f);
       const stance =
         target.y < 0 || target.vy < 0
           ? 2
@@ -2106,43 +2160,31 @@ export class Match {
         (f.action === 'punch2' && finisher && !blocked);
       // Aerial drill pauses are applied by the attacker's contact branch instead.
       const hitStop = airDrill ? 0 : response.stop;
-      const distance = (target.x - f.x) * f.facing;
-      return !f.connected &&
-        f.age >= attack.startup &&
-        f.age < attack.startup + attack.active &&
-        (!cycle || activeAge % cycle.interval < cycle.active) &&
-        distance >= 0 &&
-        distance <= attack.range &&
-        Math.abs(f.y - target.y) < 110
-        ? [
-            {
-              f,
-              target,
-              damage,
-              finisher,
-              heavy,
-              hitStop,
-              attackerStop: airDrill
-                ? 0
-                : (response.attackerStop ?? response.stop),
-              airDrill,
-              reaction: reaction as AnimatedAction | null,
-              facing: f.facing,
-              x: target.x - f.facing * 42,
-              y:
-                GROUND +
-                target.y -
-                (f.action.startsWith('crouch') ||
-                target.action.startsWith('crouch')
-                  ? 75
-                  : 145),
-              projectile: null as Projectile | null,
-              blocked,
-              source: null as Fighter | Effect | null,
-              fbh: false,
-            },
-          ]
-        : [];
+      return [
+        {
+          f,
+          target,
+          damage,
+          finisher,
+          heavy,
+          hitStop,
+          attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
+          airDrill,
+          reaction: reaction as AnimatedAction | null,
+          facing: f.facing,
+          x: target.x - f.facing * 42,
+          y:
+            GROUND +
+            target.y -
+            (f.action.startsWith('crouch') || target.action.startsWith('crouch')
+              ? 75
+              : 145),
+          projectile: null as Projectile | null,
+          blocked,
+          source: null as Fighter | Effect | null,
+          fbh: false,
+        },
+      ];
     });
     this.fighters.forEach((f, i) => {
       if (!frozen[i] && isScripted(f.action))
@@ -2195,13 +2237,9 @@ export class Match {
         Math.abs(projectile.x - target.x) < 65 &&
         Math.abs(projectile.y - (target.y - 125)) < 90
       ) {
+        const blocked = this.guarding(target, projectile);
         // Action 227 selects FB on ground (no stop), strong hit in air.
-        const hitStop =
-          guards.has(target.action) && target.facing !== projectile.facing
-            ? 10
-            : target.y < 0 || target.vy < 0
-              ? 15
-              : 0;
+        const hitStop = blocked ? 10 : target.y < 0 || target.vy < 0 ? 15 : 0;
         contacts.push({
           f,
           target,
@@ -2216,8 +2254,7 @@ export class Match {
           x: target.x - projectile.facing * 42,
           y: GROUND + projectile.y,
           projectile,
-          blocked:
-            guards.has(target.action) && target.facing !== projectile.facing,
+          blocked,
           source: null,
           fbh: false,
         });

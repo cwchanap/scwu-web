@@ -200,7 +200,12 @@ export class TrainingScene extends Phaser.Scene {
   }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    this.match = new Match(mode, mode === 'cpu');
+    // Authored: each match seeds its CPU afresh.
+    this.match = new Match(
+      mode,
+      mode === 'cpu',
+      Math.floor(Math.random() * 2 ** 32),
+    );
     this.match.practice = { ...this.practice };
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
     this.idle.forEach((vm) => vm.tick());

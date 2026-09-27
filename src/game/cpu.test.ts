@@ -1,0 +1,147 @@
+import { describe, expect, it } from 'vitest';
+import { CpuVM, RYUKO_CPU } from './cpu';
+import type { CpuEntry, CpuStep } from './cpu';
+
+describe('recovered CPU table', () => {
+  it("exports Ryuko's 43 used entries", () => {
+    expect(RYUKO_CPU).toHaveLength(43);
+    // 登録1: walk forward for 20 ticks, 10%, 0–1400 source pixels.
+    expect(RYUKO_CPU[0]).toEqual({
+      flags: 0,
+      probability: 10,
+      min: 0,
+      max: 1400,
+      steps: [{ direction: 2, command: 0, duration: 20 }],
+    });
+    // Slot 40: DST (command 7) at 0–30 pixels, 90%.
+    expect(RYUKO_CPU[40]).toEqual({
+      flags: 0,
+      probability: 90,
+      min: 0,
+      max: 30,
+      steps: [{ direction: 0, command: 7, duration: 1 }],
+    });
+  });
+});
+
+// At level 100 each jitter is rand % 1 = 0 and every probability of 100
+// passes, so selection and timing are exact without re-deriving the LCG.
+const at = (x: number, y = 0) => ({ x, y });
+const step = (direction: number, command = 0, duration = 3): CpuStep => ({
+  direction,
+  command,
+  duration,
+});
+const entry = (steps: CpuStep[], rest: Partial<CpuEntry> = {}): CpuEntry => ({
+  flags: 0,
+  probability: 100,
+  min: 0,
+  max: 2000,
+  steps,
+  ...rest,
+});
+// Self at 300 and the opponent at 600: 200 source pixels apart.
+function run(vm: CpuVM, count: number, self = at(300), opponent = at(600)) {
+  return Array.from({ length: count }, () => vm.input(self, opponent));
+}
+
+describe('CPU decision and playback', () => {
+  it('holds a step for its duration plus one, then gives no input as the entry ends', () => {
+    const vm = new CpuVM([entry([step(2)])], 100);
+    // Level 100 resets the decision timer to -50, so it picks again at once.
+    expect(run(vm, 6).map((input) => !!input.right)).toEqual([
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('plays steps in order until one is missing', () => {
+    const vm = new CpuVM([entry([step(2, 0, 0), step(6, 0, 0)])], 100);
+    expect(run(vm, 3)).toEqual([{ right: true }, { left: true }, {}]);
+  });
+
+  it('filters by probability, distance and who is airborne; the last pass wins', () => {
+    const picks = (entries: CpuEntry[], self = at(300), opponent = at(600)) =>
+      run(new CpuVM(entries, 100), 1, self, opponent)[0];
+    expect(picks([entry([step(2)], { probability: 0 })])).toEqual({});
+    expect(picks([entry([step(2)], { min: 201 })])).toEqual({});
+    expect(picks([entry([step(2)], { max: 199 })])).toEqual({});
+    expect(picks([entry([step(2)], { min: 200, max: 200 })])).toEqual({
+      right: true,
+    });
+    expect(picks([entry([step(2)], { flags: 1 })])).toEqual({});
+    expect(picks([entry([step(2)], { flags: 1 })], at(300, -10))).toEqual({
+      right: true,
+    });
+    expect(picks([entry([step(2)], { flags: 2 })])).toEqual({});
+    expect(
+      picks([entry([step(2)], { flags: 2 })], at(300), at(600, -10)),
+    ).toEqual({ right: true });
+    expect(picks([entry([step(2)]), entry([step(6)])])).toEqual({
+      left: true,
+    });
+  });
+
+  it('turns directions toward and away from the opponent', () => {
+    const facingLeft = (direction: number) =>
+      run(new CpuVM([entry([step(direction)])], 100), 1, at(600), at(300))[0];
+    expect(facingLeft(2)).toEqual({ left: true });
+    expect(facingLeft(6)).toEqual({ right: true });
+    expect(facingLeft(9)).toEqual({ jump: true, left: true });
+    expect(facingLeft(5)).toEqual({ crouch: true, right: true });
+    expect(facingLeft(1)).toEqual({});
+  });
+
+  it('presses a command on alternate ticks, including across repeated steps', () => {
+    const punches = (steps: CpuStep[]) =>
+      run(new CpuVM([entry(steps)], 100), steps.length * 2 + 1).map(
+        (input) => input.punch,
+      );
+    // Duration 4: five ticks, pressed on the first, third and fifth.
+    expect(
+      run(new CpuVM([entry([step(0, 19, 4)])], 100), 6).map((i) => i.punch),
+    ).toEqual([true, false, true, false, true, undefined]);
+    // P:1 P:1 — the second step still gets its own press.
+    expect(punches([step(0, 19, 1), step(0, 19, 1)])).toEqual([
+      true,
+      false,
+      true,
+      false,
+      undefined,
+    ]);
+  });
+
+  it('maps commands to single controls', () => {
+    const command = (id: number) =>
+      run(new CpuVM([entry([step(0, id)])], 100), 1)[0];
+    expect(command(8)).toEqual({ drill: true });
+    expect(command(11)).toEqual({ jump: true, right: true });
+    expect(command(14)).toEqual({ dash: true, left: true });
+    expect(command(22)).toEqual({ cpuIori: true });
+    expect(command(15)).toEqual({});
+  });
+
+  it('stays off at level 0 without drawing', () => {
+    const vm = new CpuVM([entry([step(2)])], 0);
+    expect(run(vm, 5)).toEqual([{}, {}, {}, {}, {}]);
+    expect(vm.seed).toBe(0);
+  });
+
+  it('guards on rand % 100 < level', () => {
+    const always = new CpuVM([], 100);
+    const never = new CpuVM([], 0);
+    expect([always.guards(), always.guards()]).toEqual([true, true]);
+    expect(never.guards()).toBe(false);
+    expect(never.seed).not.toBe(0);
+  });
+
+  it("plays Ryuko's table at the authored level", () => {
+    const vm = new CpuVM(RYUKO_CPU);
+    expect(vm.level).toBe(50);
+    expect(run(vm, 200).some((input) => Object.keys(input).length)).toBe(true);
+  });
+});
