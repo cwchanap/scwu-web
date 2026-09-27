@@ -85,8 +85,8 @@ export class CpuVM {
   ) {}
 
   // Authored: the engine shares one rand seed with everything; the CPU keeps
-  // its own.
-  private random() {
+  // its own, and the match draws its other rolls from it.
+  random() {
     const [seed, value] = rand(this.seed);
     this.seed = seed;
     return value;

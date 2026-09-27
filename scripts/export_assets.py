@@ -175,6 +175,8 @@ def main():
         "grab": 196, "throw": 197, "throwSpin": 199,
         "hitUp": 200, "hitUpRecover": 201, "hitUpJump": 202,
         "iori": 246, "iori2": 247, "iori3": 248,
+        # CPU IORI's recovery: op 0x20 at PC 5887 jumps to action 411 + 31.
+        "cpuIoriRecover": (411, 31),
         "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218, "dstMissileSmoke": 219,
         "evilDst": 221,
         "dstFire": 385, "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
@@ -192,9 +194,10 @@ def main():
     clips = {}
     image_ids = {419, 464, 2001}
     for name, index in actions.items():
+        index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
         frames = []
-        for pc in range(action.start, action.end):
+        for pc in range(action.start + offset, action.end):
             if p.records[pc][0] == 12:
                 frame = display_record(p, pc)
                 image = c.images[frame["image"]]

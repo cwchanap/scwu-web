@@ -16,7 +16,7 @@ import { CpuVM } from './cpu';
 import type { CpuEntry } from './cpu';
 import { ROUND_END_TICKS } from './hud';
 import { animationDuration, animationFrame } from './animations';
-import { placement } from './standing';
+import { placement, rand } from './standing';
 
 function ticks(
   match: Match,
@@ -3640,6 +3640,36 @@ describe('CPU IORI', () => {
     expect(cpu.x).toBeLessThan(ryuko.x + 1000);
     match.step({}, {});
     expect(cpu).toMatchObject({ action: 'iori3', age: 0 });
+  });
+
+  it('recovers one time in six instead (op 0x20 at PC 5887)', () => {
+    // The match's CPU draws rand % 6; above 4 jumps to 411 + 31.
+    const seedFor = (recover: boolean) => {
+      let seed = 0;
+      while (rand(seed)[1] % 6 > 4 !== recover) seed++;
+      return seed;
+    };
+    for (const recover of [false, true]) {
+      const match = new Match('cpu', false, seedFor(recover));
+      const [ryuko, cpu] = match.fighters;
+      cpu.x = ryuko.x + 1000;
+      match.step({}, { cpuIori: true });
+      ticks(match, 66);
+      expect(cpu).toMatchObject({
+        action: recover ? 'cpuIoriRecover' : 'iori3',
+        age: 0,
+      });
+    }
+    // Images 441, 321 and 31 for five ticks each, then idle.
+    expect(animationDuration('cpuIoriRecover')).toBe(15);
+    const match = new Match('cpu', false, seedFor(true));
+    const cpu = match.fighters[1];
+    cpu.x = match.fighters[0].x + 1000;
+    match.step({}, { cpuIori: true });
+    ticks(match, 66 + 14);
+    expect(cpu.action).toBe('cpuIoriRecover');
+    match.step({}, {});
+    expect(cpu.action).toBe('idle');
   });
 
   it('hits with response 3 for source damage 10', () => {

@@ -376,6 +376,7 @@ export const animations = {
   counterHit: scriptClip(174),
   // Command 22 (CPU IORI): action 410 jumps to 411, which jumps to iori3 (248).
   cpuIori: scriptClip(410),
+  cpuIoriRecover: clip(data.clips.cpuIoriRecover),
   // Super-cancel versions, entered when a super cancels IORI.
   scMusashi: scriptClip(260),
   scGetterBeam: scriptClip(265),

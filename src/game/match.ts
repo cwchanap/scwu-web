@@ -1403,9 +1403,10 @@ export class Match {
     if (end === 'hold' || end === 'loop' || f.age < animationDuration(action))
       return true;
     if (next === 97) this.action(f, 'fly');
-    // CPU IORI: 411 jumps into iori3 at PC 5888. ponytail: op 0x20 at PC 5887
-    // recovers one time in six instead; add the roll with that recovery clip.
-    else if (next === 248) this.action(f, 'iori3');
+    // CPU IORI: op 0x20 at PC 5887 jumps to its recovery (411 + 31) when
+    // rand % 6 > 4; otherwise 411 jumps into iori3 at PC 5888.
+    else if (next === 248)
+      this.action(f, this.cpu.random() % 6 > 4 ? 'cpuIoriRecover' : 'iori3');
     else if (next === 215) {
       // Action 222 continues into DST Hit, which re-applies response 30.
       const target = this.fighters[1 - this.fighters.indexOf(f)];
@@ -1755,6 +1756,7 @@ export class Match {
         reactions.has(f.action) ||
         [
           'punchHit',
+          'cpuIoriRecover',
           'kickHit',
           'land',
           'drillLand',

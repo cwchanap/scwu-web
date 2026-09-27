@@ -124,7 +124,7 @@ Unblockable boxes and the air-guard rule still apply afterwards.
 - **Alternating presses**: a command step presses its control on alternate ticks, because a port button needs a release before it counts as fresh again.
 - **Single controls**: commands become one-button controls, since the port has no motion inputs.
 - **Neutral states** are the ones where the port's own guard input takes effect. They stand in for the engine's object flags `+0x15e & 0xc`.
-- **No recovery roll** (ponytail): CPU IORI always continues into `iori3`. The 1-in-6 recovery branch is skipped.
+- **Recovery roll** (added after the first commit): CPU IORI recovers one time in six through op `0x20` at PC 5887, drawing from the CPU's own seed. Its op `0x1e` has mode 0, so it has no cancel window.
 - **No dash shortcuts for the CPU**: the port's double-tap and air-direction dash shortcuts are keyboard/touch input choices. The CPU dashes only through its DASH commands. Without this, a jump-toward step in the air, after the double jump is spent, would air-dash where the original does nothing.
 - **Who counts as the CPU**: the Vs. CPU opponent on ticks where the CPU supplies its input. When a caller passes opponent input (tests), that fighter is player-driven, with no guard roll and with the shortcuts.
 
