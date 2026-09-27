@@ -306,7 +306,7 @@ const reactionSlides: Partial<
   hitRapid: slide(1, -150, 10), // 83, PC 954
 };
 // Air reactions without a landing handler play the op 0x01 commands of their
-// flattened scripts; landing then follows the ground-pose rule in move().
+// flattened scripts; move() ends them on landing (0x411810).
 const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airHit: 74, // PCs 774/778: rise at raw 100, then −300/−650, ax 1, gravity 66
   airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
@@ -650,7 +650,6 @@ export interface Fighter {
   fade: number;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
-  // An air reaction switched to its ground pose on landing finishes in place.
   // This action's own attack or box has connected (hit or block).
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
@@ -1864,9 +1863,15 @@ export class Match {
       if (f.age < animationDuration(f.action)) return;
     }
     const airborne = f.y < 0 || f.vy < 0;
-    // 0x411a80: an air reaction that ends airborne enters action 7 (+0x7586),
-    // whose op 0x01 (PC 99, flags 0xe) keeps vx, vy and ax and sets gravity 80.
-    if (airborne && AIR_REACTIONS[f.action]) {
+    // Air attacks jump into action 7 (PCs 2485/2507/2528, 2664/2692/2719) and
+    // an air reaction that ends airborne enters it through 0x411a80 (+0x7586).
+    // Its op 0x01 (PC 99, flags 0xe) keeps vx, vy and ax and sets gravity 80.
+    if (
+      airborne &&
+      (AIR_REACTIONS[f.action] ||
+        f.action === 'airPunch' ||
+        f.action === 'airKick')
+    ) {
       const { ax } = f;
       this.action(f, 'jump');
       f.ax = ax;

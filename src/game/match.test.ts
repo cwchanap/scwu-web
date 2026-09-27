@@ -884,6 +884,27 @@ describe('recovered cancels', () => {
     while (f.y < 0) match.step();
     expect(f.jumpVariable).toBe(0);
   });
+
+  it.each(['punch', 'kick'] as const)(
+    'restores gravity 80 when an air-dash %s ends airborne (action 7, PC 99)',
+    (button) => {
+      const match = new Match();
+      const f = match.fighters[0];
+      match.step({ jump: true });
+      ticks(match, 20);
+      match.step({ dash: true });
+      match.step();
+      match.step();
+      match.step({ [button]: true });
+      f.y = -2000;
+      const action = button === 'punch' ? 'airPunch' : 'airKick';
+      expect(f.action).toBe(action);
+      while (f.action === action) match.step();
+      expect(f).toMatchObject({ action: 'jump', jumpVariable: 20 });
+      expect(f.y).toBeLessThan(0);
+      expect(f.gravity).toBeCloseTo(80 * (393 / 65536) * 1.5);
+    },
+  );
 });
 
 describe('recovered power gauge', () => {
