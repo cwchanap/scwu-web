@@ -21,6 +21,7 @@
     airGuard: 'Air guard',
     attack: 'Attack',
     jumpIn: 'Jump in',
+    cpu: 'Original CPU',
   };
   let status = $state<GameStatus>({
     ready: false,
@@ -403,11 +404,12 @@
         <p>
           Free practice has no timer. Below the arena, choose how the partner
           behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, or jumping in. Max stock refills your supers
-          whenever you stand idle, and Low health keeps Ryuko at 30% for her
-          desperation moves. Vs. CPU is the original game's CPU, playing Ryuko's
-          own moves, specials and supers. Reduce their health to zero, or lead
-          on health when time runs out. Changing modes starts a fresh match.
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps Ryuko at 30% for her desperation moves. Vs. CPU is the original
+          game's CPU, playing Ryuko's own moves, specials and supers. Reduce
+          their health to zero, or lead on health when time runs out. Changing
+          modes starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

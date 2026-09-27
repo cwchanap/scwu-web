@@ -40,6 +40,8 @@ export const initialStatus: GameStatus = {
   error: '',
 };
 const ART_SCALE = 1.5;
+// Authored: each match seeds its CPU afresh.
+const randomSeed = () => Math.floor(Math.random() * 2 ** 32);
 const BASE = `${import.meta.env.BASE_URL}assets/`;
 const keyMap: Record<string, Control> = {
   ArrowLeft: 'left',
@@ -69,7 +71,7 @@ const keyMap: Record<string, Control> = {
 };
 
 export class TrainingScene extends Phaser.Scene {
-  match = new Match();
+  match = new Match('practice', false, randomSeed());
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
@@ -200,12 +202,7 @@ export class TrainingScene extends Phaser.Scene {
   }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    // Authored: each match seeds its CPU afresh.
-    this.match = new Match(
-      mode,
-      mode === 'cpu',
-      Math.floor(Math.random() * 2 ** 32),
-    );
+    this.match = new Match(mode, mode === 'cpu', randomSeed());
     this.match.practice = { ...this.practice };
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
     this.idle.forEach((vm) => vm.tick());

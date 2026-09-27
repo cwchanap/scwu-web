@@ -10,6 +10,8 @@ export const DUMMY_BEHAVIORS = [
   'airGuard',
   'attack',
   'jumpIn',
+  // The recovered CPU (cpu.ts), which the match plays itself.
+  'cpu',
 ] as const;
 export type DummyBehavior = (typeof DUMMY_BEHAVIORS)[number];
 
@@ -21,7 +23,7 @@ const JUMP_IN_DISTANCE = 250;
 const ATTACK_TICKS = 100;
 
 export function dummyInput(
-  behavior: DummyBehavior,
+  behavior: Exclude<DummyBehavior, 'cpu'>,
   self: Fighter,
   opponent: Fighter,
   tick: number,

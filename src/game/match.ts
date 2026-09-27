@@ -807,7 +807,8 @@ export class Match {
     lowHealth: false,
   };
   cpu: CpuVM;
-  // This tick's Vs. CPU opponent input comes from the CPU (none was supplied).
+  // This tick's opponent input comes from the CPU (none was supplied, in Vs.
+  // CPU or with the CPU practice partner).
   private cpuDriven = false;
   private previous: [Input, Input] = [{}, {}];
   private history: [InputFrame[], InputFrame[]] = [[], []];
@@ -1480,8 +1481,9 @@ export class Match {
 
   private ai(): Input {
     const [player, opponent] = this.fighters;
-    if (this.mode === 'practice')
-      return dummyInput(this.practice.partner, opponent, player, this.ticks);
+    const { partner } = this.practice;
+    if (this.mode === 'practice' && partner !== 'cpu')
+      return dummyInput(partner, opponent, player, this.ticks);
     return this.cpu.input(opponent, player);
   }
 
@@ -1994,7 +1996,8 @@ export class Match {
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(this.fighters[0].hp, DESPERATION_HP);
     }
-    this.cpuDriven = this.mode === 'cpu' && !opponent;
+    this.cpuDriven =
+      !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     // The engine records every tick of input, including frozen ones.
     this.history.forEach((history, i) => {

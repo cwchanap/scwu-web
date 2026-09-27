@@ -505,6 +505,25 @@ describe('practice partner', () => {
     ryuko.age = ATTACKS[action].startup - 1;
   }
 
+  it('plays the original CPU, guard roll included', () => {
+    const { match, ryuko, target } = partner('cpu');
+    match.cpu = new CpuVM([], 100);
+    strike(ryuko, 'punch');
+    match.step();
+    expect(target.action).toBe('block');
+    const walkIn: CpuEntry = {
+      flags: 0,
+      probability: 100,
+      min: 0,
+      max: 2000,
+      steps: [{ direction: 2, command: 0, duration: 5 }],
+    };
+    const walker = partner('cpu', 400);
+    walker.match.cpu = new CpuVM([walkIn], 100);
+    walker.match.step();
+    expect(walker.target.action).toBe('walk');
+  });
+
   it('stands still by default', () => {
     const { match, target } = partner('stand');
     for (let tick = 0; tick < 200; tick++) match.step();
