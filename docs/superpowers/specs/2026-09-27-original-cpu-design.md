@@ -55,7 +55,7 @@ chosen):
 The engine clears the CPU's whole input history every tick (`memset` at
 `0x403300`) and then writes the current step. For a direction step it writes
 the direction; for a command step it writes the command's complete input
-sequence. So a command is re-entered on **every** tick of its step, and a
+sequence with the step's direction added to every frame (`0x411644`). So a command is re-entered on **every** tick of its step, and a
 direction-only step can never form a double-tap dash.
 
 **Directions.** Nibbles index the tables at `0x41f138`/`0x41f178`. The

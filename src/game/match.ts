@@ -544,7 +544,8 @@ const blocks = new Set<Action>([
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
 // Where move() lets a fighter start guarding: the authored stand-in for the
 // engine's object flags +0x15e & 0xc, under which a CPU victim rolls a guard.
-const neutral = new Set<Action>([
+// Finished actions become idle or jump in move() before contacts are checked.
+const neutralActions = new Set<Action>([
   'idle',
   'walk',
   'backwalk',
@@ -553,8 +554,11 @@ const neutral = new Set<Action>([
   'crouch',
   'crouchEnter',
   'jump',
-  'doubleJump',
 ]);
+const neutral = (f: Fighter) =>
+  neutralActions.has(f.action) ||
+  (f.action === 'doubleJump' && f.age >= 3) ||
+  (f.action === 'hitUpJump' && f.age >= 8);
 const reactions = new Set<Action>([
   'hit',
   'hitHeavy',
@@ -1482,16 +1486,14 @@ export class Match {
   }
 
   // 0x40f3a2: a CPU victim ignores its input. In a neutral state it guards on
-  // rand % 100 < level; in a guard reaction it keeps guarding.
+  // rand % 100 < level; in a guard reaction it keeps guarding, whichever way
+  // it faces (0x40f449).
   private guarding(target: Fighter, source: { facing: number }) {
-    if (guards.has(target.action) && target.facing !== source.facing)
-      return true;
-    return (
-      this.cpuDriven &&
-      target === this.fighters[1] &&
-      neutral.has(target.action) &&
-      this.cpu.guards()
-    );
+    if (this.cpuDriven && target === this.fighters[1])
+      return (
+        guards.has(target.action) || (neutral(target) && this.cpu.guards())
+      );
+    return guards.has(target.action) && target.facing !== source.facing;
   }
 
   private doubleJump(f: Fighter, direction: number) {

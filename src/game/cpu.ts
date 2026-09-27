@@ -133,10 +133,11 @@ export class CpuVM {
     return this.random() % 100 < this.level;
   }
 
-  // A direction step holds its direction. The engine clears the CPU's input
-  // history every tick (0x403300) and rewrites the command, so a command step
-  // re-enters it each tick; a port button needs a release to count again, so
-  // it presses on alternate ticks (authored).
+  // A step holds its direction, and a command step adds its command, as
+  // 0x411644 adds the step's direction to the command's input. The engine
+  // clears the CPU's input history every tick (0x403300) and rewrites the
+  // command, so a command step re-enters it each tick; a port button needs a
+  // release to count again, so it presses on alternate ticks (authored).
   private stepInput(step: CpuStep, self: Body, opponent: Body): Input {
     const toward = self.x > opponent.x ? 'left' : 'right';
     const away = toward === 'left' ? 'right' : 'left';

@@ -3667,11 +3667,35 @@ describe('recovered CPU', () => {
     expect(cpu.action).toBe('hit');
   });
 
-  it('keeps guarding through a guard reaction', () => {
-    const { match, ryuko, cpu } = vsCpu(new CpuVM([], 0));
-    Object.assign(cpu, { action: 'block', age: 0 });
-    punch(match, ryuko);
-    expect(cpu.action).toBe('block');
+  it('keeps guarding through a guard reaction, even on a cross-up', () => {
+    for (const facing of [-1, 1] as const) {
+      const { match, ryuko, cpu } = vsCpu(new CpuVM([], 0));
+      // Facing 1 turns the CPU away from Ryuko: 0x40f449 ignores facing.
+      Object.assign(cpu, { action: 'block', age: 0, facing });
+      punch(match, ryuko);
+      expect(cpu.action).toBe('block');
+    }
+  });
+
+  it('rolls in the air only where a player could start an air guard', () => {
+    const struck = (action: 'doubleJump' | 'hitUpJump', age: number) => {
+      const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
+      const airborne = { y: -60, vy: 0, gravity: 0 };
+      Object.assign(cpu, { action, age, ...airborne });
+      Object.assign(ryuko, {
+        action: 'airPunch',
+        age: ATTACKS.airPunch.startup - 1,
+        ...airborne,
+      });
+      match.step();
+      return cpu.action;
+    };
+    // move() ignores guard input for a double jump's first three ticks and
+    // the Hit Up chase jump's first eight.
+    expect(struck('doubleJump', 0)).toBe('airHitHeavy');
+    expect(struck('doubleJump', 5)).toBe('airBlockHeavy');
+    expect(struck('hitUpJump', 2)).toBe('airHitHeavy');
+    expect(struck('hitUpJump', 10)).toBe('airBlockHeavy');
   });
 
   it('rolls only when a hit lands', () => {

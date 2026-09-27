@@ -115,6 +115,19 @@ describe('CPU decision and playback', () => {
     ]);
   });
 
+  it("adds a step's direction to its command, as 0x411644 does", () => {
+    // Slot 22: crouch (D) with P, a crouching punch.
+    expect(RYUKO_CPU[22].steps[0]).toEqual({
+      direction: 4,
+      command: 19,
+      duration: 1,
+    });
+    expect(run(new CpuVM([RYUKO_CPU[22]], 100), 1)[0]).toEqual({
+      crouch: true,
+      punch: true,
+    });
+  });
+
   it('maps commands to single controls', () => {
     const command = (id: number) =>
       run(new CpuVM([entry([step(0, id)])], 100), 1)[0];
