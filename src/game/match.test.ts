@@ -2135,7 +2135,8 @@ describe('prototype training rules', () => {
       expect(f.y).toBe(height);
       expect(f.x).toBe(x);
       match.step();
-      expect(f.y - height).toBeCloseTo(age === 1 ? -2.308731 : 0.719604, 5);
+      // Hit 76's first op 0x01 (PC 816) replaces the dash's motion either way.
+      expect(f.y - height).toBeCloseTo(-100 * (655 / 65536) * 1.5, 6);
       ticks(match, 100);
       expect(f.y).toBe(0);
       expect(f.vx).toBe(0);
@@ -2683,12 +2684,40 @@ describe('prototype training rules', () => {
     // Hit 73 slides from its fifth tick, so punch 2 drifts between strikes;
     // its last strike selects 75. Guards 149/163 slide after the last strike.
     ['punch2', [18, 24, 30], 36, 10, [0, 8.395], 231.173, 95.947],
-    // ponytail: airborne and rapid hit reactions keep the MVP push.
-    ['airKick', [15, 23, 31], 87, 13, [], 22, 8],
-    ['kick3', [15, 21, 27, 33, 39, 45, 51, 57], 82, 17, [], 22, 204.266],
+    // Air hit 76 rises for five ticks, then flies back at raw 300 (PC 823);
+    // air guard 158 slides at raw 450, speeding up, out of the next strike.
+    [
+      'airKick',
+      [15, 23, 31],
+      87,
+      13,
+      [0, 13.439, 26.877],
+      196.083,
+      243.271,
+      [15],
+    ],
+    // Beam hit 83 slides at raw 150 with +10 (PC 954): 11.604 per strike.
+    [
+      'kick3',
+      [15, 21, 27, 33, 39, 45, 51, 57],
+      82,
+      17,
+      [0, 11.604, 23.207, 34.811, 46.414, 58.018, 69.622],
+      104.972,
+      204.266,
+    ],
   ] as const)(
     'gives %s one contact per strike, then its reaction motion',
-    (action, ages, image, damage, drift, hitShift, guardShift) => {
+    (
+      action,
+      ages,
+      image,
+      damage,
+      drift,
+      hitShift,
+      guardShift,
+      guardAges: readonly number[] = ages,
+    ) => {
       for (const facing of [1, -1] as const)
         for (const guarded of [false, true]) {
           const match = new Match();
@@ -2717,7 +2746,7 @@ describe('prototype training rules', () => {
               expect(impact.blocked).toBe(guarded);
             }
           }
-          expect(contacts).toEqual(ages);
+          expect(contacts).toEqual(guarded ? guardAges : ages);
           expect(f.hits).toBe(guarded ? 0 : ages.length);
           expect(f.damage).toBe(guarded ? 0 : damage);
           expect(target.hp).toBe(guarded ? 100 : 100 - damage);
@@ -2875,6 +2904,7 @@ describe('prototype training rules', () => {
     (action) => {
       const match = new Match();
       const [f, target] = match.fighters;
+      f.x = 900;
       target.x = f.x + 150;
       f.action = action;
       f.age = action === 'drill' ? 10 : 0;
@@ -2886,10 +2916,11 @@ describe('prototype training rules', () => {
       expect(f.action).toBe(action === 'drill' ? 'hit' : 'airHit');
       const interruptedX = f.x;
       ticks(match, 120);
-      // Only hit 73's own slide (−280 for 20 ticks) moves the grounded drill.
+      // Only the reaction moves the drill: hit 73's slide (−280 for 20 ticks),
+      // or air hit 74's flight (−300 with ax 1 from age 5, kept in the fall).
       expect(interruptedX - f.x).toBeCloseTo(
-        action === 'drill' ? 20 * 280 * (655 / 65536) * 1.5 : 0,
-        3,
+        action === 'drill' ? 20 * 280 * (655 / 65536) * 1.5 : 152.69,
+        2,
       );
       expect(f.action).toBe('idle');
     },
@@ -3534,15 +3565,15 @@ describe('prototype training rules', () => {
 
   // An air guard cannot block these: their guard-air responses are 2 and 4.
   it.each([
-    ['punch', false, 'airHit', 'hit'],
-    ['kick', false, 'airHit', 'hit'],
-    ['punch', true, 'airHit', 'hit'],
-    ['kick', true, 'airHit', 'hit'],
-    ['crouchPunch', false, 'airHitHeavy', 'hitHeavy'],
-    ['crouchPunch', true, 'airHitHeavy', 'hitHeavy'],
+    ['punch', false, 'airHit'],
+    ['kick', false, 'airHit'],
+    ['punch', true, 'airHit'],
+    ['kick', true, 'airHit'],
+    ['crouchPunch', false, 'airHitHeavy'],
+    ['crouchPunch', true, 'airHitHeavy'],
   ] as const)(
-    'preserves recovery after landing from %s with guard=%s',
-    (attack, guard, airReaction, groundReaction) => {
+    'launches a low jumper hit by %s with guard=%s past its recovery',
+    (attack, guard, airReaction) => {
       const match = new Match();
       const player = match.fighters[0];
       player.x = 530;
@@ -3555,29 +3586,47 @@ describe('prototype training rules', () => {
         );
       expect(player.action).toBe(airReaction);
       expect(player.y).toBeLessThan(0);
-      const duration = animationDuration(airReaction);
       const contactHeight = player.y;
       ticks(match, attack === 'crouchPunch' ? 15 : 10);
       expect(player.y).toBe(contactHeight);
-      ticks(match, 2);
-      expect(player.y).toBe(0);
-      expect(player.action).toBe(groundReaction);
-      const x = player.x;
-      ticks(match, duration - 4, {
-        right: true,
-        punch: true,
-        jump: true,
-        dash: true,
-        drill: true,
-      });
+      // 74/76 rise at raw 100 (PCs 774/816), then fly up and back.
       match.step();
-      expect(player.action).toBe(groundReaction);
-      expect(player.x).toBe(x);
-      expect(player.y).toBe(0);
-      match.step({ punch: true });
-      expect(player.action).toBe('punch');
+      expect(player.y).toBeCloseTo(
+        contactHeight - 100 * (655 / 65536) * 1.5,
+        6,
+      );
+      const duration = animationDuration(airReaction);
+      ticks(match, duration - 1);
+      expect(player.y).toBeLessThan(contactHeight);
+      for (let tick = 0; tick < 100 && player.y < 0; tick++) match.step();
+      expect(player.action).toBe('land');
     },
   );
+
+  it("finishes an air guard's recovery in place when it lands mid-reaction", () => {
+    const match = new Match();
+    const player = match.fighters[0];
+    Object.assign(player, { action: 'airBlock', age: 0, y: -10, vy: 0 });
+    // 153 falls from rest at gravity 70 and restarts the fall at age 3.
+    ticks(match, 6);
+    expect(player).toMatchObject({ action: 'airBlock', age: 6 });
+    match.step();
+    expect(player).toMatchObject({ action: 'block', y: 0 });
+    const remaining = animationDuration('block') - player.age;
+    expect(remaining).toBe(animationDuration('airBlock') - 7);
+    const x = player.x;
+    ticks(match, remaining - 1, {
+      right: true,
+      punch: true,
+      jump: true,
+      dash: true,
+      drill: true,
+    });
+    expect(player).toMatchObject({ action: 'block', x, y: 0 });
+    match.step();
+    match.step({ punch: true });
+    expect(player.action).toBe('punch');
+  });
 
   it('shows win/loss or draw poses when time expires with both fighters alive', () => {
     for (const hp of [92, 100]) {
@@ -3917,5 +3966,80 @@ describe('recovered rush and time-stop reactions', () => {
     match.step({}, {});
     expect(target.x).toBe(1200);
     expect(target.y).toBeCloseTo(-120 + 70 * (393 / 65536) * 1.5, 6);
+  });
+});
+
+describe('recovered air and rapid reaction motion', () => {
+  const raw = (655 / 65536) * 1.5;
+  const acc = (393 / 65536) * 1.5;
+  // Fighter 1 faces Ryuko on its left, so "back" is +x.
+  function place(action: Fighter['action'], y = -150) {
+    const match = new Match();
+    const target = match.fighters[1];
+    Object.assign(target, { action, age: 0, x: 1200, y, vx: 0, vy: 0 });
+    return { match, target };
+  }
+
+  it.each([
+    ['airHit', 5, 650], // 74, PCs 774/778
+    ['airHitHeavy', 6, 850], // 76, PCs 816/823
+  ] as const)(
+    '%s rises at raw 100, then flies back from age %i',
+    (action, launch, vy) => {
+      const { match, target } = place(action);
+      ticks(match, launch - 1);
+      expect(target.x).toBe(1200);
+      expect(target.y).toBeCloseTo(-150 - (launch - 1) * 100 * raw, 6);
+      const y = target.y;
+      match.step({}, {});
+      // Raw -300 and -vy with ax 1 and gravity 66.
+      expect(target.x - 1200).toBeCloseTo(300 * raw - acc, 6);
+      expect(target.y - y).toBeCloseTo(-vy * raw + 66 * acc, 6);
+    },
+  );
+
+  it('drifts the air beam hit back for nine ticks, then launches it (84)', () => {
+    const { match, target } = place('airHitRapid');
+    ticks(match, 8);
+    expect(target.y).toBe(-150);
+    expect(target.x - 1200).toBeCloseTo(8 * 100 * raw, 6);
+    // PC 990: raw -400/-830 with gravity 80; 84 has no landing handler.
+    match.step({}, {});
+    expect(target.y).toBeCloseTo(-150 - 830 * raw + 80 * acc, 6);
+    for (let tick = 0; tick < 200 && target.y < 0; tick++) match.step({}, {});
+    expect(target.action).toBe('land');
+  });
+
+  it.each([
+    ['airBlock', 420, 3], // 153, PCs 2060/2063
+    ['airBlockHeavy', 450, 6], // 158, PCs 2133/2136
+    ['airBlockRapid', 450, 6], // 167, PCs 2263/2266
+  ] as const)(
+    '%s slides back at raw %i, speeding up, and restarts its fall at age %i',
+    (action, vx, restart) => {
+      const { match, target } = place(action);
+      ticks(match, restart - 1);
+      expect(target.vy).toBeCloseTo((restart - 1) * 70 * acc, 6);
+      // Flag 0x1a zeroes vy and keeps vx, ax and gravity.
+      match.step({}, {});
+      expect(target.vy).toBeCloseTo(70 * acc, 6);
+      expect(target.x - 1200).toBeCloseTo(
+        restart * vx * raw + (15 * acc * restart * (restart + 1)) / 2,
+        6,
+      );
+    },
+  );
+
+  it('pushes the beam hit back at raw 150, then drifts it in at +10 (83)', () => {
+    const { match, target } = place('hitRapid', 0);
+    ticks(match, 15);
+    expect(target.x - 1200).toBeCloseTo(15 * 150 * raw - 120 * 10 * acc, 6);
+    ticks(match, 18);
+    expect(target.x - 1200).toBeCloseTo(33 * 150 * raw - 561 * 10 * acc, 6);
+  });
+
+  it('plays the beam hits for 34 ticks, one branch of their op 0x20', () => {
+    expect(animationDuration('hitRapid')).toBe(34);
+    expect(animationDuration('airHitRapid')).toBe(34);
   });
 });

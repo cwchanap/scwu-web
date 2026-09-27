@@ -302,6 +302,19 @@ const reactionSlides: Partial<
   crouchBlockStop: slide(9, -250, 8), // 161, PC 2185
   blockRapid: slide(9, -650, 8), // 163, PC 2215
   crouchBlockRapid: slide(9, -650, 8), // 165, PC 2245
+  // Unclamped: the beam hit stops at its 25th moving tick, then drifts back in.
+  hitRapid: slide(1, -150, 10), // 83, PC 954
+};
+// Air reactions without a landing handler play the op 0x01 commands of their
+// flattened scripts; landing then follows the ground-pose rule in move().
+const AIR_REACTIONS: Partial<Record<Action, number>> = {
+  airHit: 74, // PCs 774/778: rise at raw 100, then −300/−650, ax 1, gravity 66
+  airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
+  airHitRapid: 84, // PCs 979/990: drift at −100, then −400/−830, gravity 80
+  airBlock: 153, // PCs 2060/2063: −420, ax −15, gravity 70; vy 0 at age 3
+  airBlockHeavy: 158, // PCs 2133/2136: −450 and vy 0 at age 6
+  airBlockRapid: 167, // PCs 2263/2266: as 158
+  airTimeStopGuard: 172, // PC 2323: falls from rest at gravity 70
 };
 // Motion starts at the listed action age; landing enters the next action.
 // Commands before a reaction's first display apply on its first moving tick.
@@ -347,7 +360,9 @@ const launchMotion: Partial<
   },
 };
 const hasMotion = (action: Action) =>
-  Object.hasOwn(reactionSlides, action) || Object.hasOwn(launchMotion, action);
+  Object.hasOwn(reactionSlides, action) ||
+  Object.hasOwn(launchMotion, action) ||
+  Object.hasOwn(AIR_REACTIONS, action);
 // Ryuko's parameter block (file offset 0x157a1d9): 100 power per stock, three
 // stocks, none at the start. Routine 0x40e6f0 carries and borrows between them.
 export const POWER_PER_STOCK = 100;
@@ -759,6 +774,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
 const clampX = (x: number) =>
   Math.max(FIGHTER_MARGIN, Math.min(STAGE_WIDTH - FIGHTER_MARGIN, x));
 function gravity(f: Fighter) {
+  f.vx += f.ax;
   f.x = clampX(f.x + f.vx);
   f.vy += f.gravity;
   f.y = Math.min(0, f.y + f.vy);
@@ -767,6 +783,25 @@ function gravity(f: Fighter) {
     f.vx = f.vy = 0;
     f.gravity = 0.24;
   }
+}
+// Op 0x01: flag bit 0 adds; bits 1–4 keep vx, vy, ax and ay unchanged.
+function motion(
+  actor: Pick<Fighter, 'vx' | 'vy' | 'ax' | 'gravity' | 'facing'>,
+  event: Extract<ScriptEvent, { op: 'motion' }>,
+) {
+  const set = (current: number, value: number) =>
+    event.flags & 1 ? current + value : value;
+  if (!(event.flags & 2))
+    actor.vx = set(actor.vx, actor.facing * event.vx * SOURCE_VELOCITY_SCALE);
+  if (!(event.flags & 4))
+    actor.vy = set(actor.vy, event.vy * SOURCE_VELOCITY_SCALE);
+  if (!(event.flags & 8))
+    actor.ax = set(
+      actor.ax,
+      actor.facing * event.ax * SOURCE_ACCELERATION_SCALE,
+    );
+  if (!(event.flags & 16))
+    actor.gravity = set(actor.gravity, event.ay * SOURCE_ACCELERATION_SCALE);
 }
 // Op 0x01 velocity and gravity from a script, in raw source units.
 function scriptMotion(f: Fighter, vx: number, vy: number, gravity: number) {
@@ -1262,29 +1297,9 @@ export class Match {
       case 'spawn':
         this.spawnObject(actor, owner, event);
         break;
-      case 'motion': {
-        // Flag bit 0 adds; bits 1–4 keep vx, vy, ax and ay unchanged.
-        const set = (current: number, value: number) =>
-          event.flags & 1 ? current + value : value;
-        if (!(event.flags & 2))
-          actor.vx = set(
-            actor.vx,
-            actor.facing * event.vx * SOURCE_VELOCITY_SCALE,
-          );
-        if (!(event.flags & 4))
-          actor.vy = set(actor.vy, event.vy * SOURCE_VELOCITY_SCALE);
-        if (!(event.flags & 8))
-          actor.ax = set(
-            actor.ax,
-            actor.facing * event.ax * SOURCE_ACCELERATION_SCALE,
-          );
-        if (!(event.flags & 16))
-          actor.gravity = set(
-            actor.gravity,
-            event.ay * SOURCE_ACCELERATION_SCALE,
-          );
+      case 'motion':
+        motion(actor, event);
         break;
-      }
       case 'box':
         // Slot 1 boxes sit 2000 pixels down: they meet objects, not bodies.
         if (event.slot !== 0) break;
@@ -1492,7 +1507,6 @@ export class Match {
         f: attacker,
         target,
         damage: blocked || !box.damage ? 0 : sourceDamage(box.damage),
-        finisher: true,
         heavy: true,
         hitStop: reaction.stop,
         // Objects, like DST's missiles, pause without pausing Ryuko.
@@ -1676,11 +1690,12 @@ export class Match {
     this.slideReaction(f);
     launchHitUpJump(f);
     if (f.action === 'hitUpJump' && f.age < 8) return;
-    // Action 172 replaces the fall with gravity 70 and no speed (PC 2323).
-    if (f.action === 'airTimeStopGuard' && f.age === 1) {
-      f.vx = f.vy = 0;
-      f.gravity = 70 * SOURCE_ACCELERATION_SCALE;
-    }
+    // Commands before a reaction's first display apply on its first moving tick.
+    const reaction = AIR_REACTIONS[f.action];
+    if (reaction)
+      for (const event of script(reaction).events)
+        if (event.op === 'motion' && Math.max(event.t, 1) === f.age)
+          motion(f, event);
     if (f.y < 0 || f.vy < 0) {
       f.airAge++;
       if (aerialDrills.has(f.action)) {
@@ -2216,7 +2231,6 @@ export class Match {
           f,
           target,
           damage,
-          finisher,
           heavy,
           hitStop,
           attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
@@ -2262,7 +2276,6 @@ export class Match {
             f,
             target,
             damage: MISSILE_DAMAGE,
-            finisher: true,
             heavy: true,
             // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
             // The missile, not Ryuko, pauses.
@@ -2295,7 +2308,6 @@ export class Match {
           f,
           target,
           damage: 16,
-          finisher: true,
           heavy: true,
           hitStop,
           attackerStop: hitStop,
@@ -2315,7 +2327,6 @@ export class Match {
       f,
       target,
       damage: strength,
-      finisher,
       heavy,
       hitStop,
       attackerStop,
@@ -2386,10 +2397,6 @@ export class Match {
         target.vx = target.vy = 0;
         target.facing = facing === 1 ? -1 : 1;
       }
-      // ponytail: airborne and rapid reactions keep the MVP push until their
-      // own motion is reconstructed.
-      if (finisher && target.hp > 0 && !moved)
-        target.x = clampX(target.x + facing * (blocked ? 8 : 22));
       this.impacts.push({
         x,
         y,

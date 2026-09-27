@@ -164,7 +164,6 @@ def main():
         "guard": 149, "crouchGuard": 151, "airGuard": 153,
         "blockHeavy": 154, "crouchBlockHeavy": 156, "airBlockHeavy": 158,
         "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76, "jumpHit": 77, "drillDown": 135,
-        "hitRapid": 83, "airHitRapid": 84,
         "blockRapid": 163, "crouchBlockRapid": 165, "airBlockRapid": 167,
         "timeStopGuard": 168, "crouchTimeStopGuard": 170, "airTimeStopGuard": 172,
         "punch": 178, "kick": 186, "crouchPunch": 185, "crouchKick": 194,
@@ -244,10 +243,12 @@ def main():
     # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
-    # IORI (410, which jumps through 411 into iori3).
+    # IORI (410, which jumps through 411 into iori3), the rush air hit (122), and the
+    # beam hits (83, 84) and air reactions whose op 0x01 commands the match plays.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
-                          279, 280, 286, 292, 318, 319, 410, 122]
+                          279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
+                          74, 76, 153, 158, 167, 172]
     played = set(actions.values())
     while queue:
         index = queue.pop()

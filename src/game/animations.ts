@@ -341,8 +341,9 @@ export const animations = {
   hitHeavy: clip(data.clips.hitHeavy),
   airHit: clip(data.clips.airHit),
   airHitHeavy: clip(data.clips.airHitHeavy),
-  hitRapid: clip(data.clips.hitRapid),
-  airHitRapid: clip(data.clips.airHitRapid),
+  // Op 0x20 in 83/84 only picks which of two pose orders plays (PCs 957, 982).
+  hitRapid: scriptClip(83),
+  airHitRapid: scriptClip(84),
   // Action 60's last display waits for landing; action 62 then slides and holds.
   down: clip(
     data.clips.ko,
