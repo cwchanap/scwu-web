@@ -1093,6 +1093,27 @@ describe('recovered supers', () => {
     expect(animationDuration('blackRush')).toBe(270);
   });
 
+  it('meets a guard with the time-stop guards (responses 78–80 → 168–172)', () => {
+    const { match, ryuko, target } = superMatch(200);
+    match.practice.partner = 'guard';
+    // Guard before the super's entry stop freezes the partner.
+    match.step();
+    expect(target.action).toBe('guard');
+    ryuko.hp = 29;
+    match.step({ blackRush: true });
+    const seen = new Set<string>();
+    until(match, () => {
+      seen.add(target.action);
+      return ryuko.action !== 'blackRush';
+    });
+    // Strikes 1–6 guard with 78 → 168; the finish guards with 25 → 154.
+    expect([...seen].filter((action) => action !== 'guard')).toEqual([
+      'timeStopGuard',
+      'blockHeavy',
+    ]);
+    expect(target.hp).toBe(100);
+  });
+
   it('needs all three stocks for the Mega Getter Beam cinematic', () => {
     const short = superMatch(150, 2);
     short.match.step({ megaBeam: true });
@@ -2472,6 +2493,35 @@ describe('prototype training rules', () => {
     },
   );
 
+  it("hops twice on punch 3's landing handlers, then slides into the strike", () => {
+    // Action 181: PC 2434 hops at raw 300/-400 with gravity 110, and landing
+    // (handler slot 1, PC 2433) ends the pose. After two ticks PC 2440 hops at
+    // 300/-300 with gravity 120 (PC 2439); PC 2447 slides at raw 500 until
+    // PC 2457.
+    const { match, f } = chainMatch(1200);
+    Object.assign(f, { action: 'punch2', age: 19 });
+    match.step({});
+    match.step({ punch: true });
+    expect(f).toMatchObject({ action: 'punch3', age: 0, y: 0 });
+    const x = f.x;
+    const heights: number[] = [];
+    for (let age = 1; age <= 41; age++) {
+      match.step({});
+      expect(f.action).toBe('punch3');
+      heights.push(f.y);
+    }
+    const airborne = heights.map((y) => y < 0);
+    const ages = (from: number, to: number) => airborne.slice(from - 1, to);
+    expect(ages(1, 11).every(Boolean)).toBe(true);
+    expect(ages(12, 14).some(Boolean)).toBe(false);
+    expect(ages(15, 21).every(Boolean)).toBe(true);
+    expect(ages(22, 41).some(Boolean)).toBe(false);
+    expect(Math.min(...heights.slice(0, 11))).toBeCloseTo(-15.2015, 3);
+    const raw = (655 / 65536) * 1.5;
+    expect(f.x - x).toBeCloseTo(20 * 300 * raw + 13 * 500 * raw, 3);
+    expect(ATTACKS.punch3.startup).toBe(12 + 2 + 8 + 6 + 8);
+  });
+
   it('plays a full punch string on hit with the recovered timing', () => {
     const { match, f, target } = chainMatch();
     const sequence: [number, string][] = [];
@@ -2487,8 +2537,8 @@ describe('prototype training rules', () => {
       [7, 'punchHit'],
       [25, 'punch2'],
       [56, 'punch3'],
-      // Punch 3's 57 ticks plus the 15-tick stop of its slam (123).
-      [128, 'idle'],
+      // Punch 3's 64 ticks plus the 15-tick stop of its slam (123).
+      [135, 'idle'],
     ]);
     expect(f.hits).toBe(3);
     expect(target.hp).toBe(100 - 8 - 3 - 16);
@@ -2872,16 +2922,21 @@ describe('prototype training rules', () => {
             }
           }
           // Response 56 → action 135 drives a hit victim down, but its nine
-          // stop ticks hold it in reach of each stage; blocks stay in range
-          // too. Both are struck until they land.
+          // stop ticks hold it in reach of each stage. An air guard selects
+          // 80 → 172, which falls from rest at gravity 70 (PC 2323) and lands
+          // sooner. Both are struck until they land.
           expect(contacts).toEqual(
-            height === -40 ? [1] : [1, 11, 21, 31, 41, 51, 61],
+            height === -40
+              ? [1]
+              : guarded
+                ? [1, 11, 21, 31]
+                : [1, 11, 21, 31, 41, 51, 61],
           );
           expect(damage).toEqual(
             guarded
               ? height === -40
                 ? [0]
-                : [0, 0, 0, 0, 0, 0, 0]
+                : [0, 0, 0, 0]
               : height === -40
                 ? [16]
                 : [16, 5, 3, 1, 1, 1, 1],
@@ -3812,5 +3867,55 @@ describe('recovered CPU', () => {
 
   it('seeds the CPU from the match', () => {
     expect(new Match('cpu', false, 7).cpu.seed).toBe(7);
+  });
+});
+
+describe('recovered rush and time-stop reactions', () => {
+  const raw = (655 / 65536) * 1.5;
+
+  it('drifts, launches and knocks down from the rush air hit (122)', () => {
+    const match = new Match();
+    const target = match.fighters[1];
+    target.x = 1200;
+    Object.assign(target, { action: 'rushAirHit', age: 0, y: -100, vy: 0 });
+    // PC 1616: raw -100 away from Ryuko, with no fall, until PC 1628.
+    ticks(match, 8);
+    expect(target).toMatchObject({ action: 'rushAirHit', y: -100 });
+    expect(target.x - 1200).toBeCloseTo(8 * 100 * raw, 3);
+    // PC 1628 launches at -400/-830 with gravity 80; handler slot 1 → 146.
+    match.step({}, {});
+    expect(target.y).toBeLessThan(-100);
+    for (let tick = 0; tick < 200 && target.action === 'rushAirHit'; tick++)
+      match.step({}, {});
+    expect(target.action).toBe('knockdown');
+  });
+
+  it('holds the standing time-stop guard in place with its counter checks', () => {
+    const match = new Match();
+    const target = match.fighters[1];
+    target.x = 1200;
+    target.stock = 1;
+    Object.assign(target, { action: 'timeStopGuard', age: 0 });
+    ticks(match, 2);
+    expect(target).toMatchObject({ action: 'timeStopGuard', x: 1200 });
+    // 168's op 0x24 at age 3 (PC 2279) reads Hit Up for COUNTER HIT.
+    match.step({}, { hitUp: true });
+    expect(target.action).toBe('counterHit');
+  });
+
+  it('drops the air time-stop guard straight down at gravity 70 (PC 2323)', () => {
+    const match = new Match();
+    const target = match.fighters[1];
+    target.x = 1200;
+    Object.assign(target, {
+      action: 'airTimeStopGuard',
+      age: 0,
+      y: -120,
+      vx: 5,
+      vy: -3,
+    });
+    match.step({}, {});
+    expect(target.x).toBe(1200);
+    expect(target.y).toBeCloseTo(-120 + 70 * (393 / 65536) * 1.5, 6);
   });
 });

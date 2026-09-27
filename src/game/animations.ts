@@ -218,7 +218,8 @@ export const animations = {
   punchHit: clip(data.clips.punchHit),
   kickHit: clip(data.clips.kickHit),
   punch2: clip(data.clips.punch2),
-  punch3: clip(data.clips.punch3, false, [5, 2, 8, 6, 8, 5, 15, 8]),
+  // Action 181's two hop poses last until each landing: 12 and 8 ticks.
+  punch3: clip(data.clips.punch3, false, [12, 2, 8, 6, 8, 5, 15, 8]),
   kick2: clip(data.clips.kick2),
   hitUp: clip(data.clips.hitUp),
   hitUpRecover: clip(data.clips.hitUpRecover),
@@ -332,6 +333,10 @@ export const animations = {
   blockRapid: clip(data.clips.blockRapid),
   crouchBlockRapid: clip(data.clips.crouchBlockRapid),
   airBlockRapid: clip(data.clips.airBlockRapid),
+  // The hidden super's guards (responses 78–80 → 168–172).
+  timeStopGuard: clip(data.clips.timeStopGuard),
+  crouchTimeStopGuard: clip(data.clips.crouchTimeStopGuard),
+  airTimeStopGuard: clip(data.clips.airTimeStopGuard),
   hit: clip(data.clips.hit),
   hitHeavy: clip(data.clips.hitHeavy),
   airHit: clip(data.clips.airHit),
@@ -385,6 +390,8 @@ export const animations = {
   // Responses 43 (action 97, looping 98 until landing) and 33 (88, looping 90).
   fly: scriptClip(97),
   shock: scriptClip(88),
+  // Response 76 in the air → action 122; op 0x20 there only reorders poses.
+  rushAirHit: scriptClip(122),
   // Response 30 (action 128); op 0x07 then replaces the pose from the held table.
   superHeld: clip(data.clips.grabbed.slice(0, 1)),
 };

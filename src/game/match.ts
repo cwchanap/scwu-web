@@ -72,7 +72,7 @@ export const ATTACKS = {
   airPunch: { startup: 18, active: 19, range: 150, damage: 8 },
   airKick: { startup: 15, active: 24, range: 180, damage: 13 },
   punch2: { startup: 18, active: 18, range: 205, damage: 10 },
-  punch3: { startup: 29, active: 20, range: 235, damage: 16 },
+  punch3: { startup: 36, active: 20, range: 235, damage: 16 },
   kick2: { startup: 13, active: 16, range: 205, damage: 14 },
   hitUp: { startup: 15, active: 10, range: 165, damage: 15 },
   iori: { startup: 21, active: 8, range: 180, damage: 10 },
@@ -241,6 +241,8 @@ const GUARD_COUNTERS: Partial<Record<Action, [number, number][]>> = {
   crouchBlockStop: guardChecks(10), // 161, PCs 2177–2187
   blockRapid: guardChecks(10), // 163, PCs 2207–2217
   crouchBlockRapid: guardChecks(10), // 165, PCs 2237–2247
+  timeStopGuard: guardChecks(10), // 168, PCs 2275–2283
+  crouchTimeStopGuard: guardChecks(10), // 170, PCs 2300–2308
 };
 // The input history those checks read: direction and fresh buttons per tick.
 interface InputFrame {
@@ -312,6 +314,8 @@ const launchMotion: Partial<
       vy: number;
       gravity: number;
       land: AnimatedAction;
+      // Raw horizontal velocity before the launch, with no fall.
+      drift?: number;
     }
   >
 > = {
@@ -331,6 +335,16 @@ const launchMotion: Partial<
   twistBounce: { tick: 5, vx: -200, vy: -1200, gravity: 90, land: 'knockdown' },
   // Response 43 → action 97 (PC 1186), spinning in 98 until its landing → 146.
   fly: { tick: 6, vx: -100, vy: -2400, gravity: 90, land: 'knockdown' },
+  // Response 76 → action 122 in the air: PC 1616 drifts, PC 1628 launches,
+  // and its landing handler (slot 1, PC 1627) enters 146.
+  rushAirHit: {
+    tick: 9,
+    vx: -400,
+    vy: -830,
+    gravity: 80,
+    land: 'knockdown',
+    drift: -100,
+  },
 };
 const hasMotion = (action: Action) =>
   Object.hasOwn(reactionSlides, action) || Object.hasOwn(launchMotion, action);
@@ -376,6 +390,10 @@ const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
   blockRapid: [2, 0],
   crouchBlockRapid: [2, 0],
   airBlockRapid: [2, 0],
+  timeStopGuard: [2, 0],
+  crouchTimeStopGuard: [2, 0],
+  airTimeStopGuard: [2, 0],
+  rushAirHit: [1, 0],
 };
 for (const action of [
   'hitHeavy',
@@ -502,8 +520,7 @@ const RESPONSE_REACTIONS: Record<
   // FBB and FBH jump to 83 and 80; FBH first adds 10 power to the attacker.
   111: { action: 'hitRapid', stop: 0 },
   112: { action: 'launchAway', stop: 13 },
-  // ponytail: action 122's random juggle loop plays as the rapid air hit.
-  122: { action: 'airHitRapid', stop: 0 },
+  122: { action: 'rushAirHit', stop: 0 },
   128: { action: 'superHeld', stop: 0 },
   129: { action: 'dstToss', stop: 0 },
   154: { action: 'blockHeavy', stop: 10 },
@@ -512,10 +529,10 @@ const RESPONSE_REACTIONS: Record<
   163: { action: 'blockRapid', stop: 0 },
   165: { action: 'crouchBlockRapid', stop: 0 },
   167: { action: 'airBlockRapid', stop: 0 },
-  // ponytail: the 'time stop' guards (168–172) play as heavy blocks.
-  168: { action: 'blockHeavy', stop: 10 },
-  170: { action: 'crouchBlockHeavy', stop: 10 },
-  172: { action: 'airBlockHeavy', stop: 10 },
+  // The hidden super's 'time stop' guards have no op 0x1a and no slide.
+  168: { action: 'timeStopGuard', stop: 0 },
+  170: { action: 'crouchTimeStopGuard', stop: 0 },
+  172: { action: 'airTimeStopGuard', stop: 0 },
 };
 const FBH = 112;
 const FBH_POWER = 10;
@@ -540,6 +557,9 @@ const blocks = new Set<Action>([
   'airBlockRapid',
   'blockStop',
   'crouchBlockStop',
+  'timeStopGuard',
+  'crouchTimeStopGuard',
+  'airTimeStopGuard',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
 // Where move() lets a fighter start guarding: the authored stand-in for the
@@ -578,6 +598,7 @@ const groundReactions: Partial<Record<Action, AnimatedAction>> = {
   airHitRapid: 'hitRapid',
   airBlock: 'block',
   airBlockHeavy: 'blockHeavy',
+  airTimeStopGuard: 'timeStopGuard',
   airBlockRapid: 'blockRapid',
 };
 const protectedReactions = new Set<Action>([
@@ -746,6 +767,12 @@ function gravity(f: Fighter) {
     f.vx = f.vy = 0;
     f.gravity = 0.24;
   }
+}
+// Op 0x01 velocity and gravity from a script, in raw source units.
+function scriptMotion(f: Fighter, vx: number, vy: number, gravity: number) {
+  f.vx = f.facing * vx * SOURCE_VELOCITY_SCALE;
+  f.vy = vy * SOURCE_VELOCITY_SCALE;
+  f.gravity = gravity * SOURCE_ACCELERATION_SCALE;
 }
 function launchJump(f: Fighter, double = false) {
   // Actions 4–6 and 10–12 choose neutral or directional velocity at takeoff.
@@ -921,6 +948,8 @@ export class Match {
       f.jumpVariable === 20
     )
       f.gravity = 45 * SOURCE_ACCELERATION_SCALE;
+    // Action 181 hops at once (PC 2434); its landing handler ends the pose.
+    if (action === 'punch3') scriptMotion(f, 300, -400, 110);
   }
 
   private showResultPose(f: Fighter, index: number) {
@@ -967,6 +996,8 @@ export class Match {
     const motion = launchMotion[f.action];
     if (!motion) return false;
     // Victim actions hold their impact pose before the motion command.
+    if (motion.drift && f.age < motion.tick)
+      f.x = clampX(f.x + f.facing * motion.drift * SOURCE_VELOCITY_SCALE);
     if (f.age === motion.tick) {
       f.vx = f.facing * motion.vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
@@ -1645,6 +1676,11 @@ export class Match {
     this.slideReaction(f);
     launchHitUpJump(f);
     if (f.action === 'hitUpJump' && f.age < 8) return;
+    // Action 172 replaces the fall with gravity 70 and no speed (PC 2323).
+    if (f.action === 'airTimeStopGuard' && f.age === 1) {
+      f.vx = f.vy = 0;
+      f.gravity = 70 * SOURCE_ACCELERATION_SCALE;
+    }
     if (f.y < 0 || f.vy < 0) {
       f.airAge++;
       if (aerialDrills.has(f.action)) {
@@ -1698,6 +1734,8 @@ export class Match {
             return;
           }
         }
+        // Punch 3's landing handlers (slot 1, PCs 2433/2439) continue it.
+        if (f.action === 'punch3') return;
         this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
         return;
       }
@@ -1783,6 +1821,12 @@ export class Match {
         (f.action === 'kick2' && f.age >= 2 && f.age < 13)
       )
         f.x = clampX(f.x + f.facing * 600 * SOURCE_VELOCITY_SCALE);
+      // Action 181 hops again after its two-tick pose (PC 2440), then slides
+      // at raw 500 from PC 2447 until PC 2457.
+      if (f.action === 'punch3' && f.age === 14)
+        scriptMotion(f, 300, -300, 120);
+      if (f.action === 'punch3' && f.age >= 29 && f.age <= 41)
+        f.x = clampX(f.x + f.facing * 500 * SOURCE_VELOCITY_SCALE);
       // Action 200: six accelerating ticks, then stop before the kick.
       if (f.action === 'hitUp' && f.age >= 2 && f.age < 8)
         f.x = clampX(

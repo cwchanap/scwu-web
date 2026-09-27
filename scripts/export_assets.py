@@ -166,6 +166,7 @@ def main():
         "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76, "jumpHit": 77, "drillDown": 135,
         "hitRapid": 83, "airHitRapid": 84,
         "blockRapid": 163, "crouchBlockRapid": 165, "airBlockRapid": 167,
+        "timeStopGuard": 168, "crouchTimeStopGuard": 170, "airTimeStopGuard": 172,
         "punch": 178, "kick": 186, "crouchPunch": 185, "crouchKick": 194,
         "airPunch": 182, "airKick": 191,
         "punch2": 180, "punch3": 181, "kick2": 188, "kick3": 189, "kick3Repeat": 190,
@@ -246,7 +247,7 @@ def main():
     # IORI (410, which jumps through 411 into iori3).
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
-                          279, 280, 286, 292, 318, 319, 410]
+                          279, 280, 286, 292, 318, 319, 410, 122]
     played = set(actions.values())
     while queue:
         index = queue.pop()
