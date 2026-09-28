@@ -1,8 +1,22 @@
 import data from './generated/assets.json';
 import type { Frame } from './standing';
 
-// `held` marks an op 0x07 held-pose display, drawn by heldPlacement.
-export type Pose = Frame & { width: number; height: number; held?: boolean };
+// Op 0x19 box in source pixels: centre and half size from the fighter's origin.
+export type BodyBox = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind: number;
+};
+// `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
+// lists the op 0x19 boxes set when the pose displays.
+export type Pose = Frame & {
+  width: number;
+  height: number;
+  held?: boolean;
+  body?: BodyBox[];
+};
 interface Clip {
   frames: Pose[];
   ticks: number[];
@@ -23,6 +37,13 @@ function clip(
     loopStart >= frames.length
   )
     throw new Error('Animation clips need one positive tick duration per pose');
+  // A pose that sets no body boxes keeps the previous pose's, as op 0x09 calls
+  // and op 0x0a jumps keep them in the source (only 0x410cf0 clears them).
+  let body: BodyBox[] | undefined;
+  frames = frames.map((frame) => {
+    body = frame.body ?? body;
+    return frame.body || !body ? frame : { ...frame, body };
+  });
   return { frames, ticks, loopStart };
 }
 
@@ -430,6 +451,14 @@ export function animationDuration(action: AnimatedAction | number) {
   const found =
     typeof action === 'number' ? objectClip(action) : animations[action];
   return found ? found.ticks.reduce((total, ticks) => total + ticks, 0) : 0;
+}
+
+// The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
+// fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
+export function hurtboxes(action: Action, age: number): BodyBox[] {
+  const pose: Pose =
+    action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
+  return (pose.body ?? []).filter((box) => box.kind & 6);
 }
 
 export function animationFrame(

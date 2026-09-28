@@ -668,6 +668,45 @@ describe('recovered attack boxes', () => {
   });
 });
 
+describe('recovered body boxes', () => {
+  // A punch at age 7 against a victim held in one pose `gap` ahead.
+  function punched(
+    pose: Fighter['action'],
+    gap: number,
+    input: Input = {},
+    y = 0,
+  ) {
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + gap;
+    victim.action = pose;
+    victim.age = 12;
+    victim.y = y;
+    f.action = 'punch';
+    f.age = 6;
+    match.step({}, input);
+    return victim.hp < 100;
+  }
+
+  it.each([
+    // Punch box (74, ±63); idle (action 1, PC 10) (−1, ±37) reaches 259.5.
+    ['idle', {}, 259, true],
+    // Crouch (action 19, PC 237): (−2, −71, ±32, ±83) reaches 250.5.
+    ['crouch', { crouch: true }, 255, false],
+    ['crouch', { crouch: true }, 250, true],
+  ] as const)(
+    'hurts %s through its own op 0x19 box (%j, gap %i: %s)',
+    (pose, input, gap, hit) => {
+      expect(punched(pose, gap, input)).toBe(hit);
+    },
+  );
+
+  it('leaves a backdash nothing to hit once it leaves the ground (action 14)', () => {
+    // PCs 177–184: a low kind-2 box during the wind-up, then push boxes only.
+    expect(punched('backdash', 120, {}, -30)).toBe(false);
+  });
+});
+
 describe('recovered victim responses', () => {
   const S = (655 / 65536) * 1.5;
   const A = (393 / 65536) * 1.5;
@@ -1126,9 +1165,10 @@ describe('recovered supers', () => {
     expect(target.x - ryuko.x).toBeCloseTo(105 * 1.5);
     expect(target.y).toBeCloseTo(-315);
     until(match, () => target.action === 'fly');
-    // Op 0x15 takes 120 of 510 life; the box adds 30 more.
+    // Op 0x15 takes 120 of 510 life. The 30-damage box that follows finds no
+    // body box: FLY NO HIT (97) sets only a kind-0 one (PC 1181).
     until(match, () => ryuko.action === 'fly');
-    expect(target.hp).toBe(100 - 24 - 6);
+    expect(target.hp).toBe(100 - 24);
     until(match, () => ryuko.action === 'getUp');
     expect(target.action).not.toBe('superHeld');
   });
@@ -1672,6 +1712,8 @@ describe('prototype training rules', () => {
     for (const attack of ['punch', 'throw'] as const) {
       const match = new Match();
       match.fighters[0].x = 550;
+      // A punch pressed a tick earlier lands before the grab's own tick.
+      if (attack === 'punch') match.step({}, { punch: true });
       ticks(match, 8, { throw: true }, { [attack]: true });
       expect(match.fighters[0].action).toBe(
         attack === 'punch' ? 'hit' : 'grab',
@@ -1679,6 +1721,12 @@ describe('prototype training rules', () => {
       expect(match.fighters[1].action).not.toBe('grabbed');
       expect(match.fighters[1].hp).toBe(100);
     }
+    // Action 196's grab tick (PC 2748) keeps only a kind-1 body box, so a
+    // simultaneous punch passes through and the grab wins.
+    const match = new Match();
+    match.fighters[0].x = 550;
+    ticks(match, 8, { throw: true }, { punch: true });
+    expect(match.fighters[1].action).toBe('grabbed');
   });
 
   it.each([0, 20, 65])(
@@ -3026,19 +3074,20 @@ describe('prototype training rules', () => {
           // Response 56 → action 135 drives a hit victim down, but its nine
           // stop ticks hold it in reach of each stage until it lands. An air
           // guard selects 80 → 172, which falls from rest at gravity 70 (PC
-          // 2323): its body box reaches the diving box until the drill lands.
+          // 2323); its body box (−4, −120, ±37, ±73) leaves the diving box's
+          // reach after three stages.
           expect(contacts).toEqual(
             height === -40
               ? [1]
               : guarded
-                ? [1, 11, 21, 31, 41, 51]
+                ? [1, 11, 21]
                 : [1, 11, 21, 31, 41, 51, 61],
           );
           expect(damage).toEqual(
             guarded
               ? height === -40
                 ? [0]
-                : [0, 0, 0, 0, 0, 0]
+                : [0, 0, 0]
               : height === -40
                 ? [16]
                 : [16, 5, 3, 1, 1, 1, 1],

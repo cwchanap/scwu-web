@@ -4,6 +4,7 @@ import {
   DST_TOSS_TICK,
   dstHold,
   eventsAt,
+  hurtboxes,
   isScripted,
   RESPONSES,
   script,
@@ -583,32 +584,34 @@ const FBH_POWER = 10;
 const SOURCE_LIFE = 510;
 const sourceDamage = (life: number) =>
   Math.max(1, Math.round((life * 100) / SOURCE_LIFE));
-// Op 0x19 body box of the victim reactions (83, NO SUPER), in source pixels.
-const BODY = { x: -1, y: -92, w: 37, h: 102 };
 type Box = { x: number; y: number; w: number; h: number };
-// A box from `origin` meets the target's body box when both axes overlap.
+const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29 }; // action 218
+// 0x40f010: a box from `origin` hits when it overlaps one of the target's body
+// boxes on both axes, each mirrored by its owner's facing.
 function reaches(
   origin: { x: number; y: number },
   facing: number,
   box: Box,
   target: Fighter,
 ) {
-  return (
-    Math.abs(
-      origin.x +
-        facing * box.x * 1.5 -
-        (target.x + target.facing * BODY.x * 1.5),
-    ) <
-      (box.w + BODY.w) * 1.5 &&
-    Math.abs(origin.y + box.y * 1.5 - (target.y + BODY.y * 1.5)) <
-      (box.h + BODY.h) * 1.5
+  return hurtboxes(target.action, target.age).some(
+    (body) =>
+      Math.abs(
+        origin.x +
+          facing * box.x * 1.5 -
+          (target.x + target.facing * body.x * 1.5),
+      ) <
+        (box.w + body.w) * 1.5 &&
+      Math.abs(origin.y + box.y * 1.5 - (target.y + body.y * 1.5)) <
+        (box.h + body.h) * 1.5,
   );
 }
-// The farthest centre distance at which an attack's first box meets a victim
-// facing it (for the authored practice partners).
+// The farthest centre distance at which an attack's first box meets an idle
+// victim facing it (for the authored practice partners).
 export function reach(action: keyof typeof ATTACKS) {
   const { box } = ATTACKS[action].strikes[0];
-  return (box.x + box.w + BODY.w + BODY.x) * 1.5;
+  const [body] = hurtboxes('idle', 0);
+  return (box.x + box.w + body.w + body.x) * 1.5;
 }
 export function isAttack(action: Action): action is keyof typeof ATTACKS {
   return Object.hasOwn(ATTACKS, action);
@@ -2298,17 +2301,9 @@ export class Match {
       const target = this.fighters[1 - projectile.owner];
       if (projectile.hit || protectedReactions.has(target.action)) continue;
       if (projectile.kind === 'missile') {
-        // Action 218's box (−6, −21, ±47, ±29) against the tossed victim's
-        // (−1, −92, ±37, ±102), in source pixels. Every response is 32 → 85.
-        if (
-          Math.abs(
-            projectile.x -
-              projectile.facing * 9 -
-              (target.x - target.facing * 1.5),
-          ) <
-            (47 + 37) * 1.5 &&
-          Math.abs(projectile.y - 31.5 - (target.y - 138)) < (29 + 102) * 1.5
-        )
+        // Action 218's box against the tossed victim's body boxes. Every
+        // response is 32 → 85.
+        if (reaches(projectile, projectile.facing, MISSILE_BOX, target))
           contacts.push({
             f,
             target,

@@ -64,6 +64,27 @@ def decode_event(record):
     return None
 
 
+def body_boxes(bodies, record):
+    """Apply op 0x19 (0x412d63): slot r[9] holds the box until a zero size clears it.
+
+    The hit test (0x40f1b8) reads every slot whose kind r[10] has bit 1 or 2 set.
+    Only an action change through 0x410cf0 clears the slots; calls and jumps keep
+    them. `bodies` is None until the walk sets a slot, so a called action's
+    frames can inherit its caller's boxes.
+    """
+    bodies = dict(bodies or {})
+    if s16(record, 5) and s16(record, 7):
+        bodies[record[9]] = dict(x=s16(record, 1), y=s16(record, 3), w=s16(record, 5),
+                                 h=s16(record, 7), kind=record[10])
+    else:
+        bodies.pop(record[9], None)
+    return bodies
+
+
+def with_body(frame, bodies):
+    return frame if bodies is None else dict(frame, body=[bodies[k] for k in sorted(bodies)])
+
+
 def flatten(p, c, index, played=()):
     """Linearize one action for playback by the match.
 
@@ -74,7 +95,7 @@ def flatten(p, c, index, played=()):
     0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
     path is the super's normal path.
     """
-    frames, events = [], []
+    frames, events, bodies = [], [], {}
     t, pc, stack, seen = 0, p.action(index).start, [], {}
     action = index
     result = dict(loop=-1, end="end", next=None)
@@ -98,7 +119,7 @@ def flatten(p, c, index, played=()):
         if op == 0x0c:
             frame = display_record(p, pc)
             image = c.images[frame["image"]]
-            frames.append(dict(frame, width=image.width, height=image.height, t=t))
+            frames.append(with_body(dict(frame, width=image.width, height=image.height, t=t), bodies))
             if frame["duration"] == 0:
                 result["end"] = "hold"
                 break
@@ -122,6 +143,8 @@ def flatten(p, c, index, played=()):
             continue
         elif op == 0x05:
             break
+        elif op == 0x19:
+            bodies = body_boxes(bodies, record)
         else:
             event = decode_event(record)
             if event:
@@ -196,12 +219,14 @@ def main():
     for name, index in actions.items():
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
-        frames = []
-        for pc in range(action.start + offset, action.end):
-            if p.records[pc][0] == 12:
+        frames, bodies = [], None
+        for pc in range(action.start, action.end):
+            if p.records[pc][0] == 0x19:
+                bodies = body_boxes(bodies, p.records[pc])
+            elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
                 image = c.images[frame["image"]]
-                frames.append(dict(frame, width=image.width, height=image.height))
+                frames.append(with_body(dict(frame, width=image.width, height=image.height), bodies))
                 image_ids.add(frame["image"])
         clips[name] = frames
     # Op 0x07 replaces a held fighter's display with an entry of this 15 x 6-byte
