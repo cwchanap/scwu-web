@@ -66,7 +66,8 @@ export const GROUND = 636;
 // Keep one wall for every state so changing pose never relocates a fighter.
 export const FIGHTER_MARGIN = 185;
 // Op 0x18 attack boxes: centre and half size in source pixels from the
-// attacker's origin, x toward its facing, active for ages [from, to).
+// attacker's origin, x toward its facing, active for ages [from, to), with
+// the box's kind (r[10]) and damage (r[12]).
 const strike = (
   from: number,
   to: number,
@@ -74,56 +75,63 @@ const strike = (
   y: number,
   w: number,
   h: number,
-) => ({ from, to, box: { x, y, w, h } });
-// Strikes that repeat every `interval` ticks, as op 0x09 calls and loops do.
+  damage: number,
+  kind: number,
+) => ({ from, to, box: { x, y, w, h, damage, kind } });
+// Strikes that repeat every `interval` ticks, as op 0x09 calls and loops do,
+// each with its own damage.
 const strikes = (
-  count: number,
   interval: number,
   first: ReturnType<typeof strike>,
+  damages: number[],
 ) =>
-  Array.from({ length: count }, (_, k) => ({
-    ...first,
+  damages.map((damage, k) => ({
     from: first.from + k * interval,
     to: first.to + k * interval,
+    box: { ...first.box, damage },
   }));
-// Authored: damage, the total for a complete move.
 export const ATTACKS = {
-  punch: { damage: 8, strikes: [strike(7, 12, 74, -114, 63, 27)] }, // PC 2367
-  kick: { damage: 13, strikes: [strike(7, 12, 92, -91, 60, 31)] }, // PC 2559
-  crouchPunch: { damage: 8, strikes: [strike(14, 24, 96, -89, 60, 24)] }, // PC 2541
-  crouchKick: { damage: 13, strikes: [strike(18, 28, 99, -70, 70, 53)] }, // PC 2732
-  airPunch: { damage: 8, strikes: [strike(18, 33, 25, -43, 54, 38)] }, // PC 2477
+  punch: { strikes: [strike(7, 12, 74, -114, 63, 27, 10, 3)] }, // PC 2367
+  kick: { strikes: [strike(7, 12, 92, -91, 60, 31, 8, 3)] }, // PC 2559
+  crouchPunch: { strikes: [strike(14, 24, 96, -89, 60, 24, 30, 1)] }, // PC 2541
+  crouchKick: { strikes: [strike(18, 28, 99, -70, 70, 53, 30, 1)] }, // PC 2732
+  airPunch: { strikes: [strike(18, 33, 25, -43, 54, 38, 15, 1)] }, // PC 2477
   // PCs 2649/2653/2657.
   airKick: {
-    damage: 13,
-    strikes: strikes(3, 8, strike(15, 19, 10, -51, 53, 27)),
+    strikes: strikes(8, strike(15, 19, 10, -51, 53, 27, 4, 3), [4, 4, 4]),
   },
   // PCs 2401/2407/2414.
   punch2: {
-    damage: 10,
-    strikes: strikes(3, 6, strike(18, 21, 69, -118, 61, 32)),
+    strikes: strikes(6, strike(18, 21, 69, -118, 61, 32, 5, 3), [5, 5, 5]),
   },
   // PC 2454, after the two landing-timed hops (12 + 2 + 8) and PCs 2446/2450.
-  punch3: { damage: 16, strikes: [strike(36, 41, 66, -102, 82, 83)] },
-  kick2: { damage: 14, strikes: [strike(16, 26, 60, -118, 53, 68)] }, // PC 2595
-  hitUp: { damage: 15, strikes: [strike(15, 25, 33, -152, 40, 45)] }, // PC 2824
-  iori: { damage: 10, strikes: [strike(21, 29, 80, -98, 53, 29)] }, // PC 3620
-  iori2: { damage: 12, strikes: [strike(23, 31, 103, -104, 61, 29)] }, // PC 3656
-  iori3: { damage: 16, strikes: [strike(21, 26, 79, -121, 58, 59)] }, // PC 3690
+  punch3: { strikes: [strike(36, 41, 66, -102, 82, 83, 35, 0)] },
+  kick2: { strikes: [strike(16, 26, 60, -118, 53, 68, 20, 3)] }, // PC 2595
+  hitUp: { strikes: [strike(15, 25, 33, -152, 40, 45, 15, 1)] }, // PC 2824
+  iori: { strikes: [strike(21, 29, 80, -98, 53, 29, 15, 7)] }, // PC 3620
+  iori2: { strikes: [strike(23, 31, 103, -104, 61, 29, 18, 7)] }, // PC 3656
+  iori3: { strikes: [strike(21, 26, 79, -121, 58, 59, 20, 7)] }, // PC 3690
   // PC 2619 calls action 190 eight times: its beam box (PC 2632) for 3 of 6 ticks.
   kick3: {
-    damage: 17,
-    strikes: strikes(8, 6, strike(15, 18, 169, -115, 163, 25)),
+    strikes: strikes(
+      6,
+      strike(15, 18, 169, -115, 163, 25, 4, 2),
+      [4, 4, 4, 4, 4, 4, 4, 4],
+    ),
   },
   // PCs 2921–2942.
   drill: {
-    damage: 18,
-    strikes: strikes(6, 6, strike(23, 26, 132, -108, 60, 31)),
+    strikes: strikes(
+      6,
+      strike(23, 26, 132, -108, 60, 31, 5, 7),
+      [5, 5, 5, 5, 7, 8],
+    ),
   },
   // Action 208 has no box; its spins (209–211, PCs 2985/3015/3036/3057) keep
-  // one, re-armed by their contact stages rather than by age.
-  airDrill: { damage: 16, strikes: [] },
-  airDrillSpin: { damage: 16, strikes: [strike(0, Infinity, 29, -54, 60, 39)] },
+  // one, re-armed by their contact stages rather than by age, with damage
+  // AIR_DRILL_DAMAGE by stage.
+  airDrill: { strikes: [] },
+  airDrillSpin: { strikes: [strike(0, Infinity, 29, -54, 60, 39, 20, 6)] },
 };
 // Ryuko's op 0x17 selects the victim response by stance: standing, crouching,
 // airborne, then the same three while guarding. Each response names a victim
@@ -302,7 +310,7 @@ const aerialDrills = new Set<Action>([
   'airDrillSpin',
   'airDrillContact',
 ]);
-const AIR_DRILL_DAMAGE = [16, 5, 3, 1];
+const AIR_DRILL_DAMAGE = [20, 5, 3, 1];
 // Opcode 1 uses 16.16 velocity scaled by floor(65536 / 100) at speed 10.
 // Convert the recovered source velocities to the web's 1.5-scale arena.
 const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
@@ -396,8 +404,10 @@ const hasMotion = (action: Action) =>
 // stocks, none at the start. Routine 0x40e6f0 carries and borrows between them.
 export const POWER_PER_STOCK = 100;
 export const MAX_STOCK = 3;
-// The same block's 30% (153 of 510 life) selects desperation branches.
-export const DESPERATION_HP = 30;
+// The same block's 510 life. Its 30% (153) selects desperation branches and,
+// in 0x40e7c0, shrinks every loss to 60%.
+export const LIFE = 510;
+export const DESPERATION_HP = 153;
 // Opcode 0x15 self power in each attack's script, credited when it starts.
 const ATTACK_POWER: Partial<Record<Action, number>> = {
   punch2: 3,
@@ -462,15 +472,15 @@ export const AXE_RELEASE_TICK = 16;
 export { THROW_RELEASE_TICK } from './animations';
 const THROW_STARTUP = 7;
 const THROW_RANGE = 115;
-const THROW_DAMAGE = 18;
+// PC 2770 (op 0x15).
+const THROW_DAMAGE = 30;
 // Action 214's one-tick grab box reaches 137 source pixels, versus 76 for the
-// normal grab (196). Its range and both damages are training rules.
+// normal grab (196). Its range is a training rule.
 // PC 3082 (op 0x11) enters EVIL DST (221) at 153 of 510 life or less; its box
 // and timing match 214's.
 const DST_STARTUP = 4;
 const DST_RANGE = THROW_RANGE + (137 - 76) * 1.5;
-const DST_DAMAGE = 10;
-const MISSILE_DAMAGE = 8;
+const DST_DAMAGE = 10; // PC 3112 (op 0x15)
 // Action 215 slides back at raw velocity −400 from PC 3120 to PC 3132 and
 // fires two missiles (218) at raw velocity 1000/−1000 from PCs 3127–3128.
 const DST_FIRE_TICK = 268;
@@ -580,21 +590,39 @@ const RESPONSE_REACTIONS: Record<
 };
 const FBH = 112;
 const FBH_POWER = 10;
-// Super damage converts the source's 510-point life to the 100-point bar.
-const SOURCE_LIFE = 510;
-const sourceDamage = (life: number) =>
-  Math.max(1, Math.round((life * 100) / SOURCE_LIFE));
-type Box = { x: number; y: number; w: number; h: number };
-const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29 }; // action 218
-// 0x40f010: a box from `origin` hits when it overlaps one of the target's body
-// boxes on both axes, each mirrored by its owner's facing.
-function reaches(
+// 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1).
+function loseLife(f: Fighter, loss: number) {
+  if (loss && f.hp <= DESPERATION_HP)
+    loss = Math.max(1, Math.trunc((loss * 60) / 100));
+  f.hp = Math.max(0, f.hp - loss);
+  return loss;
+}
+// 0x40f010: a hit takes the box's damage scaled by the struck body box's
+// percentage `taken`; a guard takes 20% (+0x7ca5) only from a box of kind bit 2.
+// ponytail: Ryuko's combo decay (+0x7ca8) is 0, so the victim's hit count
+// never reduces damage and isn't tracked.
+function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
+  if (!blocked)
+    return box.damage && Math.max(1, Math.trunc((box.damage * taken) / 100));
+  return box.damage && box.kind & 4
+    ? Math.max(1, Math.trunc((box.damage * 20) / 100))
+    : 0;
+}
+// Action 227, PC 3292.
+// ponytail: the axe's flight and hit area are authored and meet no body box,
+// so a hit takes 100%. Porting 227's motion would let this box find one.
+const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
+// Action 218, PC 3164.
+const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29, damage: 22, kind: 0 };
+// 0x40f010: a box from `origin` hits the first of the target's body boxes it
+// overlaps on both axes, each mirrored by its owner's facing.
+function struck(
   origin: { x: number; y: number },
   facing: number,
-  box: Box,
+  box: ScriptBox,
   target: Fighter,
 ) {
-  return hurtboxes(target.action, target.age).some(
+  return hurtboxes(target.action, target.age).find(
     (body) =>
       Math.abs(
         origin.x +
@@ -717,6 +745,7 @@ export interface ScriptBox {
   w: number;
   h: number;
   damage: number;
+  kind: number;
 }
 export interface Projectile {
   owner: number;
@@ -789,7 +818,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   vx: 0,
   vy: 0,
   gravity: 0.24,
-  hp: 100,
+  hp: LIFE,
   facing,
   action: 'idle',
   age: 0,
@@ -1170,9 +1199,8 @@ export class Match {
       if (attacker.age !== THROW_RELEASE_TICK) return;
       this.action(target, 'thrown');
       target.vy = -6;
-      target.hp = Math.max(0, target.hp - THROW_DAMAGE);
       attacker.hits++;
-      attacker.damage += THROW_DAMAGE;
+      attacker.damage += loseLife(target, THROW_DAMAGE);
       // PC 2770 adds 5 to both; the thrown victim's action 132 adds 8 more.
       addPower(attacker, 5);
       addPower(target, 13);
@@ -1200,9 +1228,8 @@ export class Match {
       target.y = -96 * 1.5;
       target.vy = 0;
       target.facing = attacker.facing === 1 ? -1 : 1;
-      target.hp = Math.max(0, target.hp - DST_DAMAGE);
       attacker.hits++;
-      attacker.damage += DST_DAMAGE;
+      attacker.damage += loseLife(target, DST_DAMAGE);
       // PC 3112 adds 5 power to both fighters.
       addPower(attacker, 5);
       addPower(target, 5);
@@ -1265,7 +1292,7 @@ export class Match {
     const command = SUPER_COMMANDS[control];
     const cancel = IORI.has(f.action) ? SUPER_CANCELS[control] : undefined;
     if (cancel?.via254) {
-      const life = (f.hp * SOURCE_LIFE) / 100;
+      const life = f.hp;
       const enter =
         f.stock >= 2 && (cancel.life === undefined || life < cancel.life);
       if (enter) f.stock -= 2;
@@ -1289,7 +1316,7 @@ export class Match {
       entered.add(action);
       let next: Action | undefined;
       for (const event of eventsAt(SCRIPTED[action], 0)) {
-        const life = (f.hp * SOURCE_LIFE) / 100;
+        const life = f.hp;
         const branch =
           event.op === 'life'
             ? event.below
@@ -1354,6 +1381,7 @@ export class Match {
                 w: event.w,
                 h: event.h,
                 damage: event.damage,
+                kind: event.kind,
               }
             : null;
         actor.connected = false;
@@ -1395,8 +1423,7 @@ export class Match {
       }
       case 'power':
         if (event.otherLife < 0) {
-          const damage = sourceDamage(-event.otherLife);
-          other.hp = Math.max(0, other.hp - damage);
+          const damage = loseLife(other, -event.otherLife);
           self.hits++;
           self.damage += damage;
         }
@@ -1526,7 +1553,8 @@ export class Match {
             y: source.y + this.cameraY - GROUND,
           }
         : source;
-    if (!reaches(origin, source.facing, box, target)) return [];
+    const body = struck(origin, source.facing, box, target);
+    if (!body) return [];
     const guarding = this.guarding(target, source);
     const stance =
       target.y < 0 || target.vy < 0
@@ -1542,7 +1570,7 @@ export class Match {
       {
         f: attacker,
         target,
-        damage: blocked || !box.damage ? 0 : sourceDamage(box.damage),
+        damage: boxDamage(box, body.taken, blocked),
         heavy: true,
         hitStop: reaction.stop,
         // Objects, like DST's missiles, pause without pausing Ryuko.
@@ -2221,7 +2249,7 @@ export class Match {
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
       if (frozen[i] || !isAttack(f.action)) return [];
-      const { damage: total, strikes } = ATTACKS[f.action];
+      const { strikes } = ATTACKS[f.action];
       const index = strikes.findIndex(
         ({ from, to }) => f.age >= from && f.age < to,
       );
@@ -2233,17 +2261,13 @@ export class Match {
       const finisher = airDrill
         ? f.airDrillStage === 3
         : index === strikes.length - 1;
-      const damage = airDrill
-        ? AIR_DRILL_DAMAGE[f.airDrillStage]
-        : Math.floor(total / strikes.length) +
-          (finisher ? total % strikes.length : 0);
+      const box = airDrill
+        ? { ...strike.box, damage: AIR_DRILL_DAMAGE[f.airDrillStage] }
+        : strike.box;
       const target = this.fighters[1 - i];
-      if (
-        protectedReactions.has(target.action) ||
-        f.connected ||
-        !reaches(f, f.facing, strike.box, target)
-      )
-        return [];
+      if (protectedReactions.has(target.action) || f.connected) return [];
+      const body = struck(f, f.facing, box, target);
+      if (!body) return [];
       // Decided on contact only: a CPU victim draws its guard roll here.
       const guarding = this.guarding(target, f);
       const stance =
@@ -2270,7 +2294,7 @@ export class Match {
         {
           f,
           target,
-          damage,
+          damage: boxDamage(box, body.taken, blocked),
           heavy,
           hitStop,
           attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
@@ -2303,11 +2327,12 @@ export class Match {
       if (projectile.kind === 'missile') {
         // Action 218's box against the tossed victim's body boxes. Every
         // response is 32 → 85.
-        if (reaches(projectile, projectile.facing, MISSILE_BOX, target))
+        const body = struck(projectile, projectile.facing, MISSILE_BOX, target);
+        if (body)
           contacts.push({
             f,
             target,
-            damage: MISSILE_DAMAGE,
+            damage: boxDamage(MISSILE_BOX, body.taken, false),
             heavy: true,
             // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
             // The missile, not Ryuko, pauses.
@@ -2339,7 +2364,7 @@ export class Match {
         contacts.push({
           f,
           target,
-          damage: 16,
+          damage: boxDamage(AXE_BOX, 100, blocked),
           heavy: true,
           hitStop,
           attackerStop: hitStop,
@@ -2386,15 +2411,14 @@ export class Match {
         );
       }
       if (fbh) addPower(f, FBH_POWER);
-      const damage = blocked ? 0 : strength;
-      target.hp = Math.max(0, target.hp - damage);
-      f.damage += damage;
+      f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
       const airborne = target.y < 0 || target.vy < 0;
       // Only the axe leaves its reaction to stance: action 227's strong
-      // responses (50 → FB → 75, 4, 25–27).
-      if (blocked)
+      // responses (50 → FB → 75, 4, 25–27). A chip that empties life still
+      // KOs (0x40e7c0).
+      if (blocked && target.hp > 0)
         this.action(
           target,
           reaction ??
@@ -2406,7 +2430,7 @@ export class Match {
           true,
         );
       else {
-        f.hits++;
+        if (!blocked) f.hits++;
         this.action(
           target,
           target.hp === 0
@@ -2439,7 +2463,7 @@ export class Match {
         effect: blocked ? 'guardSpark' : 'hitSpark',
       });
       // The guard reaction's first op 0x24 runs before its first display.
-      if (blocked)
+      if (blocked && target.hp > 0)
         this.counter(target, this.history[this.fighters.indexOf(target)]);
     }
     // Run contact branches after all hits: an interrupted aerial drill must not

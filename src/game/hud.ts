@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { DESPERATION_HP, POWER_PER_STOCK } from './match';
+import { DESPERATION_HP, LIFE, POWER_PER_STOCK } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -18,7 +18,7 @@ export function koFrame(age: number) {
 }
 
 export function healthCrop(hp: number, right: boolean) {
-  const width = Math.round((254 * Math.max(0, Math.min(100, hp))) / 100);
+  const width = Math.round((254 * Math.max(0, Math.min(LIFE, hp))) / LIFE);
   return { x: right ? 254 - width : 0, width };
 }
 

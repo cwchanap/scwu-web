@@ -12,7 +12,7 @@ import {
   throwHold,
 } from './animations';
 import type { Pose } from './animations';
-import { FixedClock, GROUND, HEIGHT, Match, WIDTH } from './match';
+import { FixedClock, GROUND, HEIGHT, LIFE, Match, WIDTH } from './match';
 import type { Control, Mode, PracticeOptions } from './match';
 
 export interface GameStatus {
@@ -30,7 +30,7 @@ export interface GameStatus {
 export const initialStatus: GameStatus = {
   ready: false,
   paused: false,
-  hp: [100, 100],
+  hp: [LIFE, LIFE],
   seconds: Infinity,
   hits: 0,
   damage: 0,

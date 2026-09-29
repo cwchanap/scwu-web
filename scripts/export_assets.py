@@ -67,7 +67,8 @@ def decode_event(record):
 def body_boxes(bodies, record):
     """Apply op 0x19 (0x412d63): slot r[9] holds the box until a zero size clears it.
 
-    The hit test (0x40f1b8) reads every slot whose kind r[10] has bit 1 or 2 set.
+    The hit test (0x40f1b8) reads every slot whose kind r[10] has bit 1 or 2 set;
+    r[11] is the percentage of a hit's damage the body takes (0x40f010).
     Only an action change through 0x410cf0 clears the slots; calls and jumps keep
     them. `bodies` is None until the walk sets a slot, so a called action's
     frames can inherit its caller's boxes.
@@ -75,7 +76,7 @@ def body_boxes(bodies, record):
     bodies = dict(bodies or {})
     if s16(record, 5) and s16(record, 7):
         bodies[record[9]] = dict(x=s16(record, 1), y=s16(record, 3), w=s16(record, 5),
-                                 h=s16(record, 7), kind=record[10])
+                                 h=s16(record, 7), kind=record[10], taken=record[11])
     else:
         bodies.pop(record[9], None)
     return bodies

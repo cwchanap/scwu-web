@@ -26,7 +26,7 @@
   let status = $state<GameStatus>({
     ready: false,
     paused: false,
-    hp: [100, 100],
+    hp: [510, 510],
     seconds: Infinity,
     hits: 0,
     damage: 0,
@@ -152,7 +152,7 @@
           role="meter"
           aria-label="Player health"
           aria-valuemin="0"
-          aria-valuemax="100"
+          aria-valuemax="510"
           aria-valuenow={status.hp[0]}
         >
           {status.hp[0]}
@@ -161,7 +161,7 @@
           role="meter"
           aria-label="Opponent health"
           aria-valuemin="0"
-          aria-valuemax="100"
+          aria-valuemax="510"
           aria-valuenow={status.hp[1]}
         >
           {status.hp[1]}

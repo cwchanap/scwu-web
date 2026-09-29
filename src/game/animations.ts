@@ -8,6 +8,7 @@ export type BodyBox = {
   w: number;
   h: number;
   kind: number;
+  taken: number;
 };
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays.
