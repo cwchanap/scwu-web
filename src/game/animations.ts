@@ -48,28 +48,14 @@ function clip(
   return { frames, ticks, loopStart };
 }
 
-const THROW_GRIP_TICKS = 12;
-const spinTicks = data.clips.throwSpin.map((frame) => frame.duration);
-const spinDuration = spinTicks.reduce((total, ticks) => total + ticks, 0);
-// ponytail: three authored rotations; original object dispatch is not interpreted.
-const throwSpin = Array.from({ length: 3 }, () => data.clips.throwSpin).flat();
-export const THROW_RELEASE_TICK = THROW_GRIP_TICKS + spinDuration * 3;
-
-// Shared by the held fighter's physics and draw order to stay in sync with the turn.
-export function throwHold(age: number) {
-  if (age < THROW_GRIP_TICKS || age >= THROW_RELEASE_TICK)
-    return { x: 90, y: -24, behind: false };
-  const angle = ((age - THROW_GRIP_TICKS) / spinDuration) * Math.PI * 2;
-  return {
-    x: Math.cos(angle) * 90,
-    y: -48 - Math.sin(angle) * 24,
-    behind: Math.sin(angle) > 0,
-  };
-}
-
-// Action 215 calls the throw spin (199) three times, then 217 ten times.
+// Action 197 calls the throw spin (199) three times (PC 2767), then tosses.
+const throwSpins = Array.from({ length: 3 }, () => data.clips.throwSpin).flat();
+export const THROW_TOSS_TICK =
+  data.clips.throw[0].duration +
+  throwSpins.reduce((total, frame) => total + frame.duration, 0);
+// Action 215 plays the same three spins, then 217 ten times.
 const dstSpins = [
-  ...Array.from({ length: 3 }, () => data.clips.throwSpin).flat(),
+  ...throwSpins,
   ...Array.from({ length: 10 }, () => data.clips.dstSpin).flat(),
 ];
 export const DST_TOSS_TICK =
@@ -78,6 +64,7 @@ export const DST_TOSS_TICK =
 // Actions 199/217 run op 0x07 before each spin display: the held offset in
 // source pixels, bit 2 (face the holder's way, mirrored image) and bit 0
 // (drawn behind the holder). Response 30 first places the victim 60 ahead.
+// The throw (197) opens with the same five ticks, so it shares these holds.
 const DST_HOLDS = [
   { x: 60, same: true, behind: true },
   { x: -10, same: true, behind: true },
@@ -307,32 +294,12 @@ export const animations = {
   axeFlight: clip(data.clips.axeFlight, true),
   axeHit: clip(data.clips.axeHit),
   grab: clip(data.clips.grab),
-  throw: clip(
-    [data.clips.throw[0], ...throwSpin, ...data.clips.throw.slice(1)],
-    false,
-    [
-      THROW_GRIP_TICKS,
-      ...throwSpin.map((frame) => frame.duration),
-      18,
-      10,
-      8,
-      8,
-    ],
-  ),
-  grabbed: clip(
-    [
-      data.clips.grabbed[0],
-      ...Array.from({ length: 3 }, () => [
-        data.clips.grabbedSpin[0],
-        data.clips.grabbedSpin[0],
-        data.clips.grabbedSpin[1],
-        data.clips.grabbedSpin[1],
-      ]).flat(),
-    ],
-    false,
-    [THROW_GRIP_TICKS, ...Array.from({ length: 3 }, () => spinTicks).flat()],
-  ),
-  thrown: clip(data.clips.thrown, false, [2, 2, 2, 12, 1]),
+  // Its victim plays dstHeld until the toss: the same response 30 and spins.
+  throw: clip([
+    data.clips.throw[0],
+    ...throwSpins,
+    ...data.clips.throw.slice(1),
+  ]),
   knockdown: clip(data.clips.knockdown),
   getUp: clip(data.clips.getUp),
   hitSpark: clip(data.clips.hitSpark),

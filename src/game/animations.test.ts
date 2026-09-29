@@ -12,6 +12,7 @@ import {
   isBlank,
   RESPONSES,
   script,
+  THROW_TOSS_TICK,
 } from './animations';
 
 describe('selected core animation assets', () => {
@@ -258,20 +259,20 @@ describe('selected core animation assets', () => {
     expect(animationDuration('kick3')).toBe(88);
   });
 
-  it('plays the grab, release, floor impact, and get-up poses', () => {
+  it('plays the grab, the Chuck Hit spins and recovery, floor impact, and get-up poses', () => {
     expect(animationFrame('grab', 0).image).toBe(103);
+    // Action 197: five ticks, three calls of 199 (PC 2767), then its recovery.
     expect(animationFrame('throw', 0).image).toBe(106);
     expect(
-      [12, 17, 22, 27, 32].map((age) => animationFrame('throw', age).image),
+      [5, 10, 15, 20, 25].map((age) => animationFrame('throw', age).image),
     ).toEqual([107, 108, 107, 110, 107]);
-    expect(animationFrame('throw', 22).flip_x).toBe(true);
-    expect(animationFrame('grabbed', 12).flip_y).toBe(true);
-    expect(animationFrame('throw', 72).image).toBe(111);
-    expect(animationFrame('throw', 108).image).toBe(24);
-    expect(animationFrame('grabbed', 0).image).toBe(47);
-    expect(animationFrame('thrown', 0).image).toBe(52);
-    expect(animationFrame('thrown', 6).image).toBe(60);
-    expect(animationFrame('thrown', 100).image).toBe(61);
+    expect(animationFrame('throw', 15).flip_x).toBe(true);
+    expect(THROW_TOSS_TICK).toBe(65);
+    expect(
+      [64, 65, 155, 185, 195].map((age) => animationFrame('throw', age).image),
+    ).toEqual([110, 111, 106, 94, 24]);
+    expect(animationDuration('throw')).toBe(205);
+    expect(animationFrame('dstHeld', 0).image).toBe(47);
     expect(animationFrame('knockdown', 0).image).toBe(62);
     expect(animationFrame('knockdown', 10).image).toBe(63);
     expect(

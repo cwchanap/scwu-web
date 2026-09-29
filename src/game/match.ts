@@ -9,8 +9,7 @@ import {
   RESPONSES,
   script,
   SCRIPTED,
-  THROW_RELEASE_TICK,
-  throwHold,
+  THROW_TOSS_TICK,
 } from './animations';
 import type {
   Action,
@@ -469,31 +468,38 @@ const DOUBLE_TAP_TICKS = 20;
 const INTRO_WALK_TICKS = 50;
 const INTRO_WALK = INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE;
 export const AXE_RELEASE_TICK = 16;
-export { THROW_RELEASE_TICK } from './animations';
-const THROW_STARTUP = 7;
-const THROW_RANGE = 115;
-// PC 2770 (op 0x15).
-const THROW_DAMAGE = 30;
-// Action 214's one-tick grab box reaches 137 source pixels, versus 76 for the
-// normal grab (196). Its range is a training rule.
-// PC 3082 (op 0x11) enters EVIL DST (221) at 153 of 510 life or less; its box
-// and timing match 214's.
-const DST_STARTUP = 4;
-const DST_RANGE = THROW_RANGE + (137 - 76) * 1.5;
-const DST_DAMAGE = 10; // PC 3112 (op 0x15)
+export { THROW_TOSS_TICK } from './animations';
+// One-tick op 0x18 grab boxes with responses 30: action 196 at age 7 (PC 2750)
+// and 214 at age 4 (PC 3091). PC 3082 (op 0x11) enters EVIL DST (221) at 153 of
+// 510 life or less; its box and timing match 214's (PC 3206).
+const THROW_BOX: ScriptBox = {
+  x: 35,
+  y: 6,
+  w: 41,
+  h: 3,
+  damage: 0,
+  kind: 0xa8,
+};
+const DST_BOX: ScriptBox = { x: 67, y: 6, w: 70, h: 1, damage: 0, kind: 8 };
 // Action 215 slides back at raw velocity −400 from PC 3120 to PC 3132 and
 // fires two missiles (218) at raw velocity 1000/−1000 from PCs 3127–3128.
 const DST_FIRE_TICK = 268;
 const DST_SLIDE_TICKS = 25;
 const grabs = {
-  grab: { startup: THROW_STARTUP, range: THROW_RANGE, hold: 'throw' },
-  dst: { startup: DST_STARTUP, range: DST_RANGE, hold: 'dstHit' },
-  evilDst: { startup: DST_STARTUP, range: DST_RANGE, hold: 'evilDstHit' },
+  grab: { startup: 7, box: THROW_BOX, hold: 'throw' },
+  dst: { startup: 4, box: DST_BOX, hold: 'dstHit' },
+  evilDst: { startup: 4, box: DST_BOX, hold: 'evilDstHit' },
 } as const;
 const held = {
-  throw: 'grabbed',
+  throw: 'dstHeld',
   dstHit: 'dstHeld',
   evilDstHit: 'superHeld',
+} as const;
+// Response 31 tosses the victim after the spins (PCs 2769/3111), and op 0x15
+// takes its life (PCs 2770/3112).
+const tosses = {
+  throw: { tick: THROW_TOSS_TICK, damage: 30 },
+  dstHit: { tick: DST_TOSS_TICK, damage: 10 },
 } as const;
 // Spawns from actions 199, 217 and 215 by DST action age (op 0x04): source
 // offsets, draw order from flag bit 0, and the spawned action's own velocity.
@@ -634,6 +640,14 @@ function struck(
         (box.h + body.h) * 1.5,
   );
 }
+// 0x40f010 skips a victim by the box's kind: 0x20 an airborne one, 8 one in a
+// guard reaction (+0x15e & 0xc is 0xc) and 0x80 one in a hit reaction or hold
+// (8). Free and attacking fighters (0 and 4) can be grabbed.
+function grabbable(box: ScriptBox, target: Fighter) {
+  if (box.kind & 0x20 && (target.y < 0 || target.vy !== 0)) return false;
+  if (blocks.has(target.action)) return !(box.kind & 8);
+  return !(box.kind & 0x80 && reactions.has(target.action));
+}
 // The farthest centre distance at which an attack's first box meets an idle
 // victim facing it (for the authored practice partners).
 export function reach(action: keyof typeof ATTACKS) {
@@ -692,10 +706,8 @@ const reactions = new Set<Action>([
   ...blocks,
 ]);
 const protectedReactions = new Set<Action>([
-  'grabbed',
   'dstHeld',
   'superHeld',
-  'thrown',
   'knockdown',
   'slamBounce',
   'bounceDown',
@@ -851,7 +863,6 @@ function gravity(f: Fighter) {
   f.x = clampX(f.x + f.vx);
   f.vy += f.gravity;
   f.y = Math.min(0, f.y + f.vy);
-  if (f.action === 'thrown') f.x = clampX(f.x - f.facing * 2);
   if (f.y === 0) {
     f.vx = f.vy = 0;
     f.gravity = 0.24;
@@ -1044,7 +1055,7 @@ export class Match {
       action === 'dash' ||
       action === 'backdash' ||
       aerialDrills.has(action) ||
-      ['grabbed', 'thrown', 'down'].includes(action)
+      action === 'down'
     ) {
       f.vx = 0;
       f.gravity = 0.24;
@@ -1069,14 +1080,13 @@ export class Match {
       f.action === 'bounceDown' ||
       Object.hasOwn(launchMotion, f.action) ||
       (f.action === 'hitUpJump' && f.age < 8) ||
-      // A timeout release skips the remaining DST; a toss finishes its missiles.
-      (f.action === 'dstHit' &&
-        f.age >= DST_TOSS_TICK &&
-        f.age < animationDuration('dstHit')) ||
+      // A timeout release skips the rest of a throw; a toss finishes its move.
+      (Object.hasOwn(tosses, f.action) &&
+        f.age >= tosses[f.action as keyof typeof tosses].tick &&
+        f.age < animationDuration(f.action as AnimatedAction)) ||
       ((f.action === 'land' ||
         f.action === 'drillLand' ||
-        f.action === 'getUp' ||
-        f.action === 'throw') &&
+        f.action === 'getUp') &&
         f.age < animationDuration(f.action))
     )
       return;
@@ -1148,7 +1158,6 @@ export class Match {
     // Strikes resolve first; simultaneous grab attempts both miss.
     const attempts = this.fighters.filter((f, index) => {
       const target = this.fighters[1 - index];
-      const distance = (target.x - f.x) * f.facing;
       const grab = grabs[f.action as keyof typeof grabs];
       return (
         grab &&
@@ -1157,13 +1166,10 @@ export class Match {
         f.age === grab.startup &&
         f.hp > 0 &&
         target.hp > 0 &&
-        target.y === 0 &&
-        target.vy === 0 &&
         !protectedReactions.has(target.action) &&
-        !reactions.has(target.action) &&
         !Object.hasOwn(held, target.action) &&
-        distance >= 0 &&
-        distance <= grab.range
+        grabbable(grab.box, target) &&
+        struck(f, f.facing, grab.box, target)
       );
     });
     if (attempts.length === 1) {
@@ -1186,51 +1192,25 @@ export class Match {
       )
         this.action(target, target.y < 0 ? 'airHit' : 'hit');
       if (target.action === 'superHeld') this.placeHeld(attacker, target);
-      if (target.action !== 'grabbed') return;
-      if (attacker.action !== 'throw' || attacker.hp === 0) {
-        this.action(target, target.y < 0 ? 'airHit' : 'hit');
-        return;
-      }
-      const hold = throwHold(attacker.age);
-      target.x = clampX(attacker.x + attacker.facing * hold.x);
-      target.y = hold.y;
-      target.vy = 0;
-      target.facing = attacker.facing === 1 ? -1 : 1;
-      if (attacker.age !== THROW_RELEASE_TICK) return;
-      this.action(target, 'thrown');
-      target.vy = -6;
-      attacker.hits++;
-      attacker.damage += loseLife(target, THROW_DAMAGE);
-      // PC 2770 adds 5 to both; the thrown victim's action 132 adds 8 more.
-      addPower(attacker, 5);
-      addPower(target, 13);
-      this.impacts.push({
-        x: target.x - attacker.facing * 42,
-        y: GROUND + target.y - 145,
-        age: 0,
-        blocked: false,
-        heavy: true,
-        facing: attacker.facing,
-        effect: 'hitSpark',
-      });
     });
   }
 
   private holdDst(attacker: Fighter, target: Fighter) {
-    if (attacker.action !== 'dstHit' || attacker.hp === 0) {
+    const toss = tosses[attacker.action as keyof typeof tosses];
+    if (!toss || attacker.hp === 0) {
       this.action(target, 'hit');
       return;
     }
-    if (attacker.age === DST_TOSS_TICK) {
-      // PC 3111: response 31 places the victim at (14, −96), then action 129.
+    if (attacker.age === toss.tick) {
+      // Response 31 places the victim at (14, −96), then action 129.
       this.action(target, 'dstToss');
       target.x = clampX(attacker.x + attacker.facing * 14 * 1.5);
       target.y = -96 * 1.5;
       target.vy = 0;
       target.facing = attacker.facing === 1 ? -1 : 1;
       attacker.hits++;
-      attacker.damage += loseLife(target, DST_DAMAGE);
-      // PC 3112 adds 5 power to both fighters.
+      attacker.damage += loseLife(target, toss.damage);
+      // Both op 0x15s add 5 power to both fighters.
       addPower(attacker, 5);
       addPower(target, 5);
       this.impacts.push({
@@ -1729,7 +1709,6 @@ export class Match {
       return;
     }
     if (
-      f.action === 'grabbed' ||
       f.action === 'dstHeld' ||
       f.action === 'superHeld' ||
       f.action === 'shock'
@@ -1797,10 +1776,6 @@ export class Match {
         f.doubleJumped = false;
         f.airDashed = false;
         f.jumpVariable = 0;
-        if (f.action === 'thrown') {
-          this.action(f, 'knockdown');
-          return;
-        }
         // 0x411810: landing without a slot-1 handler ends the action, and the
         // free state reads commands on the same tick. The air reactions have
         // none.
@@ -1814,12 +1789,7 @@ export class Match {
       }
     }
     this.recoverKnockdown(f);
-    if (
-      f.action === 'thrown' ||
-      f.action === 'knockdown' ||
-      f.action === 'bounceDown'
-    )
-      return;
+    if (f.action === 'knockdown' || f.action === 'bounceDown') return;
     if (f.action === 'takeoff') {
       if (f.age < animationDuration('takeoff')) return;
       launchJump(f);
@@ -2097,8 +2067,7 @@ export class Match {
         if (f.y < 0 || f.vy < 0) {
           f.airAge++;
           gravity(f);
-          if (f.y === 0 && f.action === 'thrown') this.action(f, 'knockdown');
-          else if (f.y === 0 && f.hp > 0)
+          if (f.y === 0 && f.hp > 0)
             this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
         }
         this.recoverKnockdown(f);
@@ -2188,9 +2157,13 @@ export class Match {
           age: 0,
           hit: false,
         });
-      if (f.action !== 'dstHit') return;
-      for (const effect of dstEffects(f.age)) this.spawnEffect(f, effect);
-      if (f.age !== DST_FIRE_TICK) return;
+      // The throw's spins (199) spawn the same smoke as DST's.
+      if (
+        f.action === 'dstHit' ||
+        (f.action === 'throw' && f.age < THROW_TOSS_TICK)
+      )
+        for (const effect of dstEffects(f.age)) this.spawnEffect(f, effect);
+      if (f.action !== 'dstHit' || f.age !== DST_FIRE_TICK) return;
       for (const [x, y] of [
         [30, -80],
         [71, -78],
@@ -2219,13 +2192,11 @@ export class Match {
       }
     });
     // Hit immunity does not disable body separation during knockdown/get-up.
-    // Only the held pairs and the airborne throw may overlap.
+    // Only the held pairs may overlap.
     // Action 294 hides Ryuko and walks her through the shocked victim.
     const overlapping = new Set<Action>([
-      'grabbed',
       'dstHeld',
       'superHeld',
-      'thrown',
       'megaBeamHit',
     ]);
     if (
@@ -2513,7 +2484,6 @@ export class Match {
         if (f.action === 'down') this.fighters[1 - index].hitStop += 10;
       });
       this.fighters.forEach((f, index) => {
-        if (f.action === 'grabbed') this.action(f, 'airHit');
         if (f.action === 'dstHeld') this.action(f, 'hit');
         // A super's hold or cinematic ends with the round.
         if (f.action === 'superHeld' || f.action === 'shock')

@@ -210,7 +210,7 @@ def main():
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
         "launchDown": 123, "slamBounce": 124, "bounceDown": 147,
         "launchUp": 81, "launchAway": 80, "sweep": 79,
-        "grabbed": 128, "grabbedSpin": 130, "thrown": 132,
+        "grabbed": 128,
         "knockdown": 146, "getUp": 145,
         "hitSpark": 345, "hitStreak": 348, "guardSpark": 370,
         "ko": 60, "down": 62, "win": 57, "winStand": 58, "draw": 65,

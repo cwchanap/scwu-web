@@ -9,7 +9,6 @@ import {
   dstHold,
   heldFrame,
   isBlank,
-  throwHold,
 } from './animations';
 import type { Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, LIFE, Match, WIDTH } from './match';
@@ -299,13 +298,11 @@ export class TrainingScene extends Phaser.Scene {
           (pose.held ? holder : f).facing === -1,
         );
         const behind =
-          f.action === 'grabbed'
-            ? throwHold(f.age).behind
-            : f.action === 'dstHeld'
-              ? dstHold(holder.age)?.behind
-              : f.action === 'superHeld'
-                ? ((f.held?.flags ?? 0) & 1) !== 0
-                : undefined;
+          f.action === 'dstHeld'
+            ? dstHold(holder.age)?.behind
+            : f.action === 'superHeld'
+              ? ((f.held?.flags ?? 0) & 1) !== 0
+              : undefined;
         // Op 0x23 mode 4 fades the display by fade/32.
         sprite
           .setVisible(!isBlank(pose))

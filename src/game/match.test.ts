@@ -3,7 +3,7 @@ import {
   addPower,
   ATTACKS,
   AXE_RELEASE_TICK,
-  THROW_RELEASE_TICK,
+  THROW_TOSS_TICK,
   FIGHTER_MARGIN,
   FixedClock,
   LIFE,
@@ -18,7 +18,7 @@ import { CpuVM } from './cpu';
 import type { CpuEntry } from './cpu';
 import { ROUND_END_TICKS } from './hud';
 import { animationDuration, animationFrame } from './animations';
-import { placement, rand } from './standing';
+import { heldPlacement, placement, rand } from './standing';
 
 function ticks(
   match: Match,
@@ -343,6 +343,9 @@ describe('Daisetsuzan Oroshi command throw', () => {
       const [attacker, target] = match.fighters;
       attacker.x = facing === 1 ? 600 : 1300;
       target.x = attacker.x + facing * 190;
+      // A turning fighter (23/24) has no body box low enough to grab.
+      attacker.facing = facing;
+      target.facing = facing === 1 ? -1 : 1;
       ticks(match, 4, { dst: true });
       expect(attacker).toMatchObject({ action: 'dst', age: 3 });
       match.step();
@@ -450,7 +453,8 @@ describe('Daisetsuzan Oroshi command throw', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 600;
-    target.x = 600 + 210;
+    // Just past the box's reach (259.5 arena pixels).
+    target.x = 600 + 260;
     match.step({ dst: true });
     ticks(match, animationDuration('dst') - 1);
     expect(attacker.action).toBe('dst');
@@ -1110,10 +1114,11 @@ describe('recovered power gauge', () => {
     expect(attacker.power).toBe(10);
     const thrower = new Match();
     thrower.fighters[1].x = thrower.fighters[0].x + 100;
-    ticks(thrower, 8 + THROW_RELEASE_TICK, { throw: true });
-    expect(thrower.fighters[1].action).toBe('thrown');
+    ticks(thrower, 8 + THROW_TOSS_TICK, { throw: true });
+    expect(thrower.fighters[1].action).toBe('dstToss');
+    // PC 2770 credits 5 to both; the toss (129) credits none.
     expect(thrower.fighters[0].power).toBe(5);
-    expect(thrower.fighters[1].power).toBe(13);
+    expect(thrower.fighters[1].power).toBe(5);
   });
 });
 
@@ -1633,28 +1638,49 @@ describe('prototype training rules', () => {
   // Action 180 lunges 13 ticks at raw velocity 600 before its first strike.
   const LUNGE = 13 * 600 * (655 / 65536) * 1.5;
   it.each([1, -1] as const)(
-    'plays the catching attack before releasing the opponent facing %i',
+    'holds the opponent through three spins of action 199, then tosses them facing %i',
     (facing) => {
       const match = new Match();
       const [attacker, target] = match.fighters;
       attacker.x = facing === 1 ? 550 : 410;
       target.x = facing === 1 ? 660 : 300;
+      // A turning fighter (23/24) has no body box low enough to grab.
+      attacker.facing = facing;
+      target.facing = facing === 1 ? -1 : 1;
       ticks(match, 8, { throw: true });
+      // PC 2765: response 30 holds the victim 60 source pixels ahead.
+      expect(attacker).toMatchObject({ action: 'throw', age: 0 });
+      expect(target).toMatchObject({
+        action: 'dstHeld',
+        x: attacker.x + facing * 90,
+        y: 0,
+      });
       const poses = new Set<number>();
-      const sides = new Set<number>();
-      for (let tick = 0; tick < 72; tick++) {
-        expect(attacker.action).toBe('throw');
-        expect(target.action).toBe('grabbed');
-        expect(target.hp).toBe(LIFE);
-        poses.add(animationFrame('throw', attacker.age).image);
-        sides.add(Math.sign(Math.round((target.x - attacker.x) * facing)));
+      const offsets = new Set<number>();
+      for (let tick = 1; tick < THROW_TOSS_TICK; tick++) {
         match.step({ punch: true, jump: true }, { jump: true, dash: true });
+        expect(attacker.action).toBe('throw');
+        expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
+        poses.add(animationFrame('throw', attacker.age).image);
+        offsets.add(Math.round((target.x - attacker.x) * facing));
       }
       expect(poses).toEqual(new Set([106, 107, 108, 110]));
-      expect(sides).toEqual(new Set([-1, 0, 1]));
-      expect(target.action).toBe('thrown');
-      expect(target.hp).toBe(LIFE - 30);
-      expect(attacker.hits).toBe(1);
+      // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
+      expect([...offsets]).toEqual([90, -15, -90, 0]);
+      match.step();
+      // PC 2769: response 31 at (14, −96) enters action 129; PC 2770 deals 30.
+      expect(target).toMatchObject({
+        action: 'dstToss',
+        x: attacker.x + facing * 21,
+        y: -144,
+        facing: -facing,
+        hp: LIFE - 30,
+      });
+      expect(attacker).toMatchObject({
+        action: 'throw',
+        age: THROW_TOSS_TICK,
+        hits: 1,
+      });
       expect(animationFrame('throw', attacker.age).image).toBe(111);
     },
   );
@@ -1666,9 +1692,12 @@ describe('prototype training rules', () => {
       const [attacker, target] = match.fighters;
       attacker.x = facing === 1 ? 550 : 410;
       target.x = facing === 1 ? 660 : 300;
+      // A turning fighter (23/24) has no body box low enough to grab.
+      attacker.facing = facing;
+      target.facing = facing === 1 ? -1 : 1;
       ticks(match, 8, { throw: true });
       const seen = new Set<string>();
-      for (let tick = 0; tick < 300; tick++) {
+      for (let tick = 0; tick < 450; tick++) {
         const recovering = ['knockdown', 'getUp'].includes(target.action);
         const previousX = match.fighters.map((f) => f.x);
         match.step(
@@ -1690,7 +1719,14 @@ describe('prototype training rules', () => {
           );
       }
       expect(seen).toEqual(
-        new Set(['grabbed', 'thrown', 'knockdown', 'getUp', 'idle']),
+        new Set([
+          'dstHeld',
+          'dstToss',
+          'tossBounce',
+          'knockdown',
+          'getUp',
+          'idle',
+        ]),
       );
       expect(target.hp).toBe(LIFE - 30);
     },
@@ -1707,22 +1743,28 @@ describe('prototype training rules', () => {
         ticks(match, 500, direction, direction);
         const target = match.fighters[1];
         if (lethal) target.hp = 18;
-        for (let tick = 0; tick < 300; tick++) {
+        for (let tick = 0; tick < 450; tick++) {
           match.step({ throw: tick === 0 }, {});
           if (
             target.action === 'idle' ||
-            !['grabbed', 'thrown', 'knockdown', 'getUp'].includes(target.action)
+            ![
+              'dstHeld',
+              'dstToss',
+              'tossBounce',
+              'knockdown',
+              'getUp',
+            ].includes(target.action)
           )
             continue;
           const pose = animationFrame(target.action, target.age);
           // Match the renderer's 1.5x artwork scale and integer placement.
-          const p = placement(
+          const p = (pose.held ? heldPlacement : placement)(
             pose,
             pose.width,
             pose.height,
             (target.x - match.cameraX) / 1.5,
             0,
-            target.facing === -1,
+            (pose.held ? match.fighters[0] : target).facing === -1,
           );
           expect(p.left * 1.5).toBeGreaterThanOrEqual(0);
           expect((p.left + pose.width) * 1.5).toBeLessThanOrEqual(WIDTH);
@@ -1742,20 +1784,19 @@ describe('prototype training rules', () => {
       target.x = facing === 1 ? 660 : 550;
       ticks(match, 8, { throw: true }, { guard: true });
       expect(attacker.action).toBe('throw');
-      expect(target.action).toBe('grabbed');
-      expect(target.y).toBeLessThan(0);
-      ticks(match, THROW_RELEASE_TICK - 1, {}, { punch: true, jump: true });
-      expect(target.hp).toBe(LIFE);
-      expect(target.action).toBe('grabbed');
+      expect(target.action).toBe('dstHeld');
+      ticks(match, THROW_TOSS_TICK - 1, {}, { punch: true, jump: true });
+      expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
       match.step();
-      expect(target.hp).toBe(LIFE - 30);
-      expect(target.action).toBe('thrown');
+      expect(target).toMatchObject({ action: 'dstToss', hp: LIFE - 30 });
       expect(attacker.hits).toBe(1);
       expect(match.impacts).toMatchObject([
         { blocked: false, heavy: true, facing },
       ]);
+      // Action 129 flies at raw −200/−3000, gravity 90; landing bounces
+      // through PC 1756 into 131, then knockdown.
       const releaseX = target.x;
-      for (let tick = 0; tick < 100 && target.action === 'thrown'; tick++)
+      for (let tick = 0; tick < 200 && target.action !== 'knockdown'; tick++)
         match.step({}, { jump: true, punch: true });
       expect((target.x - releaseX) * facing).toBeGreaterThan(0);
       expect(target.y).toBe(0);
@@ -1791,6 +1832,54 @@ describe('prototype training rules', () => {
     expect(match.fighters[0].action).toBe('jump');
   });
 
+  it.each([
+    ['grab', 7, 167, 168],
+    ['dst', 4, 259, 260],
+  ] as const)(
+    "grabs when %s's op 0x18 box meets the idle body box",
+    (move, startup, reached, missed) => {
+      // Action 196's box (35, 6) ±(41, 3) (PC 2750) and 214's (67, 6) ±(70, 1)
+      // (PC 3091) against idle's (−1, −92) ±(37, 102), both mirrored.
+      for (const gap of [reached, missed]) {
+        const match = new Match();
+        const [attacker, target] = match.fighters;
+        attacker.x = 600;
+        target.x = 600 + gap;
+        ticks(match, startup + 1, {
+          [move === 'grab' ? 'throw' : 'dst']: true,
+        });
+        expect(target.action).toBe(gap === reached ? 'dstHeld' : 'idle');
+      }
+    },
+  );
+
+  it.each([
+    ['throw', 'punch', true],
+    ['throw', 'hit', false],
+    ['throw', 'block', false],
+    ['dst', 'hit', true],
+    ['dst', 'block', false],
+    ['throw', 'turn', false],
+    ['dst', 'turn', false],
+  ] as const)(
+    '%s against a victim in %s grabs: %s',
+    (control, state, grabbed) => {
+      // 0x40f010 skips a kind-0x80 box against +0x15e & 0xc == 8 (a hit
+      // reaction) and a kind-8 box against 0xc (a guard reaction). Action
+      // 196's box is kind 0xa8, 214's kind 8. A turn's body box (23, PC 252)
+      // ends at y −1, above either box.
+      const match = new Match();
+      const [attacker, target] = match.fighters;
+      attacker.x = 600;
+      target.x = 720;
+      ticks(match, control === 'throw' ? 7 : 4, { [control]: true });
+      target.action = state;
+      target.age = 0;
+      match.step();
+      expect(target.action).toBe(grabbed ? 'dstHeld' : state);
+    },
+  );
+
   it('lets strikes interrupt a grab and makes simultaneous grabs whiff fairly', () => {
     for (const attack of ['punch', 'throw'] as const) {
       const match = new Match();
@@ -1801,7 +1890,7 @@ describe('prototype training rules', () => {
       expect(match.fighters[0].action).toBe(
         attack === 'punch' ? 'hit' : 'grab',
       );
-      expect(match.fighters[1].action).not.toBe('grabbed');
+      expect(match.fighters[1].action).not.toBe('dstHeld');
       expect(match.fighters[1].hp).toBe(LIFE);
     }
     // Action 196's grab tick (PC 2748) keeps only a kind-1 body box, so a
@@ -1809,11 +1898,11 @@ describe('prototype training rules', () => {
     const match = new Match();
     match.fighters[0].x = 550;
     ticks(match, 8, { throw: true }, { punch: true });
-    expect(match.fighters[1].action).toBe('grabbed');
+    expect(match.fighters[1].action).toBe('dstHeld');
   });
 
-  it.each([0, 20, 65])(
-    'releases a grabbed fighter if a projectile interrupts at hold tick %i',
+  it.each([0, 20, 64])(
+    'releases a held fighter if a projectile interrupts at hold tick %i',
     (age) => {
       const match = new Match();
       const [attacker, target] = match.fighters;
@@ -1832,7 +1921,7 @@ describe('prototype training rules', () => {
       });
       match.step();
       expect(attacker.action).toBe('hitHeavy');
-      expect(target.action).toBe('airHit');
+      expect(target.action).toBe('hit');
       ticks(match, 100);
       expect(target.action).toBe('idle');
       expect(target.y).toBe(0);
@@ -1845,11 +1934,14 @@ describe('prototype training rules', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 550;
+    // 60% of the throw's 30 at desperation life.
     target.hp = 18;
-    ticks(match, 8 + THROW_RELEASE_TICK, { throw: true });
+    ticks(match, 8 + THROW_TOSS_TICK, { throw: true });
     expect(match.winner).toBe('player');
     expect(attacker.action).toBe('throw');
-    expect(target.action).toBe('thrown');
+    expect(target).toMatchObject({ action: 'dstToss', hp: 0 });
+    ticks(match, animationDuration('throw') - THROW_TOSS_TICK - 1);
+    expect(attacker.action).toBe('throw');
     ticks(match, ROUND_END_TICKS);
     expect(target.action).toBe('knockdown');
     expect(target.y).toBe(0);
@@ -1857,13 +1949,18 @@ describe('prototype training rules', () => {
     expect(match.resultReady).toBe(true);
   });
 
-  it('protects the throw recovery from melee and projectile hits', () => {
+  it('protects knockdown and get-up after a throw from melee and projectile hits', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 550;
-    ticks(match, 8 + THROW_RELEASE_TICK, { throw: true });
-    for (let tick = 0; tick < 142; tick++) {
-      // Keep attacks in range while the victim falls, lies down, and gets up.
+    ticks(match, 8 + THROW_TOSS_TICK, { throw: true });
+    for (let tick = 0; tick < 200 && target.action !== 'knockdown'; tick++)
+      match.step();
+    expect(target.action).toBe('knockdown');
+    const protectedTicks =
+      animationDuration('knockdown') + animationDuration('getUp') - 1;
+    for (let tick = 0; tick < protectedTicks; tick++) {
+      // Keep attacks in range while the victim lies down and gets up.
       attacker.x = target.x - 100;
       match.projectiles = [
         {
@@ -1894,7 +1991,9 @@ describe('prototype training rules', () => {
       match.fighters[0].x = 550;
       ticks(match, elapsed, { throw: true });
       const target = match.fighters[1];
-      expect(['thrown', 'knockdown', 'getUp']).toContain(target.action);
+      expect(['dstToss', 'tossBounce', 'knockdown', 'getUp']).toContain(
+        target.action,
+      );
       match.ticks = 5999;
       match.step({}, {});
       expect(target.action).not.toBe('lose');
@@ -1906,20 +2005,23 @@ describe('prototype training rules', () => {
   );
 
   it('releases a held fighter when time expires and keeps throws inside the court', () => {
-    for (const facing of [1, -1]) {
+    for (const facing of [1, -1] as const) {
       const match = new Match('cpu');
       const [attacker, target] = match.fighters;
       attacker.x =
         facing === 1 ? WIDTH - FIGHTER_MARGIN - 110 : FIGHTER_MARGIN + 110;
       target.x = facing === 1 ? WIDTH - FIGHTER_MARGIN : FIGHTER_MARGIN;
+      // A turning fighter (23/24) has no body box low enough to grab.
+      attacker.facing = facing;
+      target.facing = facing === 1 ? -1 : 1;
       ticks(match, 8, { throw: true });
-      expect(target.action).toBe('grabbed');
+      expect(target.action).toBe('dstHeld');
       expect(target.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
       expect(target.x).toBeLessThanOrEqual(WIDTH - FIGHTER_MARGIN);
       match.ticks = 5999;
       match.step({}, {});
       expect(match.winner).toBe('draw');
-      expect(target.action).not.toBe('grabbed');
+      expect(target.action).not.toBe('dstHeld');
       ticks(match, ROUND_END_TICKS);
       expect(target.y).toBe(0);
       expect(target.action).toBe('draw');
