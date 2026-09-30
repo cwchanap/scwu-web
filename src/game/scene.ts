@@ -322,27 +322,21 @@ export class TrainingScene extends Phaser.Scene {
           const projectile = projectiles[index];
           sprite.setVisible(!!projectile);
           if (!projectile) return;
-          if (projectile.kind === 'missile') {
-            const pose = animationFrame('dstMissile', projectile.age);
-            this.place(
-              sprite,
-              pose,
-              projectile.x,
-              GROUND + projectile.y,
-              projectile.facing,
-            );
-            return;
-          }
           const pose = animationFrame(
-            projectile.hit ? 'axeHit' : 'axeFlight',
+            projectile.kind === 'missile'
+              ? 'dstMissile'
+              : projectile.hit
+                ? 'axeHit'
+                : 'axeFlight',
             projectile.age,
           );
-          // Axe flight uses an authored center anchor, independent of fighter offsets.
-          sprite
-            .setOrigin(0.5)
-            .setTexture(`ryuko-${pose.image}`)
-            .setPosition(projectile.x, GROUND + projectile.y)
-            .setFlip(projectile.facing === -1, false);
+          this.place(
+            sprite,
+            pose,
+            projectile.x,
+            GROUND + projectile.y,
+            projectile.facing,
+          );
         },
       );
       this.pool(this.effectSprites, effects.length).forEach((sprite, index) => {

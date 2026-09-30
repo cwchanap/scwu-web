@@ -614,9 +614,10 @@ function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
     ? Math.max(1, Math.trunc((box.damage * 20) / 100))
     : 0;
 }
-// Action 227, PC 3292.
-// ponytail: the axe's flight and hit area are authored and meet no body box,
-// so a hit takes 100%. Porting 227's motion would let this box find one.
+// Action 227, PC 3292, re-set every display. Its slot-1 box and body boxes
+// (y + 2000/5000) meet other objects.
+// ponytail: axes don't clash with objects, and ignore op 0x1f var 0x86 (the
+// super freeze), which holds 227 in place with no box.
 const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
 // Action 218, PC 3164.
 const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29, damage: 22, kind: 0 };
@@ -1312,14 +1313,7 @@ export class Match {
       if (!next) break;
       action = next;
     }
-    if (
-      !action ||
-      (action === 'axeThrow' &&
-        this.projectiles.some(
-          (p) => p.kind === 'axe' && this.fighters[p.owner] === f,
-        ))
-    )
-      return false;
+    if (!action) return false;
     this.action(f, action, true);
     this.fireEvents(f);
     return true;
@@ -1635,14 +1629,7 @@ export class Match {
     // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
     if (fresh('dst') && ok(31))
       return start(f.hp <= DESPERATION_HP ? 'evilDst' : 'dst');
-    if (
-      fresh('axe') &&
-      ok(31) &&
-      !this.projectiles.some(
-        (p) => p.kind === 'axe' && this.fighters[p.owner] === f,
-      )
-    )
-      return start('axeThrow');
+    if (fresh('axe') && ok(31)) return start('axeThrow');
     if (fresh('punch') && ok(21))
       return start(input.crouch ? 'crouchPunch' : 'punch');
     if (fresh('hitUp') && ok(21)) return start('hitUp');
@@ -2136,22 +2123,25 @@ export class Match {
       if (p.hit) return p.kind === 'axe' && p.age < animationDuration('axeHit');
       p.x += p.vx;
       p.y += p.vy;
-      return (
-        (p.kind === 'missile' || p.age < 180) &&
-        p.x >= -80 &&
-        p.x <= STAGE_WIDTH + 80 &&
-        p.y > -3 * HEIGHT
-      );
+      // ponytail: action 227 loops until deleted; the engine's object culling
+      // isn't recovered, so objects leave 80 pixels past the stage.
+      return p.x >= -80 && p.x <= STAGE_WIDTH + 80 && p.y > -3 * HEIGHT;
     });
     this.fighters.forEach((f, owner) => {
       if (frozen[owner]) return;
+      // Action 226 deletes its object 6, the last axe (PC 3267), then spawns
+      // action 227 there at (−6, −102) (PC 3279), flying at raw 900 (PC 3293).
+      if (f.action === 'axeThrow' && f.age === 0)
+        this.projectiles = this.projectiles.filter(
+          (p) => p.kind !== 'axe' || p.owner !== owner,
+        );
       if (f.action === 'axeThrow' && f.age === AXE_RELEASE_TICK)
         this.projectiles.push({
           owner,
           kind: 'axe',
-          x: f.x + f.facing * 140,
-          y: f.y - 140,
-          vx: f.facing * 7,
+          x: f.x + f.facing * -6 * 1.5,
+          y: f.y - 102 * 1.5,
+          vx: f.facing * 900 * SOURCE_VELOCITY_SCALE,
           vy: 0,
           facing: f.facing,
           age: 0,
@@ -2295,61 +2285,57 @@ export class Match {
       const f = this.fighters[projectile.owner];
       const target = this.fighters[1 - projectile.owner];
       if (projectile.hit || protectedReactions.has(target.action)) continue;
+      const box = projectile.kind === 'missile' ? MISSILE_BOX : AXE_BOX;
+      const body = struck(projectile, projectile.facing, box, target);
+      if (!body) continue;
       if (projectile.kind === 'missile') {
         // Action 218's box against the tossed victim's body boxes. Every
         // response is 32 → 85.
-        const body = struck(projectile, projectile.facing, MISSILE_BOX, target);
-        if (body)
-          contacts.push({
-            f,
-            target,
-            damage: boxDamage(MISSILE_BOX, body.taken, false),
-            heavy: true,
-            // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
-            // The missile, not Ryuko, pauses.
-            hitStop: contacts.some(
-              (c) => c.projectile?.kind === 'missile' && c.target === target,
-            )
-              ? 0
-              : 13,
-            attackerStop: 0,
-            airDrill: false,
-            reaction: 'twist',
-            facing: projectile.facing,
-            x: projectile.x,
-            y: GROUND + projectile.y - 31.5,
-            projectile,
-            blocked: false,
-            source: null,
-            fbh: false,
-          });
-        continue;
-      }
-      if (
-        Math.abs(projectile.x - target.x) < 65 &&
-        Math.abs(projectile.y - (target.y - 125)) < 90
-      ) {
-        const blocked = this.guarding(target, projectile);
-        // Action 227 selects FB on ground (no stop), strong hit in air.
-        const hitStop = blocked ? 10 : target.y < 0 || target.vy < 0 ? 15 : 0;
         contacts.push({
           f,
           target,
-          damage: boxDamage(AXE_BOX, 100, blocked),
+          damage: boxDamage(MISSILE_BOX, body.taken, false),
           heavy: true,
-          hitStop,
-          attackerStop: hitStop,
+          // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
+          // The missile, not Ryuko, pauses.
+          hitStop: contacts.some(
+            (c) => c.projectile?.kind === 'missile' && c.target === target,
+          )
+            ? 0
+            : 13,
+          attackerStop: 0,
           airDrill: false,
-          reaction: null,
+          reaction: 'twist',
           facing: projectile.facing,
-          x: target.x - projectile.facing * 42,
-          y: GROUND + projectile.y,
+          x: projectile.x,
+          y: GROUND + projectile.y - 31.5,
           projectile,
-          blocked,
+          blocked: false,
           source: null,
           fbh: false,
         });
+        continue;
       }
+      const blocked = this.guarding(target, projectile);
+      // Action 227 selects FB on ground (no stop), strong hit in air.
+      const hitStop = blocked ? 10 : target.y < 0 || target.vy < 0 ? 15 : 0;
+      contacts.push({
+        f,
+        target,
+        damage: boxDamage(AXE_BOX, body.taken, blocked),
+        heavy: true,
+        hitStop,
+        attackerStop: hitStop,
+        airDrill: false,
+        reaction: null,
+        facing: projectile.facing,
+        x: target.x - projectile.facing * 42,
+        y: GROUND + projectile.y,
+        projectile,
+        blocked,
+        source: null,
+        fbh: false,
+      });
     }
     for (const {
       f,

@@ -1902,8 +1902,9 @@ describe('prototype training rules', () => {
   });
 
   it.each([0, 20, 64])(
-    'releases a held fighter if a projectile interrupts at hold tick %i',
+    'lets an axe pass through the thrower at hold tick %i',
     (age) => {
+      // Chuck Hit (197) sets no op 0x19 body box, so nothing strikes it.
       const match = new Match();
       const [attacker, target] = match.fighters;
       attacker.x = 550;
@@ -1911,22 +1912,18 @@ describe('prototype training rules', () => {
       match.projectiles.push({
         owner: 1,
         kind: 'axe',
-        vx: -7,
+        vx: 0,
         vy: 0,
         x: attacker.x + 50,
-        y: -140,
+        y: -153,
         facing: -1,
         age: 0,
         hit: false,
       });
       match.step();
-      expect(attacker.action).toBe('hitHeavy');
-      expect(target.action).toBe('hit');
-      ticks(match, 100);
-      expect(target.action).toBe('idle');
-      expect(target.y).toBe(0);
-      expect(target.hp).toBe(LIFE);
-      expect(attacker.hits).toBe(0);
+      expect(attacker).toMatchObject({ action: 'throw', hp: LIFE });
+      expect(target.action).toBe(age === 64 ? 'dstToss' : 'dstHeld');
+      expect(match.projectiles).toMatchObject([{ hit: false }]);
     },
   );
 
@@ -2100,7 +2097,7 @@ describe('prototype training rules', () => {
       const match = new Match();
       ticks(match, 40, { axe: true }, { guard: blocked });
       expect(match.impacts).toMatchObject([
-        { effect: blocked ? 'guardSpark' : 'hitSpark', heavy: true, y: 496 },
+        { effect: blocked ? 'guardSpark' : 'hitSpark', heavy: true, y: 483 },
       ]);
       // Action 227's box deals 30 and, as kind 6, chips 20% on guard.
       expect(match.fighters[1].hp).toBe(LIFE - (blocked ? 6 : 30));
@@ -3492,10 +3489,15 @@ describe('prototype training rules', () => {
     for (const facing of [1, -1]) {
       const match = new Match();
       if (facing === -1) match.fighters.reverse();
+      const thrower = match.fighters[0];
       ticks(match, AXE_RELEASE_TICK, { axe: true });
       expect(match.projectiles).toHaveLength(0);
       match.step({ axe: true });
-      expect(match.projectiles).toMatchObject([{ age: 0, facing, hit: false }]);
+      // PC 3279 spawns action 227 at (−6, −102); PC 3293 moves it at raw 900.
+      expect(match.projectiles).toMatchObject([
+        { age: 0, facing, hit: false, x: thrower.x - facing * 9, y: -153 },
+      ]);
+      expect(match.projectiles[0].vx).toBeCloseTo(facing * 13.493, 3);
       expect(match.fighters[1].hp).toBe(LIFE);
       ticks(match, 100, { axe: true });
       expect(match.fighters[1].hp).toBe(LIFE - 30);
@@ -3539,15 +3541,33 @@ describe('prototype training rules', () => {
     expect(airborne.projectiles).toHaveLength(0);
   });
 
-  it('limits active axes and cancels a throw interrupted before release', () => {
+  it('hits through the body box, 120% against an attacking pose', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 500;
+    target.x = 900;
+    match.step({ axe: true });
+    for (let i = 0; i < 100 && target.hp === LIFE; i++) {
+      target.action = 'punch';
+      target.age = 3;
+      match.step();
+    }
+    expect(target.hp).toBe(LIFE - 36);
+  });
+
+  it('replaces the flying axe with a new throw and cancels one interrupted before release', () => {
     const match = new Match();
     match.fighters[0].x = FIGHTER_MARGIN;
-    match.fighters[1].x = WIDTH - FIGHTER_MARGIN;
+    match.fighters[1].x = STAGE_WIDTH - FIGHTER_MARGIN;
     match.step({ axe: true });
     ticks(match, animationDuration('axeThrow'));
+    expect(match.projectiles).toMatchObject([{ hit: false }]);
+    // Action 226 deletes object 6, the last axe (PC 3267), before its own.
     match.step({ axe: true });
-    expect(match.fighters[0].action).toBe('idle');
-    expect(match.projectiles).toHaveLength(1);
+    expect(match.fighters[0].action).toBe('axeThrow');
+    expect(match.projectiles).toHaveLength(0);
+    ticks(match, AXE_RELEASE_TICK);
+    expect(match.projectiles).toMatchObject([{ age: 0 }]);
     const interrupted = new Match();
     interrupted.fighters[0].x = 530;
     ticks(interrupted, 8, { axe: true }, { punch: true });
@@ -3811,7 +3831,7 @@ describe('prototype training rules', () => {
       const match = new Match();
       const [player, target] = match.fighters;
       player.x = attack === 'melee' ? 530 : FIGHTER_MARGIN;
-      target.x = attack === 'melee' ? 660 : 792;
+      target.x = attack === 'melee' ? 660 : 1200;
       target.hp = 8;
       for (let tick = 0; tick < 100 && !match.winner; tick++) {
         match.step(
