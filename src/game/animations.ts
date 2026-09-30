@@ -147,6 +147,8 @@ export interface Script {
 const scripts = data.scripts as unknown as Record<string, Script>;
 // The victim action selected by each op 0x17 response id.
 export const RESPONSES: readonly number[] = data.responses;
+// The hit-effect action each response spawns at contact (0 = none).
+export const RESPONSE_EFFECTS: readonly number[] = data.response_effects;
 export function script(index: number) {
   const found = scripts[index];
   if (!found) throw new Error(`Source action ${index} was not exported`);
@@ -302,10 +304,6 @@ export const animations = {
   ]),
   knockdown: clip(data.clips.knockdown),
   getUp: clip(data.clips.getUp),
-  hitSpark: clip(data.clips.hitSpark),
-  // Select the first branch; the remaining displays are its mirrored alternative.
-  hitStreak: clip(data.clips.hitStreak.slice(0, 13)),
-  guardSpark: clip(data.clips.guardSpark),
   crouchPunch: clip(data.clips.crouchPunch),
   crouchKick: clip(data.clips.crouchKick),
   airPunch: clip(data.clips.airPunch),
@@ -423,10 +421,19 @@ export function animationDuration(action: AnimatedAction | number) {
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
-export function hurtboxes(action: Action, age: number): BodyBox[] {
+function bodies(action: Action, age: number): BodyBox[] {
   const pose: Pose =
     action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
-  return (pose.body ?? []).filter((box) => box.kind & 6);
+  return pose.body ?? [];
+}
+export function hurtboxes(action: Action, age: number): BodyBox[] {
+  return bodies(action, age).filter((box) => box.kind & 6);
+}
+// Kind bit 0 pushes (0x40fce9), walked from the last slot down.
+export function pushboxes(action: Action, age: number): BodyBox[] {
+  return bodies(action, age)
+    .filter((box) => box.kind & 1)
+    .reverse();
 }
 
 export function animationFrame(

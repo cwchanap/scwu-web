@@ -5,7 +5,9 @@ import {
   dstHold,
   eventsAt,
   hurtboxes,
+  pushboxes,
   isScripted,
+  RESPONSE_EFFECTS,
   RESPONSES,
   script,
   SCRIPTED,
@@ -161,22 +163,6 @@ const ATTACK_RESPONSES: Record<
   airDrill: { ids: [56, 56, 56, 34, 35, 80] },
   airDrillSpin: { ids: [56, 56, 56, 34, 35, 80] }, // PCs 2984/3014
 };
-// Authored impact effect weight: heavy impacts add the 348 streak.
-const heavyImpacts = new Set<Action>([
-  'crouchPunch',
-  'crouchKick',
-  'airPunch',
-  'airKick',
-  'punch3',
-  'kick2',
-  'hitUp',
-  'iori',
-  'iori2',
-  'iori3',
-  'drill',
-  'airDrill',
-  'airDrillSpin',
-]);
 const followUps = { iori: 'iori2', iori2: 'iori3' } as const;
 // Op 0x24 (handler 0x413a50) at these action ages runs the command check at
 // 0x410a50 over the last `window` ticks of input: the newest fresh P (checked
@@ -622,24 +608,31 @@ const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
 // Action 218, PC 3164.
 const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29, damage: 22, kind: 0 };
 // 0x40f010: a box from `origin` hits the first of the target's body boxes it
-// overlaps on both axes, each mirrored by its owner's facing.
+// overlaps on both axes, each mirrored by its owner's facing. 0x40eab0 puts
+// the contact at the centre of that overlap.
 function struck(
   origin: { x: number; y: number },
   facing: number,
   box: ScriptBox,
   target: Fighter,
 ) {
-  return hurtboxes(target.action, target.age).find(
-    (body) =>
-      Math.abs(
-        origin.x +
-          facing * box.x * 1.5 -
-          (target.x + target.facing * body.x * 1.5),
-      ) <
-        (box.w + body.w) * 1.5 &&
-      Math.abs(origin.y + box.y * 1.5 - (target.y + body.y * 1.5)) <
-        (box.h + body.h) * 1.5,
-  );
+  const x = origin.x + facing * box.x * 1.5;
+  const y = origin.y + box.y * 1.5;
+  const mid = (a: number, r: number, b: number, s: number) =>
+    (Math.min(a + r, b + s) + Math.max(a - r, b - s)) / 2;
+  for (const body of hurtboxes(target.action, target.age)) {
+    const bx = target.x + target.facing * body.x * 1.5;
+    const by = target.y + body.y * 1.5;
+    if (
+      Math.abs(x - bx) < (box.w + body.w) * 1.5 &&
+      Math.abs(y - by) < (box.h + body.h) * 1.5
+    )
+      return {
+        taken: body.taken,
+        x: mid(x, box.w * 1.5, bx, body.w * 1.5),
+        y: mid(y, box.h * 1.5, by, body.h * 1.5),
+      };
+  }
 }
 // 0x40f010 skips a victim by the box's kind: 0x20 an airborne one, 8 one in a
 // guard reaction (+0x15e & 0xc is 0xc) and 0x80 one in a hit reaction or hold
@@ -816,15 +809,6 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   fade: 0,
   ...fields,
 });
-export interface Impact {
-  x: number;
-  y: number;
-  age: number;
-  blocked: boolean;
-  heavy: boolean;
-  facing: -1 | 1;
-  effect: 'hitSpark' | 'guardSpark';
-}
 const fighter = (x: number, facing: -1 | 1): Fighter => ({
   x,
   y: 0,
@@ -945,7 +929,6 @@ export class Match {
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
-  impacts: Impact[] = [];
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
   practice: PracticeOptions = {
@@ -1214,15 +1197,6 @@ export class Match {
       // Both op 0x15s add 5 power to both fighters.
       addPower(attacker, 5);
       addPower(target, 5);
-      this.impacts.push({
-        x: target.x - attacker.facing * 42,
-        y: GROUND + target.y - 145,
-        age: 0,
-        blocked: false,
-        heavy: true,
-        facing: attacker.facing,
-        effect: 'hitSpark',
-      });
       return;
     }
     const hold = dstHold(attacker.age);
@@ -1428,7 +1402,7 @@ export class Match {
   }
 
   private spawnObject(
-    parent: Fighter | Effect,
+    parent: { x: number; y: number; facing: -1 | 1; screen?: boolean },
     owner: number,
     event: {
       flags: number;
@@ -1536,7 +1510,8 @@ export class Match {
         : target.action.startsWith('crouch')
           ? 1
           : 0;
-    const victim = RESPONSES[source.responses[(guarding ? 3 : 0) + stance]];
+    const response = source.responses[(guarding ? 3 : 0) + stance];
+    const victim = RESPONSES[response];
     const reaction = RESPONSE_REACTIONS[victim];
     if (!reaction) return [];
     const blocked = blocks.has(reaction.action);
@@ -1545,7 +1520,7 @@ export class Match {
         f: attacker,
         target,
         damage: boxDamage(box, body.taken, blocked),
-        heavy: true,
+        effect: box.damage ? RESPONSE_EFFECTS[response] : 0,
         hitStop: reaction.stop,
         // Objects, like DST's missiles, pause without pausing Ryuko.
         attackerStop:
@@ -1553,8 +1528,8 @@ export class Match {
         airDrill: false,
         reaction: reaction.action as AnimatedAction | null,
         facing: source.facing,
-        x: target.x - source.facing * 42,
-        y: GROUND + target.y - 145,
+        x: body.x,
+        y: body.y,
         projectile: null as Projectile | null,
         blocked,
         source: source as Fighter | Effect | null,
@@ -2000,9 +1975,6 @@ export class Match {
 
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
-    this.impacts = this.impacts.filter(
-      (impact) => ++impact.age < animationDuration(impact.effect),
-    );
     // Objects spawned during this pass start moving next tick.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
@@ -2181,32 +2153,31 @@ export class Match {
         });
       }
     });
-    // Hit immunity does not disable body separation during knockdown/get-up.
-    // Only the held pairs may overlap.
-    // Action 294 hides Ryuko and walks her through the shocked victim.
-    const overlapping = new Set<Action>([
-      'dstHeld',
-      'superHeld',
-      'megaBeamHit',
-    ]);
-    if (
-      !overlapping.has(a.action) &&
-      !overlapping.has(b.action) &&
-      Math.abs(a.y - b.y) < 120 &&
-      Math.abs(a.x - b.x) < 90
-    ) {
-      const sign = a.x <= b.x ? 1 : -1;
-      const mid = Math.max(
-        FIGHTER_MARGIN + 45,
-        Math.min(STAGE_WIDTH - FIGHTER_MARGIN - 45, (a.x + b.x) / 2),
-      );
-      if (frozen[0] && !frozen[1]) b.x = clampX(a.x + sign * 90);
-      else if (frozen[1] && !frozen[0]) a.x = clampX(b.x - sign * 90);
-      else if (!frozen[0] && !frozen[1]) {
-        a.x = mid - sign * 45;
-        b.x = mid + sign * 45;
+    // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
+    // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
+    // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
+    // moves when the other is grounded, and a KO'd fighter (life +0xdf05 is 0)
+    // pushes no one. Held and hidden poses set no such box, and hit stop
+    // doesn't stop the push.
+    // ponytail: the engine (0x40f910) pushes fighter 0 before fighter 1 moves
+    // and clamps each on its own next move; the port pushes after both move,
+    // then clamps both.
+    const pixel = (v: number) => Math.floor(v / 1.5);
+    for (const boxA of pushboxes(a.action, a.age)) {
+      const ax = pixel(a.x) + a.facing * boxA.x;
+      const ay = pixel(a.y) + boxA.y;
+      for (const boxB of pushboxes(b.action, b.age)) {
+        const bx = pixel(b.x) + b.facing * boxB.x;
+        const by = pixel(b.y) + boxB.y;
+        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
+        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
+        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
+        if (b.hp > 0 && (a.y < 0 || b.y === 0)) a.x += push;
+        if (a.hp > 0 && (b.y < 0 || a.y === 0)) b.x -= push;
       }
     }
+    a.x = clampX(a.x);
+    b.x = clampX(b.x);
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
       if (frozen[i] || !isAttack(f.action)) return [];
@@ -2238,17 +2209,10 @@ export class Match {
             ? 1
             : 0;
       const { ids, last } = ATTACK_RESPONSES[f.action];
-      const response =
-        RESPONSE_REACTIONS[
-          RESPONSES[
-            (finisher && last ? last : ids)[(guarding ? 3 : 0) + stance]
-          ]
-        ];
+      const id = (finisher && last ? last : ids)[(guarding ? 3 : 0) + stance];
+      const response = RESPONSE_REACTIONS[RESPONSES[id]];
       const reaction = response.action;
       const blocked = blocks.has(reaction);
-      const heavy =
-        heavyImpacts.has(f.action) ||
-        (f.action === 'punch2' && finisher && !blocked);
       // Aerial drill pauses are applied by the attacker's contact branch instead.
       const hitStop = airDrill ? 0 : response.stop;
       return [
@@ -2256,19 +2220,14 @@ export class Match {
           f,
           target,
           damage: boxDamage(box, body.taken, blocked),
-          heavy,
+          effect: box.damage ? RESPONSE_EFFECTS[id] : 0,
           hitStop,
           attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
           airDrill,
           reaction: reaction as AnimatedAction | null,
           facing: f.facing,
-          x: target.x - f.facing * 42,
-          y:
-            GROUND +
-            target.y -
-            (f.action.startsWith('crouch') || target.action.startsWith('crouch')
-              ? 75
-              : 145),
+          x: body.x,
+          y: body.y,
           projectile: null as Projectile | null,
           blocked,
           source: null as Fighter | Effect | null,
@@ -2295,7 +2254,7 @@ export class Match {
           f,
           target,
           damage: boxDamage(MISSILE_BOX, body.taken, false),
-          heavy: true,
+          effect: RESPONSE_EFFECTS[32],
           // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
           // The missile, not Ryuko, pauses.
           hitStop: contacts.some(
@@ -2307,8 +2266,8 @@ export class Match {
           airDrill: false,
           reaction: 'twist',
           facing: projectile.facing,
-          x: projectile.x,
-          y: GROUND + projectile.y - 31.5,
+          x: body.x,
+          y: body.y,
           projectile,
           blocked: false,
           source: null,
@@ -2323,14 +2282,15 @@ export class Match {
         f,
         target,
         damage: boxDamage(AXE_BOX, body.taken, blocked),
-        heavy: true,
+        // Responses 50 and 4 name effect 340; guards 25–27 name 370.
+        effect: RESPONSE_EFFECTS[blocked ? 25 : 50],
         hitStop,
         attackerStop: hitStop,
         airDrill: false,
         reaction: null,
         facing: projectile.facing,
-        x: target.x - projectile.facing * 42,
-        y: GROUND + projectile.y,
+        x: body.x,
+        y: body.y,
         projectile,
         blocked,
         source: null,
@@ -2341,7 +2301,7 @@ export class Match {
       f,
       target,
       damage: strength,
-      heavy,
+      effect,
       hitStop,
       attackerStop,
       reaction,
@@ -2410,15 +2370,16 @@ export class Match {
         target.vx = target.vy = 0;
         target.facing = facing === 1 ? -1 : 1;
       }
-      this.impacts.push({
-        x,
-        y,
-        age: 0,
-        blocked,
-        heavy,
-        facing,
-        effect: blocked ? 'guardSpark' : 'hitSpark',
-      });
+      // 0x40f567: a box with damage spawns its response's effect action (word
+      // 2 of the entry) through 0x406570 at the contact, facing the striker.
+      if (effect)
+        this.spawnObject({ x, y, facing }, this.fighters.indexOf(f), {
+          flags: 1,
+          action: effect,
+          x: 0,
+          y: 0,
+          slot: 0,
+        });
       // The guard reaction's first op 0x24 runs before its first display.
       if (blocked && target.hp > 0)
         this.counter(target, this.history[this.fighters.indexOf(target)]);

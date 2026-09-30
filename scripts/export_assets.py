@@ -212,7 +212,6 @@ def main():
         "launchUp": 81, "launchAway": 80, "sweep": 79,
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
-        "hitSpark": 345, "hitStreak": 348, "guardSpark": 370,
         "ko": 60, "down": 62, "win": 57, "winStand": 58, "draw": 65,
     }
     clips = {}
@@ -242,9 +241,11 @@ def main():
         held.append(dict(image=packed & 8191, dx=dx, dy=dy, width=image.width, height=image.height))
         if packed & 8191:
             image_ids.add(packed & 8191)
-    # The 83-entry response table before it: the victim action for each response id.
+    # The 83-entry response table before it (player +0x6daa): the victim action
+    # for each response id, then the hit-effect action 0x40f567 spawns.
     response_offset = held_offset - 4 - 83 * 4
     responses = [u16(data, response_offset + 4 * i) for i in range(83)]
+    response_effects = [u16(data, response_offset + 4 * i + 2) for i in range(83)]
     # The CPU table 10 bytes after the held-pose table: 100 entries of 111 bytes
     # (name, +0x20 flags, +0x21 probability, +0x22/+0x24 distance, ten 7-byte
     # steps at +0x2a), played by the CPU routine at 0x411270. Keep entries up to
@@ -270,11 +271,12 @@ def main():
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
     # IORI (410, which jumps through 411 into iori3), the rush air hit (122), and the
-    # beam hits (83, 84) and air reactions whose op 0x01 commands the match plays.
+    # beam hits (83, 84) and air reactions whose op 0x01 commands the match plays,
+    # and every response's hit effect.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
                           279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-                          74, 76, 153, 158, 167, 172]
+                          74, 76, 153, 158, 167, 172, *filter(None, response_effects)]
     played = set(actions.values())
     while queue:
         index = queue.pop()
@@ -301,7 +303,7 @@ def main():
             path.unlink()
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, clips=clips, held=held,
-        responses=responses, cpu=cpu, scripts={str(k): scripts[k] for k in sorted(scripts)},
+        responses=responses, response_effects=response_effects, cpu=cpu, scripts={str(k): scripts[k] for k in sorted(scripts)},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()
     # Python is an independent oracle. Keep fixtures out of the browser bundle.

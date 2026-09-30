@@ -1,6 +1,6 @@
 // Authored training partners for free practice. Each behavior only produces
 // input, so the partner plays through the same rules as the player.
-import { reach } from './match';
+import { ATTACKS, reach } from './match';
 import type { Fighter, Input } from './match';
 
 export const DUMMY_BEHAVIORS = [
@@ -48,9 +48,15 @@ export function dummyInput(
           tick % ATTACK_TICKS === 0,
       };
     case 'jumpIn':
+      // Kick so the strike comes out once the jump has closed within reach;
+      // pushing bodies keep the jumper from landing any closer.
       if (!grounded(self))
         return {
-          kick: self.vy > 0 && distance < reach('airKick') && press(tick),
+          kick:
+            self.vy > 0 &&
+            distance - ATTACKS.airKick.strikes[0].from * Math.abs(self.vx) <
+              reach('airKick') &&
+            press(tick),
         };
       return distance > JUMP_IN_DISTANCE
         ? { [toward]: true, jump: press(tick) }

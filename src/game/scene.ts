@@ -3,13 +3,7 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
-import {
-  animationDuration,
-  animationFrame,
-  dstHold,
-  heldFrame,
-  isBlank,
-} from './animations';
+import { animationFrame, dstHold, heldFrame, isBlank } from './animations';
 import type { Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, LIFE, Match, WIDTH } from './match';
 import type { Control, Mode, PracticeOptions } from './match';
@@ -83,7 +77,6 @@ export class TrainingScene extends Phaser.Scene {
   private projectileSprites: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
   private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
-  private impactSprites: Phaser.GameObjects.Image[][] = [];
   private ready = false;
   private error = '';
   private lastStatus = '';
@@ -361,47 +354,6 @@ export class TrainingScene extends Phaser.Scene {
         );
       });
       this.updateHud?.(this.match);
-      while (this.impactSprites.length < this.match.impacts.length) {
-        this.impactSprites.push(
-          [0, 1].map(() =>
-            this.add
-              .image(0, 0, 'ryuko-160')
-              .setOrigin(0)
-              .setScale(ART_SCALE)
-              .setDepth(20)
-              .setBlendMode(Phaser.BlendModes.ADD),
-          ),
-        );
-      }
-      this.impactSprites.forEach((layers, index) => {
-        const impact = this.match.impacts[index];
-        layers.forEach((sprite, layer) => {
-          const visible =
-            !!impact &&
-            (layer === 0 ||
-              (!impact.blocked &&
-                impact.heavy &&
-                impact.age < animationDuration('hitStreak')));
-          sprite.setVisible(visible);
-          if (!visible) return;
-          const pose = animationFrame(
-            layer === 0 ? impact.effect : 'hitStreak',
-            impact.age,
-          );
-          const p = placement(
-            pose,
-            pose.width,
-            pose.height,
-            impact.x / ART_SCALE,
-            impact.y / ART_SCALE,
-            impact.facing === -1,
-          );
-          sprite
-            .setTexture(`ryuko-${pose.image}`)
-            .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
-            .setFlip(p.flip_x, p.flip_y);
-        });
-      });
       this.report();
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);

@@ -10,6 +10,7 @@ import {
   eventsAt,
   heldFrame,
   isBlank,
+  RESPONSE_EFFECTS,
   RESPONSES,
   script,
   THROW_TOSS_TICK,
@@ -81,20 +82,23 @@ describe('selected core animation assets', () => {
   });
 
   it('plays the recovered hit and guard effects with their display timings', () => {
+    // Responses name 339–344 (sparks 345/346), 370 (guard) and 406 (beam).
+    expect(RESPONSE_EFFECTS.slice(1, 13)).toEqual([
+      339, 339, 340, 340, 340, 342, 340, 341, 341, 342, 342, 342,
+    ]);
+    expect(RESPONSE_EFFECTS.slice(22, 30).every((e) => e === 370)).toBe(true);
     expect(
-      [0, 4, 7, 9, 12, 14, 16, 18].map(
-        (age) => animationFrame('hitSpark', age).image,
-      ),
+      [0, 4, 7, 9, 12, 14, 16, 18].map((age) => animationFrame(339, age).image),
     ).toEqual([160, 161, 162, 163, 164, 165, 166, 167]);
-    expect(animationDuration('hitSpark')).toBe(21);
-    expect(animationDuration('guardSpark')).toBe(22);
-    expect(animationFrame('guardSpark', 2).image).toBe(224);
-    expect(animationFrame('guardSpark', 19).image).toBe(229);
-    expect(animationDuration('hitStreak')).toBe(18);
-    expect(animationFrame('hitStreak', 17).image).toBe(192);
-    expect(animations.hitStreak.frames.every((frame) => !frame.flip_x)).toBe(
-      true,
-    );
+    expect(animationDuration(339)).toBe(21);
+    expect(animationDuration(370)).toBe(22);
+    expect(animationFrame(370, 2).image).toBe(224);
+    expect(animationFrame(370, 19).image).toBe(229);
+    // ponytail: op 0x20 at PC 5147 picks a streak branch; the export plays the
+    // first, unmirrored one.
+    expect(animationDuration(348)).toBe(18);
+    expect(animationFrame(348, 17).image).toBe(192);
+    expect(script(348).frames.every((frame) => !frame.flip_x)).toBe(true);
   });
 
   it('expands DST calls and holds the victim in the recovered held pose', () => {
