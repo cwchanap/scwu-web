@@ -60,6 +60,8 @@ def decode_event(record):
     if op == 0x20:  # branch to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
         return dict(op="random", divisor=u16(record, 1) + 1, above=u16(record, 3),
                     action=u16(record, 6), offset=record[8])
+    if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer
+        return dict(op="freeze", add=s16(record, 7))
     if op == 0x1a:  # hit-stop ticks for the object itself and the opponent
         return dict(op="stop", self=record[1], other=record[2])
     if op == 0x23:  # colour mode: 2 draws additively, 4 fades by r[5]/32

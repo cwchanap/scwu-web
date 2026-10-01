@@ -135,6 +135,7 @@ export type ScriptEvent = { t: number } & (
       damage: number;
     }
   | { op: 'stop'; self: number; other: number }
+  | { op: 'freeze'; add: number }
   | { op: 'color'; mode: number; fade: number }
   | {
       op: 'random';

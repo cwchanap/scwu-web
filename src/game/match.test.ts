@@ -3636,15 +3636,129 @@ describe('prototype training rules', () => {
     expect(interrupted.projectiles).toHaveLength(0);
   });
 
-  it('lets axes trade and clears projectiles when the round ends', () => {
+  it('breaks opposing axes where their object boxes meet', () => {
     const match = new Match();
-    match.fighters.forEach((f) => {
-      f.hp = 16;
-    });
-    ticks(match, 100, { axe: true }, { axe: true });
-    expect(match.winner).toBe('draw');
-    expect(match.fighters.map((f) => f.hp)).toEqual([0, 0]);
+    ticks(match, AXE_RELEASE_TICK + 1, { axe: true }, { axe: true });
+    expect(match.projectiles.map((p) => p.x)).toEqual([291, 669]);
+    ticks(match, 2);
+    expect(match.projectiles.map((p) => p.hit)).toEqual([false, false]);
+    // Each slot-1 box (±39) reaches the other's slot-0 body (±34), both 63
+    // ahead, under 109.5 arena pixels apart.
+    match.step();
+    expect(match.projectiles).toMatchObject([
+      { hit: true, age: 0 },
+      { hit: true, age: 0 },
+    ]);
+    expect(match.fighters.map((f) => f.hitStop)).toEqual([0, 0]);
+    expect(hitEffects(match)).toEqual([]);
+    ticks(match, 100);
+    expect(match.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
     expect(match.projectiles).toHaveLength(0);
+  });
+
+  it('clears projectiles when the round ends', () => {
+    const match = new Match();
+    match.fighters[1].hp = 16;
+    for (let i = 0; i < 100 && !match.winner; i++) match.step({ axe: true });
+    expect(match.winner).toBe('player');
+    expect(match.projectiles).toHaveLength(0);
+  });
+
+  it('holds an axe through the Getter Beam freeze, which op 0x1f adds to global 6', () => {
+    const match = new Match();
+    const [ryuko, target] = match.fighters;
+    target.x = 1700;
+    target.stock = 1;
+    ticks(match, AXE_RELEASE_TICK + 4, { axe: true });
+    const [axe] = match.projectiles;
+    match.step({}, { getterBeam: true });
+    // Action 264 adds 10, then 65 at age 5, with its op 0x1a stops.
+    expect([match.freeze, ryuko.hitStop]).toEqual([10, 10]);
+    match.step();
+    const x = axe.x;
+    ticks(match, 75);
+    // The axe checks after each 3-tick display: from its next one (age 6)
+    // through the first after the freeze, 75 ticks.
+    expect(match.freeze).toBe(0);
+    expect(axe).toMatchObject({ x, held: true });
+    match.step();
+    expect(axe.held).toBe(false);
+    expect(axe.x).toBeCloseTo(x + 13.493, 3);
+  });
+
+  it('holds a flying axe without its box while global 6 is positive, and a missile once at 1', () => {
+    const match = new Match();
+    const target = match.fighters[1];
+    match.projectiles = [
+      {
+        owner: 0,
+        kind: 'axe',
+        x: 560,
+        y: -153,
+        vx: 0,
+        vy: 0,
+        facing: 1,
+        age: 2,
+        hit: false,
+      },
+    ];
+    match.freeze = 4;
+    for (let tick = 0; tick < 3; tick++) {
+      match.step();
+      expect(match.projectiles[0]).toMatchObject({ held: true, hit: false });
+    }
+    expect(target.hp).toBe(LIFE);
+    match.step();
+    expect(target.hp).toBe(LIFE - 30);
+    const missile = {
+      owner: 0,
+      kind: 'missile' as const,
+      x: 1000,
+      y: -600,
+      vx: 10,
+      vy: -10,
+      facing: 1 as const,
+      age: 0,
+      hit: false,
+    };
+    match.projectiles = [missile];
+    match.freeze = 3;
+    const xs = [];
+    for (let tick = 0; tick < 3; tick++) {
+      match.step();
+      xs.push(missile.x);
+    }
+    expect(xs).toEqual([1010, 1010, 1020]);
+  });
+
+  it('deletes projectiles 50 source pixels outside the world (0x4124c9)', () => {
+    const match = new Match();
+    const missile = (x: number, y: number, vx: number, vy: number) => ({
+      owner: 0,
+      kind: 'missile' as const,
+      x,
+      y,
+      vx,
+      vy,
+      facing: 1 as const,
+      age: 0,
+      hit: false,
+    });
+    match.projectiles = [
+      missile(1985, -300, 10, 0),
+      missile(-65, -300, -10, 0),
+      missile(900, -1445, 0, -10),
+      missile(900, 125, 0, 10),
+    ];
+    match.step();
+    expect(match.projectiles.map((p) => [p.x, p.y])).toEqual([
+      [1995, -300],
+      [-75, -300],
+      [900, -1455],
+      [900, 135],
+    ]);
+    match.step();
+    expect(match.projectiles).toEqual([]);
   });
 
   it('uses a backward walk when moving away from the opponent', () => {

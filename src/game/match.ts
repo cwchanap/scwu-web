@@ -602,11 +602,18 @@ function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
     ? Math.max(1, Math.trunc((box.damage * 20) / 100))
     : 0;
 }
-// Action 227, PC 3292, re-set every display. Its slot-1 box and body boxes
-// (y + 2000/5000) meet other objects.
-// ponytail: axes don't clash with objects, and ignore op 0x1f var 0x86 (the
-// super freeze), which holds 227 in place with no box.
+// Action 227, PC 3292, re-set every display.
 const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
+// Its slot-1 box (PC 3291) and slot-0 body (PC 3290) repeat the box 2000
+// pixels down, where only objects meet; this is the body, a slot-1 body sits
+// at y + 5000 (PC 3289).
+// ponytail: only opposing axes meet there; Getter Beam's (270, 277) and
+// B G's (292, 303) y + 2000 boxes and bodies are ignored.
+const AXE_BODY = { x: 63, y: 3, w: 34, h: 44 };
+// 0x4124c9 deletes an object that doesn't follow its parent once it leaves
+// x −50..1330 or y −50..1010 source pixels; the floor is y 920 (0x412247).
+const inWorld = ({ x, y }: { x: number; y: number }) =>
+  x >= -50 * 1.5 && x <= 1330 * 1.5 && y >= -970 * 1.5 && y <= 90 * 1.5;
 // Action 218, PC 3164.
 const MISSILE_BOX = { x: -6, y: -21, w: 47, h: 29, damage: 22, kind: 0 };
 // 0x40f010: a box from `origin` hits the first of the target's body boxes it
@@ -774,6 +781,8 @@ export interface Projectile {
   facing: -1 | 1;
   age: number;
   hit: boolean;
+  // Replaying a display through the freeze, without motion or box.
+  held?: boolean;
 }
 // Spawned objects, positioned like characters by the renderer. A numeric clip
 // is a source object that runs its flattened timeline: spawns, motion, boxes.
@@ -951,6 +960,10 @@ export class Match {
   endingTicks = 0;
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
+  // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
+  // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
+  // (PCs 366–371).
+  freeze = 0;
   practice: PracticeOptions = {
     partner: 'stand',
     maxStock: false,
@@ -1366,6 +1379,9 @@ export class Match {
       case 'stop':
         other.hitStop += event.other;
         if (actor === self) self.hitStop += event.self;
+        break;
+      case 'freeze':
+        this.freeze += event.add;
         break;
       case 'handler':
         if (event.slot === 2 && actor === self) self.onHit = event.action;
@@ -2032,6 +2048,9 @@ export class Match {
 
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
+    // ponytail: KGT object 58's place in the engine's object order isn't
+    // traced; the port counts the freeze down before anything runs.
+    if (this.freeze > 0) this.freeze--;
     // Objects spawned during this pass start moving next tick.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
@@ -2151,11 +2170,19 @@ export class Match {
     this.projectiles = this.projectiles.filter((p) => {
       p.age++;
       if (p.hit) return p.kind === 'axe' && p.age < animationDuration('axeHit');
-      p.x += p.vx;
-      p.y += p.vy;
-      // ponytail: action 227 loops until deleted; the engine's object culling
-      // isn't recovered, so objects leave 80 pixels past the stage.
-      return p.x >= -80 && p.x <= STAGE_WIDTH + 80 && p.y > -3 * HEIGHT;
+      // After each display, action 227 (3 ticks) and 218 (1 tick) zero their
+      // motion and attack box, then replay that display while global 6 is
+      // above 0 (227, PCs 3297–3318) or exactly 1 (218, PC 3168).
+      const display = p.kind === 'axe' ? 3 : 1;
+      if (p.age % display === 0) {
+        p.held = p.kind === 'axe' ? this.freeze > 0 : this.freeze === 1;
+        if (p.held) p.age -= display;
+      }
+      if (!p.held) {
+        p.x += p.vx;
+        p.y += p.vy;
+      }
+      return inWorld(p);
     });
     this.fighters.forEach((f, owner) => {
       if (frozen[owner]) return;
@@ -2302,7 +2329,12 @@ export class Match {
     for (const projectile of this.projectiles) {
       const f = this.fighters[projectile.owner];
       const target = this.fighters[1 - projectile.owner];
-      if (projectile.hit || protectedReactions.has(target.action)) continue;
+      if (
+        projectile.hit ||
+        projectile.held ||
+        protectedReactions.has(target.action)
+      )
+        continue;
       const box = projectile.kind === 'missile' ? MISSILE_BOX : AXE_BOX;
       const body = struck(projectile, projectile.facing, box, target);
       if (!body) continue;
@@ -2355,6 +2387,29 @@ export class Match {
         source: null,
         fbh: false,
       });
+    }
+    // 0x40f010 tests every object's boxes against the other side's bodies; an
+    // object victim (+0x15a 1) only fires the striker's hit handler
+    // (0x40f36a), so axes whose y + 2000 box and body meet both break into
+    // 230 at once, without damage, stop or effect, even held by the freeze.
+    const axes = this.projectiles.filter((p) => p.kind === 'axe' && !p.hit);
+    const clashed = axes.filter((p) =>
+      axes.some(
+        (q) =>
+          q.owner !== p.owner &&
+          Math.abs(
+            p.x +
+              p.facing * AXE_BOX.x * 1.5 -
+              q.x -
+              q.facing * AXE_BODY.x * 1.5,
+          ) <
+            (AXE_BOX.w + AXE_BODY.w) * 1.5 &&
+          Math.abs(p.y - q.y) < (AXE_BOX.h + AXE_BODY.h) * 1.5,
+      ),
+    );
+    for (const p of clashed) {
+      p.hit = true;
+      p.age = 0;
     }
     for (const {
       f,
