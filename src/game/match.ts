@@ -2149,7 +2149,8 @@ export class Match {
       if (history.length > HISTORY_TICKS) history.shift();
     });
     const frozen = this.fighters.map((f) => f.hitStop > 0);
-    this.fighters.forEach((f, i) => {
+    const move = (i: number) => {
+      const f = this.fighters[i];
       this.move(
         f,
         this.fighters[1 - i],
@@ -2164,9 +2165,35 @@ export class Match {
         )
       )
         this.directionTaps[i] = null;
-    });
-    this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
+      this.settle(f);
+    };
     const [a, b] = this.fighters;
+    // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
+    // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
+    // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
+    // moves when the other is grounded, and a KO'd fighter (life +0xdf05 is 0)
+    // pushes no one. Held and hidden poses set no such box, and hit stop
+    // doesn't stop the push.
+    // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
+    // fighter 0 then pushes against fighter 1's boxes from the last tick, so
+    // its own share stays unclamped until its next move.
+    move(0);
+    const pixel = (v: number) => Math.floor(v / 1.5);
+    for (const boxA of pushboxes(a.action, a.age)) {
+      const ax = pixel(a.x) + a.facing * boxA.x;
+      const ay = pixel(a.y) + boxA.y;
+      for (const boxB of pushboxes(b.action, b.age)) {
+        const bx = pixel(b.x) + b.facing * boxB.x;
+        const by = pixel(b.y) + boxB.y;
+        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
+        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
+        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
+        if (b.hp > 0 && (a.y < 0 || b.y === 0)) a.x += push;
+        if (a.hp > 0 && (b.y < 0 || a.y === 0)) b.x -= push;
+      }
+    }
+    move(1);
+    this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
     this.projectiles = this.projectiles.filter((p) => {
       p.age++;
       if (p.hit) return p.kind === 'axe' && p.age < animationDuration('axeHit');
@@ -2238,32 +2265,6 @@ export class Match {
         });
       }
     });
-    // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
-    // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
-    // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
-    // moves when the other is grounded, and a KO'd fighter (life +0xdf05 is 0)
-    // pushes no one. Held and hidden poses set no such box, and hit stop
-    // doesn't stop the push.
-    // 0x40f910 walks fighter 0, then fighter 1: each settles, and fighter 0
-    // then pushes, so its share stays unclamped until its next move.
-    // ponytail: the port moves both fighters before either settles; the
-    // engine moves fighter 1 after fighter 0 pushes.
-    this.settle(a);
-    const pixel = (v: number) => Math.floor(v / 1.5);
-    for (const boxA of pushboxes(a.action, a.age)) {
-      const ax = pixel(a.x) + a.facing * boxA.x;
-      const ay = pixel(a.y) + boxA.y;
-      for (const boxB of pushboxes(b.action, b.age)) {
-        const bx = pixel(b.x) + b.facing * boxB.x;
-        const by = pixel(b.y) + boxB.y;
-        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
-        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
-        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
-        if (b.hp > 0 && (a.y < 0 || b.y === 0)) a.x += push;
-        if (a.hp > 0 && (b.y < 0 || a.y === 0)) b.x -= push;
-      }
-    }
-    this.settle(b);
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
       if (frozen[i] || !isAttack(f.action)) return [];

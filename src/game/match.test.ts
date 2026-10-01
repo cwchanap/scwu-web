@@ -1717,14 +1717,14 @@ describe('prototype training rules', () => {
         );
         seen.add(target.action);
         // The walker presses into the downed body's push box (knockdown ±26,
-        // get-up ±40). Against the wall, get-up's wider box and the walker's
-        // idle one open 47 px of overlap at once, which the push eases out a
-        // quarter per tick instead of snapping.
+        // get-up ±40). Against the wall, get-up's wider box, met a tick late
+        // as fighter 1's last box, opens 36 px of overlap at once, which the
+        // push eases out a quarter per tick instead of snapping.
         if (['knockdown', 'getUp'].includes(target.action))
           expect((target.x - attacker.x) * facing).toBeGreaterThan(60);
         if (recovering)
           match.fighters.forEach((f, index) =>
-            expect(Math.abs(f.x - previousX[index])).toBeLessThan(12),
+            expect(Math.abs(f.x - previousX[index])).toBeLessThanOrEqual(13.5),
           );
       }
       expect(seen).toEqual(
@@ -2739,13 +2739,14 @@ describe('prototype training rules', () => {
       // right, so the push moves the jumper left a quarter of their 71-pixel
       // overlap: off the body at the right wall, past the left one. There the
       // jumper, fighter 0, pushes after its motion step, so each fall tick's
-      // clamp is pushed out again.
+      // clamp is pushed out again; fighter 1 moves after the push and turns.
       expect(f.x).toBe(target.x);
       match.step({}, {});
       expect(f.action).toBe('jump');
       expect(target.x - f.x).toBe(26.625);
       match.step({}, {});
-      expect(target.x - f.x).toBeCloseTo(facing === 1 ? 36.757 : 26.625, 3);
+      expect(target.action).toBe('turn');
+      expect(target.x - f.x).toBeCloseTo(facing === 1 ? 36.757 : 25.875, 3);
     },
   );
 
@@ -3047,7 +3048,7 @@ describe('prototype training rules', () => {
     ],
     // Beam hit 83 slides at raw 150 with +10 (PC 954): 11.604 per strike.
     // Kick 3's closing pose adds a leg push box, (57, −56) ±(57, 65), that
-    // shoves a guard's slide on, one pixel less facing −1 (whole pixels).
+    // shoves a guard's slide on.
     [
       'kick3',
       [15, 21, 27, 33, 39, 45, 51, 57],
@@ -3055,7 +3056,7 @@ describe('prototype training rules', () => {
       8 * 4,
       [0, 11.604, 23.207, 34.811, 46.414, 58.018, 69.622],
       104.972,
-      [241.766, 241.391],
+      244.016,
     ],
   ] as const)(
     'gives %s one contact per strike, then its reaction motion',
