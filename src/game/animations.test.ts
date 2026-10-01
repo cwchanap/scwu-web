@@ -135,12 +135,15 @@ describe('selected core animation assets', () => {
       flip_x: true,
     });
     expect(animationFrame('dstHeld', 184).flip_x).toBe(false);
-    expect([4, 5, 64, 65, 184, 185].map((age) => dstHold(age))).toEqual([
-      { x: 60, same: false, behind: false },
-      { x: 60, same: true, behind: true },
-      { x: 0, same: false, behind: false },
-      { x: 60, same: true, behind: true },
-      { x: 0, same: false, behind: false },
+    // Op 0x14 places at age 0 and 199's op 0x07s as their displays start;
+    // 217's (from 65) re-place every tick.
+    expect([0, 4, 5, 64, 65, 184, 185].map((age) => dstHold(age))).toEqual([
+      { x: 60, same: false, behind: false, place: true },
+      { x: 60, same: false, behind: false, place: false },
+      { x: 60, same: true, behind: true, place: true },
+      { x: 0, same: false, behind: false, place: false },
+      { x: 60, same: true, behind: true, place: true },
+      { x: 0, same: false, behind: false, place: true },
       null,
     ]);
     // Numeric loops replay only the source loop target, not the entry pose.

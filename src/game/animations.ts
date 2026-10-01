@@ -63,8 +63,11 @@ export const DST_TOSS_TICK =
   dstSpins.reduce((total, frame) => total + frame.duration, 0);
 // Actions 199/217 run op 0x07 before each spin display: the held offset in
 // source pixels, bit 2 (face the holder's way, mirrored image) and bit 0
-// (drawn behind the holder). Response 30 first places the victim 60 ahead.
-// The throw (197) opens with the same five ticks, so it shares these holds.
+// (drawn behind the holder). Response 30 (op 0x14) first places the victim 60
+// ahead. The throw (197) opens with the same five ticks, so it shares these
+// holds. `place` is true when an op places the victim this tick: op 0x14 at
+// age 0, op 0x07 as its display starts, and every tick through 217, whose bit
+// 4 (0x10) has the holder's motion step re-place it (0x40fa29).
 const DST_HOLDS = [
   { x: 60, same: true, behind: true },
   { x: -10, same: true, behind: true },
@@ -73,10 +76,14 @@ const DST_HOLDS = [
 ];
 export function dstHold(age: number) {
   const first = data.clips.dstHit[0].duration;
-  if (age < first) return { x: 60, same: false, behind: false };
+  if (age < first) return { x: 60, same: false, behind: false, place: !age };
   let time = age - first;
   for (const [index, frame] of dstSpins.entries()) {
-    if (time < frame.duration) return DST_HOLDS[index % DST_HOLDS.length];
+    if (time < frame.duration)
+      return {
+        ...DST_HOLDS[index % DST_HOLDS.length],
+        place: !time || index >= throwSpins.length,
+      };
     time -= frame.duration;
   }
   return null;

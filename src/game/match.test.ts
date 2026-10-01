@@ -12,7 +12,7 @@ import {
   WIDTH,
   STAGE_WIDTH,
 } from './match';
-import type { Fighter, Input } from './match';
+import type { Effect, Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
 import { CpuVM } from './cpu';
 import type { CpuEntry } from './cpu';
@@ -22,7 +22,7 @@ import {
   animationFrame,
   RESPONSE_EFFECTS,
 } from './animations';
-import { heldPlacement, placement, rand } from './standing';
+import { rand } from './standing';
 
 function ticks(
   match: Match,
@@ -61,7 +61,6 @@ describe('Hit Up launcher', () => {
         hp: LIFE - 15,
       });
       const contactX = target.x;
-      const contactCameraX = match.cameraX;
       ticks(match, 34, {}, { jump: true, punch: true });
       expect(target).toMatchObject({ age: 24, y: 0, x: contactX });
       match.step();
@@ -74,8 +73,6 @@ describe('Hit Up launcher', () => {
         seen.add(target.action);
         apex = Math.min(apex, target.y);
         match.step({}, { punch: true });
-        expect(match.cameraX).toBe(contactCameraX);
-        expect(match.cameraY).toBe(0);
       }
       // Sum 47 source integration steps: -47*v + g*47*48/2.
       expect(apex).toBeCloseTo(-589.056, 3);
@@ -1426,7 +1423,7 @@ describe('IORI chain', () => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.x = facing === 1 ? 185 : 1735;
-      target.x = facing === 1 ? 1735 : 185;
+      target.x = f.x + facing * 800;
       const start = f.x;
       const stages: number[] = [];
       let previous = f.action;
@@ -1592,7 +1589,7 @@ describe('IORI chain', () => {
   });
 
   it.each([1, -1] as const)(
-    'keeps the chain visible and bounded at the stage wall facing %i',
+    'keeps the chain bounded at the stage wall facing %i',
     (facing) => {
       const match = new Match();
       const [f, target] = match.fighters;
@@ -1606,19 +1603,6 @@ describe('IORI chain', () => {
         });
         expect(f.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
         expect(f.x).toBeLessThanOrEqual(STAGE_WIDTH - FIGHTER_MARGIN);
-        if (f.action !== 'iori' && f.action !== 'iori2' && f.action !== 'iori3')
-          continue;
-        const pose = animationFrame(f.action, f.age);
-        const p = placement(
-          pose,
-          pose.width,
-          pose.height,
-          (f.x - match.cameraX) / 1.5,
-          0,
-          f.facing === -1,
-        );
-        expect(p.left * 1.5).toBeGreaterThanOrEqual(0);
-        expect((p.left + pose.width) * 1.5).toBeLessThanOrEqual(WIDTH);
       }
       expect(f.hits).toBe(3);
     },
@@ -1742,7 +1726,7 @@ describe('prototype training rules', () => {
   );
 
   it.each([1, -1] as const)(
-    'keeps the full held, thrown and recovery sprites inside the court facing %i',
+    'throws at the wall through recovery facing %i',
     (facing) => {
       for (const lethal of [false, true]) {
         const match = new Match();
@@ -1752,32 +1736,8 @@ describe('prototype training rules', () => {
         ticks(match, 500, direction, direction);
         const target = match.fighters[1];
         if (lethal) target.hp = 18;
-        for (let tick = 0; tick < 450; tick++) {
-          match.step({ throw: tick === 0 }, {});
-          if (
-            target.action === 'idle' ||
-            ![
-              'dstHeld',
-              'dstToss',
-              'tossBounce',
-              'knockdown',
-              'getUp',
-            ].includes(target.action)
-          )
-            continue;
-          const pose = animationFrame(target.action, target.age);
-          // Match the renderer's 1.5x artwork scale and integer placement.
-          const p = (pose.held ? heldPlacement : placement)(
-            pose,
-            pose.width,
-            pose.height,
-            (target.x - match.cameraX) / 1.5,
-            0,
-            (pose.held ? match.fighters[0] : target).facing === -1,
-          );
-          expect(p.left * 1.5).toBeGreaterThanOrEqual(0);
-          expect((p.left + pose.width) * 1.5).toBeLessThanOrEqual(WIDTH);
-        }
+        match.step({ throw: true }, {});
+        ticks(match, 449);
         expect(target.hp).toBe(lethal ? 0 : LIFE - 30);
         expect(target.action).toBe(lethal ? 'knockdown' : 'idle');
       }
@@ -2187,9 +2147,10 @@ describe('prototype training rules', () => {
       for (const backwards of [false, true]) {
         const match = new Match();
         const [f, target] = match.fighters;
-        // Far enough that the dash never reaches the target's push box.
+        // Far enough that the dash never reaches the target's push box, and
+        // near enough that the back dash stays inside the camera walls.
         f.x = facing === 1 ? 440 : 760;
-        target.x = facing === 1 ? 1100 : 185;
+        target.x = f.x + facing * 500;
         const start = f.x;
         match.step({
           dash: true,
@@ -2311,7 +2272,7 @@ describe('prototype training rules', () => {
   );
 
   it.each([1, -1] as const)(
-    'finishes the whole air dash beyond the old screen boundary facing %i',
+    'finishes the whole air dash past the opponent facing %i',
     (facing) => {
       const match = new Match();
       const [f, target] = match.fighters;
@@ -2325,28 +2286,8 @@ describe('prototype training rules', () => {
       while (f.action !== 'land' && elapsed < 100) {
         match.step();
         elapsed++;
-        const pose = animationFrame(
-          f.action as 'airDash' | 'jump' | 'land',
-          f.age,
-        );
-        const p = placement(
-          pose,
-          pose.width,
-          pose.height,
-          f.x / 1.5,
-          0,
-          f.facing === -1,
-        );
-        expect(p.left * 1.5 - match.cameraX).toBeGreaterThanOrEqual(0);
-        expect((p.left + pose.width) * 1.5 - match.cameraX).toBeLessThanOrEqual(
-          WIDTH,
-        );
       }
       expect(elapsed).toBe(62);
-      expect(match.cameraX).toBeCloseTo(
-        facing === 1 ? 539.604492 : 420.395508,
-        5,
-      );
       // 30 level ticks + 30 falling ticks at raw velocity 800.
       expect((f.x - start) * facing).toBeCloseTo(719.604492, 5);
       expect(f.vx).toBe(0);
@@ -2367,38 +2308,54 @@ describe('prototype training rules', () => {
     expect(effect.x).toBeCloseTo(1412.702, 3);
   });
 
-  it('follows only the player on both axes, including round endings, within stage bounds', () => {
+  it('eases the camera halfway to the fighters each tick, within the stage (0x40b022)', () => {
     const match = new Match();
     const [player, target] = match.fighters;
-    expect(match.cameraX).toBe(0);
-    player.x = 900;
-    target.x = 1260;
-    player.y = -500;
-    for (const winner of [null, 'player', 'opponent', 'draw'] as const) {
+    // Until the first step it sits on its aim, 320 source pixels left of and
+    // above the midpoint: here the stage's left end and the floor.
+    expect([match.cameraX, match.cameraY]).toEqual([0, 0]);
+    match.step();
+    player.x = 525;
+    target.x = 885;
+    // The aim is now 470 − 320 = 150 source pixels, and the camera keeps
+    // moving through round endings.
+    const xs: number[] = [];
+    for (const winner of [null, null, 'player', 'draw'] as const) {
       match.winner = winner;
-      target.hp = winner === 'player' ? 0 : 100;
-      for (const [x, y] of [
-        [250, 0],
-        [1260, -700],
-        [1735, -1000],
-      ]) {
-        target.x = x;
-        target.y = y;
-        expect(match.cameraX).toBe(420);
-        expect(match.cameraY).toBe(-250);
-      }
+      match.step();
+      xs.push(match.cameraX / 1.5);
     }
-    player.y = 0;
-    expect(match.cameraY).toBe(0);
-    player.y = -2000;
-    expect(match.cameraY).toBe(-720);
-    player.x = FIGHTER_MARGIN;
-    target.x = STAGE_WIDTH - FIGHTER_MARGIN;
+    expect(xs).toEqual([75, 112, 131, 140]);
+    const at = (positions: [number, number, number, number]) => {
+      const fresh = new Match();
+      [fresh.fighters[0].x, fresh.fighters[0].y] = positions;
+      [fresh.fighters[1].x, fresh.fighters[1].y] = positions.slice(2);
+      return [fresh.cameraX, fresh.cameraY];
+    };
+    // Vertically it aims 320 above the midpoint, so it rises once the pair's
+    // midpoint is 120 source pixels (180 arena) off the floor.
+    expect(at([900, -300, 1260, 0])).toEqual([600, 0]);
+    expect(at([900, -600, 1260, 0])).toEqual([600, -120]);
+    expect(at([900, -2000, 1260, -2000])).toEqual([600, -720]);
+    expect(at([FIGHTER_MARGIN, 0, 885, 0])).toEqual([0, 0]);
+    expect(at([1035, 0, STAGE_WIDTH - FIGHTER_MARGIN, 0])).toEqual([
+      STAGE_WIDTH - WIDTH,
+      0,
+    ]);
+  });
+
+  it('holds both fighters inside walls 50 and 590 source pixels from the camera (0x40fba2)', () => {
+    const match = new Match();
+    const [player, target] = match.fighters;
+    match.step();
     expect(match.cameraX).toBe(0);
-    [player.x, target.x] = [target.x, player.x];
-    expect(match.cameraX).toBe(STAGE_WIDTH - WIDTH);
-    expect(new Match().cameraX).toBe(0);
-    expect(new Match().cameraY).toBe(0);
+    for (let tick = 0; tick < 300; tick++)
+      match.step({ left: true }, { right: true });
+    // Pulling apart, they meet the walls 540 source pixels apart, and the
+    // camera settles on their midpoint.
+    expect(target.x - player.x).toBe(540 * 1.5);
+    expect(player.x - match.cameraX).toBe(FIGHTER_MARGIN);
+    expect(target.x - match.cameraX).toBe(WIDTH - FIGHTER_MARGIN);
   });
 
   it('ends a low air dash on landing before its recovery clip finishes', () => {
@@ -2706,7 +2663,7 @@ describe('prototype training rules', () => {
   });
 
   it.each([1, -1] as const)(
-    'keeps every forward air-dash pose inside the wall facing %i, then falls off the cornered body',
+    'stops a forward air dash at the wall facing %i, then falls off the cornered body',
     (facing) => {
       const match = new Match();
       const [f, target] = match.fighters;
@@ -2718,17 +2675,6 @@ describe('prototype training rules', () => {
       expect(f.action).toBe('airDash');
       expect(f.y).toBeLessThan(-120);
       for (let age = 0; age < animationDuration('airDash') - 1; age++) {
-        const pose = animationFrame('airDash', f.age);
-        const p = placement(
-          pose,
-          pose.width,
-          pose.height,
-          (f.x - match.cameraX) / 1.5,
-          0,
-          f.facing === -1,
-        );
-        expect(p.left * 1.5).toBeGreaterThanOrEqual(0);
-        expect((p.left + pose.width) * 1.5).toBeLessThanOrEqual(WIDTH);
         const previousX = f.x;
         match.step({}, {});
         expect((f.x - previousX) * facing).toBeGreaterThanOrEqual(0);
@@ -3465,7 +3411,7 @@ describe('prototype training rules', () => {
       for (const guarded of [false, true]) {
         const match = new Match();
         const [f, target] = match.fighters;
-        f.x = facing === 1 ? FIGHTER_MARGIN : STAGE_WIDTH - FIGHTER_MARGIN;
+        f.x = facing === 1 ? 185 : STAGE_WIDTH - 185;
         target.x = f.x + facing * 270;
         const targetX = target.x;
         const contacts: number[] = [];
@@ -3499,9 +3445,7 @@ describe('prototype training rules', () => {
             : ['hitHeavy', 'launchAway', 'knockdown'],
         );
         expect(
-          (f.x -
-            (facing === 1 ? FIGHTER_MARGIN : STAGE_WIDTH - FIGHTER_MARGIN)) *
-            facing,
+          (f.x - (facing === 1 ? 185 : STAGE_WIDTH - 185)) * facing,
         ).toBeGreaterThan(390);
         // Boxes of 5, 5, 5, 5, 7 and 8, or six chips of 1.
         expect(target.hp).toBe(LIFE - (guarded ? 6 : 35));
@@ -3657,6 +3601,86 @@ describe('prototype training rules', () => {
     expect(match.projectiles).toHaveLength(0);
   });
 
+  describe('the y + 2000 object layer', () => {
+    // An object (op 0x04) of fighter `owner`, as the effect pass keeps them.
+    const object = (
+      clip: Effect['clip'],
+      owner: number,
+      fields: Partial<Effect> = {},
+    ): Effect => ({
+      clip,
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      ax: 0,
+      gravity: 0,
+      facing: 1,
+      age: 0,
+      front: true,
+      owner,
+      slot: 0,
+      screen: false,
+      box: null,
+      objectBox: null,
+      responses: [],
+      connected: false,
+      mode: 0,
+      fade: 0,
+      ...fields,
+    });
+    const axe = (owner: number, x: number) => ({
+      owner,
+      kind: 'axe' as const,
+      x,
+      y: -153,
+      vx: 0,
+      vy: 0,
+      facing: (owner === 0 ? 1 : -1) as 1 | -1,
+      age: 1,
+      hit: false,
+    });
+
+    it("breaks the other side's axes on B G's stage-wide bodies (303)", () => {
+      const match = new Match();
+      match.projectiles = [axe(0, 1100), axe(1, 1700)];
+      match.effects = [object(303, 1, { x: 1500 })];
+      match.step();
+      // Its bodies (0, 1995) ±(10000, 182) meet the axe's box 2000 down.
+      expect(match.projectiles.map((p) => [p.hit, p.age])).toEqual([
+        [true, 0],
+        [false, 2],
+      ]);
+    });
+
+    it("marks a beam that meets the other side's axe as having hit, leaving the axe", () => {
+      const match = new Match();
+      // A downed Ryuko can't be struck, so only the axe meets the beam.
+      match.fighters[0].action = 'knockdown';
+      match.projectiles = [axe(0, 1100)];
+      // Object 269 (calling 270) sets its boxes as it starts; slot 1's
+      // (644, 1995) ±(644, 72) reaches the axe's body.
+      const beam = object(269, 1, { x: 1500, facing: -1, age: -1 });
+      match.effects = [beam];
+      match.step();
+      expect(beam.objectBox).toMatchObject({ y: 1995, w: 644 });
+      expect(beam.connected).toBe(true);
+      expect(match.projectiles[0].hit).toBe(false);
+    });
+
+    it("enters B G's hit branch (294) when its lunge meets the other side's axe", () => {
+      const match = new Match();
+      const bg = match.fighters[1];
+      Object.assign(bg, { action: 'megaBeam', age: 89, fired: 89 });
+      // At age 90 action 292 sets its slot-1 box (59, 1908) ±(40, 89) and
+      // hit handler 294 (PC 4311).
+      match.projectiles = [axe(0, 470)];
+      match.step();
+      expect(bg.action).toBe('megaBeamHit');
+      expect(match.projectiles[0].hit).toBe(false);
+    });
+  });
+
   it('clears projectiles when the round ends', () => {
     const match = new Match();
     match.fighters[1].hp = 16;
@@ -3673,8 +3697,9 @@ describe('prototype training rules', () => {
     ticks(match, AXE_RELEASE_TICK + 4, { axe: true });
     const [axe] = match.projectiles;
     match.step({}, { getterBeam: true });
-    // Action 264 adds 10, then 65 at age 5, with its op 0x1a stops.
-    expect([match.freeze, ryuko.hitStop]).toEqual([10, 10]);
+    // Action 264 adds 10, then 65 at age 5, with its op 0x1a stops; KGT 58
+    // counts it down after the fighters and the axe have read it.
+    expect([match.freeze, ryuko.hitStop]).toEqual([9, 10]);
     match.step();
     const x = axe.x;
     ticks(match, 75);
@@ -3703,7 +3728,9 @@ describe('prototype training rules', () => {
         hit: false,
       },
     ];
-    match.freeze = 4;
+    // Scripts read global 6 before KGT 58 counts it down: 3, then 0 at the
+    // axe's next 3-tick display.
+    match.freeze = 3;
     for (let tick = 0; tick < 3; tick++) {
       match.step();
       expect(match.projectiles[0]).toMatchObject({ held: true, hit: false });
@@ -3723,7 +3750,7 @@ describe('prototype training rules', () => {
       hit: false,
     };
     match.projectiles = [missile];
-    match.freeze = 3;
+    match.freeze = 2;
     const xs = [];
     for (let tick = 0; tick < 3; tick++) {
       match.step();
@@ -3953,23 +3980,20 @@ describe('prototype training rules', () => {
     }
   });
 
-  it.each([790, 1600])(
-    'keeps the camera on the player while a ranged KO at x=%i lands offscreen',
+  it.each([790, 1100])(
+    'stops a ranged KO from x=%i at the right camera wall',
     (x) => {
       const match = new Match();
-      const target = match.fighters[1];
+      const [player, target] = match.fighters;
       target.x = x;
       target.hp = 1;
       match.step({ axe: true });
       for (let tick = 0; tick < 200 && !match.winner; tick++) match.step();
       expect(match.winner).toBe('player');
-      for (let tick = 0; tick < ROUND_END_TICKS; tick++) {
-        match.step();
-        expect(match.cameraX).toBe(0);
-        expect(match.cameraY).toBe(0);
-      }
+      ticks(match, ROUND_END_TICKS);
       expect(target).toMatchObject({ action: 'koLand', y: 0 });
-      expect(target.x).toBeCloseTo(x === 1600 ? 1735 : 1239.752808, 4);
+      expect(target.x - match.cameraX).toBe(WIDTH - FIGHTER_MARGIN);
+      expect([player.x, match.cameraX, match.cameraY]).toEqual([300, 220.5, 0]);
     },
   );
 
@@ -4005,10 +4029,13 @@ describe('prototype training rules', () => {
     (attack) => {
       const match = new Match();
       const [player, target] = match.fighters;
-      player.x = attack === 'melee' ? 530 : FIGHTER_MARGIN;
-      target.x = attack === 'melee' ? 660 : 1200;
+      player.x = attack === 'melee' ? 530 : 185;
+      target.x = attack === 'melee' ? 660 : 985;
       target.hp = 8;
       for (let tick = 0; tick < 100 && !match.winner; tick++) {
+        // The camera walls keep the axe's flight short of the jump, so a
+        // super's freeze (global 6) holds it until Ryuko is airborne.
+        if (attack === 'projectile' && tick === 10) match.freeze = 24;
         match.step(
           {
             jump: tick === (attack === 'melee' ? 0 : 56),
@@ -4181,6 +4208,48 @@ describe('prototype training rules', () => {
       }
     },
   );
+
+  it.each([1, -1] as const)(
+    'pushes a cornered thrower out as its spins swing the victim into the wall facing %i',
+    (facing) => {
+      const match = new Match();
+      const [thrower, victim] = match.fighters;
+      const wall = facing === 1 ? FIGHTER_MARGIN : STAGE_WIDTH - FIGHTER_MARGIN;
+      Object.assign(thrower, { x: wall, facing });
+      Object.assign(victim, { x: wall + facing * 111, facing: -facing });
+      for (let tick = 0; tick < 100 && victim.action !== 'dstToss'; tick++)
+        match.step({ throw: tick === 0 }, {});
+      // The grab records the thrower as striker, and ops 0x07 and 0x14 mark
+      // the victim reeling and held. Spin 199's −10 and −60 holds land behind
+      // the thrower, past the wall, which hands the 15 and 75 pixels it stops
+      // to the thrower, so the next −60 hold meets the wall exactly.
+      expect(victim).toMatchObject({
+        action: 'dstToss',
+        reaction: 0xa,
+        striker: true,
+      });
+      expect((thrower.x - wall) * facing).toBe(90);
+    },
+  );
+
+  it('measures the left camera wall from 50 − camera, so a scrolled one hands on nothing (0x40fbdd)', () => {
+    const match = new Match();
+    const [striker, victim] = match.fighters;
+    // Snap the camera to the stage's right end (640).
+    victim.x = 1700;
+    striker.x = 1800;
+    match.step();
+    expect(match.cameraX).toBe(STAGE_WIDTH - WIDTH);
+    // The camera moves halfway to the pair's aim of 110, to 375, so the left
+    // wall is at source 425 and stops the reeling victim 25 pixels.
+    Object.assign(victim, { x: 600, facing: 1, reaction: 8, striker: true });
+    Object.assign(striker, { x: 690, facing: -1 });
+    match.step();
+    expect(match.cameraX).toBe(375 * 1.5);
+    expect(victim.x).toBe(425 * 1.5);
+    // (50 − 375) − 400 is negative, so the striker's transfer stays 0.
+    expect(striker.transfer).toBe(0);
+  });
 
   it('pushes overlapping bodies apart by a quarter of their push-box overlap', () => {
     // Idle push boxes (−1, −92) ±(37, 102) at source x 200 and 240 overlap by
@@ -4507,6 +4576,8 @@ describe('recovered rush and time-stop reactions', () => {
   it('drifts, launches and knocks down from the rush air hit (122)', () => {
     const match = new Match();
     const target = match.fighters[1];
+    // Within the camera walls' 540 source pixels of Ryuko.
+    match.fighters[0].x = 900;
     target.x = 1200;
     Object.assign(target, { action: 'rushAirHit', age: 0, y: -100, vy: 0 });
     // PC 1616: raw -100 away from Ryuko, with no fall, until PC 1628.
@@ -4524,6 +4595,8 @@ describe('recovered rush and time-stop reactions', () => {
   it('holds the standing time-stop guard in place with its counter checks', () => {
     const match = new Match();
     const target = match.fighters[1];
+    // Within the camera walls' 540 source pixels of Ryuko.
+    match.fighters[0].x = 900;
     target.x = 1200;
     target.stock = 1;
     Object.assign(target, { action: 'timeStopGuard', age: 0 });
@@ -4537,6 +4610,8 @@ describe('recovered rush and time-stop reactions', () => {
   it('drops the air time-stop guard straight down at gravity 70 (PC 2323)', () => {
     const match = new Match();
     const target = match.fighters[1];
+    // Within the camera walls' 540 source pixels of Ryuko.
+    match.fighters[0].x = 900;
     target.x = 1200;
     Object.assign(target, {
       action: 'airTimeStopGuard',
@@ -4558,6 +4633,7 @@ describe('recovered air and rapid reaction motion', () => {
   function place(action: Fighter['action'], y = -150) {
     const match = new Match();
     const target = match.fighters[1];
+    match.fighters[0].x = 900;
     Object.assign(target, { action, age: 0, x: 1200, y, vx: 0, vy: 0 });
     return { match, target };
   }

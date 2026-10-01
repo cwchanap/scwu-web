@@ -1,6 +1,7 @@
 // New MVP rules. These are intentionally separate from recovered idle semantics.
 import {
   animationDuration,
+  animationFrame,
   DST_TOSS_TICK,
   dstHold,
   eventsAt,
@@ -17,6 +18,7 @@ import {
 import type {
   Action,
   AnimatedAction,
+  BodyBox,
   ObjectKey,
   ScriptedAction,
   ScriptEvent,
@@ -65,9 +67,8 @@ export const WIDTH = 960;
 export const STAGE_WIDTH = 1920;
 export const HEIGHT = 720;
 export const GROUND = 636;
-// Reserve the extended air dash (181.5px) and throw/recovery poses, including rounding.
-// Keep one wall for every state so changing pose never relocates a fighter.
-export const FIGHTER_MARGIN = 185;
+// The walls with the camera at either end of the stage: 50 source pixels in.
+export const FIGHTER_MARGIN = 50 * 1.5;
 // Op 0x18 attack boxes: centre and half size in source pixels from the
 // attacker's origin, x toward its facing, active for ages [from, to), with
 // the box's kind (r[10]) and damage (r[12]).
@@ -605,11 +606,10 @@ function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
 // Action 227, PC 3292, re-set every display.
 const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
 // Its slot-1 box (PC 3291) and slot-0 body (PC 3290) repeat the box 2000
-// pixels down, where only objects meet; this is the body, a slot-1 body sits
-// at y + 5000 (PC 3289).
-// ponytail: only opposing axes meet there; Getter Beam's (270, 277) and
-// B G's (292, 303) y + 2000 boxes and bodies are ignored.
-const AXE_BODY = { x: 63, y: 3, w: 34, h: 44 };
+// pixels down, where only objects meet (a slot-1 body sits at y + 5000, PC
+// 3289).
+const AXE_OBJECT_BOX = { ...AXE_BOX, y: 2003 };
+const AXE_BODY = { x: 63, y: 2003, w: 34, h: 44 };
 // 0x4124c9 deletes an object that doesn't follow its parent once it leaves
 // x −50..1330 or y −50..1010 source pixels; the floor is y 920 (0x412247).
 const inWorld = ({ x, y }: { x: number; y: number }) =>
@@ -744,6 +744,8 @@ export interface Fighter {
   fired: number;
   ax: number;
   box: ScriptBox | null;
+  // Op 0x18 slot 1: the box repeated 2000 pixels down, for objects' bodies.
+  objectBox: ScriptBox | null;
   responses: number[];
   onHit: number;
   fade: number;
@@ -803,6 +805,7 @@ export interface Effect {
   // Op 0x04 flag 0x40: viewport coordinates instead of the stage.
   screen: boolean;
   box: ScriptBox | null;
+  objectBox: ScriptBox | null;
   responses: number[];
   connected: boolean;
   // Op 0x23: mode 2 draws additively, mode 4 fades by fade/32.
@@ -823,6 +826,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   slot: 0,
   screen: false,
   box: null,
+  objectBox: null,
   responses: [],
   connected: false,
   mode: 0,
@@ -854,6 +858,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   fired: -1,
   ax: 0,
   box: null,
+  objectBox: null,
   responses: [],
   onHit: 0,
   fade: 0,
@@ -865,13 +870,22 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   stopped: 0,
   transfer: 0,
 });
+// Camera scroll (0x447f2c) in source pixels, which the walls read this tick.
+let cameraLeft = 0;
+// In the Vs. modes (0x470058 1 or 2) a player's motion step clamps x to 50
+// and 590 source pixels from the camera (0x40fba2–0x40fca2).
 const clampX = (x: number) =>
-  Math.max(FIGHTER_MARGIN, Math.min(STAGE_WIDTH - FIGHTER_MARGIN, x));
-// Moves stop at the walls at once; settle hands on the distance stopped.
+  Math.max((cameraLeft + 50) * 1.5, Math.min((cameraLeft + 590) * 1.5, x));
+// Moves stop at the walls at once; settle hands on the distance stopped. The
+// left wall measures it as (50 − camera) − x (0x40fbdd), not from the wall.
 function placeX(f: Fighter, x: number) {
   f.x = clampX(x);
-  f.stopped += f.x - x;
+  f.stopped += f.x > x ? Math.max(0, (50 - cameraLeft) * 1.5 - x) : f.x - x;
 }
+const clampCamera = ({ x, y }: { x: number; y: number }) => ({
+  x: Math.max(0, Math.min(640, x)),
+  y: Math.max(0, Math.min(480, y)),
+});
 function gravity(f: Fighter) {
   f.vx += f.ax;
   placeX(f, f.x + f.vx);
@@ -964,6 +978,8 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
+  // Camera scroll (0x447f2c, 0x447f30) in source pixels, from the first step.
+  private camera: { x: number; y: number } | null = null;
   practice: PracticeOptions = {
     partner: 'stand',
     maxStock: false,
@@ -1017,12 +1033,24 @@ export class Match {
     return dash;
   }
 
+  // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
+  // and left of the fighters' midpoint, its floor at y 920.
+  private aim() {
+    const [a, b] = this.fighters;
+    return {
+      x: Math.trunc((a.x + b.x) / 3) - 320,
+      y: Math.trunc(920 + (a.y + b.y) / 3) - 320,
+    };
+  }
+
+  // Authored start: the camera begins on the fighters, as round start's 320,
+  // 480 (0x407094) does for fighters centred on the stage.
+  private view() {
+    return this.camera ?? clampCamera(this.aim());
+  }
+
   get cameraX() {
-    // Authored player lock, including round endings. Stage bounds are recovered.
-    return Math.max(
-      0,
-      Math.min(STAGE_WIDTH - WIDTH, this.fighters[0].x - WIDTH / 2),
-    );
+    return this.view().x * 1.5;
   }
 
   get seconds() {
@@ -1032,8 +1060,7 @@ export class Match {
   }
 
   get cameraY() {
-    // Keep the court framed until the player rises above the vertical dead zone.
-    return Math.max(-HEIGHT, Math.min(0, this.fighters[0].y + 250));
+    return (this.view().y - 480) * 1.5;
   }
 
   get resultReady() {
@@ -1061,6 +1088,7 @@ export class Match {
     f.fired = -1;
     f.ax = 0;
     f.box = null;
+    f.objectBox = null;
     f.responses = [];
     f.onHit = 0;
     f.fade = 0;
@@ -1197,6 +1225,9 @@ export class Match {
       const hold = grabs[attacker.action as keyof typeof grabs].hold;
       this.action(attacker, hold);
       this.action(target, held[hold]);
+      // The grab box deals nothing, so 0x40f7a8 sets no reaction bits, but
+      // 0x40f8a4 still records the thrower as the victim's striker.
+      target.striker = true;
       // A scripted hold (EVIL DST's 222) applies its response at once.
       this.fireEvents(attacker);
     }
@@ -1221,8 +1252,10 @@ export class Match {
       return;
     }
     if (attacker.age === toss.tick) {
-      // Response 31 places the victim at (14, −96), then action 129.
+      // Response 31 (op 0x14) places the victim at (14, −96), then action 129.
+      const { striker } = target;
       this.action(target, 'dstToss');
+      Object.assign(target, { reaction: 0xa, striker });
       placeX(target, attacker.x + attacker.facing * 14 * 1.5);
       target.y = -96 * 1.5;
       target.vy = 0;
@@ -1235,7 +1268,8 @@ export class Match {
       return;
     }
     const hold = dstHold(attacker.age);
-    if (!hold) return;
+    if (!hold?.place) return;
+    target.reaction = 0xa;
     placeX(target, attacker.x + attacker.facing * hold.x * 1.5);
     target.y = 0;
     target.vy = 0;
@@ -1357,10 +1391,8 @@ export class Match {
       case 'motion':
         motion(actor, event);
         break;
-      case 'box':
-        // Slot 1 boxes sit 2000 pixels down: they meet objects, not bodies.
-        if (event.slot !== 0) break;
-        actor.box =
+      case 'box': {
+        const box =
           event.w || event.h
             ? {
                 x: event.x,
@@ -1371,8 +1403,15 @@ export class Match {
                 kind: event.kind,
               }
             : null;
+        // Slot 1 boxes sit 2000 pixels down: they meet objects, not fighters.
+        if (event.slot !== 0) {
+          actor.objectBox = box;
+          break;
+        }
+        actor.box = box;
         actor.connected = false;
         break;
+      }
       case 'responses':
         actor.responses = event.ids;
         break;
@@ -1401,7 +1440,9 @@ export class Match {
         if (!reaction || !this.catchHeld(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
+        const { striker } = other;
         this.action(other, reaction.action, true);
+        Object.assign(other, { reaction: 0xa, striker });
         other.hitStop += reaction.stop;
         self.hitStop += reaction.stop;
         const [victimPower, attackerPower] = REACTION_POWER[
@@ -1442,10 +1483,18 @@ export class Match {
     }
   }
 
-  // Ops 0x07/0x14 move the opponent this super holds or has just tossed.
+  // Ops 0x07/0x14 move the opponent this super holds or has just tossed,
+  // marking it reeling and held (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a)
+  // while its striker stays recorded.
   private catchHeld(target: Fighter) {
-    if (target.action === 'dstToss') this.action(target, 'superHeld');
-    return target.action === 'superHeld';
+    if (target.action === 'dstToss') {
+      const { striker } = target;
+      this.action(target, 'superHeld');
+      target.striker = striker;
+    }
+    if (target.action !== 'superHeld') return false;
+    target.reaction = 0xa;
+    return true;
   }
 
   private placeHeld(holder: Fighter, target: Fighter) {
@@ -1558,6 +1607,13 @@ export class Match {
     return true;
   }
 
+  // Op 0x04 flag 0x40 objects sit in viewport coordinates.
+  private origin(source: Fighter | Effect) {
+    return 'screen' in source && source.screen
+      ? { x: source.x + this.cameraX, y: source.y + this.cameraY - GROUND }
+      : source;
+  }
+
   // Script boxes hit the opponent's op 0x19 body box through op 0x17 responses.
   private boxContact(source: Fighter | Effect, owner: number) {
     const box = source.box;
@@ -1565,14 +1621,7 @@ export class Match {
     const target = this.fighters[1 - owner];
     if (!box || source.connected || protectedReactions.has(target.action))
       return [];
-    const origin =
-      'screen' in source && source.screen
-        ? {
-            x: source.x + this.cameraX,
-            y: source.y + this.cameraY - GROUND,
-          }
-        : source;
-    const body = struck(origin, source.facing, box, target);
+    const body = struck(this.origin(source), source.facing, box, target);
     if (!body) return [];
     const guarding = this.guarding(target, source);
     const stance =
@@ -1607,6 +1656,69 @@ export class Match {
         fbh: victim === FBH,
       },
     ];
+  }
+
+  // 0x40f010 tests every object's boxes against the other side's bodies. In
+  // Ryuko's data objects meet only 2000 pixels down: an axe's box and body
+  // (PCs 3290–3291), the beams' boxes (270, 277), B G's lunge box (292) and
+  // its stage-wide bodies (303). An object victim (+0x15a 1) only fires the
+  // striker's hit handler (0x40f36a, taken up next tick) and marks it as
+  // having hit (0x40f31c), which 0x40f010 checks only before the striker's
+  // pass: axes break into 230 without damage, stop or effect, even held by
+  // the freeze; B G's lunge enters 294; a beam, which sets no handler, waits
+  // for its next box.
+  // ponytail: 294's ops (0x07, 0x14) move the object it caught (+0xdef9);
+  // here the axe flies on and they find no one to hold.
+  private objectHits(frozen: boolean[]) {
+    type At = { x: number; y: number; facing: -1 | 1; owner: number };
+    const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>][] = [];
+    const strikers: [At, ScriptBox, () => void][] = [];
+    for (const p of this.projectiles) {
+      if (p.kind !== 'axe' || p.hit) continue;
+      bodies.push([p, AXE_BODY]);
+      strikers.push([
+        p,
+        AXE_OBJECT_BOX,
+        () => {
+          p.hit = true;
+          p.age = 0;
+        },
+      ]);
+    }
+    for (const e of this.effects) {
+      const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
+      for (const body of animationFrame(e.clip, e.age).body ?? [])
+        if (body.kind & 6) bodies.push([at, body]);
+      if (e.objectBox && !e.connected)
+        strikers.push([at, e.objectBox, () => (e.connected = true)]);
+    }
+    this.fighters.forEach((f, owner) => {
+      if (!f.objectBox || f.connected || frozen[owner]) return;
+      strikers.push([
+        { ...f, owner },
+        f.objectBox,
+        () => {
+          f.connected = true;
+          if (!f.onHit) return;
+          this.action(f, SOURCE_ACTIONS[f.onHit], true);
+          this.fireEvents(f);
+        },
+      ]);
+    });
+    return strikers
+      .filter(([a, box]) =>
+        bodies.some(
+          ([b, body]) =>
+            a.owner !== b.owner &&
+            Math.abs(
+              a.x + a.facing * box.x * 1.5 - b.x - b.facing * body.x * 1.5,
+            ) <
+              (box.w + body.w) * 1.5 &&
+            Math.abs(a.y + box.y * 1.5 - b.y - body.y * 1.5) <
+              (box.h + body.h) * 1.5,
+        ),
+      )
+      .map(([, , fire]) => fire);
   }
 
   private ai(): Input {
@@ -2048,9 +2160,25 @@ export class Match {
 
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
-    // ponytail: KGT object 58's place in the engine's object order isn't
-    // traced; the port counts the freeze down before anything runs.
+    this.run(player, opponent);
+    // Objects run by priority each tick (0x404d4c). KGT action 58, the stage
+    // layout, counts global 6 down (PCs 366–371) at 0x65 (0x406890's callers),
+    // after the fighters (0x50) and their axes and missiles (op 0x04 flag 1,
+    // one in front), so it moves after they have read it.
     if (this.freeze > 0) this.freeze--;
+  }
+
+  private run(player: Input, opponent?: Input) {
+    // The camera object runs with the scripts, before motion (0x40ffc0), so
+    // the walls use the positions from the end of the last tick. In the Vs.
+    // modes it moves halfway to its aim each tick (0x40b022–0x40b080).
+    const view = this.view();
+    const aim = this.aim();
+    this.camera = clampCamera({
+      x: Math.trunc((view.x + aim.x) / 2),
+      y: Math.trunc((view.y + aim.y) / 2),
+    });
+    cameraLeft = this.camera.x;
     // Objects spawned during this pass start moving next tick.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
@@ -2389,29 +2517,7 @@ export class Match {
         fbh: false,
       });
     }
-    // 0x40f010 tests every object's boxes against the other side's bodies; an
-    // object victim (+0x15a 1) only fires the striker's hit handler
-    // (0x40f36a), so axes whose y + 2000 box and body meet both break into
-    // 230 at once, without damage, stop or effect, even held by the freeze.
-    const axes = this.projectiles.filter((p) => p.kind === 'axe' && !p.hit);
-    const clashed = axes.filter((p) =>
-      axes.some(
-        (q) =>
-          q.owner !== p.owner &&
-          Math.abs(
-            p.x +
-              p.facing * AXE_BOX.x * 1.5 -
-              q.x -
-              q.facing * AXE_BODY.x * 1.5,
-          ) <
-            (AXE_BOX.w + AXE_BODY.w) * 1.5 &&
-          Math.abs(p.y - q.y) < (AXE_BOX.h + AXE_BODY.h) * 1.5,
-      ),
-    );
-    for (const p of clashed) {
-      p.hit = true;
-      p.age = 0;
-    }
+    const objectHits = this.objectHits(frozen);
     for (const {
       f,
       target,
@@ -2540,6 +2646,7 @@ export class Match {
         this.fireEvents(f);
       }
     }
+    for (const fire of objectHits) fire();
     this.resolveThrows(frozen);
     if (a.hp === 0 || b.hp === 0 || this.seconds === 0) {
       this.projectiles = [];
