@@ -57,6 +57,9 @@ def decode_event(record):
     if op == 0x18:  # attack box: centre and half extents; r[12] damage
         return dict(op="box", slot=record[9], x=s16(record, 1), y=s16(record, 3), w=s16(record, 5),
                     h=s16(record, 7), kind=record[10], damage=record[12])
+    if op == 0x20:  # branch to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
+        return dict(op="random", divisor=u16(record, 1) + 1, above=u16(record, 3),
+                    action=u16(record, 6), offset=record[8])
     if op == 0x1a:  # hit-stop ticks for the object itself and the opponent
         return dict(op="stop", self=record[1], other=record[2])
     if op == 0x23:  # colour mode: 2 draws additively, 4 fades by r[5]/32
@@ -86,7 +89,7 @@ def with_body(frame, bodies):
     return frame if bodies is None else dict(frame, body=[bodies[k] for k in sorted(bodies)])
 
 
-def flatten(p, c, index, played=()):
+def flatten(p, c, index, played=(), offset=0):
     """Linearize one action for playback by the match.
 
     Inlines op 0x09 calls with their repeat counts and follows op 0x0a jumps. A
@@ -94,10 +97,10 @@ def flatten(p, c, index, played=()):
     action (below 250), or into an action the match plays as its own clip
     (`played`), ends the timeline with `next`. Conditions (0x10, 0x11, 0x16,
     0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
-    path is the super's normal path.
+    path is the super's normal path. `offset` starts at an op 0x20 jump target.
     """
     frames, events, bodies = [], [], {}
-    t, pc, stack, seen = 0, p.action(index).start, [], {}
+    t, pc, stack, seen = 0, p.action(index).start + offset, [], {}
     action = index
     result = dict(loop=-1, end="end", next=None)
     for _ in range(20000):
@@ -272,21 +275,24 @@ def main():
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
     # IORI (410, which jumps through 411 into iori3), the rush air hit (122), and the
     # beam hits (83, 84) and air reactions whose op 0x01 commands the match plays,
-    # and every response's hit effect.
+    # and every response's hit effect with its op 0x20 branches, keyed
+    # "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    scripts, queue = {}, [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264, 265, 278,
-                          279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-                          74, 76, 153, 158, 167, 172, *filter(None, response_effects)]
+    scripts, queue = {}, [(i, 0) for i in [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264,
+                          265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
+                          74, 76, 153, 158, 167, 172, *filter(None, response_effects)]]
     played = set(actions.values())
     while queue:
-        index = queue.pop()
-        if index in scripts:
+        index, offset = key = queue.pop()
+        if key in scripts:
             continue
-        script = scripts[index] = flatten(p, c, index, played)
+        script = scripts[key] = flatten(p, c, index, played, offset)
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         for event in script["events"]:
             if (event["op"] == "spawn" and event["action"]) or (event["op"] == "handler" and event["slot"] == 2):
-                queue.append(event["action"])
+                queue.append((event["action"], 0))
+            if event["op"] == "random" and event["action"]:
+                queue.append((event["action"], event["offset"]))
     images = []
     for index in sorted(image_ids):
         record = c.images[index]
@@ -303,7 +309,7 @@ def main():
             path.unlink()
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, clips=clips, held=held,
-        responses=responses, response_effects=response_effects, cpu=cpu, scripts={str(k): scripts[k] for k in sorted(scripts)},
+        responses=responses, response_effects=response_effects, cpu=cpu, scripts={f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()
     # Python is an independent oracle. Keep fixtures out of the browser bundle.

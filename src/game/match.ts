@@ -5,6 +5,7 @@ import {
   dstHold,
   eventsAt,
   hurtboxes,
+  isObject,
   pushboxes,
   isScripted,
   RESPONSE_EFFECTS,
@@ -16,6 +17,7 @@ import {
 import type {
   Action,
   AnimatedAction,
+  ObjectKey,
   ScriptedAction,
   ScriptEvent,
 } from './animations';
@@ -744,6 +746,15 @@ export interface Fighter {
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
   jumpVariable: number;
+  // Reaction bits 2–3 of +0x15e: 8 after a hit, 12 after a guard (0x40f7a8,
+  // 0x40f6a2), until an action change the contact didn't cause. `striker`:
+  // the opponent's own body dealt one of them (+0xdefd, 0x40f8a4).
+  reaction: number;
+  striker: boolean;
+  // Distance the walls stopped this tick, and player +0xdf49: x the next
+  // motion step adds (0x40fa09).
+  stopped: number;
+  transfer: number;
 }
 export interface ScriptBox {
   x: number;
@@ -767,7 +778,7 @@ export interface Projectile {
 // Spawned objects, positioned like characters by the renderer. A numeric clip
 // is a source object that runs its flattened timeline: spawns, motion, boxes.
 export interface Effect {
-  clip: AnimatedAction | number;
+  clip: AnimatedAction | ObjectKey;
   x: number;
   y: number;
   vx: number;
@@ -840,12 +851,21 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   held: null,
   contact: false,
   jumpVariable: 0,
+  reaction: 0,
+  striker: false,
+  stopped: 0,
+  transfer: 0,
 });
 const clampX = (x: number) =>
   Math.max(FIGHTER_MARGIN, Math.min(STAGE_WIDTH - FIGHTER_MARGIN, x));
+// Moves stop at the walls at once; settle hands on the distance stopped.
+function placeX(f: Fighter, x: number) {
+  f.x = clampX(x);
+  f.stopped += f.x - x;
+}
 function gravity(f: Fighter) {
   f.vx += f.ax;
-  f.x = clampX(f.x + f.vx);
+  placeX(f, f.x + f.vx);
   f.vy += f.gravity;
   f.y = Math.min(0, f.y + f.vy);
   if (f.y === 0) {
@@ -921,7 +941,7 @@ function slideDst(f: Fighter) {
     f.age >= DST_FIRE_TICK &&
     f.age < DST_FIRE_TICK + DST_SLIDE_TICKS
   )
-    f.x = clampX(f.x - f.facing * 400 * SOURCE_VELOCITY_SCALE);
+    placeX(f, f.x - f.facing * 400 * SOURCE_VELOCITY_SCALE);
 }
 
 export class Match {
@@ -1020,6 +1040,8 @@ export class Match {
     f.age = 0;
     f.connected = false;
     f.contact = false;
+    f.reaction = 0;
+    f.striker = false;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
     f.nextJump = false;
@@ -1098,7 +1120,7 @@ export class Match {
     if (!motion) return false;
     // Victim actions hold their impact pose before the motion command.
     if (motion.drift && f.age < motion.tick)
-      f.x = clampX(f.x + f.facing * motion.drift * SOURCE_VELOCITY_SCALE);
+      placeX(f, f.x + f.facing * motion.drift * SOURCE_VELOCITY_SCALE);
     if (f.age === motion.tick) {
       f.vx = f.facing * motion.vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
@@ -1131,11 +1153,11 @@ export class Match {
             (f.age - slide.start + 1) *
               slide.acceleration *
               SOURCE_ACCELERATION_SCALE);
-        f.x = clampX(f.x + f.vx);
+        placeX(f, f.x + f.vx);
       }
     }
     if (f.action === 'bounceDown' && f.age <= 10)
-      f.x = clampX(f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+      placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
   }
 
   private resolveThrows(frozen: boolean[]) {
@@ -1188,7 +1210,7 @@ export class Match {
     if (attacker.age === toss.tick) {
       // Response 31 places the victim at (14, −96), then action 129.
       this.action(target, 'dstToss');
-      target.x = clampX(attacker.x + attacker.facing * 14 * 1.5);
+      placeX(target, attacker.x + attacker.facing * 14 * 1.5);
       target.y = -96 * 1.5;
       target.vy = 0;
       target.facing = attacker.facing === 1 ? -1 : 1;
@@ -1201,7 +1223,7 @@ export class Match {
     }
     const hold = dstHold(attacker.age);
     if (!hold) return;
-    target.x = clampX(attacker.x + attacker.facing * hold.x * 1.5);
+    placeX(target, attacker.x + attacker.facing * hold.x * 1.5);
     target.y = 0;
     target.vy = 0;
     target.facing = hold.same === (attacker.facing === 1) ? 1 : -1;
@@ -1303,9 +1325,13 @@ export class Match {
   }
 
   private fireEffect(e: Effect) {
-    if (typeof e.clip !== 'number') return;
-    for (const event of eventsAt(e.clip, e.age))
+    const { clip } = e;
+    if (!isObject(clip)) return;
+    for (const event of eventsAt(clip, e.age)) {
       this.runEvent(e, e.owner, event);
+      // An op 0x20 jump has run the branch's own events instead.
+      if (e.clip !== clip) return;
+    }
   }
 
   private runEvent(actor: Fighter | Effect, owner: number, event: ScriptEvent) {
@@ -1382,6 +1408,21 @@ export class Match {
         actor.fade = event.mode === 4 ? event.fade : 0;
         if ('mode' in actor) actor.mode = event.mode;
         break;
+      case 'random':
+        // Op 0x20 jumps to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
+        // (0x417a22). Objects roll it: streak 348 picks one of three pose sets,
+        // each mirrored or not; stars 351/360 one of four flights.
+        // ponytail: fighters play the fall-through (76, 83, 84, 122 only
+        // reorder poses; CPU IORI 410 rolls when it ends).
+        if (!('clip' in actor)) break;
+        if (this.cpu.random() % event.divisor <= event.above || !event.action)
+          break;
+        actor.clip = event.offset
+          ? `${event.action}+${event.offset}`
+          : event.action;
+        actor.age = 0;
+        this.fireEffect(actor);
+        break;
     }
   }
 
@@ -1394,7 +1435,7 @@ export class Match {
   private placeHeld(holder: Fighter, target: Fighter) {
     const held = target.held;
     if (!held) return;
-    target.x = clampX(holder.x + holder.facing * held.x * 1.5);
+    placeX(target, holder.x + holder.facing * held.x * 1.5);
     target.y = Math.min(0, holder.y + held.y * 1.5);
     target.vx = target.vy = 0;
     target.facing =
@@ -1445,6 +1486,20 @@ export class Match {
     this.fireEffect(child);
   }
 
+  // A player's motion step (0x40fa09–0x40fc9f) adds its transfer (+0xdf49),
+  // then clamps it to the walls. Reeling from the opponent's own strike and
+  // not KO'd, it hands the distance the walls stopped to that opponent's
+  // transfer, unless the opponent is reeling from a hit itself; guarding, it
+  // still takes it. Fighter 1 moves it this tick, fighter 0 the next.
+  private settle(f: Fighter) {
+    const other = this.fighters[1 - this.fighters.indexOf(f)];
+    placeX(f, f.x + f.transfer);
+    f.transfer = 0;
+    if (f.hp > 0 && f.reaction & 8 && f.striker && (other.reaction & 12) !== 8)
+      other.transfer += f.stopped;
+    f.stopped = 0;
+  }
+
   // A scripted fighter's own motion; false when its timeline has ended on foot.
   private moveScripted(f: Fighter) {
     const action = f.action as ScriptedAction;
@@ -1452,7 +1507,7 @@ export class Match {
     const airborne = f.y < 0 || f.vy < 0;
     f.vx += f.ax;
     f.vy += f.gravity;
-    f.x = clampX(f.x + f.vx);
+    placeX(f, f.x + f.vx);
     f.y = Math.min(0, f.y + f.vy);
     if (f.action !== action) return true;
     // Airborne supers end on landing (handler slot 1 enters a landing action).
@@ -1714,7 +1769,7 @@ export class Match {
           )
             f.vy =
               (f.airDrillStage === 0 ? 1000 : 1500) * SOURCE_VELOCITY_SCALE;
-          f.x = clampX(f.x + f.facing * 800 * SOURCE_VELOCITY_SCALE);
+          placeX(f, f.x + f.facing * 800 * SOURCE_VELOCITY_SCALE);
           f.y = Math.min(0, f.y + f.vy);
           if (f.y === 0) f.vy = 0;
         }
@@ -1730,8 +1785,7 @@ export class Match {
           f.vy = 0;
           f.gravity = JUMP_GRAVITY;
         }
-        if (f.age >= 3 && f.age < (backwards ? 23 : 33))
-          f.x = clampX(f.x + f.vx);
+        if (f.age >= 3 && f.age < (backwards ? 23 : 33)) placeX(f, f.x + f.vx);
         else gravity(f);
       } else gravity(f);
       if (f.y === 0) {
@@ -1816,7 +1870,8 @@ export class Match {
       slideDst(f);
       // Action 207 moves before its first strike, then slides during recovery.
       if (f.action === 'drill' && f.age >= 11 && f.age < 69)
-        f.x = clampX(
+        placeX(
+          f,
           f.x + f.facing * (f.age < 59 ? 900 : 100) * SOURCE_VELOCITY_SCALE,
         );
       // Actions 180/188 lunge at raw velocity 600: from their first moving
@@ -1825,16 +1880,17 @@ export class Match {
         (f.action === 'punch2' && f.age >= 1 && f.age <= 13) ||
         (f.action === 'kick2' && f.age >= 2 && f.age < 13)
       )
-        f.x = clampX(f.x + f.facing * 600 * SOURCE_VELOCITY_SCALE);
+        placeX(f, f.x + f.facing * 600 * SOURCE_VELOCITY_SCALE);
       // Action 181 hops again after its two-tick pose (PC 2440), then slides
       // at raw 500 from PC 2447 until PC 2457.
       if (f.action === 'punch3' && f.age === 14)
         scriptMotion(f, 300, -300, 120);
       if (f.action === 'punch3' && f.age >= 29 && f.age <= 41)
-        f.x = clampX(f.x + f.facing * 500 * SOURCE_VELOCITY_SCALE);
+        placeX(f, f.x + f.facing * 500 * SOURCE_VELOCITY_SCALE);
       // Action 200: six accelerating ticks, then stop before the kick.
       if (f.action === 'hitUp' && f.age >= 2 && f.age < 8)
-        f.x = clampX(
+        placeX(
+          f,
           f.x +
             f.facing *
               (600 * SOURCE_VELOCITY_SCALE +
@@ -1845,7 +1901,8 @@ export class Match {
         (f.action === 'iori2' && f.age >= 8 && f.age < 23) ||
         (f.action === 'iori3' && f.age >= 8 && f.age < 21)
       )
-        f.x = clampX(
+        placeX(
+          f,
           f.x +
             f.facing *
               (f.action === 'iori2' ? 700 : 800) *
@@ -1957,7 +2014,7 @@ export class Match {
       this.action(f, crouched ? 'crouch' : 'crouchEnter');
       return;
     }
-    if (!airborne) f.x = clampX(f.x + direction * 2.8);
+    if (!airborne) placeX(f, f.x + direction * 2.8);
     this.action(
       f,
       airborne
@@ -2016,7 +2073,7 @@ export class Match {
         if (f.action === 'koLand') {
           // Action 62, PCs 641–644: ten ticks of backward slide, then rest.
           if (f.age <= 10)
-            f.x = clampX(f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+            placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
           return;
         }
         if (this.moveLaunch(f)) return;
@@ -2034,6 +2091,7 @@ export class Match {
       });
       // Apply together after frame entry so a double KO is iteration-independent.
       for (const f of this.fighters) f.hitStop += koStop;
+      this.fighters.forEach((f) => this.settle(f));
       return;
     }
     if (this.fighters.some((f) => f.action === 'intro')) {
@@ -2159,9 +2217,11 @@ export class Match {
     // moves when the other is grounded, and a KO'd fighter (life +0xdf05 is 0)
     // pushes no one. Held and hidden poses set no such box, and hit stop
     // doesn't stop the push.
-    // ponytail: the engine (0x40f910) pushes fighter 0 before fighter 1 moves
-    // and clamps each on its own next move; the port pushes after both move,
-    // then clamps both.
+    // 0x40f910 walks fighter 0, then fighter 1: each settles, and fighter 0
+    // then pushes, so its share stays unclamped until its next move.
+    // ponytail: the port moves both fighters before either settles; the
+    // engine moves fighter 1 after fighter 0 pushes.
+    this.settle(a);
     const pixel = (v: number) => Math.floor(v / 1.5);
     for (const boxA of pushboxes(a.action, a.age)) {
       const ax = pixel(a.x) + a.facing * boxA.x;
@@ -2176,8 +2236,7 @@ export class Match {
         if (a.hp > 0 && (b.y < 0 || a.y === 0)) b.x -= push;
       }
     }
-    a.x = clampX(a.x);
-    b.x = clampX(b.x);
+    this.settle(b);
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = this.fighters.flatMap((f, i) => {
       if (frozen[i] || !isAttack(f.action)) return [];
@@ -2319,7 +2378,8 @@ export class Match {
       } else if (source) source.connected = true;
       else f.connected = true;
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
-      if (!projectile && (!source || source === f)) f.contact = true;
+      const body = !projectile && (!source || source === f);
+      if (body) f.contact = true;
       // Hit reactions delete the victim's objects with ids 7–9 (op 0x04, action 0).
       if (!blocked) {
         const victim = this.fighters.indexOf(target);
@@ -2331,6 +2391,7 @@ export class Match {
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
+      const { striker } = target;
       const airborne = target.y < 0 || target.vy < 0;
       // Only the axe leaves its reaction to stance: action 227's strong
       // responses (50 → FB → 75, 4, 25–27). A chip that empties life still
@@ -2356,6 +2417,8 @@ export class Match {
           true,
         );
       }
+      target.reaction = blocked ? 12 : 8;
+      target.striker = striker || body;
       // Axe response 50 (action 110) credits only the thrower on the ground.
       const [victimPower, attackerPower] =
         projectile?.kind === 'axe' && target.action === 'hitHeavy'

@@ -136,6 +136,13 @@ export type ScriptEvent = { t: number } & (
     }
   | { op: 'stop'; self: number; other: number }
   | { op: 'color'; mode: number; fade: number }
+  | {
+      op: 'random';
+      divisor: number;
+      above: number;
+      action: number;
+      offset: number;
+    }
 );
 export interface Script {
   frames: (Pose & { t: number })[];
@@ -145,18 +152,20 @@ export interface Script {
   next: number | null;
 }
 const scripts = data.scripts as unknown as Record<string, Script>;
+// A source action, or "action+offset" for an op 0x20 branch entering mid-action.
+export type ObjectKey = number | `${number}+${number}`;
 // The victim action selected by each op 0x17 response id.
 export const RESPONSES: readonly number[] = data.responses;
 // The hit-effect action each response spawns at contact (0 = none).
 export const RESPONSE_EFFECTS: readonly number[] = data.response_effects;
-export function script(index: number) {
+export function script(index: ObjectKey) {
   const found = scripts[index];
   if (!found) throw new Error(`Source action ${index} was not exported`);
   return found;
 }
-const scriptEvents = new Map<number, Map<number, ScriptEvent[]>>();
+const scriptEvents = new Map<ObjectKey, Map<number, ScriptEvent[]>>();
 // Events that run when a scripted action or object reaches the given age.
-export function eventsAt(index: number, age: number) {
+export function eventsAt(index: ObjectKey, age: number) {
   let byTick = scriptEvents.get(index);
   if (!byTick) {
     byTick = new Map();
@@ -167,7 +176,7 @@ export function eventsAt(index: number, age: number) {
   return byTick.get(age) ?? [];
 }
 // A zero-length display waits for gameplay (landing); hold it like a long pose.
-const scriptClip = (index: number) => {
+const scriptClip = (index: ObjectKey) => {
   const { frames, loop } = script(index);
   return clip(
     frames,
@@ -175,8 +184,8 @@ const scriptClip = (index: number) => {
     frames.map((frame) => frame.duration || 1),
   );
 };
-const objectClips = new Map<number, Clip | null>();
-function objectClip(index: number) {
+const objectClips = new Map<ObjectKey, Clip | null>();
+function objectClip(index: ObjectKey) {
   if (!objectClips.has(index))
     objectClips.set(
       index,
@@ -412,10 +421,14 @@ export type ScriptedAction = keyof typeof SCRIPTED;
 export const isScripted = (action: Action): action is ScriptedAction =>
   Object.hasOwn(SCRIPTED, action);
 
-// Numbers name a spawned source object, played from its flattened timeline.
-export function animationDuration(action: AnimatedAction | number) {
-  const found =
-    typeof action === 'number' ? objectClip(action) : animations[action];
+// Object keys name a spawned source object, played from its flattened timeline.
+export const isObject = (
+  action: AnimatedAction | ObjectKey,
+): action is ObjectKey => !Object.hasOwn(animations, action);
+const clipOf = (action: AnimatedAction | ObjectKey) =>
+  isObject(action) ? objectClip(action) : animations[action];
+export function animationDuration(action: AnimatedAction | ObjectKey) {
+  const found = clipOf(action);
   return found ? found.ticks.reduce((total, ticks) => total + ticks, 0) : 0;
 }
 
@@ -437,11 +450,10 @@ export function pushboxes(action: Action, age: number): BodyBox[] {
 }
 
 export function animationFrame(
-  action: AnimatedAction | number,
+  action: AnimatedAction | ObjectKey,
   age: number,
 ): Pose {
-  const found =
-    typeof action === 'number' ? objectClip(action) : animations[action];
+  const found = clipOf(action);
   if (!found) throw new Error(`Source object ${action} has no displays`);
   const { frames, ticks, loopStart } = found;
   const duration = animationDuration(action);

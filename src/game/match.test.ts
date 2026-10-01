@@ -2045,11 +2045,13 @@ describe('prototype training rules', () => {
         ticks(match, 8, { kick: true }, { guard: blocked });
         // Kick responses 1 and 22 name 339 and 370. Its box (92, −91) ±(60, 31)
         // spans the idle body box (−1, −92) ±(37, 102) across, so the overlap
-        // centres on the body's x and the box's y. Only 339 spawns streak 348.
+        // centres on the body's x and the box's y. Only 339 spawns streak 348,
+        // whose op 0x20 chain rolls 38, 7719, 21238, 2437 from seed 0: 38 % 3
+        // mirrors, 7719 % 6 moves on to 349, 21238 % 5 mirrors, 2437 % 4 stays.
         const clip = blocked ? 370 : 339;
         const x = targetX + facing * 1.5;
         expect(match.effects.map((e) => e.clip)).toEqual(
-          blocked ? [370] : [339, 348],
+          blocked ? [370] : [339, '349+17'],
         );
         expect(hitEffects(match)).toMatchObject([
           { clip, x, y: -136.5, age: 0, facing, front: true, owner: 0 },
@@ -2064,6 +2066,29 @@ describe('prototype training rules', () => {
         expect((target.x - targetX) * facing).toBeGreaterThan(18);
       }
     }
+  });
+
+  it('rolls each streak and star branch of op 0x20 with the shared rand', () => {
+    const streaks = new Set();
+    const stars = new Set();
+    for (let seed = 0; seed < 200; seed++) {
+      const match = new Match('practice', false, seed);
+      match.fighters[0].x = 530;
+      match.fighters[1].x = 660;
+      // 345 spawns the streak at contact and small stars 351 at 4 and 14.
+      ticks(match, 8, { kick: true });
+      streaks.add(match.effects[1].clip);
+      ticks(match, 14);
+      for (const { clip } of match.effects)
+        if (typeof clip === 'number' && clip > 350 && clip < 360)
+          stars.add(clip);
+    }
+    // Three pose sets (348–350), each mirrored at offset 17; 351 falls through
+    // to 356's flight or jumps to 352, 354 or 358, each with its trail object.
+    expect(streaks).toEqual(
+      new Set([348, '348+17', 349, '349+17', 350, '350+17']),
+    );
+    expect(stars).toEqual(new Set([351, 352, 354, 358, 353, 355, 357, 359]));
   });
 
   it('centres a crouching punch effect on its box and emits none on a whiff', () => {
@@ -2712,11 +2737,15 @@ describe('prototype training rules', () => {
       // The dash box (−76 ±27) passes over the idle body (−92 ±102) to the
       // wall. The fall's box (−101 ±92) dips into it; sharing x, both face
       // right, so the push moves the jumper left a quarter of their 71-pixel
-      // overlap: off the body at the right wall, into the clamp at the left.
+      // overlap: off the body at the right wall, past the left one. There the
+      // jumper, fighter 0, pushes after its motion step, so each fall tick's
+      // clamp is pushed out again.
       expect(f.x).toBe(target.x);
       match.step({}, {});
       expect(f.action).toBe('jump');
-      expect(target.x - f.x).toBe(facing === 1 ? 26.625 : 0);
+      expect(target.x - f.x).toBe(26.625);
+      match.step({}, {});
+      expect(target.x - f.x).toBeCloseTo(facing === 1 ? 36.757 : 26.625, 3);
     },
   );
 
@@ -3435,7 +3464,7 @@ describe('prototype training rules', () => {
       for (const guarded of [false, true]) {
         const match = new Match();
         const [f, target] = match.fighters;
-        f.x = facing === 1 ? FIGHTER_MARGIN : WIDTH - FIGHTER_MARGIN;
+        f.x = facing === 1 ? FIGHTER_MARGIN : STAGE_WIDTH - FIGHTER_MARGIN;
         target.x = f.x + facing * 270;
         const targetX = target.x;
         const contacts: number[] = [];
@@ -3469,7 +3498,8 @@ describe('prototype training rules', () => {
             : ['hitHeavy', 'launchAway', 'knockdown'],
         );
         expect(
-          (f.x - (facing === 1 ? FIGHTER_MARGIN : WIDTH - FIGHTER_MARGIN)) *
+          (f.x -
+            (facing === 1 ? FIGHTER_MARGIN : STAGE_WIDTH - FIGHTER_MARGIN)) *
             facing,
         ).toBeGreaterThan(390);
         // Boxes of 5, 5, 5, 5, 7 and 8, or six chips of 1.
@@ -4007,6 +4037,35 @@ describe('prototype training rules', () => {
       expect(match.resultReady).toBe(true);
     }
   });
+
+  // 0x40fad9: a victim reeling from the striker's own kick, stopped by the
+  // wall, hands the stopped distance to the striker's transfer (+0xdf49), so
+  // the cornered striker gives up the slide and the gap ends as in the open.
+  it.each([1, -1] as const)(
+    'pushes the striker back by the slide a cornered hit or guard loses facing %i',
+    (facing) => {
+      for (const guard of [false, true]) {
+        const run = (targetX: number) => {
+          const match = new Match();
+          const [f, target] = match.fighters;
+          target.x = targetX;
+          f.x = targetX - facing * 130;
+          ticks(match, 8, { kick: true }, { guard });
+          ticks(match, 60, {}, { guard });
+          return [f.x - targetX + facing * 130, target.x - targetX];
+        };
+        const slide = facing * (guard ? 95.947 : 83.954);
+        const open = run(facing === 1 ? 900 : 700);
+        const corner = run(
+          facing === 1 ? STAGE_WIDTH - FIGHTER_MARGIN : FIGHTER_MARGIN,
+        );
+        expect(open[0]).toBeCloseTo(0, 3);
+        expect(open[1]).toBeCloseTo(slide, 3);
+        expect(corner[0]).toBeCloseTo(-slide, 3);
+        expect(corner[1]).toBeCloseTo(0, 3);
+      }
+    },
+  );
 
   it('pushes overlapping bodies apart by a quarter of their push-box overlap', () => {
     // Idle push boxes (−1, −92) ±(37, 102) at source x 200 and 240 overlap by

@@ -94,11 +94,22 @@ describe('selected core animation assets', () => {
     expect(animationDuration(370)).toBe(22);
     expect(animationFrame(370, 2).image).toBe(224);
     expect(animationFrame(370, 19).image).toBe(229);
-    // ponytail: op 0x20 at PC 5147 picks a streak branch; the export plays the
-    // first, unmirrored one.
+    // Op 0x20 at PC 5147 jumps to 348's mirrored copy at offset 17 when
+    // rand() % 3 > 1; each branch chains on to 349 and 350 the same way.
+    expect(script(348).events[0]).toMatchObject({
+      op: 'random',
+      divisor: 3,
+      above: 1,
+      action: 348,
+      offset: 17,
+    });
     expect(animationDuration(348)).toBe(18);
     expect(animationFrame(348, 17).image).toBe(192);
     expect(script(348).frames.every((frame) => !frame.flip_x)).toBe(true);
+    expect(script('348+17').frames.every((frame) => frame.flip_x)).toBe(true);
+    expect(script('348+17').events[0]).toMatchObject({ action: 349 });
+    expect(script('349+17').events[0]).toMatchObject({ action: 350 });
+    expect(animationDuration('350+17')).toBe(17);
   });
 
   it('expands DST calls and holds the victim in the recovered held pose', () => {
