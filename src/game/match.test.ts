@@ -1186,6 +1186,22 @@ describe('recovered supers', () => {
     expect(target.hp).toBe(LIFE - 20);
   });
 
+  it("hands a cornered beam victim's slide to Ryuko, and her beam follows her (0x40f8ac, 0x40f992)", () => {
+    const { match, ryuko, target } = superMatch(400);
+    target.x = STAGE_WIDTH - FIGHTER_MARGIN;
+    ryuko.x = target.x - 400;
+    match.step({ getterBeam: true });
+    while (ryuko.age < 95) match.step();
+    // Hitbox 269 (op 0x04 flag 0x21) follows Ryuko at (26, −115) and records
+    // itself as the striker, so the slides the wall stops push her back.
+    const hitbox = match.effects.find((e) => e.clip === 269);
+    expect(target.striker).toBe('object');
+    ticks(match, 40);
+    expect(target.x).toBe(STAGE_WIDTH - FIGHTER_MARGIN);
+    expect(ryuko.x).toBeLessThan(target.x - 400);
+    expect(hitbox).toMatchObject({ x: ryuko.x + 26 * 1.5, y: -115 * 1.5 });
+  });
+
   it('shouts NO SUPER without stock and gains its power, on the ground and in the air', () => {
     const { match, ryuko } = superMatch(250, 0);
     match.step({ getterBeam: true });
@@ -3621,6 +3637,7 @@ describe('prototype training rules', () => {
       owner,
       slot: 0,
       screen: false,
+      follow: null,
       box: null,
       objectBox: null,
       responses: [],
@@ -3666,6 +3683,30 @@ describe('prototype training rules', () => {
       expect(beam.objectBox).toMatchObject({ y: 1995, w: 644 });
       expect(beam.connected).toBe(true);
       expect(match.projectiles[0].hit).toBe(false);
+    });
+
+    it('re-arms an object at each display holding a box of kind bit 1 (0x41257d)', () => {
+      const match = new Match();
+      // Object 303's first box (kind 6) has hit; its second display starts
+      // at age 3, before the op that clears the box.
+      const bg = object(303, 1, {
+        x: 1500,
+        age: 2,
+        connected: true,
+        box: { x: 0, y: -5, w: 10000, h: 182, damage: 5, kind: 6 },
+      });
+      match.effects = [bg];
+      match.step();
+      expect(bg).toMatchObject({ age: 3, box: null, connected: false });
+    });
+
+    it('culls an object that leaves the world unless it follows a parent (0x4124c9)', () => {
+      const match = new Match();
+      const outside = { x: 1331 * 1.5, y: 0, facing: 1 as const };
+      const follow = { parent: outside, x: 0, y: 0 };
+      match.effects = [object(273, 0, outside), object(273, 0, { follow })];
+      match.step();
+      expect(match.effects.map((e) => e.follow)).toEqual([follow]);
     });
 
     it("enters B G's hit branch (294) when its lunge meets the other side's axe", () => {
@@ -4209,6 +4250,63 @@ describe('prototype training rules', () => {
     },
   );
 
+  it('keeps the reaction and striker through the knockdown until neutral (0x411abc)', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 440;
+    target.x = 590;
+    ticks(match, 19, { crouch: true, kick: true });
+    const seen: [string, number, string | null][] = [];
+    for (let tick = 0; tick < 300; tick++) {
+      if (seen.at(-1)?.[0] !== target.action)
+        seen.push([target.action, target.reaction, target.striker]);
+      match.step();
+    }
+    expect(seen).toEqual([
+      ['sweep', 8, 'body'],
+      ['knockdown', 8, 'body'],
+      ['getUp', 8, 'body'],
+      ['idle', 0, null],
+    ]);
+  });
+
+  // Punch 3's slam lands through its landing handler into the bounce (124),
+  // keeping +0x15e, so a cornered bounce and its slide (147) still hand
+  // their distance on.
+  it.each([1, -1] as const)(
+    'pushes the striker back by a cornered slam bounce facing %i',
+    (facing) => {
+      const run = (victimX: number) => {
+        const match = new Match();
+        const [f, victim] = match.fighters;
+        Object.assign(victim, { x: victimX, facing: -facing });
+        Object.assign(f, {
+          x: victimX - facing * 120,
+          facing,
+          action: 'punch3',
+          age: ATTACKS.punch3.strikes[0].from - 1,
+        });
+        let start: number[] = [];
+        for (let tick = 0; tick < 300 && victim.action !== 'getUp'; tick++) {
+          match.step();
+          // Its motion starts at age 10, once the bodies have pushed apart.
+          if (victim.action === 'slamBounce' && victim.age === 9)
+            start = [f.x + f.transfer, victim.x];
+        }
+        expect(victim.action).toBe('getUp');
+        return [f.x - start[0], victim.x - start[1]];
+      };
+      const open = run(facing === 1 ? 900 : 1000);
+      const corner = run(
+        facing === 1 ? STAGE_WIDTH - FIGHTER_MARGIN : FIGHTER_MARGIN,
+      );
+      expect(open[0]).toBe(0);
+      expect(open[1] * facing).toBeGreaterThan(0);
+      expect(corner[1]).toBe(0);
+      expect(corner[0]).toBeCloseTo(-open[1], 3);
+    },
+  );
+
   it.each([1, -1] as const)(
     'pushes a cornered thrower out as its spins swing the victim into the wall facing %i',
     (facing) => {
@@ -4226,7 +4324,7 @@ describe('prototype training rules', () => {
       expect(victim).toMatchObject({
         action: 'dstToss',
         reaction: 0xa,
-        striker: true,
+        striker: 'body',
       });
       expect((thrower.x - wall) * facing).toBe(90);
     },
@@ -4242,7 +4340,7 @@ describe('prototype training rules', () => {
     expect(match.cameraX).toBe(STAGE_WIDTH - WIDTH);
     // The camera moves halfway to the pair's aim of 110, to 375, so the left
     // wall is at source 425 and stops the reeling victim 25 pixels.
-    Object.assign(victim, { x: 600, facing: 1, reaction: 8, striker: true });
+    Object.assign(victim, { x: 600, facing: 1, reaction: 8, striker: 'body' });
     Object.assign(striker, { x: 690, facing: -1 });
     match.step();
     expect(match.cameraX).toBe(375 * 1.5);

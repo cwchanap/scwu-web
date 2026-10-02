@@ -646,6 +646,16 @@ function struck(
 // 0x40f010 skips a victim by the box's kind: 0x20 an airborne one, 8 one in a
 // guard reaction (+0x15e & 0xc is 0xc) and 0x80 one in a hit reaction or hold
 // (8). Free and attacking fighters (0 and 4) can be grabbed.
+// Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
+// (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
+const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
+// A script step that starts a display first re-arms an object holding an
+// attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
+function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
+  const kinds = (actor.box?.kind ?? 0) | (actor.objectBox?.kind ?? 0);
+  if (kinds & 2 && age > 0 && script(index).frames.some((f) => f.t === age))
+    actor.connected = false;
+}
 function grabbable(box: ScriptBox, target: Fighter) {
   if (box.kind & 0x20 && (target.y < 0 || target.vy !== 0)) return false;
   if (blocks.has(target.action)) return !(box.kind & 8);
@@ -755,11 +765,12 @@ export interface Fighter {
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
   jumpVariable: number;
-  // Reaction bits 2–3 of +0x15e: 8 after a hit, 12 after a guard (0x40f7a8,
-  // 0x40f6a2), until an action change the contact didn't cause. `striker`:
-  // the opponent's own body dealt one of them (+0xdefd, 0x40f8a4).
+  // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
+  // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
+  // fighter returns to neutral. `striker` (+0xdefd): the opponent's own box
+  // ('body', 0x40f8a4) or an object following it ('object', 0x40f8ac).
   reaction: number;
-  striker: boolean;
+  striker: 'body' | 'object' | null;
   // Distance the walls stopped this tick, and player +0xdf49: x the next
   // motion step adds (0x40fa09).
   stopped: number;
@@ -786,6 +797,8 @@ export interface Projectile {
   // Replaying a display through the freeze, without motion or box.
   held?: boolean;
 }
+// What spawns an object: a fighter, a projectile or another object.
+type Spawner = { x: number; y: number; facing: -1 | 1; screen?: boolean };
 // Spawned objects, positioned like characters by the renderer. A numeric clip
 // is a source object that runs its flattened timeline: spawns, motion, boxes.
 export interface Effect {
@@ -804,6 +817,9 @@ export interface Effect {
   slot: number;
   // Op 0x04 flag 0x40: viewport coordinates instead of the stage.
   screen: boolean;
+  // Op 0x04 flag 0x20 (+0x28 bit 0x20000000): the parent it keeps to, at the
+  // op's offset (+0x12d/+0x12f).
+  follow: { parent: Spawner; x: number; y: number } | null;
   box: ScriptBox | null;
   objectBox: ScriptBox | null;
   responses: number[];
@@ -825,6 +841,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   owner: 0,
   slot: 0,
   screen: false,
+  follow: null,
   box: null,
   objectBox: null,
   responses: [],
@@ -866,7 +883,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   contact: false,
   jumpVariable: 0,
   reaction: 0,
-  striker: false,
+  striker: null,
   stopped: 0,
   transfer: 0,
 });
@@ -1080,8 +1097,14 @@ export class Match {
     f.age = 0;
     f.connected = false;
     f.contact = false;
-    f.reaction = 0;
-    f.striker = false;
+    // A script ending in op 0x00 returns to neutral (0x411a80), which clears
+    // bits 4 and 8, on the ground 1 and 2 as well, and the striker
+    // (0x411abc–0x411b06). Air reactions land straight into idle, as landing
+    // without a handler clears them too (0x4124c3).
+    if (neutralActions.has(action)) {
+      f.reaction &= f.y < 0 ? ~0xc : ~0xf;
+      f.striker = null;
+    }
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
     f.nextJump = false;
@@ -1227,7 +1250,7 @@ export class Match {
       this.action(target, held[hold]);
       // The grab box deals nothing, so 0x40f7a8 sets no reaction bits, but
       // 0x40f8a4 still records the thrower as the victim's striker.
-      target.striker = true;
+      target.striker = 'body';
       // A scripted hold (EVIL DST's 222) applies its response at once.
       this.fireEvents(attacker);
     }
@@ -1253,9 +1276,8 @@ export class Match {
     }
     if (attacker.age === toss.tick) {
       // Response 31 (op 0x14) places the victim at (14, −96), then action 129.
-      const { striker } = target;
       this.action(target, 'dstToss');
-      Object.assign(target, { reaction: 0xa, striker });
+      markHeld(target);
       placeX(target, attacker.x + attacker.facing * 14 * 1.5);
       target.y = -96 * 1.5;
       target.vy = 0;
@@ -1267,13 +1289,13 @@ export class Match {
       addPower(target, 5);
       return;
     }
-    const hold = dstHold(attacker.age);
-    if (!hold?.place) return;
-    target.reaction = 0xa;
-    placeX(target, attacker.x + attacker.facing * hold.x * 1.5);
+    const spin = dstHold(attacker.age);
+    if (!spin?.place) return;
+    markHeld(target);
+    placeX(target, attacker.x + attacker.facing * spin.x * 1.5);
     target.y = 0;
     target.vy = 0;
-    target.facing = hold.same === (attacker.facing === 1) ? 1 : -1;
+    target.facing = spin.same === (attacker.facing === 1) ? 1 : -1;
   }
 
   private spawnEffect(
@@ -1367,6 +1389,7 @@ export class Match {
     if (!isScripted(f.action) || f.fired === f.age) return;
     f.fired = f.age;
     const owner = this.fighters.indexOf(f);
+    rearm(f, SCRIPTED[f.action], f.age);
     for (const event of eventsAt(SCRIPTED[f.action], f.age))
       this.runEvent(f, owner, event);
   }
@@ -1374,6 +1397,7 @@ export class Match {
   private fireEffect(e: Effect) {
     const { clip } = e;
     if (!isObject(clip)) return;
+    rearm(e, clip, e.age);
     for (const event of eventsAt(clip, e.age)) {
       this.runEvent(e, e.owner, event);
       // An op 0x20 jump has run the branch's own events instead.
@@ -1404,12 +1428,10 @@ export class Match {
               }
             : null;
         // Slot 1 boxes sit 2000 pixels down: they meet objects, not fighters.
-        if (event.slot !== 0) {
-          actor.objectBox = box;
-          break;
-        }
-        actor.box = box;
-        actor.connected = false;
+        if (event.slot !== 0) actor.objectBox = box;
+        else actor.box = box;
+        // Op 0x18 re-arms a player for a box of kind bit 1 (0x412d49).
+        if (box && box.kind & 2 && !('clip' in actor)) actor.connected = false;
         break;
       }
       case 'responses':
@@ -1440,9 +1462,7 @@ export class Match {
         if (!reaction || !this.catchHeld(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
-        const { striker } = other;
         this.action(other, reaction.action, true);
-        Object.assign(other, { reaction: 0xa, striker });
         other.hitStop += reaction.stop;
         self.hitStop += reaction.stop;
         const [victimPower, attackerPower] = REACTION_POWER[
@@ -1483,17 +1503,11 @@ export class Match {
     }
   }
 
-  // Ops 0x07/0x14 move the opponent this super holds or has just tossed,
-  // marking it reeling and held (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a)
-  // while its striker stays recorded.
+  // Ops 0x07/0x14 move the opponent this super holds or has just tossed.
   private catchHeld(target: Fighter) {
-    if (target.action === 'dstToss') {
-      const { striker } = target;
-      this.action(target, 'superHeld');
-      target.striker = striker;
-    }
+    if (target.action === 'dstToss') this.action(target, 'superHeld');
     if (target.action !== 'superHeld') return false;
-    target.reaction = 0xa;
+    markHeld(target);
     return true;
   }
 
@@ -1508,7 +1522,7 @@ export class Match {
   }
 
   private spawnObject(
-    parent: { x: number; y: number; facing: -1 | 1; screen?: boolean },
+    parent: Spawner,
     owner: number,
     event: {
       flags: number;
@@ -1544,6 +1558,7 @@ export class Match {
       owner,
       slot: event.slot,
       screen,
+      follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
     });
     // A script without displays never advances, so its events all fire at t=0
     // (anime beam 296 only spawns 297 and 299); nothing is left to draw.
@@ -1552,15 +1567,17 @@ export class Match {
   }
 
   // A player's motion step (0x40fa09–0x40fc9f) adds its transfer (+0xdf49),
-  // then clamps it to the walls. Reeling from the opponent's own strike and
-  // not KO'd, it hands the distance the walls stopped to that opponent's
-  // transfer, unless the opponent is reeling from a hit itself; guarding, it
-  // still takes it. Fighter 1 moves it this tick, fighter 0 the next.
+  // then clamps it to the walls. Reeling from a strike and not KO'd, it hands
+  // the distance the walls stopped to the striker's owner (0x40fb08), unless
+  // the striker is reeling from a hit itself (0x40faf0); guarding, it still
+  // takes it. An object striker's bits stay clear, so its owner always does.
+  // Fighter 1 moves it this tick, fighter 0 the next.
   private settle(f: Fighter) {
     const other = this.fighters[1 - this.fighters.indexOf(f)];
     placeX(f, f.x + f.transfer);
     f.transfer = 0;
-    if (f.hp > 0 && f.reaction & 8 && f.striker && (other.reaction & 12) !== 8)
+    const reeling = f.striker === 'body' && (other.reaction & 12) === 8;
+    if (f.hp > 0 && f.reaction & 8 && f.striker && !reeling)
       other.transfer += f.stopped;
     f.stopped = 0;
   }
@@ -1666,9 +1683,9 @@ export class Match {
   // having hit (0x40f31c), which 0x40f010 checks only before the striker's
   // pass: axes break into 230 without damage, stop or effect, even held by
   // the freeze; B G's lunge enters 294; a beam, which sets no handler, waits
-  // for its next box.
-  // ponytail: 294's ops (0x07, 0x14) move the object it caught (+0xdef9);
-  // here the axe flies on and they find no one to hold.
+  // for its next box. The lunge records the axe as caught (+0xdef9,
+  // 0x40f2e0), but only grab-entered actions and Air Drill's hit branch hold
+  // or toss with ops 0x07/0x14, so the axe flies on.
   private objectHits(frozen: boolean[]) {
     type At = { x: number; y: number; facing: -1 | 1; owner: number };
     const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>][] = [];
@@ -2188,8 +2205,14 @@ export class Match {
       e.y += e.vy;
       if (++e.age < animationDuration(e.clip)) this.fireEffect(e);
     }
+    // A script that runs out reaches the next action's op 0x00, which
+    // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
+    // leaves the world unless it follows a parent.
     this.effects = this.effects.filter(
-      (e) => e.age < animationDuration(e.clip),
+      (e) =>
+        e.age < animationDuration(e.clip) &&
+        (e.follow !== null ||
+          inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e)),
     );
     if (this.winner) {
       this.endingTicks++;
@@ -2321,6 +2344,15 @@ export class Match {
       }
     }
     move(1);
+    // 0x40f992–0x40f9d9: after its own motion, an object following its
+    // parent takes the parent's position plus its offset, mirrored by the
+    // parent's facing; the fighters have moved before it.
+    for (const e of this.effects)
+      if (e.follow) {
+        const { parent, x, y } = e.follow;
+        e.x = parent.x + parent.facing * x * 1.5;
+        e.y = parent.y + y * 1.5;
+      }
     this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
     this.projectiles = this.projectiles.filter((p) => {
       p.age++;
@@ -2553,7 +2585,6 @@ export class Match {
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
-      const { striker } = target;
       const airborne = target.y < 0 || target.vy < 0;
       // Only the axe leaves its reaction to stance: action 227's strong
       // responses (50 → FB → 75, 4, 25–27). A chip that empties life still
@@ -2579,8 +2610,14 @@ export class Match {
           true,
         );
       }
-      target.reaction = blocked ? 12 : 8;
-      target.striker = striker || body;
+      target.reaction = blocked
+        ? target.reaction | 0xc
+        : (target.reaction & ~4) | 8;
+      // 0x40f8a4 records a fighter striking with its own box, 0x40f8ac an
+      // object following its parent; other objects leave the striker as is.
+      if (body) target.striker = 'body';
+      else if (source && 'clip' in source && source.follow)
+        target.striker = 'object';
       // Axe response 50 (action 110) credits only the thrower on the ground.
       const [victimPower, attackerPower] =
         projectile?.kind === 'axe' && target.action === 'hitHeavy'
