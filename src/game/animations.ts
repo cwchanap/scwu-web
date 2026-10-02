@@ -30,6 +30,14 @@ export type TrailSpec = Color & {
 // Op 0x0e's shake for one axis: 0x40c9e0's type, amplitude in source pixels
 // and length in drawn frames.
 export type Quake = { type: number; amplitude: number; frames: number };
+// Op 0x0e's colour fader: type, target r, g, b and fade, length in ticks, and
+// flags picking the faders it starts (1 the owner, 2 the caught opponent, 4
+// the screen's, 8 a second global).
+export type FaderSpec = Omit<Color, 'mode'> & {
+  type: number;
+  ticks: number;
+  flags: number;
+};
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
 // state an earlier record of its clip set, `events` the op 0x0e and 0x25
@@ -40,7 +48,7 @@ export type Pose = Frame & {
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  events?: Extract<SourceEvent, { op: 'trail' | 'shake' }>[];
+  events?: Extract<SourceEvent, { op: 'trail' | 'screen' }>[];
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
@@ -172,7 +180,12 @@ export type SourceEvent =
   | { op: 'freeze'; add: number }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
-  | { op: 'shake'; x: Quake | null; y: Quake | null }
+  | {
+      op: 'screen';
+      fader: FaderSpec | null;
+      x: Quake | null;
+      y: Quake | null;
+    }
   | {
       op: 'random';
       divisor: number;

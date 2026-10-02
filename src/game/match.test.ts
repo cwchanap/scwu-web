@@ -1500,6 +1500,27 @@ describe('recovered supers', () => {
     expect(target.action).not.toBe('superHeld');
   });
 
+  it("fades Musashi Hit's Ryuko to green and back through her fader", () => {
+    const { match, ryuko } = superMatch(130);
+    match.step({ musashi: true });
+    until(match, () => ryuko.action === 'musashiHit' && ryuko.age === 513);
+    // PC 3849: type 2, toward g +30 over 30 ticks from her colour then (0);
+    // PC 3850's op 0x23 keeps only its additive mode under the fader. The
+    // tick ends at 29 ticks left: g = 30 × (100 − 96) / 100.
+    expect(ryuko.fader).toMatchObject({ type: 2, left: 29, ticks: 30 });
+    expect(ryuko.color).toEqual({ mode: 2, r: 0, g: 1, b: 0, fade: 0 });
+    ticks(match, 29);
+    // The last write, at 1 tick left, stays: 30 × 97 / 100.
+    expect(ryuko.color).toEqual({ mode: 2, r: 0, g: 29, b: 0, fade: 0 });
+    match.step();
+    // PC 3857: type 1 back to 0 over 10 ticks from g 29; PC 3861 resets the
+    // mode first, and the fader overwrites the offsets: 29 × 90 / 100.
+    expect(ryuko).toMatchObject({ age: 543, fader: { type: 1, left: 9 } });
+    expect(ryuko.color).toEqual({ mode: 0, r: 0, g: 26, b: 0, fade: 0 });
+    ticks(match, 9);
+    expect(ryuko.color.g).toBe(2);
+  });
+
   it('misses Musashi out of reach and still spends the stock', () => {
     const { match, ryuko, target } = superMatch(300);
     match.step({ musashi: true });

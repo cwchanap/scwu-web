@@ -276,6 +276,15 @@ export class TrainingScene extends Phaser.Scene {
     return tinted;
   }
 
+  // A running type-2 fader shows its start colour on odd drawn frames
+  // (0x40cb72; 0x4456fc counts them).
+  private faded(color: Color, owner: number): Color {
+    const { fader } = this.match.fighters[owner];
+    return fader?.type === 2 && fader.left && this.frame & 1
+      ? { ...color, ...fader.start }
+      : color;
+  }
+
   // Blitters 0x40c840 by op 0x23 mode: 1 averages with the screen, 2 adds,
   // 4 fades by fade/32.
   private paint(sprite: Phaser.GameObjects.Image, pose: Pose, color: Color) {
@@ -360,7 +369,6 @@ export class TrainingScene extends Phaser.Scene {
         );
       }
       this.quake = this.match.quake;
-      this.frame++;
       // World objects draw at their position less the scroll and the shake
       // (0x40d82f); viewport objects and the HUD do not move.
       this.cameras.main.setScroll(
@@ -385,7 +393,7 @@ export class TrainingScene extends Phaser.Scene {
             : f.action === 'superHeld'
               ? ((f.held?.flags ?? 0) & 1) !== 0
               : undefined;
-        this.paint(sprite, pose, f.color)
+        this.paint(sprite, pose, this.faded(f.color, i))
           .setDepth(behind === undefined ? 2 : behind ? 1 : 3)
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
@@ -432,7 +440,7 @@ export class TrainingScene extends Phaser.Scene {
           effect.x,
           effect.screen ? effect.y : GROUND + effect.y,
           effect.facing,
-          pose.color ?? effect.color,
+          pose.color ?? this.faded(effect.color, effect.owner),
         );
       });
       // Each object draws its afterimages, oldest first, just before itself
@@ -450,7 +458,11 @@ export class TrainingScene extends Phaser.Scene {
             ...sample,
             depth: depth - 0.1,
             screen: object?.screen ?? false,
-            color: afterimageColor(trail, skipped + i, actor.color),
+            color: afterimageColor(
+              trail,
+              skipped + i,
+              this.faded(actor.color, object?.owner ?? index),
+            ),
           }));
         },
       );
@@ -469,6 +481,7 @@ export class TrainingScene extends Phaser.Scene {
           );
         },
       );
+      this.frame++;
       this.updateHud?.(this.match);
       this.report();
     } catch (error) {

@@ -72,11 +72,14 @@ def decode_event(record):
         return color_state(record)
     if op == 0x25:  # afterimage (0x413a9a): r[3] images every r[4] + 1 ticks; zero in either turns it off
         return trail_state(record)
-    if op == 0x0e:  # screen effects (0x4132fa): r[9:12] and r[12:15] shake x and y (type, amplitude, frames)
-        def axis(i):
+    if op == 0x0e:  # screen effects (0x4132fa): a colour fader, then the x and y shake
+        def axis(i):  # r[9:12], r[12:15]: type, amplitude, frames
             return dict(type=record[i], amplitude=record[i + 1], frames=record[i + 2]) if record[i] else None
+        # r[1] type, r[2:6] target r, g, b, fade, r[6:8] ticks; r[8] picks the faders.
+        fader = dict(type=record[1], r=s8(record, 2), g=s8(record, 3), b=s8(record, 4), fade=s8(record, 5),
+                     ticks=u16(record, 6), flags=record[8]) if record[1] and record[8] else None
         x, y = axis(9), axis(12)
-        return dict(op="shake", x=x, y=y) if x or y else None
+        return dict(op="screen", fader=fader, x=x, y=y) if fader or x or y else None
     return None
 
 

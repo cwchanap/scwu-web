@@ -789,6 +789,7 @@ export interface Fighter {
   color: Color;
   trail: Trail | null;
   entered: Pose | null;
+  fader: Fader | null;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
@@ -936,6 +937,28 @@ export function stepShake(
   else if (type === 4 && amplitude) axis.offset = random() % amplitude;
   if (frame & 1) axis.offset = -axis.offset;
 }
+// Op 0x0e's fader for one player (0x4dfd93 + player × 0xe03f): 0x40ca90
+// writes r, g, b and fade over the colour of every object of that player
+// while `left` runs. Type 1 blends from `start` toward the target as `left`
+// falls; type 2 also shows `start` on odd drawn frames (scene.ts).
+export interface Fader {
+  type: number;
+  start: Omit<Color, 'mode'>;
+  target: Omit<Color, 'mode'>;
+  left: number;
+  ticks: number;
+}
+export function faderColor({ start, target, left, ticks }: Fader) {
+  const p = Math.trunc((left * 100) / ticks);
+  const mix = (to: number, from: number) =>
+    Math.trunc((to * (100 - p) + from * p) / 100);
+  return {
+    r: mix(target.r, start.r),
+    g: mix(target.g, start.g),
+    b: mix(target.b, start.b),
+    fade: mix(target.fade, start.fade),
+  };
+}
 // The display a fighter shows.
 export function fighterPose(f: Fighter): Pose {
   if (f.action === 'superHeld' && f.held?.pose)
@@ -996,6 +1019,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   color: NORMAL_COLOR,
   trail: null,
   entered: null,
+  fader: null,
   held: null,
   contact: false,
   jumpVariable: 0,
@@ -1614,8 +1638,22 @@ export class Match {
       case 'trail':
         actor.trail = startTrail(event);
         break;
-      case 'shake':
-        // Op 0x0e r[9:15] (0x41348b): each axis it names restarts.
+      case 'screen':
+        // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
+        // actor's colour. ponytail: flag 2 (the caught opponent's), 4 and 8
+        // (global faders; the round intro's fades to 0 from 0) are left out.
+        if (event.fader && event.fader.flags & 1) {
+          const { type, r, g, b, fade, ticks } = event.fader;
+          const { color } = actor;
+          self.fader = {
+            type,
+            start: { r: color.r, g: color.g, b: color.b, fade: color.fade },
+            target: { r, g, b, fade },
+            left: ticks,
+            ticks,
+          };
+        }
+        // r[9:15] (0x41348b): each shake axis it names restarts.
         this.quake = {
           x: event.x ? { ...event.x } : this.quake.x,
           y: event.y ? { ...event.y } : this.quake.y,
@@ -2360,6 +2398,18 @@ export class Match {
       if (pose === f.entered) return;
       f.entered = pose;
       for (const event of pose.events ?? []) this.runEvent(f, index, event);
+    });
+    // The tick ends counting the faders down (0x404d97); each draw then
+    // writes a running one over the colour of its player's objects.
+    this.fighters.forEach((f, owner) => {
+      const { fader } = f;
+      // Type 3 (0x40cacf) blends by rand(); no Ryuko record uses it.
+      if (!fader?.left || !--fader.left || fader.type > 2) return;
+      const blend = faderColor(fader);
+      // ponytail: a clip effect's own frame colour still wins; no Ryuko
+      // fader runs while one is out.
+      for (const actor of [f, ...this.effects.filter((e) => e.owner === owner)])
+        actor.color = { ...actor.color, ...blend };
     });
     // Objects run by priority each tick (0x404d4c). KGT action 58, the stage
     // layout, counts global 6 down (PCs 366–371) at 0x65 (0x406890's callers),
