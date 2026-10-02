@@ -542,6 +542,36 @@ describe('Daisetsuzan Oroshi command throw', () => {
   });
 });
 
+describe('nested smoke', () => {
+  it("plays the DST dash smoke's own puffs (object 396, PCs 5705–5710)", () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    match.step({ dst: true });
+    const dash = () => match.effects.find((e) => e.clip === 'dashSmoke');
+    while (!dash()) match.step();
+    const smoke = dash()!;
+    const puffs: { age: number; dx: number; front: boolean }[] = [];
+    const seen = new Set();
+    while (smoke.age < 25) {
+      match.step();
+      for (const e of match.effects)
+        if (e.clip === 394 && !seen.has(e)) {
+          seen.add(e);
+          puffs.push({ age: smoke.age, dx: e.x - smoke.x, front: e.front });
+        }
+    }
+    // Flag 4 draws each behind its spawner, 20, 30 and 40 source pixels on.
+    expect(puffs).toEqual(
+      [20, 30, 40].map((x, i) => ({
+        age: 10 + 5 * i,
+        dx: f.facing * x * 1.5,
+        front: false,
+      })),
+    );
+  });
+});
+
 describe('practice partner', () => {
   // Without an explicit opponent input, practice mode asks the partner.
   function partner(behavior: DummyBehavior, gap = 120) {
@@ -3944,6 +3974,7 @@ describe('prototype training rules', () => {
       connected: false,
       color: NORMAL_COLOR,
       trail: null,
+      entered: null,
       ...fields,
     });
     const axe = (owner: number, x: number) => ({

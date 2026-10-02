@@ -866,6 +866,8 @@ export interface Effect {
   connected: boolean;
   color: Color;
   trail: Trail | null;
+  // A clip effect's display whose events last ran.
+  entered: Pose | null;
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -993,6 +995,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   connected: false,
   color: NORMAL_COLOR,
   trail: null,
+  entered: null,
   ...fields,
 });
 const fighter = (x: number, facing: -1 | 1): Fighter => ({
@@ -1554,7 +1557,16 @@ export class Match {
 
   private fireEffect(e: Effect) {
     const { clip } = e;
-    if (!isObject(clip)) return;
+    if (!isObject(clip)) {
+      // A clip effect runs the spawns its displays carry: object 396 puffs
+      // smoke 394 behind itself at ages 10, 15 and 20 (PCs 5705–5710).
+      const pose = animationFrame(clip, e.age);
+      if (pose === e.entered) return;
+      e.entered = pose;
+      for (const event of pose.events ?? [])
+        if (event.op === 'spawn') this.runEvent(e, e.owner, event);
+      return;
+    }
     rearm(e, clip, e.age);
     for (const event of eventsAt(clip, e.age)) {
       this.runEvent(e, e.owner, event);
@@ -2422,7 +2434,11 @@ export class Match {
       const pose = fighterPose(f);
       if (pose === f.entered) return;
       f.entered = pose;
-      for (const event of pose.events ?? []) this.runEvent(f, index, event);
+      // ponytail: fighters' clip spawns (landing, hit and guard dust, the
+      // air dash's 390/391, the KO's 59, reactions' deletes) stay off; the
+      // DST, throw, missile and axe spawns are played from their own rules.
+      for (const event of pose.events ?? [])
+        if (event.op !== 'spawn') this.runEvent(f, index, event);
     });
     // The tick ends counting the faders down (0x404d97); each draw then
     // writes a running one over the colour of its player's objects.

@@ -40,15 +40,18 @@ export type FaderSpec = Omit<Color, 'mode'> & {
 };
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
-// state an earlier record of its clip set, `events` the op 0x0e and 0x25
-// records run just before it.
+// state an earlier record of its clip set, `events` the op 0x04, 0x0e,
+// 0x1f (player variables) and 0x25 records run just before it.
 export type Pose = Frame & {
   width: number;
   height: number;
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  events?: Extract<SourceEvent, { op: 'trail' | 'screen' | 'variable' }>[];
+  events?: Extract<
+    SourceEvent,
+    { op: 'spawn' | 'trail' | 'screen' | 'variable' }
+  >[];
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;

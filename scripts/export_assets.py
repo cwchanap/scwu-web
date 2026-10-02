@@ -262,9 +262,9 @@ def main():
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] in (0x0e, 0x1f, 0x25) and pc >= action.start + offset:
+            elif p.records[pc][0] in (0x04, 0x0e, 0x1f, 0x25) and pc >= action.start + offset:
                 event = decode_event(p.records[pc])
-                if event and event["op"] in ("screen", "trail", "variable"):
+                if event and event["op"] in ("spawn", "screen", "trail", "variable"):
                     events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
