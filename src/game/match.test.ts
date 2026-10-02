@@ -4562,9 +4562,11 @@ describe('recovered CPU', () => {
     expect(never.cpu.action).toBe('hit');
   });
 
-  it('does not roll while the CPU attacks or reacts', () => {
+  it('does not roll while the CPU attacks', () => {
     const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
-    Object.assign(cpu, { action: 'noSuper', age: 0 });
+    // A command entered free marks it attacking (+0x15e bit 4, 0x411a41).
+    match.step({}, { kick: true });
+    expect([cpu.action, cpu.reaction]).toEqual(['kick', 4]);
     punch(match, ryuko);
     expect(cpu.action).toBe('hit');
   });
@@ -4573,31 +4575,40 @@ describe('recovered CPU', () => {
     for (const facing of [-1, 1] as const) {
       const { match, ryuko, cpu } = vsCpu(new CpuVM([], 0));
       // Facing 1 turns the CPU away from Ryuko: 0x40f449 ignores facing.
-      Object.assign(cpu, { action: 'block', age: 0, facing });
+      Object.assign(cpu, { action: 'block', age: 0, facing, reaction: 0xc });
       punch(match, ryuko);
       expect(cpu.action).toBe('block');
     }
   });
 
-  it('rolls in the air only where a player could start an air guard', () => {
-    const struck = (action: 'doubleJump' | 'hitUpJump', age: number) => {
+  it('rolls in the air only while free (0x40f3c2)', () => {
+    // Ryuko's air punch meets the CPU after its inputs and the wait.
+    const struck = (inputs: Input[], until: (cpu: Fighter) => boolean) => {
       const { match, ryuko, cpu } = vsCpu(new CpuVM([], 100));
-      const airborne = { y: -60, vy: 0, gravity: 0 };
-      Object.assign(cpu, { action, age, ...airborne });
+      for (const input of inputs) match.step({}, input);
+      while (!until(cpu)) match.step({}, {});
+      const { x, y, vy, gravity } = cpu;
       Object.assign(ryuko, {
         action: 'airPunch',
         age: ATTACKS.airPunch.strikes[0].from - 1,
-        ...airborne,
+        ...{ x: x - 120, y, vy, gravity },
       });
       match.step();
       return cpu.action;
     };
-    // move() ignores guard input for a double jump's first three ticks and
-    // the Hit Up chase jump's first eight.
-    expect(struck('doubleJump', 0)).toBe('airHitHeavy');
-    expect(struck('doubleJump', 5)).toBe('airBlockHeavy');
-    expect(struck('hitUpJump', 2)).toBe('airHitHeavy');
-    expect(struck('hitUpJump', 10)).toBe('airBlockHeavy');
+    const jumped = (age: number) => (cpu: Fighter) =>
+      cpu.action === 'jump' && cpu.age === age;
+    const jump: Input[] = [{ jump: true }, ...Array<Input>(14).fill({})];
+    // The jump is free from takeoff (the neutral handler, 0x410dc0).
+    expect(struck([{ jump: true }], (cpu) => cpu.age === 3)).toBe('blockStop');
+    expect(struck([{ jump: true }], jumped(6))).toBe('airBlockHeavy');
+    // A double jump is a command until it lands.
+    const double = [...jump, { jump: true }];
+    expect(struck(double, (cpu) => cpu.age === 2)).toBe('airHitHeavy');
+    expect(struck(double, (cpu) => cpu.age === 30)).toBe('airHitHeavy');
+    // An air attack falls through op 0x0a into action 7, keeping bit 4.
+    const fall = (cpu: Fighter) => cpu.action === 'jump' && cpu.reaction === 4;
+    expect(struck([...jump, { punch: true }], fall)).toBe('airHitHeavy');
   });
 
   it('rolls only when a hit lands', () => {

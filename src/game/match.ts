@@ -649,6 +649,15 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
+// A command entered free and a landing handler mark a player acting
+// (+0x15e & ~8 | 4, 0x411a41 and 0x4118f3); a cancel keeps the bits.
+const markActing = (f: Fighter) => (f.reaction = (f.reaction & ~8) | 4);
+// Returning to neutral (0x411a80) clears bits 4 and 8, on the ground 1 and 2
+// as well, and the striker (0x411abc–0x411b06).
+function toNeutral(f: Fighter) {
+  f.reaction &= f.y < 0 ? ~0xc : ~0xf;
+  f.striker = null;
+}
 // A script step that starts a display first re-arms an object holding an
 // attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
 function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
@@ -688,9 +697,10 @@ const blocks = new Set<Action>([
   'airTimeStopGuard',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
-// Where move() lets a fighter start guarding: the authored stand-in for the
-// engine's object flags +0x15e & 0xc, under which a CPU victim rolls a guard.
-// Finished actions become idle or jump in move() before contacts are checked.
+// What the free state enters through the neutral handler (0x410dc0, actions
+// 1–7 and 18–27) once a script ends in op 0x00, plus the authored guard poses.
+// The fall is left out: air attacks, air dashes and supers reach it through
+// op 0x0a, which keeps the bits, so only an air reaction's end clears them.
 const neutralActions = new Set<Action>([
   'idle',
   'walk',
@@ -699,12 +709,12 @@ const neutralActions = new Set<Action>([
   'crouchTurn',
   'crouch',
   'crouchEnter',
-  'jump',
+  'stand',
+  'takeoff',
+  'guard',
+  'crouchGuard',
+  'airGuard',
 ]);
-const neutral = (f: Fighter) =>
-  neutralActions.has(f.action) ||
-  (f.action === 'doubleJump' && f.age >= 3) ||
-  (f.action === 'hitUpJump' && f.age >= 8);
 const reactions = new Set<Action>([
   'hit',
   'hitHeavy',
@@ -1097,14 +1107,9 @@ export class Match {
     f.age = 0;
     f.connected = false;
     f.contact = false;
-    // A script ending in op 0x00 returns to neutral (0x411a80), which clears
-    // bits 4 and 8, on the ground 1 and 2 as well, and the striker
-    // (0x411abc–0x411b06). Air reactions land straight into idle, as landing
-    // without a handler clears them too (0x4124c3).
-    if (neutralActions.has(action)) {
-      f.reaction &= f.y < 0 ? ~0xc : ~0xf;
-      f.striker = null;
-    }
+    // Air reactions land straight into idle, as landing without a handler
+    // clears the bits too (0x4124c3).
+    if (neutralActions.has(action)) toNeutral(f);
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
     f.nextJump = false;
@@ -1597,6 +1602,7 @@ export class Match {
       f.vx = f.vy = 0;
       f.doubleJumped = f.airDashed = false;
       f.jumpVariable = 0;
+      markActing(f);
       this.action(f, 'land');
       return true;
     }
@@ -1746,14 +1752,15 @@ export class Match {
     return this.cpu.input(opponent, player);
   }
 
-  // 0x40f3a2: a CPU victim ignores its input. In a neutral state it guards on
-  // rand % 100 < level; in a guard reaction it keeps guarding, whichever way
-  // it faces (0x40f449).
+  // 0x40f3a2: a CPU victim ignores its input. Free (+0x15e & 0xc is 0) it
+  // guards on rand % 100 < level (0x40f3c2); in a guard reaction (0xc) it
+  // keeps guarding, whichever way it faces (0x40f449). Ryuko's +0x7cb6 bit 2
+  // lets it guard in the air (0x40f475).
   private guarding(target: Fighter, source: { facing: number }) {
-    if (this.cpuDriven && target === this.fighters[1])
-      return (
-        guards.has(target.action) || (neutral(target) && this.cpu.guards())
-      );
+    if (this.cpuDriven && target === this.fighters[1]) {
+      const bits = target.reaction & 0xc;
+      return bits === 0xc || (bits === 0 && this.cpu.guards());
+    }
     return guards.has(target.action) && target.facing !== source.facing;
   }
 
@@ -1944,6 +1951,7 @@ export class Match {
         // Punch 3's landing handlers (slot 1, PCs 2433/2439) continue it.
         else if (f.action === 'punch3') return;
         else {
+          markActing(f);
           this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
           return;
         }
@@ -2084,6 +2092,7 @@ export class Match {
         f.action === 'airKick')
     ) {
       const { ax } = f;
+      if (AIR_REACTIONS[f.action]) toNeutral(f);
       this.action(f, 'jump');
       f.ax = ax;
       f.gravity = JUMP_GRAVITY;
@@ -2109,6 +2118,7 @@ export class Match {
       }
       if (!f.doubleJumped) {
         this.doubleJump(f, direction);
+        markActing(f);
         return;
       }
     }
@@ -2136,9 +2146,13 @@ export class Match {
             : 'dash',
       );
       if (airborne) f.airDashed = true;
+      markActing(f);
       return;
     }
-    if (this.command(f, input, previous, airborne)) return;
+    if (this.command(f, input, previous, airborne)) {
+      markActing(f);
+      return;
+    }
     // Actions 23/24: a grounded fighter turns before walking or idling again.
     // Any other input interrupts the turn, as it does standing.
     if (
