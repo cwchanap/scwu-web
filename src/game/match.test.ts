@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   addPower,
+  afterimageColor,
   ATTACKS,
   AXE_RELEASE_TICK,
   THROW_TOSS_TICK,
+  fighterPose,
   FIGHTER_MARGIN,
   FixedClock,
   LIFE,
@@ -956,6 +958,132 @@ describe('recovered guard counter', () => {
     expect(target.action).toBe('airBlockHeavy');
     ticks(match, 30, {}, { guard: true, hitUp: true });
     expect(target.stock).toBe(1);
+  });
+});
+
+describe('recovered afterimages (op 0x25)', () => {
+  it('samples a backdash every six ticks before its script, keeps three, and stops on landing', () => {
+    const match = new Match();
+    const f = match.fighters[0];
+    match.step({ dash: true, left: true });
+    expect(f.action).toBe('backdash');
+    // Action 14, PC 176: three images, one every 5 + 1 ticks, half blended.
+    expect(f.trail).toMatchObject({
+      spec: { count: 3, interval: 5, mode: 1, tint: 0 },
+      samples: [],
+    });
+    // 0x412271 samples at the next step, before the scripts and motion.
+    const pose = fighterPose(f);
+    const x = f.x;
+    match.step();
+    expect(f.trail!.samples).toEqual([{ x, y: 0, facing: 1, pose }]);
+    ticks(match, 5);
+    expect(f.trail!.samples).toHaveLength(1);
+    match.step();
+    expect(f.trail!.samples).toHaveLength(2);
+    ticks(match, 12);
+    expect(f.trail!.samples).toHaveLength(3);
+    while (f.action === 'backdash') match.step();
+    // Action 9 frees the slot at PC 112.
+    expect(f).toMatchObject({ action: 'land', trail: null });
+  });
+
+  it("keeps an air dash's afterimages through an air attack until landing", () => {
+    const match = new Match();
+    const f = match.fighters[0];
+    match.step({ jump: true });
+    ticks(match, 20);
+    match.step({ dash: true });
+    const trail = f.trail;
+    expect(trail?.spec).toMatchObject({ count: 2, interval: 5, mode: 4 });
+    ticks(match, 2);
+    match.step({ punch: true });
+    // Action 182 has no op 0x25, and 0x410cf0 keeps the slot.
+    expect(f).toMatchObject({ action: 'airPunch', trail });
+    while (f.y < 0) match.step();
+    expect(f.trail).toBeNull();
+  });
+
+  it('keeps sampling through hit-stop', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 130;
+    match.step({ drill: true });
+    while (f.hitStop === 0) match.step();
+    // Action 207 samples every other tick, frozen or not; the frozen drill
+    // repeats its display (the body push can still move it).
+    let last = f.trail!.samples.at(-1);
+    let added = 0;
+    for (let i = 0; i < 6; i++) {
+      match.step();
+      expect(f.hitStop).toBeGreaterThan(0);
+      if (f.trail!.samples.at(-1) !== last) added++;
+      last = f.trail!.samples.at(-1);
+    }
+    expect(added).toBe(3);
+    expect(new Set(f.trail!.samples.map((s) => s.pose)).size).toBe(1);
+  });
+
+  it('colours each image by r[6] (0x40ce8e)', () => {
+    // Air dash 16: blend from (10, 0, 30) faded 32/32 toward the object's.
+    const spec = { count: 2, interval: 5, mode: 4, tint: 2 };
+    const trail = (counter: number) => ({
+      spec: { ...spec, r: 10, g: 0, b: 30, fade: 32 },
+      counter,
+      samples: [],
+    });
+    expect(afterimageColor(trail(5), 0, NORMAL_COLOR)).toEqual({
+      mode: 4,
+      r: 5,
+      g: 0,
+      b: 15,
+      fade: 16,
+    });
+    expect(afterimageColor(trail(5), 1, NORMAL_COLOR)).toEqual({
+      ...NORMAL_COLOR,
+      mode: 4,
+    });
+    expect(afterimageColor(trail(2), 0, NORMAL_COLOR)).toEqual({
+      mode: 4,
+      r: 8,
+      g: 0,
+      b: 24,
+      fade: 25,
+    });
+    expect(afterimageColor(trail(2), 1, NORMAL_COLOR)).toEqual({
+      mode: 4,
+      r: 3,
+      g: 0,
+      b: 9,
+      fade: 9,
+    });
+    // The Change Attack's (318) take the record's darkening; tint 0 keeps
+    // the object's colour in the record's mode.
+    const own = { mode: 2, r: 4, g: 4, b: 4, fade: 0 };
+    const fixed = {
+      spec: {
+        count: 3,
+        interval: 5,
+        mode: 1,
+        tint: 1,
+        r: -5,
+        g: -5,
+        b: -5,
+        fade: 0,
+      },
+      counter: 0,
+      samples: [],
+    };
+    expect(afterimageColor(fixed, 0, own)).toEqual({
+      mode: 1,
+      r: -5,
+      g: -5,
+      b: -5,
+      fade: 0,
+    });
+    expect(
+      afterimageColor({ ...fixed, spec: { ...fixed.spec, tint: 0 } }, 0, own),
+    ).toEqual({ ...own, mode: 1 });
   });
 });
 
@@ -3701,6 +3829,7 @@ describe('prototype training rules', () => {
       responses: [],
       connected: false,
       color: NORMAL_COLOR,
+      trail: null,
       ...fields,
     });
     const axe = (owner: number, x: number) => ({

@@ -2,10 +2,12 @@
 import {
   animationDuration,
   animationFrame,
+  clipPose,
   DST_TOSS_TICK,
   dstHold,
   entryColor,
   eventsAt,
+  heldFrame,
   hurtboxes,
   isObject,
   pushboxes,
@@ -23,8 +25,10 @@ import type {
   BodyBox,
   Color,
   ObjectKey,
+  Pose,
   ScriptedAction,
   ScriptEvent,
+  TrailSpec,
 } from './animations';
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
 import { dummyInput } from './dummy';
@@ -779,8 +783,11 @@ export interface Fighter {
   objectBox: ScriptBox | null;
   responses: number[];
   onHit: number;
-  // Op 0x23: action changes (0x410cf0) keep it.
+  // Op 0x23 and 0x25: action changes (0x410cf0) keep them. `trailPose` is the
+  // clip display whose op 0x25 last ran.
   color: Color;
+  trail: Trail | null;
+  trailPose: Pose | null;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
@@ -849,6 +856,67 @@ export interface Effect {
   responses: number[];
   connected: boolean;
   color: Color;
+  trail: Trail | null;
+}
+// Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
+// countdown and the samples to draw, oldest first.
+export interface Trail {
+  spec: TrailSpec;
+  counter: number;
+  samples: { x: number; y: number; facing: -1 | 1; pose: Pose }[];
+}
+// 0x413a9a: a record with no count or interval frees the slot; any other
+// starts it afresh.
+const startTrail = ({
+  count,
+  interval,
+  mode,
+  tint,
+  r,
+  g,
+  b,
+  fade,
+}: TrailSpec): Trail | null =>
+  count && interval
+    ? {
+        spec: { count, interval, mode, tint, r, g, b, fade },
+        counter: 0,
+        samples: [],
+      }
+    : null;
+// 0x40ce8e: the k-th of `count` images (oldest 0) keeps the object's colour
+// (tint 0), takes the record's (1), or blends from the record's toward the
+// object's as k and the countdown grow (2). Each draws in the record's mode.
+export function afterimageColor(trail: Trail, k: number, own: Color): Color {
+  const { spec } = trail;
+  if (spec.tint === 1)
+    return {
+      mode: spec.mode,
+      r: spec.r,
+      g: spec.g,
+      b: spec.b,
+      fade: spec.fade,
+    };
+  if (spec.tint !== 2) return { ...own, mode: spec.mode };
+  const p = Math.trunc(
+    (100 * (k * spec.interval + trail.counter)) / (spec.count * spec.interval),
+  );
+  const mix = (from: number, to: number) =>
+    Math.trunc((from * (100 - p) + to * p) / 100);
+  return {
+    mode: spec.mode,
+    r: mix(spec.r, own.r),
+    g: mix(spec.g, own.g),
+    b: mix(spec.b, own.b),
+    fade: mix(spec.fade, own.fade),
+  };
+}
+// The display a fighter shows.
+export function fighterPose(f: Fighter): Pose {
+  if (f.action === 'superHeld' && f.held?.pose)
+    return heldFrame(f.held.pose, f.held.flags);
+  if (f.branch) return animationFrame(f.branch, f.age);
+  return clipPose(f.action, f.action === 'jump' ? f.airAge : f.age);
 }
 const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   x: 0,
@@ -869,6 +937,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   responses: [],
   connected: false,
   color: NORMAL_COLOR,
+  trail: null,
   ...fields,
 });
 const fighter = (x: number, facing: -1 | 1): Fighter => ({
@@ -900,6 +969,8 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   responses: [],
   onHit: 0,
   color: NORMAL_COLOR,
+  trail: null,
+  trailPose: null,
   held: null,
   contact: false,
   jumpVariable: 0,
@@ -1141,6 +1212,7 @@ export class Match {
     f.responses = [];
     f.onHit = 0;
     f.color = entryColor(action) ?? f.color;
+    f.trailPose = null;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (isScripted(action) || action === 'superHeld' || action === 'shock') {
@@ -1511,6 +1583,9 @@ export class Match {
         actor.color = { mode, r, g, b, fade };
         break;
       }
+      case 'trail':
+        actor.trail = startTrail(event);
+        break;
       case 'random':
         // Op 0x20 jumps to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
         // (0x417a22). Objects roll it: streak 348 picks one of three pose sets,
@@ -2224,7 +2299,32 @@ export class Match {
 
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
+    // 0x412271: before its script each tick, frozen or not, an object with
+    // an afterimage slot counts down and, past zero, samples its position,
+    // facing and display.
+    for (const actor of [...this.fighters, ...this.effects]) {
+      const { trail } = actor;
+      if (!trail || --trail.counter >= 0) continue;
+      trail.counter = trail.spec.interval;
+      trail.samples.push({
+        x: actor.x,
+        y: actor.y,
+        facing: actor.facing,
+        pose:
+          'clip' in actor
+            ? animationFrame(actor.clip, actor.age)
+            : fighterPose(actor),
+      });
+      if (trail.samples.length > trail.spec.count) trail.samples.shift();
+    }
     this.run(player, opponent);
+    // A clip display carries the op 0x25 record its action runs before it.
+    for (const f of this.fighters) {
+      const pose = fighterPose(f);
+      if (pose.trail === undefined || pose === f.trailPose) continue;
+      f.trailPose = pose;
+      f.trail = pose.trail && startTrail(pose.trail);
+    }
     // Objects run by priority each tick (0x404d4c). KGT action 58, the stage
     // layout, counts global 6 down (PCs 366–371) at 0x65 (0x406890's callers),
     // after the fighters (0x50) and their axes and missiles (op 0x04 flag 1,

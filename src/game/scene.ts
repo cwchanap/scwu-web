@@ -3,16 +3,19 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
-import {
-  animationFrame,
-  dstHold,
-  heldFrame,
-  isBlank,
-  NORMAL_COLOR,
-} from './animations';
+import { animationFrame, dstHold, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
-import { FixedClock, GROUND, HEIGHT, LIFE, Match, WIDTH } from './match';
-import type { Control, Mode, PracticeOptions } from './match';
+import {
+  afterimageColor,
+  fighterPose,
+  FixedClock,
+  GROUND,
+  HEIGHT,
+  LIFE,
+  Match,
+  WIDTH,
+} from './match';
+import type { Control, Effect, Mode, PracticeOptions } from './match';
 
 export interface GameStatus {
   ready: boolean;
@@ -39,6 +42,7 @@ export const initialStatus: GameStatus = {
   error: '',
 };
 const ART_SCALE = 1.5;
+const effectDepth = (e: Effect) => (e.screen ? 5 : e.front ? 4 : 1);
 // Authored: each match seeds its CPU afresh.
 const randomSeed = () => Math.floor(Math.random() * 2 ** 32);
 const BASE = `${import.meta.env.BASE_URL}assets/`;
@@ -82,6 +86,7 @@ export class TrainingScene extends Phaser.Scene {
   private shadows: Phaser.GameObjects.Ellipse[] = [];
   private projectileSprites: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
+  private trailSprites: Phaser.GameObjects.Image[] = [];
   private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
   private ready = false;
   private error = '';
@@ -292,10 +297,7 @@ export class TrainingScene extends Phaser.Scene {
       const image = data.images.find((image) => image.index === frame.image)!;
       return { ...frame, width: image.width, height: image.height };
     }
-    if (f.action === 'superHeld' && f.held?.pose)
-      return heldFrame(f.held.pose, f.held.flags);
-    if (f.branch) return animationFrame(f.branch, f.age);
-    return animationFrame(f.action, f.action === 'jump' ? f.airAge : f.age);
+    return fighterPose(f);
   }
 
   update(_time: number, delta: number) {
@@ -384,7 +386,7 @@ export class TrainingScene extends Phaser.Scene {
         const pose = animationFrame(effect.clip, effect.age);
         this.place(
           sprite
-            .setDepth(effect.screen ? 5 : effect.front ? 4 : 1)
+            .setDepth(effectDepth(effect))
             .setScrollFactor(effect.screen ? 0 : 1),
           pose,
           effect.x,
@@ -393,6 +395,40 @@ export class TrainingScene extends Phaser.Scene {
           pose.color ?? effect.color,
         );
       });
+      // Each object draws its afterimages, oldest first, just before itself
+      // (0x40cd15–0x40d4cf).
+      const afterimages = [...this.match.fighters, ...effects].flatMap(
+        (actor, index) => {
+          const { trail } = actor;
+          if (!trail) return [];
+          const object = 'clip' in actor ? actor : null;
+          const depth = object
+            ? effectDepth(object)
+            : this.sprites[index].depth;
+          const skipped = trail.spec.count - trail.samples.length;
+          return trail.samples.map((sample, i) => ({
+            ...sample,
+            depth: depth - 0.1,
+            screen: object?.screen ?? false,
+            color: afterimageColor(trail, skipped + i, actor.color),
+          }));
+        },
+      );
+      this.pool(this.trailSprites, afterimages.length).forEach(
+        (sprite, index) => {
+          const image = afterimages[index];
+          sprite.setVisible(!!image);
+          if (!image) return;
+          this.place(
+            sprite.setDepth(image.depth).setScrollFactor(image.screen ? 0 : 1),
+            image.pose,
+            image.x,
+            image.screen ? image.y : GROUND + image.y,
+            image.facing,
+            image.color,
+          );
+        },
+      );
       this.updateHud?.(this.match);
       this.report();
     } catch (error) {

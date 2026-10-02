@@ -20,15 +20,24 @@ export type Color = {
   fade: number;
 };
 export const NORMAL_COLOR: Color = { mode: 0, r: 0, g: 0, b: 0, fade: 0 };
+// Op 0x25 (0x413a9a): `count` afterimages, one sampled every `interval` + 1
+// ticks, drawn in blit `mode`; `tint` picks each image's colour (0x40ce8e).
+export type TrailSpec = Color & {
+  count: number;
+  interval: number;
+  tint: number;
+};
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
-// state an earlier record of its clip set.
+// state an earlier record of its clip set, `trail` the op 0x25 record run
+// just before it (null turns the afterimages off).
 export type Pose = Frame & {
   width: number;
   height: number;
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
+  trail?: TrailSpec | null;
 };
 interface Clip {
   frames: Pose[];
@@ -156,6 +165,7 @@ export type ScriptEvent = { t: number } & (
   | { op: 'stop'; self: number; other: number }
   | { op: 'freeze'; add: number }
   | ({ op: 'color' } & Color)
+  | ({ op: 'trail' } & TrailSpec)
   | {
       op: 'random';
       divisor: number;
@@ -455,14 +465,16 @@ export function animationDuration(action: AnimatedAction | ObjectKey) {
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
-const poseAt = (action: Action, age: number): Pose =>
+// A fighter action's display at an age; idle stands for action 1's first,
+// as scene.ts draws idle from its VM.
+export const clipPose = (action: Action, age: number): Pose =>
   action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
 function bodies(action: Action, age: number): BodyBox[] {
-  return poseAt(action, age).body ?? [];
+  return clipPose(action, age).body ?? [];
 }
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
-export const entryColor = (action: Action) => poseAt(action, 0).color;
+export const entryColor = (action: Action) => clipPose(action, 0).color;
 export function hurtboxes(action: Action, age: number): BodyBox[] {
   return bodies(action, age).filter((box) => box.kind & 6);
 }
