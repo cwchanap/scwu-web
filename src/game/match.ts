@@ -643,9 +643,6 @@ function struck(
       };
   }
 }
-// 0x40f010 skips a victim by the box's kind: 0x20 an airborne one, 8 one in a
-// guard reaction (+0x15e & 0xc is 0xc) and 0x80 one in a hit reaction or hold
-// (8). Free and attacking fighters (0 and 4) can be grabbed.
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
@@ -676,10 +673,18 @@ function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
   if (kinds & 2 && age > 0 && script(index).frames.some((f) => f.t === age))
     actor.connected = false;
 }
-function grabbable(box: ScriptBox, target: Fighter) {
-  if (box.kind & 0x20 && (target.y < 0 || target.vy !== 0)) return false;
-  if (blocks.has(target.action)) return !(box.kind & 8);
-  return !(box.kind & 0x80 && reactions.has(target.action));
+// 0x40f010 skips a player victim by the box's kind (0x40f12d–0x40f18e): 0x10
+// one on the ground, 0x20 one in the air, 8 one in a guard reaction (+0x15e &
+// 0xc is 0xc) and 0x80 one reeling or held (8). Free and attacking fighters (0
+// and 4) meet every box. Ryuko's strikes carry none of these bits; Musashi's
+// grab (0x2a) and its super-cancel version (0x18) and the grabs (0xa8, 8) do.
+// Otherwise only body boxes protect: a lying fighter's sits below the floor, a
+// getting-up or held one has none.
+function skips(box: ScriptBox, target: Fighter) {
+  const airborne = target.y < 0 || target.vy !== 0;
+  if (box.kind & (airborne ? 0x20 : 0x10)) return true;
+  const bits = target.reaction & 0xc;
+  return (box.kind & 8 && bits === 0xc) || (box.kind & 0x80 && bits === 8);
 }
 // The farthest centre distance at which an attack's first box meets an idle
 // victim facing it (for the authored practice partners).
@@ -738,14 +743,6 @@ const reactions = new Set<Action>([
   'hitPull',
   'shock',
   ...blocks,
-]);
-const protectedReactions = new Set<Action>([
-  'dstHeld',
-  'superHeld',
-  'knockdown',
-  'slamBounce',
-  'bounceDown',
-  'getUp',
 ]);
 export interface Fighter {
   x: number;
@@ -1264,9 +1261,8 @@ export class Match {
         f.age === grab.startup &&
         f.hp > 0 &&
         target.hp > 0 &&
-        !protectedReactions.has(target.action) &&
         !Object.hasOwn(held, target.action) &&
-        grabbable(grab.box, target) &&
+        !skips(grab.box, target) &&
         struck(f, f.facing, grab.box, target)
       );
     });
@@ -1660,15 +1656,22 @@ export class Match {
   }
 
   // Script boxes hit the opponent's op 0x19 body box through op 0x17 responses.
+  // 0x40f010 tries the striker's boxes in slot order: the IORI super-cancel
+  // Musashi (260) grabs a grounded victim with slot 0 (kind 0x2a) and an
+  // airborne one with slot 1 (kind 0x18).
   private boxContact(source: Fighter | Effect, owner: number) {
-    const box = source.box;
     const attacker = this.fighters[owner];
     const target = this.fighters[1 - owner];
-    if (!box || source.connected || protectedReactions.has(target.action))
-      return [];
-    const body = struck(this.origin(source), source.facing, box, target);
-    if (!body) return [];
-    const guarding = this.guarding(target, source);
+    if (source.connected) return [];
+    const box = [source.box, source.objectBox].find(
+      (box) =>
+        box &&
+        !skips(box, target) &&
+        struck(this.origin(source), source.facing, box, target),
+    );
+    if (!box) return [];
+    const body = struck(this.origin(source), source.facing, box, target)!;
+    const guarding = this.guarding(target, source, box);
     const stance =
       target.y < 0 || target.vy < 0
         ? 2
@@ -1777,13 +1780,19 @@ export class Match {
   // 0x40f3a2: a CPU victim ignores its input. Free (+0x15e & 0xc is 0) it
   // guards on rand % 100 < level (0x40f3c2); in a guard reaction (0xc) it
   // keeps guarding, whichever way it faces (0x40f449). Ryuko's +0x7cb6 bit 2
-  // lets it guard in the air (0x40f475).
-  private guarding(target: Fighter, source: { facing: number }) {
+  // lets it guard in the air (0x40f475). A box of kind 0x40 can't be guarded
+  // (0x40f469): Musashi's finish (257) and COUNTER HIT (174).
+  private guarding(
+    target: Fighter,
+    source: { facing: number },
+    box: ScriptBox,
+  ) {
+    let guard = guards.has(target.action) && target.facing !== source.facing;
     if (this.cpuDriven && target === this.fighters[1]) {
       const bits = target.reaction & 0xc;
-      return bits === 0xc || (bits === 0 && this.cpu.guards());
+      guard = bits === 0xc || (bits === 0 && this.cpu.guards());
     }
-    return guards.has(target.action) && target.facing !== source.facing;
+    return guard && !(box.kind & 0x40);
   }
 
   private doubleJump(f: Fighter, direction: number) {
@@ -2480,11 +2489,11 @@ export class Match {
         ? { ...strike.box, damage: AIR_DRILL_DAMAGE[f.airDrillStage] }
         : strike.box;
       const target = this.fighters[1 - i];
-      if (protectedReactions.has(target.action) || f.connected) return [];
+      if (f.connected || skips(box, target)) return [];
       const body = struck(f, f.facing, box, target);
       if (!body) return [];
       // Decided on contact only: a CPU victim draws its guard roll here.
-      const guarding = this.guarding(target, f);
+      const guarding = this.guarding(target, f, box);
       const stance =
         target.y < 0 || target.vy < 0
           ? 2
@@ -2526,13 +2535,9 @@ export class Match {
     for (const projectile of this.projectiles) {
       const f = this.fighters[projectile.owner];
       const target = this.fighters[1 - projectile.owner];
-      if (
-        projectile.hit ||
-        projectile.held ||
-        protectedReactions.has(target.action)
-      )
-        continue;
+      if (projectile.hit || projectile.held) continue;
       const box = projectile.kind === 'missile' ? MISSILE_BOX : AXE_BOX;
+      if (skips(box, target)) continue;
       const body = struck(projectile, projectile.facing, box, target);
       if (!body) continue;
       if (projectile.kind === 'missile') {
@@ -2563,7 +2568,7 @@ export class Match {
         });
         continue;
       }
-      const blocked = this.guarding(target, projectile);
+      const blocked = this.guarding(target, projectile, box);
       // Action 227 selects FB on ground (no stop), strong hit in air.
       const hitStop = blocked ? 10 : target.y < 0 || target.vy < 0 ? 15 : 0;
       contacts.push({

@@ -863,6 +863,23 @@ describe('recovered victim responses', () => {
     const { victim } = strike('punch3', { guard: true });
     expect(victim).toMatchObject({ action: 'blockHeavy', hp: LIFE });
   });
+
+  it('lets a strike reach a slam bounce once its body box opens (124, PC 1668)', () => {
+    // No authored protection: the bounce's first display has no hurtbox and
+    // its second sets one at (9, −33) ±(67, 32), which a crouching kick meets.
+    const struck = (age: number) => {
+      const match = new Match();
+      const [f, victim] = match.fighters;
+      Object.assign(victim, { action: 'slamBounce', age, reaction: 8 });
+      victim.x = f.x + 120;
+      f.action = 'crouchKick';
+      f.age = ATTACKS.crouchKick.strikes[0].from - 1;
+      match.step();
+      return victim.action;
+    };
+    expect(struck(5)).toBe('slamBounce');
+    expect(struck(9)).toBe('sweep');
+  });
 });
 
 describe('recovered guard counter', () => {
@@ -1281,6 +1298,31 @@ describe('recovered supers', () => {
     expect(ryuko).toMatchObject({ action: 'idle', stock: 2 });
     expect(target.hp).toBe(LIFE);
     expect(animationDuration('musashi')).toBe(140);
+  });
+
+  it('passes Musashi over an opponent in a guard reaction (kind 0x2a, 0x40f168)', () => {
+    for (const bits of [0, 0xc]) {
+      const { match, ryuko, target } = superMatch(130);
+      match.step({ musashi: true });
+      until(match, () => ryuko.age === 51);
+      Object.assign(target, { action: 'block', age: 0, reaction: bits });
+      match.step();
+      expect(target.action).toBe(bits ? 'block' : 'superHeld');
+    }
+  });
+
+  it('grabs an airborne victim with the IORI cancel Musashi’s slot-1 box (260)', () => {
+    // Slot 0 (44, 10) ±(63, 10), kind 0x2a, skips the air; slot 1
+    // (60, −130) ±(60, 55), kind 0x18, skips the ground.
+    for (const y of [0, -150]) {
+      const { match, ryuko, target } = superMatch(120);
+      Object.assign(ryuko, { action: 'scMusashi', age: 41, fired: 41 });
+      const action = y ? 'airHit' : 'hit';
+      Object.assign(target, { action, age: 0, y, vy: 0, reaction: 8 });
+      target.gravity = 0;
+      match.step();
+      expect(target.action).toBe('superHeld');
+    }
   });
 
   it('throws an axe with the hidden command until desperation, then rushes', () => {
@@ -1838,16 +1880,16 @@ describe('prototype training rules', () => {
   );
 
   it.each([
-    ['throw', 'punch', true],
-    ['throw', 'hit', false],
-    ['throw', 'block', false],
-    ['dst', 'hit', true],
-    ['dst', 'block', false],
-    ['throw', 'turn', false],
-    ['dst', 'turn', false],
+    ['throw', 'punch', 4, true],
+    ['throw', 'hit', 8, false],
+    ['throw', 'block', 0xc, false],
+    ['dst', 'hit', 8, true],
+    ['dst', 'block', 0xc, false],
+    ['throw', 'turn', 0, false],
+    ['dst', 'turn', 0, false],
   ] as const)(
-    '%s against a victim in %s grabs: %s',
-    (control, state, grabbed) => {
+    '%s against a victim in %s (bits %i) grabs: %s',
+    (control, state, bits, grabbed) => {
       // 0x40f010 skips a kind-0x80 box against +0x15e & 0xc == 8 (a hit
       // reaction) and a kind-8 box against 0xc (a guard reaction). Action
       // 196's box is kind 0xa8, 214's kind 8. A turn's body box (23, PC 252)
@@ -1857,8 +1899,7 @@ describe('prototype training rules', () => {
       attacker.x = 600;
       target.x = 720;
       ticks(match, control === 'throw' ? 7 : 4, { [control]: true });
-      target.action = state;
-      target.age = 0;
+      Object.assign(target, { action: state, age: 0, reaction: bits });
       match.step();
       expect(target.action).toBe(grabbed ? 'dstHeld' : state);
     },
@@ -3672,7 +3713,8 @@ describe('prototype training rules', () => {
 
     it("marks a beam that meets the other side's axe as having hit, leaving the axe", () => {
       const match = new Match();
-      // A downed Ryuko can't be struck, so only the axe meets the beam.
+      // A downed Ryuko's body box lies below the floor, so only the axe meets
+      // the beam.
       match.fighters[0].action = 'knockdown';
       match.projectiles = [axe(0, 1100)];
       // Object 269 (calling 270) sets its boxes as it starts; slot 1's
@@ -3719,6 +3761,28 @@ describe('prototype training rules', () => {
       match.step();
       expect(bg.action).toBe('megaBeamHit');
       expect(match.projectiles[0].hit).toBe(false);
+    });
+
+    it('cannot be guarded with a box of kind 0x40 (0x40f469)', () => {
+      const struck = (kind: number) => {
+        const match = new Match('cpu');
+        match.cpu = new CpuVM([], 0);
+        const cpu = match.fighters[1];
+        // A CPU in a guard reaction keeps guarding (0x40f449).
+        Object.assign(cpu, { action: 'block', age: 0, reaction: 0xc });
+        match.effects = [
+          object(347, 0, {
+            x: cpu.x,
+            box: { x: 0, y: -100, w: 100, h: 100, damage: 10, kind },
+            responses: [1, 1, 2, 22, 23, 2],
+          }),
+        ];
+        match.step();
+        return cpu.action;
+      };
+      expect(struck(7)).toBe('block');
+      // Musashi's finish (257, 0x46) and COUNTER HIT (174, 0x47).
+      expect(struck(0x47)).toBe('hit');
     });
   });
 
