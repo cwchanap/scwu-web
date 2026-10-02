@@ -3,8 +3,14 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
-import { animationFrame, dstHold, heldFrame, isBlank } from './animations';
-import type { Pose } from './animations';
+import {
+  animationFrame,
+  dstHold,
+  heldFrame,
+  isBlank,
+  NORMAL_COLOR,
+} from './animations';
+import type { Color, Pose } from './animations';
 import { FixedClock, GROUND, HEIGHT, LIFE, Match, WIDTH } from './match';
 import type { Control, Mode, PracticeOptions } from './match';
 
@@ -216,12 +222,54 @@ export class TrainingScene extends Phaser.Scene {
     return sprites;
   }
 
+  // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
+  // each tinted image is drawn once and cached.
+  private texture(image: number, { r, g, b }: Color) {
+    const key = `ryuko-${image}`;
+    if (!r && !g && !b) return key;
+    const tinted = `${key}:${r},${g},${b}`;
+    if (this.textures.exists(tinted)) return tinted;
+    const source = this.textures.get(key).getSourceImage() as HTMLImageElement;
+    const canvas = this.textures.createCanvas(
+      tinted,
+      source.width,
+      source.height,
+    )!;
+    canvas.context.drawImage(source, 0, 0);
+    const pixels = canvas.getData(0, 0, source.width, source.height);
+    const shift = (value: number, by: number) => {
+      const channel = Math.min(31, Math.max(0, (value >> 3) + by));
+      return (channel << 3) | (channel >> 2);
+    };
+    for (let i = 0; i < pixels.data.length; i += 4) {
+      pixels.data[i] = shift(pixels.data[i], r);
+      pixels.data[i + 1] = shift(pixels.data[i + 1], g);
+      pixels.data[i + 2] = shift(pixels.data[i + 2], b);
+    }
+    canvas.putData(pixels, 0, 0).refresh();
+    return tinted;
+  }
+
+  // Blitters 0x40c840 by op 0x23 mode: 1 averages with the screen, 2 adds,
+  // 4 fades by fade/32.
+  private paint(sprite: Phaser.GameObjects.Image, pose: Pose, color: Color) {
+    if (isBlank(pose)) return sprite.setVisible(false);
+    return sprite
+      .setVisible(true)
+      .setTexture(this.texture(pose.image, color))
+      .setBlendMode(
+        color.mode === 2 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL,
+      )
+      .setAlpha(color.mode === 1 ? 0.5 : 1 - color.fade / 32);
+  }
+
   private place(
     sprite: Phaser.GameObjects.Image,
     pose: Pose,
     x: number,
     y: number,
     facing: -1 | 1,
+    color = pose.color ?? NORMAL_COLOR,
   ) {
     const p = placement(
       pose,
@@ -231,10 +279,8 @@ export class TrainingScene extends Phaser.Scene {
       y / ART_SCALE,
       facing === -1,
     );
-    sprite
+    this.paint(sprite, pose, color)
       .setOrigin(0)
-      .setVisible(!isBlank(pose))
-      .setTexture(isBlank(pose) ? sprite.texture.key : `ryuko-${pose.image}`)
       .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
       .setFlip(p.flip_x, p.flip_y);
   }
@@ -297,14 +343,10 @@ export class TrainingScene extends Phaser.Scene {
             : f.action === 'superHeld'
               ? ((f.held?.flags ?? 0) & 1) !== 0
               : undefined;
-        // Op 0x23 mode 4 fades the display by fade/32.
-        sprite
-          .setVisible(!isBlank(pose))
-          .setAlpha(1 - f.fade / 32)
+        this.paint(sprite, pose, f.color)
           .setDepth(behind === undefined ? 2 : behind ? 1 : 3)
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
-        if (!isBlank(pose)) sprite.setTexture(`ryuko-${pose.image}`);
         const shadow = this.shadows[i];
         shadow
           .setPosition(f.x, GROUND - 1)
@@ -337,21 +379,18 @@ export class TrainingScene extends Phaser.Scene {
         const effect = effects[index];
         sprite.setVisible(!!effect);
         if (!effect) return;
-        // Viewport objects (op 0x04 flag 0x40) ignore the camera.
+        // Viewport objects (op 0x04 flag 0x40) ignore the camera. A clip
+        // effect's frames carry their colour; a source object's events set it.
+        const pose = animationFrame(effect.clip, effect.age);
         this.place(
           sprite
             .setDepth(effect.screen ? 5 : effect.front ? 4 : 1)
-            .setScrollFactor(effect.screen ? 0 : 1)
-            .setBlendMode(
-              effect.mode === 2
-                ? Phaser.BlendModes.ADD
-                : Phaser.BlendModes.NORMAL,
-            )
-            .setAlpha(1 - effect.fade / 32),
-          animationFrame(effect.clip, effect.age),
+            .setScrollFactor(effect.screen ? 0 : 1),
+          pose,
           effect.x,
           effect.screen ? effect.y : GROUND + effect.y,
           effect.facing,
+          pose.color ?? effect.color,
         );
       });
       this.updateHud?.(this.match);

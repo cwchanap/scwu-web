@@ -22,6 +22,10 @@ GENERATED = ROOT / "src/game/generated"
 FIXTURES = ROOT / "src/game/__fixtures__"
 
 
+def s8(record, offset):
+    return struct.unpack_from("<b", record, offset)[0]
+
+
 def s16(record, offset):
     return struct.unpack_from("<h", record, offset)[0]
 
@@ -64,9 +68,14 @@ def decode_event(record):
         return dict(op="freeze", add=s16(record, 7))
     if op == 0x1a:  # hit-stop ticks for the object itself and the opponent
         return dict(op="stop", self=record[1], other=record[2])
-    if op == 0x23:  # colour mode: 2 draws additively, 4 fades by r[5]/32
-        return dict(op="color", mode=record[1], fade=record[5])
+    if op == 0x23:  # colour (0x413a07): blit mode, signed r, g, b palette offsets, r[5] fade in mode 4
+        return color_state(record)
     return None
+
+
+def color_state(record):
+    return dict(op="color", mode=record[1], r=s8(record, 2), g=s8(record, 3), b=s8(record, 4),
+                fade=s8(record, 5) if record[1] == 4 else 0)
 
 
 def body_boxes(bodies, record):
@@ -224,14 +233,18 @@ def main():
     for name, index in actions.items():
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
-        frames, bodies = [], None
+        # A display after an op 0x23 carries the colour state it sets.
+        frames, bodies, color = [], None, None
         for pc in range(action.start, action.end):
             if p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
+            elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
+                color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
                 image = c.images[frame["image"]]
-                frames.append(with_body(dict(frame, width=image.width, height=image.height), bodies))
+                frame = with_body(dict(frame, width=image.width, height=image.height), bodies)
+                frames.append(dict(frame, color=color) if color else frame)
                 image_ids.add(frame["image"])
         clips[name] = frames
     # Op 0x07 replaces a held fighter's display with an entry of this 15 x 6-byte

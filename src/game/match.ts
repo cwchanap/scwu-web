@@ -4,11 +4,13 @@ import {
   animationFrame,
   DST_TOSS_TICK,
   dstHold,
+  entryColor,
   eventsAt,
   hurtboxes,
   isObject,
   pushboxes,
   isScripted,
+  NORMAL_COLOR,
   RESPONSE_EFFECTS,
   RESPONSES,
   script,
@@ -19,6 +21,7 @@ import type {
   Action,
   AnimatedAction,
   BodyBox,
+  Color,
   ObjectKey,
   ScriptedAction,
   ScriptEvent,
@@ -768,7 +771,7 @@ export interface Fighter {
   stock: number;
   // Scripted (super) state: the last age whose events ran, op 0x01 horizontal
   // acceleration, the active op 0x18 box and op 0x17 responses, the op 0x02 hit
-  // handler, and op 0x23 fade.
+  // handler.
   fired: number;
   ax: number;
   box: ScriptBox | null;
@@ -776,7 +779,8 @@ export interface Fighter {
   objectBox: ScriptBox | null;
   responses: number[];
   onHit: number;
-  fade: number;
+  // Op 0x23: action changes (0x410cf0) keep it.
+  color: Color;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
@@ -844,9 +848,7 @@ export interface Effect {
   objectBox: ScriptBox | null;
   responses: number[];
   connected: boolean;
-  // Op 0x23: mode 2 draws additively, mode 4 fades by fade/32.
-  mode: number;
-  fade: number;
+  color: Color;
 }
 const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   x: 0,
@@ -866,8 +868,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   objectBox: null,
   responses: [],
   connected: false,
-  mode: 0,
-  fade: 0,
+  color: NORMAL_COLOR,
   ...fields,
 });
 const fighter = (x: number, facing: -1 | 1): Fighter => ({
@@ -898,7 +899,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   objectBox: null,
   responses: [],
   onHit: 0,
-  fade: 0,
+  color: NORMAL_COLOR,
   held: null,
   contact: false,
   jumpVariable: 0,
@@ -1139,7 +1140,7 @@ export class Match {
     f.objectBox = null;
     f.responses = [];
     f.onHit = 0;
-    f.fade = 0;
+    f.color = entryColor(action) ?? f.color;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (isScripted(action) || action === 'superHeld' || action === 'shock') {
@@ -1505,10 +1506,11 @@ export class Match {
         addPower(self, event.selfPower);
         addPower(other, event.otherPower);
         break;
-      case 'color':
-        actor.fade = event.mode === 4 ? event.fade : 0;
-        if ('mode' in actor) actor.mode = event.mode;
+      case 'color': {
+        const { mode, r, g, b, fade } = event;
+        actor.color = { mode, r, g, b, fade };
         break;
+      }
       case 'random':
         // Op 0x20 jumps to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
         // (0x417a22). Objects roll it: streak 348 picks one of three pose sets,

@@ -112,6 +112,38 @@ describe('selected core animation assets', () => {
     expect(animationDuration('350+17')).toBe(17);
   });
 
+  it('carries op 0x23 colour on clip frames and object scripts', () => {
+    // Axe impact 230 halves its second display (PC 3337, mode 1).
+    const impact = data.clips.axeHit[0].duration;
+    expect(animationFrame('axeHit', impact - 1).color).toBeUndefined();
+    expect(animationFrame('axeHit', impact).color).toEqual({
+      mode: 1,
+      r: 0,
+      g: 0,
+      b: 0,
+      fade: 0,
+    });
+    // DST fire 385 adds, with signed offsets (PC 5566).
+    expect(animationFrame('dstFire', 0).color).toMatchObject({
+      mode: 2,
+      r: 0,
+      g: -6,
+      b: -7,
+    });
+    // Hit sparks add tinted r −14, g −5, b +7; mode 4 keeps r[5] as its fade.
+    expect(script(347).events.find((e) => e.op === 'color')).toMatchObject({
+      mode: 2,
+      r: -14,
+      g: -5,
+      b: 7,
+      fade: 0,
+    });
+    expect(script(294).events.find((e) => e.op === 'color')).toMatchObject({
+      mode: 4,
+      fade: 29,
+    });
+  });
+
   it('expands DST calls and holds the victim in the recovered held pose', () => {
     expect(animationDuration('dst')).toBe(58);
     expect(

@@ -20,6 +20,7 @@ import { ROUND_END_TICKS } from './hud';
 import {
   animationDuration,
   animationFrame,
+  NORMAL_COLOR,
   RESPONSE_EFFECTS,
 } from './animations';
 import { rand } from './standing';
@@ -230,6 +231,22 @@ describe('Hit Up launcher', () => {
 });
 
 describe('recovered neutral and round animations', () => {
+  it('keeps op 0x23 colour through action changes until a clip resets it', () => {
+    const match = new Match();
+    const [attacker, target] = match.fighters;
+    attacker.x = 600;
+    target.x = 750;
+    const tint = { mode: 2, r: -10, g: 20, b: 0, fade: 0 };
+    target.color = tint;
+    match.step({ iori: true });
+    ticks(match, 30);
+    // 0x410cf0 leaves +0x44–0x54; hit 75 sets no colour.
+    expect(target).toMatchObject({ action: 'hitHeavy', color: tint });
+    while (target.action !== 'idle') match.step();
+    // Action 1 resets it at PC 11, before its first display.
+    expect(target.color).toEqual(NORMAL_COLOR);
+  });
+
   it('turns a standing fighter for ten ticks, then walks, and lets attacks interrupt', () => {
     const match = new Match();
     const [f, other] = match.fighters;
@@ -3683,8 +3700,7 @@ describe('prototype training rules', () => {
       objectBox: null,
       responses: [],
       connected: false,
-      mode: 0,
-      fade: 0,
+      color: NORMAL_COLOR,
       ...fields,
     });
     const axe = (owner: number, x: number) => ({

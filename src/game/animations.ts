@@ -10,13 +10,25 @@ export type BodyBox = {
   kind: number;
   taken: number;
 };
+// Op 0x23 (0x413a07): blit mode (+0x54), signed offsets added to each 5-bit
+// palette channel (+0x44/+0x48/+0x4c, 0x40d070) and mode 4's fade (+0x50).
+export type Color = {
+  mode: number;
+  r: number;
+  g: number;
+  b: number;
+  fade: number;
+};
+export const NORMAL_COLOR: Color = { mode: 0, r: 0, g: 0, b: 0, fade: 0 };
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
-// lists the op 0x19 boxes set when the pose displays.
+// lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
+// state an earlier record of its clip set.
 export type Pose = Frame & {
   width: number;
   height: number;
   held?: boolean;
   body?: BodyBox[];
+  color?: Color;
 };
 interface Clip {
   frames: Pose[];
@@ -143,7 +155,7 @@ export type ScriptEvent = { t: number } & (
     }
   | { op: 'stop'; self: number; other: number }
   | { op: 'freeze'; add: number }
-  | { op: 'color'; mode: number; fade: number }
+  | ({ op: 'color' } & Color)
   | {
       op: 'random';
       divisor: number;
@@ -443,11 +455,14 @@ export function animationDuration(action: AnimatedAction | ObjectKey) {
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
+const poseAt = (action: Action, age: number): Pose =>
+  action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
 function bodies(action: Action, age: number): BodyBox[] {
-  const pose: Pose =
-    action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
-  return pose.body ?? [];
+  return poseAt(action, age).body ?? [];
 }
+// The op 0x23 state a fighter's clip sets before its first display. Ryuko's
+// neutral, knockdown and win clips reset it there; none changes it later.
+export const entryColor = (action: Action) => poseAt(action, 0).color;
 export function hurtboxes(action: Action, age: number): BodyBox[] {
   return bodies(action, age).filter((box) => box.kind & 6);
 }
