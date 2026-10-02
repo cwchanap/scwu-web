@@ -13,9 +13,16 @@ import {
   HEIGHT,
   LIFE,
   Match,
+  stepShake,
   WIDTH,
 } from './match';
-import type { Control, Effect, Mode, PracticeOptions } from './match';
+import type {
+  Control,
+  Effect,
+  Mode,
+  PracticeOptions,
+  ShakeAxis,
+} from './match';
 
 export interface GameStatus {
   ready: boolean;
@@ -43,6 +50,13 @@ export const initialStatus: GameStatus = {
 };
 const ART_SCALE = 1.5;
 const effectDepth = (e: Effect) => (e.screen ? 5 : e.front ? 4 : 1);
+const still = (): ShakeAxis => ({
+  type: 0,
+  amplitude: 0,
+  frames: 0,
+  offset: 0,
+  left: 0,
+});
 // Authored: each match seeds its CPU afresh.
 const randomSeed = () => Math.floor(Math.random() * 2 ** 32);
 const BASE = `${import.meta.env.BASE_URL}assets/`;
@@ -87,6 +101,11 @@ export class TrainingScene extends Phaser.Scene {
   private projectileSprites: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
   private trailSprites: Phaser.GameObjects.Image[] = [];
+  // Op 0x0e's shake, stepped once per drawn frame like the source's draw
+  // loop, and the drawn-frame count whose parity flips it.
+  private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
+  private quake: Match['quake'] = { x: null, y: null };
+  private frame = 0;
   private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
   private ready = false;
   private error = '';
@@ -207,6 +226,8 @@ export class TrainingScene extends Phaser.Scene {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
     this.match = new Match(mode, mode === 'cpu', randomSeed());
     this.match.practice = { ...this.practice };
+    this.shake = { x: still(), y: still() };
+    this.quake = this.match.quake;
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
     this.idle.forEach((vm) => vm.tick());
     this.paused = false;
@@ -326,7 +347,26 @@ export class TrainingScene extends Phaser.Scene {
             this.idle[i].tick();
           });
         });
-      this.cameras.main.setScroll(this.match.cameraX, this.match.cameraY);
+      for (const axis of ['x', 'y'] as const) {
+        const quake = this.match.quake[axis];
+        if (quake !== this.quake[axis] && quake)
+          this.shake[axis] = { ...quake, offset: 0, left: quake.frames };
+        // ponytail: the source's type-4 shake draws from the shared rand
+        // (0x417a22) once per drawn frame, so its later rolls depend on the
+        // display rate; this one keeps its own so the 10 ms match stays
+        // deterministic.
+        stepShake(this.shake[axis], this.frame, () =>
+          Math.floor(Math.random() * 32768),
+        );
+      }
+      this.quake = this.match.quake;
+      this.frame++;
+      // World objects draw at their position less the scroll and the shake
+      // (0x40d82f); viewport objects and the HUD do not move.
+      this.cameras.main.setScroll(
+        this.match.cameraX + this.shake.x.offset * ART_SCALE,
+        this.match.cameraY + this.shake.y.offset * ART_SCALE,
+      );
       this.sprites.forEach((sprite, i) => {
         const f = this.match.fighters[i];
         const pose = this.pose(i);

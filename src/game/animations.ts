@@ -27,18 +27,23 @@ export type TrailSpec = Color & {
   interval: number;
   tint: number;
 };
+// Op 0x0e's shake for one axis: 0x40c9e0's type, amplitude in source pixels
+// and length in drawn frames.
+export type Quake = { type: number; amplitude: number; frames: number };
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
-// state an earlier record of its clip set, `trail` the op 0x25 record run
-// just before it (null turns the afterimages off).
+// state an earlier record of its clip set, `events` the op 0x0e and 0x25
+// records run just before it.
 export type Pose = Frame & {
   width: number;
   height: number;
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  trail?: TrailSpec | null;
+  events?: Extract<SourceEvent, { op: 'trail' | 'shake' }>[];
 };
+// JSON infers each event's op as a string; the export writes only Pose's.
+const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
 interface Clip {
   frames: Pose[];
   ticks: number[];
@@ -70,17 +75,17 @@ function clip(
 }
 
 // Action 197 calls the throw spin (199) three times (PC 2767), then tosses.
-const throwSpins = Array.from({ length: 3 }, () => data.clips.throwSpin).flat();
+const throwSpins = Array.from({ length: 3 }, () => clips.throwSpin).flat();
 export const THROW_TOSS_TICK =
-  data.clips.throw[0].duration +
+  clips.throw[0].duration +
   throwSpins.reduce((total, frame) => total + frame.duration, 0);
 // Action 215 plays the same three spins, then 217 ten times.
 const dstSpins = [
   ...throwSpins,
-  ...Array.from({ length: 10 }, () => data.clips.dstSpin).flat(),
+  ...Array.from({ length: 10 }, () => clips.dstSpin).flat(),
 ];
 export const DST_TOSS_TICK =
-  data.clips.dstHit[0].duration +
+  clips.dstHit[0].duration +
   dstSpins.reduce((total, frame) => total + frame.duration, 0);
 // Actions 199/217 run op 0x07 before each spin display: the held offset in
 // source pixels, bit 2 (face the holder's way, mirrored image) and bit 0
@@ -96,7 +101,7 @@ const DST_HOLDS = [
   { x: 0, same: false, behind: false },
 ];
 export function dstHold(age: number) {
-  const first = data.clips.dstHit[0].duration;
+  const first = clips.dstHit[0].duration;
   if (age < first) return { x: 60, same: false, behind: false, place: !age };
   let time = age - first;
   for (const [index, frame] of dstSpins.entries()) {
@@ -110,7 +115,7 @@ export function dstHold(age: number) {
   return null;
 }
 const dstHeld = () => [
-  { ...data.clips.grabbed[0], duration: data.clips.dstHit[0].duration },
+  { ...clips.grabbed[0], duration: clips.dstHit[0].duration },
   // Op 0x07 selects held pose 1 from the victim's table and adds the bit 2 flip.
   ...dstSpins.map((frame, index) => ({
     ...heldFrame(1, DST_HOLDS[index % DST_HOLDS.length].same ? 4 : 0),
@@ -121,7 +126,8 @@ const dstHeld = () => [
 // Super timelines flattened by scripts/export_assets.py: displays with op 0x09
 // calls inlined and op 0x0a jumps followed, plus the gameplay opcodes at their
 // action ages. The match plays their events; conditions are checked at entry.
-export type ScriptEvent = { t: number } & (
+export type ScriptEvent = { t: number } & SourceEvent;
+export type SourceEvent =
   | {
       op: 'motion';
       ax: number;
@@ -166,14 +172,14 @@ export type ScriptEvent = { t: number } & (
   | { op: 'freeze'; add: number }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
+  | { op: 'shake'; x: Quake | null; y: Quake | null }
   | {
       op: 'random';
       divisor: number;
       above: number;
       action: number;
       offset: number;
-    }
-);
+    };
 export interface Script {
   frames: (Pose & { t: number })[];
   events: ScriptEvent[];
@@ -244,150 +250,145 @@ export function heldFrame(pose: number, flags: number): Pose {
 // These are authored visual timelines, not execution of non-idle action bytecode.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
-  walk: clip(data.clips.walk, true),
-  backwalk: clip(data.clips.backwalk, true),
-  takeoff: clip(data.clips.jump.slice(0, 1)),
-  jump: clip(data.clips.jump.slice(1), false, [13, 5, 15, 1]),
-  doubleJump: clip(data.clips.doubleJump, false, [3, 5, 27]),
-  dash: clip(data.clips.dash, false, [5, 5, 5, 8]),
-  backdash: clip(data.clips.backdash, false, [10, 5, 5, 15, 8]),
-  airDash: clip(data.clips.airDash),
-  airBackdash: clip(data.clips.airBackdash),
-  land: clip(data.clips.land),
-  crouchEnter: clip(data.clips.crouchEnter),
-  crouch: clip(data.clips.crouch, true),
-  stand: clip(data.clips.stand),
+  walk: clip(clips.walk, true),
+  backwalk: clip(clips.backwalk, true),
+  takeoff: clip(clips.jump.slice(0, 1)),
+  jump: clip(clips.jump.slice(1), false, [13, 5, 15, 1]),
+  doubleJump: clip(clips.doubleJump, false, [3, 5, 27]),
+  dash: clip(clips.dash, false, [5, 5, 5, 8]),
+  backdash: clip(clips.backdash, false, [10, 5, 5, 15, 8]),
+  airDash: clip(clips.airDash),
+  airBackdash: clip(clips.airBackdash),
+  land: clip(clips.land),
+  crouchEnter: clip(clips.crouchEnter),
+  crouch: clip(clips.crouch, true),
+  stand: clip(clips.stand),
   // Actions 23/24 display a mirrored mid-turn pose for ten ticks.
-  turn: clip(data.clips.turn),
-  crouchTurn: clip(data.clips.crouchTurn),
+  turn: clip(clips.turn),
+  crouchTurn: clip(clips.crouchTurn),
   // Action 32 jumps to action 33 at PC 333, after its blank repositioning displays.
-  intro: clip(data.clips.intro.slice(2)),
-  punch: clip(data.clips.punch),
-  kick: clip(data.clips.kick, false, [5, 5, 7, 10, 11]),
+  intro: clip(clips.intro.slice(2)),
+  punch: clip(clips.punch),
+  kick: clip(clips.kick, false, [5, 5, 7, 10, 11]),
   // Punch 1 and kick 1 enter 179/187 on contact (op 0x02 slots 2 and 3).
-  punchHit: clip(data.clips.punchHit),
-  kickHit: clip(data.clips.kickHit),
-  punch2: clip(data.clips.punch2),
+  punchHit: clip(clips.punchHit),
+  kickHit: clip(clips.kickHit),
+  punch2: clip(clips.punch2),
   // Action 181's two hop poses last until each landing: 12 and 8 ticks.
-  punch3: clip(data.clips.punch3, false, [12, 2, 8, 6, 8, 5, 15, 8]),
-  kick2: clip(data.clips.kick2),
-  hitUp: clip(data.clips.hitUp),
-  hitUpRecover: clip(data.clips.hitUpRecover),
-  hitUpJump: clip(data.clips.hitUpJump, false, [8, 13, 5, 15, 1]),
-  iori: clip(data.clips.iori),
-  iori2: clip(data.clips.iori2),
-  iori3: clip(data.clips.iori3),
-  hitPull: clip(data.clips.hitPull),
+  punch3: clip(clips.punch3, false, [12, 2, 8, 6, 8, 5, 15, 8]),
+  kick2: clip(clips.kick2),
+  hitUp: clip(clips.hitUp),
+  hitUpRecover: clip(clips.hitUpRecover),
+  hitUpJump: clip(clips.hitUpJump, false, [8, 13, 5, 15, 1]),
+  iori: clip(clips.iori),
+  iori2: clip(clips.iori2),
+  iori3: clip(clips.iori3),
+  hitPull: clip(clips.hitPull),
   // Response 5/6 (air punch and kick against a grounded opponent) → action 77.
-  jumpHit: clip(data.clips.jumpHit),
+  jumpHit: clip(clips.jumpHit),
   // Air Drill response 56 → action 135: slammed down until landing enters 124.
-  drillDown: clip(data.clips.drillDown, false, [1]),
-  blockStop: clip(data.clips.blockStop),
-  crouchBlockStop: clip(data.clips.crouchBlockStop),
-  launchDown: clip(data.clips.launchDown, false, [3, 3, 3, 1]),
-  slamBounce: clip(data.clips.slamBounce, false, [10, 20, 1]),
-  bounceDown: clip(data.clips.bounceDown),
+  drillDown: clip(clips.drillDown, false, [1]),
+  blockStop: clip(clips.blockStop),
+  crouchBlockStop: clip(clips.crouchBlockStop),
+  launchDown: clip(clips.launchDown, false, [3, 3, 3, 1]),
+  slamBounce: clip(clips.slamBounce, false, [10, 20, 1]),
+  bounceDown: clip(clips.bounceDown),
   // The long final displays wait for landing, rather than ending the reaction.
-  launchUp: clip(data.clips.launchUp, false, [25, 30, 10, 1]),
-  launchAway: clip(data.clips.launchAway, false, [2, 2, 2, 25, 1]),
-  sweep: clip(data.clips.sweep, false, [2, 2, 2, 25, 1]),
+  launchUp: clip(clips.launchUp, false, [25, 30, 10, 1]),
+  launchAway: clip(clips.launchAway, false, [2, 2, 2, 25, 1]),
+  sweep: clip(clips.sweep, false, [2, 2, 2, 25, 1]),
   kick3: clip([
-    ...data.clips.kick3.slice(0, 3),
-    ...Array.from({ length: 8 }, () => data.clips.kick3Repeat).flat(),
-    ...data.clips.kick3.slice(3),
+    ...clips.kick3.slice(0, 3),
+    ...Array.from({ length: 8 }, () => clips.kick3Repeat).flat(),
+    ...clips.kick3.slice(3),
   ]),
-  drill: clip(data.clips.drill),
-  airDrill: clip(data.clips.airDrill.slice(0, 3)),
+  drill: clip(clips.drill),
+  airDrill: clip(clips.airDrill.slice(0, 3)),
   // Actions 209–211 loop these poses until contact or landing.
-  airDrillSpin: clip(data.clips.airDrillSpin.slice(0, 2), true),
+  airDrillSpin: clip(clips.airDrillSpin.slice(0, 2), true),
   // Actions 209–211: eight ticks of hit-stop, then this two-tick transition.
-  airDrillContact: clip(data.clips.airDrillSpin.slice(0, 1), false, [2]),
-  drillLand: clip(data.clips.drillLand),
-  dst: clip(data.clips.dst),
+  // Every contact branch shakes alike before its display (PCs 2991, 3002,
+  // 3022, 3043, 3064).
+  airDrillContact: clip(
+    [{ ...clips.airDrillSpin[0], events: clips.airDrillSpin[2].events }],
+    false,
+    [2],
+  ),
+  drillLand: clip(clips.drillLand),
+  dst: clip(clips.dst),
   // Action 221 repeats DST's grab and 58-tick miss with its own images.
-  evilDst: clip(data.clips.evilDst),
-  dstHit: clip([
-    data.clips.dstHit[0],
-    ...dstSpins,
-    ...data.clips.dstHit.slice(1),
-  ]),
+  evilDst: clip(clips.evilDst),
+  dstHit: clip([clips.dstHit[0], ...dstSpins, ...clips.dstHit.slice(1)]),
   dstHeld: clip(dstHeld()),
   // Response 31 enters action 129, which jumps to the spinning loop 130; its
   // landing branch bounces through PC 1752 into the slower loop 131.
-  dstToss: clip([data.clips.dstToss[0], ...data.clips.dstTossSpin], 1),
-  tossBounce: clip(
-    [...data.clips.dstToss.slice(1), ...data.clips.dstTossSpin2],
-    2,
-  ),
+  dstToss: clip([clips.dstToss[0], ...clips.dstTossSpin], 1),
+  tossBounce: clip([...clips.dstToss.slice(1), ...clips.dstTossSpin2], 2),
   // Missile response 32 enters action 85, then 86; landing bounces into 87.
-  twist: clip([data.clips.twist[0], ...data.clips.twisting], 1),
-  twistBounce: clip([data.clips.twist[1], ...data.clips.twisting2], 1),
-  dstMissile: clip(data.clips.dstMissile, true),
-  dstMissileSmoke: clip(data.clips.dstMissileSmoke),
-  dstFire: clip(data.clips.dstFire),
-  smokeRight: clip(data.clips.smokeRight),
-  smokeLeft: clip(data.clips.smokeLeft),
-  dashSmoke: clip(data.clips.dashSmoke),
-  hisaSmoke: clip(data.clips.hisaSmoke),
-  hisaSmokeBack: clip(data.clips.hisaSmokeBack),
-  landingSmoke: clip(data.clips.landingSmoke),
-  axeThrow: clip(data.clips.axeThrow),
-  axeFlight: clip(data.clips.axeFlight, true),
-  axeHit: clip(data.clips.axeHit),
-  grab: clip(data.clips.grab),
+  twist: clip([clips.twist[0], ...clips.twisting], 1),
+  twistBounce: clip([clips.twist[1], ...clips.twisting2], 1),
+  dstMissile: clip(clips.dstMissile, true),
+  dstMissileSmoke: clip(clips.dstMissileSmoke),
+  dstFire: clip(clips.dstFire),
+  smokeRight: clip(clips.smokeRight),
+  smokeLeft: clip(clips.smokeLeft),
+  dashSmoke: clip(clips.dashSmoke),
+  hisaSmoke: clip(clips.hisaSmoke),
+  hisaSmokeBack: clip(clips.hisaSmokeBack),
+  landingSmoke: clip(clips.landingSmoke),
+  axeThrow: clip(clips.axeThrow),
+  axeFlight: clip(clips.axeFlight, true),
+  axeHit: clip(clips.axeHit),
+  grab: clip(clips.grab),
   // Its victim plays dstHeld until the toss: the same response 30 and spins.
-  throw: clip([
-    data.clips.throw[0],
-    ...throwSpins,
-    ...data.clips.throw.slice(1),
-  ]),
-  knockdown: clip(data.clips.knockdown),
-  getUp: clip(data.clips.getUp),
-  crouchPunch: clip(data.clips.crouchPunch),
-  crouchKick: clip(data.clips.crouchKick),
-  airPunch: clip(data.clips.airPunch),
-  airKick: clip(data.clips.airKick),
-  guard: clip(data.clips.guard.slice(0, 1)),
-  crouchGuard: clip(data.clips.crouchGuard.slice(0, 1)),
-  airGuard: clip(data.clips.airGuard.slice(0, 1)),
-  block: clip(data.clips.guard),
-  crouchBlock: clip(data.clips.crouchGuard),
-  airBlock: clip(data.clips.airGuard),
-  blockHeavy: clip(data.clips.blockHeavy),
-  crouchBlockHeavy: clip(data.clips.crouchBlockHeavy),
-  airBlockHeavy: clip(data.clips.airBlockHeavy),
-  blockRapid: clip(data.clips.blockRapid),
-  crouchBlockRapid: clip(data.clips.crouchBlockRapid),
-  airBlockRapid: clip(data.clips.airBlockRapid),
+  throw: clip([clips.throw[0], ...throwSpins, ...clips.throw.slice(1)]),
+  knockdown: clip(clips.knockdown),
+  getUp: clip(clips.getUp),
+  crouchPunch: clip(clips.crouchPunch),
+  crouchKick: clip(clips.crouchKick),
+  airPunch: clip(clips.airPunch),
+  airKick: clip(clips.airKick),
+  guard: clip(clips.guard.slice(0, 1)),
+  crouchGuard: clip(clips.crouchGuard.slice(0, 1)),
+  airGuard: clip(clips.airGuard.slice(0, 1)),
+  block: clip(clips.guard),
+  crouchBlock: clip(clips.crouchGuard),
+  airBlock: clip(clips.airGuard),
+  blockHeavy: clip(clips.blockHeavy),
+  crouchBlockHeavy: clip(clips.crouchBlockHeavy),
+  airBlockHeavy: clip(clips.airBlockHeavy),
+  blockRapid: clip(clips.blockRapid),
+  crouchBlockRapid: clip(clips.crouchBlockRapid),
+  airBlockRapid: clip(clips.airBlockRapid),
   // The hidden super's guards (responses 78–80 → 168–172).
-  timeStopGuard: clip(data.clips.timeStopGuard),
-  crouchTimeStopGuard: clip(data.clips.crouchTimeStopGuard),
-  airTimeStopGuard: clip(data.clips.airTimeStopGuard),
-  hit: clip(data.clips.hit),
-  hitHeavy: clip(data.clips.hitHeavy),
-  airHit: clip(data.clips.airHit),
-  airHitHeavy: clip(data.clips.airHitHeavy),
+  timeStopGuard: clip(clips.timeStopGuard),
+  crouchTimeStopGuard: clip(clips.crouchTimeStopGuard),
+  airTimeStopGuard: clip(clips.airTimeStopGuard),
+  hit: clip(clips.hit),
+  hitHeavy: clip(clips.hitHeavy),
+  airHit: clip(clips.airHit),
+  airHitHeavy: clip(clips.airHitHeavy),
   // Op 0x20 in 83/84 picks which of two pose orders plays (PCs 957, 982); the
   // match rolls it and draws branch 83/84 + 18.
   hitRapid: scriptClip(83),
   airHitRapid: scriptClip(84),
   // Action 60's last display waits for landing; action 62 then slides and holds.
   down: clip(
-    data.clips.ko,
+    clips.ko,
     false,
-    data.clips.ko.map((frame) => frame.duration || 1),
+    clips.ko.map((frame) => frame.duration || 1),
   ),
-  koLand: clip(data.clips.down),
+  koLand: clip(clips.down),
   // Actions 57/65 call WIN STAND (58) once through opcode 0x09 at PCs 565/667.
-  win: clip([...data.clips.winStand, ...data.clips.win], false, [
-    ...data.clips.winStand.map((frame) => frame.duration),
+  win: clip([...clips.winStand, ...clips.win], false, [
+    ...clips.winStand.map((frame) => frame.duration),
     10,
     10,
     1,
   ]),
   // The source loss action is a blank screen. Use the recovered seated draw pose.
-  lose: clip(data.clips.draw),
-  draw: clip([...data.clips.winStand, ...data.clips.draw]),
+  lose: clip(clips.draw),
+  draw: clip([...clips.winStand, ...clips.draw]),
   // Supers and their hit branches, played from the flattened source timelines.
   noSuper: scriptClip(251),
   airNoSuper: scriptClip(250),
@@ -409,7 +410,7 @@ export const animations = {
   counterHit: scriptClip(174),
   // Command 22 (CPU IORI): action 410 jumps to 411, which jumps to iori3 (248).
   cpuIori: scriptClip(410),
-  cpuIoriRecover: clip(data.clips.cpuIoriRecover),
+  cpuIoriRecover: clip(clips.cpuIoriRecover),
   // Super-cancel versions, entered when a super cancels IORI.
   scMusashi: scriptClip(260),
   scGetterBeam: scriptClip(265),
@@ -421,7 +422,7 @@ export const animations = {
   // Response 76 in the air → action 122; its op 0x20 reorders poses (+18).
   rushAirHit: scriptClip(122),
   // Response 30 (action 128); op 0x07 then replaces the pose from the held table.
-  superHeld: clip(data.clips.grabbed.slice(0, 1)),
+  superHeld: clip(clips.grabbed.slice(0, 1)),
 };
 export type AnimatedAction = keyof typeof animations;
 export type Action = 'idle' | AnimatedAction;
@@ -468,7 +469,7 @@ export function animationDuration(action: AnimatedAction | ObjectKey) {
 // A fighter action's display at an age; idle stands for action 1's first,
 // as scene.ts draws idle from its VM.
 export const clipPose = (action: Action, age: number): Pose =>
-  action === 'idle' ? data.clips.idle[0] : animationFrame(action, age);
+  action === 'idle' ? clips.idle[0] : animationFrame(action, age);
 function bodies(action: Action, age: number): BodyBox[] {
   return clipPose(action, age).body ?? [];
 }

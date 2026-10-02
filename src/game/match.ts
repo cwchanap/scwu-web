@@ -26,8 +26,9 @@ import type {
   Color,
   ObjectKey,
   Pose,
+  Quake,
   ScriptedAction,
-  ScriptEvent,
+  SourceEvent,
   TrailSpec,
 } from './animations';
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
@@ -783,11 +784,11 @@ export interface Fighter {
   objectBox: ScriptBox | null;
   responses: number[];
   onHit: number;
-  // Op 0x23 and 0x25: action changes (0x410cf0) keep them. `trailPose` is the
-  // clip display whose op 0x25 last ran.
+  // Op 0x23 and 0x25: action changes (0x410cf0) keep them. `entered` is the
+  // display whose events last ran.
   color: Color;
   trail: Trail | null;
-  trailPose: Pose | null;
+  entered: Pose | null;
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
@@ -911,6 +912,30 @@ export function afterimageColor(trail: Trail, k: number, own: Color): Color {
     fade: mix(spec.fade, own.fade),
   };
 }
+// One axis of op 0x0e's shake (0x447da9 x, 0x447dbd y), which 0x40c9e0
+// steps once per drawn frame (0x404dd0, after the frame's ticks): `left`
+// counts down from `frames`, and the offset decays (type 1), grows (2),
+// holds (3) or is rand() % amplitude (4), then flips sign on odd frames
+// (0x4456fc counts them). The last frame zeroes it.
+export type ShakeAxis = Quake & { offset: number; left: number };
+export function stepShake(
+  axis: ShakeAxis,
+  frame: number,
+  random: () => number,
+) {
+  if (!axis.left) return;
+  if (!--axis.left) {
+    axis.offset = 0;
+    return;
+  }
+  const p = Math.trunc((axis.left * 100) / axis.frames);
+  const { type, amplitude } = axis;
+  if (type === 1) axis.offset = Math.trunc((amplitude * p) / 100);
+  else if (type === 2) axis.offset = Math.trunc((amplitude * (100 - p)) / 100);
+  else if (type === 3) axis.offset = amplitude;
+  else if (type === 4 && amplitude) axis.offset = random() % amplitude;
+  if (frame & 1) axis.offset = -axis.offset;
+}
 // The display a fighter shows.
 export function fighterPose(f: Fighter): Pose {
   if (f.action === 'superHeld' && f.held?.pose)
@@ -970,7 +995,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   onHit: 0,
   color: NORMAL_COLOR,
   trail: null,
-  trailPose: null,
+  entered: null,
   held: null,
   contact: false,
   jumpVariable: 0,
@@ -1009,7 +1034,7 @@ function gravity(f: Fighter) {
 // Op 0x01: flag bit 0 adds; bits 1–4 keep vx, vy, ax and ay unchanged.
 function motion(
   actor: Pick<Fighter, 'vx' | 'vy' | 'ax' | 'gravity' | 'facing'>,
-  event: Extract<ScriptEvent, { op: 'motion' }>,
+  event: Extract<SourceEvent, { op: 'motion' }>,
 ) {
   const set = (current: number, value: number) =>
     event.flags & 1 ? current + value : value;
@@ -1088,6 +1113,9 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
+  // The latest op 0x0e shake per axis; the renderer steps it (stepShake), and
+  // a new object restarts it.
+  quake: { x: Quake | null; y: Quake | null } = { x: null, y: null };
   // Camera scroll (0x447f2c, 0x447f30) in source pixels, from the first step.
   private camera: { x: number; y: number } | null = null;
   practice: PracticeOptions = {
@@ -1212,7 +1240,7 @@ export class Match {
     f.responses = [];
     f.onHit = 0;
     f.color = entryColor(action) ?? f.color;
-    f.trailPose = null;
+    f.entered = null;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (isScripted(action) || action === 'superHeld' || action === 'shock') {
@@ -1502,7 +1530,7 @@ export class Match {
     }
   }
 
-  private runEvent(actor: Fighter | Effect, owner: number, event: ScriptEvent) {
+  private runEvent(actor: Fighter | Effect, owner: number, event: SourceEvent) {
     const self = this.fighters[owner];
     const other = this.fighters[1 - owner];
     switch (event.op) {
@@ -1585,6 +1613,13 @@ export class Match {
       }
       case 'trail':
         actor.trail = startTrail(event);
+        break;
+      case 'shake':
+        // Op 0x0e r[9:15] (0x41348b): each axis it names restarts.
+        this.quake = {
+          x: event.x ? { ...event.x } : this.quake.x,
+          y: event.y ? { ...event.y } : this.quake.y,
+        };
         break;
       case 'random':
         // Op 0x20 jumps to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
@@ -2318,13 +2353,14 @@ export class Match {
       if (trail.samples.length > trail.spec.count) trail.samples.shift();
     }
     this.run(player, opponent);
-    // A clip display carries the op 0x25 record its action runs before it.
-    for (const f of this.fighters) {
+    // A clip display carries the op 0x0e and 0x25 records its action runs
+    // just before it.
+    this.fighters.forEach((f, index) => {
       const pose = fighterPose(f);
-      if (pose.trail === undefined || pose === f.trailPose) continue;
-      f.trailPose = pose;
-      f.trail = pose.trail && startTrail(pose.trail);
-    }
+      if (pose === f.entered) return;
+      f.entered = pose;
+      for (const event of pose.events ?? []) this.runEvent(f, index, event);
+    });
     // Objects run by priority each tick (0x404d4c). KGT action 58, the stage
     // layout, counts global 6 down (PCs 366–371) at 0x65 (0x406890's callers),
     // after the fighters (0x50) and their axes and missiles (op 0x04 flag 1,

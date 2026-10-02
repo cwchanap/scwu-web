@@ -13,6 +13,7 @@ import {
   reach,
   WIDTH,
   STAGE_WIDTH,
+  stepShake,
 } from './match';
 import type { Effect, Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
@@ -1084,6 +1085,69 @@ describe('recovered afterimages (op 0x25)', () => {
     expect(
       afterimageColor({ ...fixed, spec: { ...fixed.spec, tint: 0 } }, 0, own),
     ).toEqual({ ...own, mode: 1 });
+  });
+});
+
+describe('recovered screen shake (op 0x0e)', () => {
+  it('shakes from the record before a display, on a whiff too', () => {
+    const match = new Match();
+    const f = match.fighters[0];
+    match.step({ hitUp: true });
+    while (!match.quake.y) match.step();
+    // PC 2819 runs before action 200's fifth display (2 + 6 + 4 + 3 ticks in).
+    expect(f).toMatchObject({ action: 'hitUp', age: 15 });
+    expect(match.quake).toEqual({
+      x: null,
+      y: { type: 4, amplitude: 3, frames: 5 },
+    });
+    expect(match.fighters[1].hp).toBe(LIFE);
+  });
+
+  it('shakes on every Air Drill contact, hit or guard', () => {
+    for (const guard of [false, true]) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      f.y = -100;
+      f.action = 'airDrillSpin';
+      target.x = f.x + 150;
+      match.step({}, { guard });
+      expect(f.action).toBe('airDrillContact');
+      // PCs 2991 (hit) and 3002 (guard) shake alike.
+      expect(match.quake).toEqual({
+        x: { type: 4, amplitude: 4, frames: 4 },
+        y: { type: 4, amplitude: 8, frames: 8 },
+      });
+    }
+  });
+
+  it('restarts an axis on every record, even an identical one', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    match.step({ dst: true });
+    const seen = new Set();
+    while (f.action === 'dst' || f.action === 'dstHit') {
+      match.step();
+      if (match.quake.x) seen.add(match.quake.x);
+    }
+    // DST Hit (215) shakes once; each of its ten fast spins (217) again.
+    expect(seen.size).toBe(11);
+  });
+
+  it('steps each axis once per drawn frame (0x40c9e0)', () => {
+    const frames = (type: number, amplitude: number, length: number) => {
+      const axis = { type, amplitude, frames: length, offset: 0, left: length };
+      const rolls = [7, 23, 4, 18, 9, 31, 12, 5, 26, 14];
+      return Array.from({ length: length + 1 }, (_, frame) => {
+        stepShake(axis, frame, () => rolls[frame]);
+        return axis.offset || 0;
+      });
+    };
+    // Knockdown 146's y: decays as amplitude × left / frames, flipping on
+    // odd frames; the last frame zeroes it.
+    expect(frames(1, 3, 5)).toEqual([2, -1, 1, 0, 0, 0]);
+    // The KO's: rand() % 10 each frame.
+    expect(frames(4, 10, 10)).toEqual([7, -3, 4, -8, 9, -1, 2, -5, 6, 0, 0]);
   });
 });
 

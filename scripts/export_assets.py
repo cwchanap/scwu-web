@@ -72,6 +72,11 @@ def decode_event(record):
         return color_state(record)
     if op == 0x25:  # afterimage (0x413a9a): r[3] images every r[4] + 1 ticks; zero in either turns it off
         return trail_state(record)
+    if op == 0x0e:  # screen effects (0x4132fa): r[9:12] and r[12:15] shake x and y (type, amplitude, frames)
+        def axis(i):
+            return dict(type=record[i], amplitude=record[i + 1], frames=record[i + 2]) if record[i] else None
+        x, y = axis(9), axis(12)
+        return dict(op="shake", x=x, y=y) if x or y else None
     return None
 
 
@@ -241,24 +246,25 @@ def main():
     for name, index in actions.items():
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
-        # A display after an op 0x23 carries the colour state it sets, and the
-        # display after an op 0x25 its afterimage record (None turns it off).
-        frames, bodies, color, trail = [], None, None, None
+        # A display after an op 0x23 carries the colour state it sets, and
+        # the op 0x0e and 0x25 events of the records just before it.
+        frames, bodies, color, events = [], None, None, []
         for pc in range(action.start, action.end):
             if p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] == 0x25 and pc >= action.start + offset:
-                record = p.records[pc]
-                trail = {k: v for k, v in trail_state(record).items() if k != "op"} if record[3] and record[4] else False
+            elif p.records[pc][0] in (0x0e, 0x25) and pc >= action.start + offset:
+                event = decode_event(p.records[pc])
+                if event:
+                    events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
                 image = c.images[frame["image"]]
                 frame = with_body(dict(frame, width=image.width, height=image.height), bodies)
                 frame = dict(frame, color=color) if color else frame
-                frames.append(frame if trail is None else dict(frame, trail=trail or None))
-                trail = None
+                frames.append(dict(frame, events=events) if events else frame)
+                events = []
                 image_ids.add(frame["image"])
         clips[name] = frames
     # Op 0x07 replaces a held fighter's display with an entry of this 15 x 6-byte
