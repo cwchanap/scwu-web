@@ -275,14 +275,15 @@ def main():
     # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
-    # IORI (410, which jumps through 411 into iori3), the rush air hit (122), and the
-    # beam hits (83, 84) and air reactions whose op 0x01 commands the match plays,
-    # and every response's hit effect with its op 0x20 branches, keyed
+    # IORI (410, which jumps through 411 into iori3), the rush air hit (122), the
+    # beam hits (83, 84), hits 75 and 80 for their op 0x20 rolls, air reactions
+    # whose op 0x01 commands the match plays, and every response's hit effect,
+    # each with its op 0x20 branches, keyed
     # "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     scripts, queue = {}, [(i, 0) for i in [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264,
                           265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-                          74, 76, 153, 158, 167, 172, *filter(None, response_effects)]]
+                          74, 75, 76, 80, 153, 158, 167, 172, *filter(None, response_effects)]]
     played = set(actions.values())
     while queue:
         index, offset = key = queue.pop()

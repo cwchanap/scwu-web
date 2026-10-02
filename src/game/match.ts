@@ -594,8 +594,8 @@ function loseLife(f: Fighter, loss: number) {
 }
 // 0x40f010: a hit takes the box's damage scaled by the struck body box's
 // percentage `taken`; a guard takes 20% (+0x7ca5) only from a box of kind bit 2.
-// ponytail: Ryuko's combo decay (+0x7ca8) is 0, so the victim's hit count
-// never reduces damage and isn't tracked.
+// Ryuko's combo decay (+0x7ca8) is 0, so the victim's hit count never reduces
+// damage and isn't tracked.
 function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
   if (!blocked)
     return box.damage && Math.max(1, Math.trunc((box.damage * taken) / 100));
@@ -648,6 +648,17 @@ function struck(
 // (8). Free and attacking fighters (0 and 4) can be grabbed.
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
+// Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
+// 1619): 75, 76 and 80 only skip a sound, while 83, 84 and 122 swap their
+// first three poses.
+const ROLLED: Partial<Record<Action, number>> = {
+  hitHeavy: 75,
+  airHitHeavy: 76,
+  launchAway: 80,
+  hitRapid: 83,
+  airHitRapid: 84,
+  rushAirHit: 122,
+};
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
 // A command entered free and a landing handler mark a player acting
 // (+0x15e & ~8 | 4, 0x411a41 and 0x4118f3); a cancel keeps the bits.
@@ -775,6 +786,8 @@ export interface Fighter {
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
   jumpVariable: number;
+  // The op 0x20 branch this reaction rolled on entry, drawn instead of its clip.
+  branch: ObjectKey | null;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
   // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
   // fighter returns to neutral. `striker` (+0xdefd): the opponent's own box
@@ -894,6 +907,7 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   jumpVariable: 0,
   reaction: 0,
   striker: null,
+  branch: null,
   stopped: 0,
   transfer: 0,
 });
@@ -1110,6 +1124,15 @@ export class Match {
     // Air reactions land straight into idle, as landing without a handler
     // clears the bits too (0x4124c3).
     if (neutralActions.has(action)) toNeutral(f);
+    // A reaction rolls its op 0x20 at its first script step, before the hit
+    // effect's objects (the fighters' bucket 0x50 runs before their 0x5d).
+    f.branch = null;
+    const rolled = ROLLED[action];
+    const roll = rolled
+      ? script(rolled).events.find((e) => e.op === 'random')
+      : undefined;
+    if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
+      f.branch = `${roll.action}+${roll.offset}`;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
     f.nextAttack = null;
     f.nextJump = false;
@@ -1493,9 +1516,8 @@ export class Match {
       case 'random':
         // Op 0x20 jumps to r[6] at offset r[8] when rand() % (r[1] + 1) > r[3]
         // (0x417a22). Objects roll it: streak 348 picks one of three pose sets,
-        // each mirrored or not; stars 351/360 one of four flights.
-        // ponytail: fighters play the fall-through (76, 83, 84, 122 only
-        // reorder poses; CPU IORI 410 rolls when it ends).
+        // each mirrored or not; stars 351/360 one of four flights. Fighters
+        // roll their reactions' on entry (ROLLED) and CPU IORI's as it ends.
         if (!('clip' in actor)) break;
         if (this.cpu.random() % event.divisor <= event.above || !event.action)
           break;

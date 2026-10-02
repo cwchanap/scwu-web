@@ -4823,4 +4823,25 @@ describe('recovered air and rapid reaction motion', () => {
     expect(animationDuration('hitRapid')).toBe(34);
     expect(animationDuration('airHitRapid')).toBe(34);
   });
+
+  it('rolls a beam hit’s op 0x20 on entry and draws its branch (PC 957)', () => {
+    // The victim's roll is the match's first: rand % 3 > 1 enters 83 + 18.
+    const branches = new Set<Fighter['branch']>();
+    for (let seed = 0; seed < 20; seed++) {
+      const match = new Match('practice', false, seed);
+      const [f, target] = match.fighters;
+      f.action = 'kick3';
+      target.x = f.x + 140;
+      while (target.action !== 'hitRapid') match.step();
+      const branch = new CpuVM([], 0, seed).random() % 3 > 1;
+      expect(target.branch).toBe(branch ? '83+18' : null);
+      branches.add(target.branch);
+    }
+    expect(branches).toEqual(new Set([null, '83+18']));
+    // The branch swaps the first three poses.
+    const images = (clip: 'hitRapid' | '83+18') =>
+      [0, 3, 6, 9].map((age) => animationFrame(clip, age).image);
+    expect(images('hitRapid')).toEqual([47, 52, 47, 47]);
+    expect(images('83+18')).toEqual([52, 47, 52, 47]);
+  });
 });

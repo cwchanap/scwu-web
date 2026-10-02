@@ -248,6 +248,7 @@ export class TrainingScene extends Phaser.Scene {
     }
     if (f.action === 'superHeld' && f.held?.pose)
       return heldFrame(f.held.pose, f.held.flags);
+    if (f.branch) return animationFrame(f.branch, f.age);
     return animationFrame(f.action, f.action === 'jump' ? f.airAge : f.age);
   }
 

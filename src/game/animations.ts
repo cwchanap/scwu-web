@@ -345,7 +345,8 @@ export const animations = {
   hitHeavy: clip(data.clips.hitHeavy),
   airHit: clip(data.clips.airHit),
   airHitHeavy: clip(data.clips.airHitHeavy),
-  // Op 0x20 in 83/84 only picks which of two pose orders plays (PCs 957, 982).
+  // Op 0x20 in 83/84 picks which of two pose orders plays (PCs 957, 982); the
+  // match rolls it and draws branch 83/84 + 18.
   hitRapid: scriptClip(83),
   airHitRapid: scriptClip(84),
   // Action 60's last display waits for landing; action 62 then slides and holds.
@@ -395,7 +396,7 @@ export const animations = {
   // Responses 43 (action 97, looping 98 until landing) and 33 (88, looping 90).
   fly: scriptClip(97),
   shock: scriptClip(88),
-  // Response 76 in the air → action 122; op 0x20 there only reorders poses.
+  // Response 76 in the air → action 122; its op 0x20 reorders poses (+18).
   rushAirHit: scriptClip(122),
   // Response 30 (action 128); op 0x07 then replaces the pose from the held table.
   superHeld: clip(data.clips.grabbed.slice(0, 1)),
