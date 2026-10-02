@@ -1500,6 +1500,35 @@ describe('recovered supers', () => {
     expect(target.action).not.toBe('superHeld');
   });
 
+  it('darkens the court while a super holds variable 14 (action 43)', () => {
+    const { match, ryuko, target } = superMatch(300);
+    match.step({ getterBeam: true });
+    // Action 264 sets variable 14 to 100 at age 0 (PC 3975); action 43, in
+    // bucket 15,
+    // reads it a tick later.
+    expect(ryuko).toMatchObject({ darken: 100, black: { shown: 'none' } });
+    const shown = Array.from({ length: 13 }, () => {
+      match.step();
+      return ryuko.black.shown;
+    });
+    expect(shown).toEqual([
+      ...['opaque', 'half', 'half', 'half', 'half', 'half'],
+      ...['opaque', 'half', 'half', 'half', 'half', 'half'],
+      'opaque',
+    ]);
+    expect(target.black.shown).toBe('none');
+    until(match, () => ryuko.darken === 0);
+    // PC 3990 clears it at age 80 (PC 3975 set it); the panel finishes its
+    // display.
+    expect(ryuko.age).toBe(80);
+    let left = 0;
+    while (ryuko.black.shown !== 'none') {
+      match.step();
+      left++;
+    }
+    expect(left).toBeLessThanOrEqual(6);
+  });
+
   it("fades Musashi Hit's Ryuko to green and back through her fader", () => {
     const { match, ryuko } = superMatch(130);
     match.step({ musashi: true });

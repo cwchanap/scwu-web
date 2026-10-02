@@ -3,7 +3,13 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
-import { animationFrame, dstHold, isBlank, NORMAL_COLOR } from './animations';
+import {
+  animationFrame,
+  BLACK,
+  dstHold,
+  isBlank,
+  NORMAL_COLOR,
+} from './animations';
 import type { Color, Pose } from './animations';
 import {
   afterimageColor,
@@ -98,6 +104,7 @@ export class TrainingScene extends Phaser.Scene {
   private pressed = new Set<Control>();
   private sprites: Phaser.GameObjects.Image[] = [];
   private shadows: Phaser.GameObjects.Ellipse[] = [];
+  private blacks: Phaser.GameObjects.Image[] = [];
   private projectileSprites: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
   private trailSprites: Phaser.GameObjects.Image[] = [];
@@ -138,6 +145,16 @@ export class TrainingScene extends Phaser.Scene {
         .setScale(1.5)
         .setFlipX(x !== 0);
     for (const f of this.match.fighters) {
+      // Action 43, a viewport object at (327, 498) in bucket 15 (op 0x04
+      // flags 0x46 at PCs 300/325): over the court, behind every object.
+      this.blacks.push(
+        this.add
+          .image(0, 0, 'ryuko-294')
+          .setScale(ART_SCALE)
+          .setScrollFactor(0)
+          .setDepth(0.5)
+          .setVisible(false),
+      );
       this.shadows.push(
         this.add.ellipse(f.x, GROUND - 1, 94, 13, 0x171311, 0.3),
       );
@@ -397,6 +414,16 @@ export class TrainingScene extends Phaser.Scene {
           .setDepth(behind === undefined ? 2 : behind ? 1 : 3)
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
+        const { shown } = f.black;
+        if (shown === 'none') this.blacks[i].setVisible(false);
+        else
+          this.place(
+            this.blacks[i],
+            BLACK[shown],
+            327 * ART_SCALE,
+            498 * ART_SCALE,
+            1,
+          );
         const shadow = this.shadows[i];
         shadow
           .setPosition(f.x, GROUND - 1)

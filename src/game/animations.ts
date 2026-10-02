@@ -48,7 +48,7 @@ export type Pose = Frame & {
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  events?: Extract<SourceEvent, { op: 'trail' | 'screen' }>[];
+  events?: Extract<SourceEvent, { op: 'trail' | 'screen' | 'variable' }>[];
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
@@ -180,6 +180,7 @@ export type SourceEvent =
   | { op: 'freeze'; add: number }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
+  | { op: 'variable'; index: number; value: number }
   | {
       op: 'screen';
       fader: FaderSpec | null;
@@ -486,6 +487,9 @@ export const clipPose = (action: Action, age: number): Pose =>
 function bodies(action: Action, age: number): BodyBox[] {
   return clipPose(action, age).body ?? [];
 }
+// Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
+// (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436).
+export const BLACK = { opaque: clips.black[1], half: clips.black[2] };
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
 export const entryColor = (action: Action) => clipPose(action, 0).color;

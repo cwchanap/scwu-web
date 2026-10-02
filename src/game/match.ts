@@ -790,6 +790,13 @@ export interface Fighter {
   trail: Trail | null;
   entered: Pose | null;
   fader: Fader | null;
+  // Op 0x1f player variable 14 (selector 0x4e): every super sets it to 100,
+  // and most other actions clear it before their first display.
+  darken: number;
+  // Action 43 'Black', which the round intro spawns for each player (PCs
+  // 300/325): showing nothing, its panel opaque, or its panel at 50%, for
+  // `left` more ticks.
+  black: { shown: 'none' | 'opaque' | 'half'; left: number };
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
@@ -1020,6 +1027,8 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   trail: null,
   entered: null,
   fader: null,
+  darken: 0,
+  black: { shown: 'none', left: 1 },
   held: null,
   contact: false,
   jumpVariable: 0,
@@ -1637,6 +1646,9 @@ export class Match {
       }
       case 'trail':
         actor.trail = startTrail(event);
+        break;
+      case 'variable':
+        if (event.index === 14) self.darken = event.value;
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
@@ -2390,9 +2402,22 @@ export class Match {
       });
       if (trail.samples.length > trail.spec.count) trail.samples.shift();
     }
+    // Action 43 runs in bucket 15, before the fighters' scripts (0x50): while
+    // variable 14 is 100 it shows its panel one tick opaque (PC 431), then
+    // five at 50% (PC 435), checking again after each (PCs 428, 433).
+    for (const { black, darken } of this.fighters) {
+      if (black.left > 1) black.left--;
+      else if (black.shown === 'opaque')
+        Object.assign(black, { shown: 'half', left: 5 });
+      else
+        Object.assign(black, {
+          shown: darken === 100 ? 'opaque' : 'none',
+          left: 1,
+        });
+    }
     this.run(player, opponent);
-    // A clip display carries the op 0x0e and 0x25 records its action runs
-    // just before it.
+    // A clip display carries the op 0x0e, 0x1f and 0x25 records its action
+    // runs just before it.
     this.fighters.forEach((f, index) => {
       const pose = fighterPose(f);
       if (pose === f.entered) return;

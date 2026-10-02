@@ -66,6 +66,8 @@ def decode_event(record):
                     action=u16(record, 6), offset=record[8])
     if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer
         return dict(op="freeze", add=s16(record, 7))
+    if op == 0x1f and record[4] >> 6 == 1 and record[5] == 1:  # player variable r[4] & 0x3f = r[7:9]
+        return dict(op="variable", index=record[4] & 0x3f, value=s16(record, 7))
     if op == 0x1a:  # hit-stop ticks for the object itself and the opponent
         return dict(op="stop", self=record[1], other=record[2])
     if op == 0x23:  # colour (0x413a07): blit mode, signed r, g, b palette offsets, r[5] fade in mode 4
@@ -243,6 +245,8 @@ def main():
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
         "ko": 60, "down": 62, "win": 57, "winStand": 58, "draw": 65,
+        # Action 43 'Black', the super darkening the round intro spawns.
+        "black": 43,
     }
     clips = {}
     image_ids = {419, 464, 2001}
@@ -250,16 +254,17 @@ def main():
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
         # A display after an op 0x23 carries the colour state it sets, and
-        # the op 0x0e and 0x25 events of the records just before it.
+        # the op 0x0e, 0x25 and player-variable events of the records just
+        # before it.
         frames, bodies, color, events = [], None, None, []
         for pc in range(action.start, action.end):
             if p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] in (0x0e, 0x25) and pc >= action.start + offset:
+            elif p.records[pc][0] in (0x0e, 0x1f, 0x25) and pc >= action.start + offset:
                 event = decode_event(p.records[pc])
-                if event:
+                if event and event["op"] in ("screen", "trail", "variable"):
                     events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
