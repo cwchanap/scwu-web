@@ -348,6 +348,9 @@ export const animations = {
   twist: clip([clips.twist[0], ...clips.twisting], 1),
   twistBounce: clip([clips.twist[1], ...clips.twisting2], 1),
   dstMissile: clip(clips.dstMissile, true),
+  // Action 225, which 226 jumps to while its axe flies (PC 3267): one
+  // display, then neutral.
+  axeBusy: clip(clips.axeBusy),
   axeThrow: clip(clips.axeThrow),
   axeFlight: clip(clips.axeFlight, true),
   axeHit: clip(clips.axeHit),

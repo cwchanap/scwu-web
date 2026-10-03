@@ -1664,8 +1664,8 @@ export class Match {
     // object in slot r[12], then registers the new one there (0x412caf); an
     // object's deletion clears its slot (0x40e4a0). ponytail: a nonzero
     // r[5:7] instead jumps the spawner to that action while the slot's object
-    // lives (0x412ac0), as axe throw 226 does into 225 while its axe flies
-    // (PC 3267); the port's axe rules leave it out.
+    // lives (0x412ac0), which the export doesn't decode; only the axe throw
+    // uses it, and command() checks its axe (PCs 3267, 3279).
     const registers = !(event.flags & 4);
     if (registers)
       this.effects = this.effects.filter(
@@ -1956,7 +1956,16 @@ export class Match {
     // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
     if (fresh('dst') && ok(31))
       return start(f.hp <= DESPERATION_HP ? 'evilDst' : 'dst');
-    if (fresh('axe') && ok(31)) return start('axeThrow');
+    // Action 226's op 0x04 at PC 3267 jumps to 225 while its axe (slot 6)
+    // lives, flying or breaking.
+    if (fresh('axe') && ok(31))
+      return start(
+        this.projectiles.some(
+          (p) => p.kind === 'axe' && p.owner === this.fighters.indexOf(f),
+        )
+          ? 'axeBusy'
+          : 'axeThrow',
+      );
     if (fresh('punch') && ok(21))
       return start(input.crouch ? 'crouchPunch' : 'punch');
     if (fresh('hitUp') && ok(21)) return start('hitUp');
@@ -2590,13 +2599,8 @@ export class Match {
     });
     this.fighters.forEach((f, owner) => {
       if (frozen[owner]) return;
-      // ponytail: a new throw replaces the last axe; the source's PC 3267
-      // jumps to 225 instead while it flies (see spawnObject). Action 226
-      // spawns 227 at (−6, −102) (PC 3279), flying at raw 900 (PC 3293).
-      if (f.action === 'axeThrow' && f.age === 0)
-        this.projectiles = this.projectiles.filter(
-          (p) => p.kind !== 'axe' || p.owner !== owner,
-        );
+      // Action 226 spawns 227 at (−6, −102) (PC 3279), flying at raw 900
+      // (PC 3293).
       if (f.action === 'axeThrow' && f.age === AXE_RELEASE_TICK)
         this.projectiles.push({
           owner,

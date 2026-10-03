@@ -4023,18 +4023,27 @@ describe('prototype training rules', () => {
     expect(target.hp).toBe(LIFE - 36);
   });
 
-  it('replaces the flying axe with a new throw and cancels one interrupted before release', () => {
+  it('keeps a flying axe, stands a tick for a throw meanwhile and cancels one interrupted before release', () => {
     const match = new Match();
-    match.fighters[0].x = FIGHTER_MARGIN;
+    const [f] = match.fighters;
+    f.x = FIGHTER_MARGIN;
     match.fighters[1].x = STAGE_WIDTH - FIGHTER_MARGIN;
     match.step({ axe: true });
     ticks(match, animationDuration('axeThrow'));
-    expect(match.projectiles).toMatchObject([{ hit: false }]);
-    // Authored: a new throw replaces the flying axe (the source's PC 3267
-    // jumps to 225 instead while it flies).
+    const [axe] = match.projectiles;
+    expect(axe).toMatchObject({ hit: false });
+    // While its axe (slot 6) lives, 226 jumps to 225 (PC 3267): one display,
+    // then neutral, and the axe flies on.
     match.step({ axe: true });
-    expect(match.fighters[0].action).toBe('axeThrow');
-    expect(match.projectiles).toHaveLength(0);
+    expect(f.action).toBe('axeBusy');
+    expect(match.projectiles).toEqual([axe]);
+    match.step();
+    expect(f.action).toBe('idle');
+    for (let tick = 0; tick < 1000 && match.projectiles.length; tick++)
+      match.step();
+    expect(match.projectiles).toEqual([]);
+    match.step({ axe: true });
+    expect(f.action).toBe('axeThrow');
     ticks(match, AXE_RELEASE_TICK);
     expect(match.projectiles).toMatchObject([{ age: 0 }]);
     const interrupted = new Match();

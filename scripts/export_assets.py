@@ -233,7 +233,7 @@ def main():
         "punch2": 180, "punch3": 181, "kick2": 188, "kick3": 189, "kick3Repeat": 190,
         "punchHit": 179, "kickHit": 187,
         "drill": 207, "airDrill": 208, "airDrillSpin": 209, "drillLand": 212,
-        "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
+        "axeBusy": 225, "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
         "grab": 196, "throw": 197, "throwSpin": 199,
         "hitUp": 200, "hitUpRecover": 201, "hitUpJump": 202,
         "iori": 246, "iori2": 247, "iori3": 248,

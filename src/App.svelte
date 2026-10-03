@@ -356,8 +356,8 @@
           aerial drill while jumping. Aerial drill follows each hit or block
           with a weaker strike while you stay in range. Landing ends it with its
           recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
-          Only one axe per fighter can be out at a time. These basic specials do not
-          spend super stock.
+          Only one axe per fighter can be out at a time: pressing it again while your
+          axe flies does nothing. These basic specials do not spend super stock.
         </p>
         <p>
           Press <kbd>H</kbd> or Hit Up on the ground for an upward kick. On a hit,
