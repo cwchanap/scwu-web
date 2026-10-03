@@ -1614,8 +1614,10 @@ export class Match {
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
-        // actor's colour. ponytail: flag 2 (the caught opponent's), 4 and 8
-        // (global faders; the round intro's fades to 0 from 0) are left out.
+        // actor's colour. ponytail: flags 2 (the caught opponent's), 4 and 8
+        // (global faders) start from 0 (0x41336c–0x413481) and are left out:
+        // no Ryuko record uses 2 or 8, and 4 only fades the round intro's
+        // screen fader from 0 to 0 (PCs 303, 327).
         if (event.fader && event.fader.flags & 1) {
           const { type, r, g, b, fade, ticks } = event.fader;
           const { color } = actor;
