@@ -1209,12 +1209,7 @@ export class Match {
   }
 
   get resultReady() {
-    // Authored: the result also waits for a KO fall (60) to land.
-    return (
-      this.winner !== null &&
-      this.endingTicks >= ROUND_END_TICKS &&
-      !this.fighters.some((f) => f.action === 'down')
-    );
+    return this.winner !== null && this.endingTicks >= ROUND_END_TICKS;
   }
 
   private action(f: Fighter, action: Action, restart = false) {
@@ -1302,15 +1297,14 @@ export class Match {
     )
       return;
     // Back in neutral, 0x410ff1 enters the action word of the round's result
-    // (+0xe007): win 57, draw 65, or the lose action 59, which a timeout loser
-    // takes into KO Normal like a KO.
+    // (+0xe007): 1 win (57), 2 lose (59) or 3 draw (65). The result states
+    // (0x409444, 0x409519) give the loser 3 once the timer (0x470050) has run
+    // out, so a loser still standing takes the draw action.
     this.action(
       f,
-      this.winner === 'draw'
-        ? 'draw'
-        : (this.winner === 'player') === (index === 0)
-          ? 'win'
-          : 'down',
+      this.winner !== 'draw' && (this.winner === 'player') === (index === 0)
+        ? 'win'
+        : 'draw',
     );
   }
 
@@ -2399,8 +2393,8 @@ export class Match {
       if (pose === f.entered) return;
       // A reaction that rolled its op 0x20 draws the branch, but first ran
       // the records before the roll: those of its own first display. A KO
-      // (+0x75a0, 0x40e83e) or a timeout loss enters the lose action 59
-      // first: it deletes objects 7–9 and clears variables 6, 8 and 14, then
+      // (+0x75a0, 0x40e83e) enters the lose action 59 first: it deletes
+      // objects 7–9 and clears variables 6, 8 and 14, then
       // jumps to KO Normal (PC 591). With global 0 at 10 it would enter
       // 'make hikari' (63) instead (PC 590), but only the title menu writes
       // global 0, to 1 (KGT 78, PC 497).

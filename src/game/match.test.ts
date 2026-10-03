@@ -258,7 +258,7 @@ describe('Hit Up launcher', () => {
     expect(target.darken).toBe(0);
   });
 
-  it('ends a KO and a timeout loss in KO Normal, through the lose action 59', () => {
+  it('keeps KO and timeout on their own ending paths', () => {
     const ko = new Match();
     ko.fighters[0].x = 440;
     // 60% of Hit Up's 15 at desperation life.
@@ -278,7 +278,8 @@ describe('Hit Up launcher', () => {
       expect(match.winner).toBe('player');
       untilResult(match);
       expect(match.fighters[0]).toMatchObject({ action: 'win', y: 0 });
-      expect(match.fighters[1]).toMatchObject({ action: 'koLand', y: 0 });
+      // A timeout gives the loser result 3, the draw action (0x409444).
+      expect(match.fighters[1]).toMatchObject({ action: 'draw', y: 0 });
     }
   });
 });
@@ -2108,7 +2109,7 @@ describe('IORI chain', () => {
     expect(match.winner).toBe('player');
     expect(match.fighters[1].action).toBe('launchDown');
     untilResult(match);
-    expect(match.fighters[1]).toMatchObject({ action: 'koLand', y: 0 });
+    expect(match.fighters[1]).toMatchObject({ action: 'draw', y: 0 });
   });
 });
 
@@ -2445,9 +2446,9 @@ describe('prototype training rules', () => {
       );
       match.ticks = 5999;
       match.step({}, {});
-      expect(target.action).not.toBe('down');
+      expect(target.action).not.toBe('draw');
       untilResult(match);
-      expect(target).toMatchObject({ action: 'koLand', y: 0 });
+      expect(target).toMatchObject({ action: 'draw', y: 0 });
     },
   );
 
@@ -4596,7 +4597,7 @@ describe('prototype training rules', () => {
       expect(match.fighters.map((f) => f.action)).toEqual(['land', 'land']);
       ticks(match, animationDuration('land'));
       expect(match.fighters.map((f) => f.action)).toEqual(
-        hp === LIFE ? ['draw', 'draw'] : ['win', 'down'],
+        hp === LIFE ? ['draw', 'draw'] : ['win', 'draw'],
       );
     },
   );
@@ -4678,17 +4679,16 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('shows win and KO Normal, or draw poses, when time expires with both fighters alive', () => {
+  it('shows win or draw poses when time expires with both fighters alive', () => {
     for (const hp of [500, LIFE]) {
       const match = new Match('cpu');
       match.ticks = 5999;
       match.fighters[1].hp = hp;
       match.step({}, {});
+      // The loser still standing takes result 3, the draw action.
       expect(match.fighters.map((f) => f.action)).toEqual(
-        hp === LIFE ? ['draw', 'draw'] : ['win', 'down'],
+        hp === LIFE ? ['draw', 'draw'] : ['win', 'draw'],
       );
-      // KO Normal's PC 607 stops the winner ten ticks.
-      expect(match.fighters[0].hitStop).toBe(hp === LIFE ? 0 : 10);
       untilResult(match);
     }
   });
