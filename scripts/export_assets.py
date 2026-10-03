@@ -322,15 +322,16 @@ def main():
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
     # IORI (410, which jumps through 411 into iori3), the rush air hit (122), the
     # beam hits (83, 84), hits 75 and 80 for their op 0x20 rolls, air reactions
-    # whose op 0x01 commands the match plays, every response's hit effect and
-    # every object the clips spawn, each with its op 0x20 branches, keyed
+    # whose op 0x01 commands the match plays, the lose action (59) whose records
+    # open every KO, every response's hit effect and every object the clips
+    # spawn, each with its op 0x20 branches, keyed
     # "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     spawned = {(e["action"], e["offset"]) for frames in clips.values() for f in frames
                for e in f.get("events", []) if e["op"] == "spawn" and e["action"]}
     scripts, queue = {}, [(i, 0) for i in [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264,
                           265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-                          74, 75, 76, 80, 153, 158, 167, 172, *filter(None, response_effects)]]
+                          74, 75, 76, 80, 153, 158, 167, 172, 59, *filter(None, response_effects)]]
     queue += sorted(spawned)
     played = set(actions.values())
     while queue:

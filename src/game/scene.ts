@@ -413,8 +413,12 @@ export class TrainingScene extends Phaser.Scene {
             : f.action === 'superHeld'
               ? ((f.held?.flags ?? 0) & 1) !== 0
               : undefined;
+        // A KO (0x40e8cd) drops the fighter to z 0x3c, behind the other
+        // fighter and the objects drawn behind it.
         this.paint(sprite, pose, this.faded(f.color, i))
-          .setDepth(behind === undefined ? 2 : behind ? 1 : 3)
+          .setDepth(
+            f.hp === 0 ? 0.9 : behind === undefined ? 2 : behind ? 1 : 3,
+          )
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
         const { shown } = f.black;

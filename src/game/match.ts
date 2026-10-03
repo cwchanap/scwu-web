@@ -497,6 +497,8 @@ const tosses = {
   throw: { tick: THROW_TOSS_TICK, damage: 30 },
   dstHit: { tick: DST_TOSS_TICK, damage: 10 },
 } as const;
+// Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
+const LOSE = 59;
 // The DST missiles (218) and the axe (227) fly as projectiles, not objects.
 const PROJECTILE_ACTIONS = new Set([218, 227]);
 // Command table entries 'G BEAM LV1', 'MUSASHI', 'CGA', 'hidden sup' and 'B G';
@@ -1207,11 +1209,19 @@ export class Match {
   }
 
   get resultReady() {
-    return this.winner !== null && this.endingTicks >= ROUND_END_TICKS;
+    // Authored: the result also waits for a KO fall (60) to land.
+    return (
+      this.winner !== null &&
+      this.endingTicks >= ROUND_END_TICKS &&
+      !this.fighters.some((f) => f.action === 'down')
+    );
   }
 
   private action(f: Fighter, action: Action, restart = false) {
     if (f.action === action && !restart) return;
+    // KO Normal's PC 607 adds ten stop ticks to the other fighter.
+    if (action === 'down')
+      this.fighters[1 - this.fighters.indexOf(f)].hitStop += 10;
     addPower(f, ATTACK_POWER[action] ?? 0);
     // Variable 1: set by actions 10–12 and 16–17 (PCs 119/199/217); an air
     // dash's end (op 0x0a into action 7 + 0) clears it.
@@ -1291,13 +1301,16 @@ export class Match {
         f.age < animationDuration(f.action))
     )
       return;
+    // Back in neutral, 0x410ff1 enters the action word of the round's result
+    // (+0xe007): win 57, draw 65, or the lose action 59, which a timeout loser
+    // takes into KO Normal like a KO.
     this.action(
       f,
       this.winner === 'draw'
         ? 'draw'
         : (this.winner === 'player') === (index === 0)
           ? 'win'
-          : 'lose',
+          : 'down',
     );
   }
 
@@ -2383,11 +2396,20 @@ export class Match {
       const pose = fighterPose(f);
       if (pose === f.entered) return;
       // A reaction that rolled its op 0x20 draws the branch, but first ran
-      // the records before the roll: those of its own first display.
-      const events = [
-        ...((!f.entered && f.branch && clipPose(f.action, 0).events) || []),
-        ...(pose.events ?? []),
-      ];
+      // the records before the roll: those of its own first display. A KO
+      // (+0x75a0, 0x40e83e) or a timeout loss enters the lose action 59
+      // first: it deletes objects 7–9 and clears variables 6, 8 and 14, then
+      // jumps to KO Normal (PC 591). With global 0 at 10 it would enter
+      // 'make hikari' (63) instead (PC 590), but only the title menu writes
+      // global 0, to 1 (KGT 78, PC 497).
+      const entry = f.entered
+        ? []
+        : f.branch
+          ? clipPose(f.action, 0).events
+          : f.action === 'down'
+            ? script(LOSE).events
+            : [];
+      const events = [...(entry ?? []), ...(pose.events ?? [])];
       f.entered = pose;
       if (isScripted(f.action)) return;
       for (const event of events)
@@ -2892,10 +2914,6 @@ export class Match {
       this.projectiles = [];
       this.winner =
         a.hp === b.hp ? 'draw' : a.hp > b.hp ? 'player' : 'opponent';
-      this.fighters.forEach((f, index) => {
-        // KO action 60, PC 607 adds ten stop ticks to the other fighter.
-        if (f.action === 'down') this.fighters[1 - index].hitStop += 10;
-      });
       this.fighters.forEach((f, index) => {
         if (f.action === 'dstHeld') this.action(f, 'hit');
         // A super's hold or cinematic ends with the round.

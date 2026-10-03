@@ -401,8 +401,6 @@ export const animations = {
     10,
     1,
   ]),
-  // The source loss action is a blank screen. Use the recovered seated draw pose.
-  lose: clip(clips.draw),
   draw: clip([...clips.winStand, ...clips.draw]),
   // Supers and their hit branches, played from the flattened source timelines.
   noSuper: scriptClip(251),

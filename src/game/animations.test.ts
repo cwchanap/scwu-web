@@ -349,7 +349,6 @@ describe('selected core animation assets', () => {
     expect(animationFrame('draw', 114).image).toBe(1);
     expect(animationFrame('draw', 115).image).toBe(24);
     expect(animationFrame('draw', 10000).image).toBe(420);
-    expect(animationFrame('lose', 0).image).toBe(24);
     // Action 60 holds its falling pose until action 62 is entered on landing.
     expect(animationFrame('down', 13).image).toBe(52);
     expect(animationFrame('down', 14).image).toBe(60);

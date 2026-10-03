@@ -37,6 +37,13 @@ function ticks(
   for (let i = 0; i < count; i++) match.step(input, opponent);
 }
 
+// Steps an ending until its result shows.
+function untilResult(match: Match) {
+  for (let tick = 0; tick < 2000 && !match.resultReady; tick++)
+    match.step({}, {});
+  expect(match.resultReady).toBe(true);
+}
+
 // The response hit effects 0x40f567 spawns at contact.
 const HIT_EFFECTS = new Set(RESPONSE_EFFECTS.filter(Boolean));
 const hitEffects = (match: Match) =>
@@ -236,7 +243,22 @@ describe('Hit Up launcher', () => {
     }
   });
 
-  it('keeps KO and timeout on their own ending paths', () => {
+  it("runs the lose action 59's records as a KO enters (PCs 584–589)", () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    target.hp = 1;
+    target.darken = 100;
+    const beam = object(398, 1, { slot: 7 });
+    match.effects.push(beam);
+    match.step({ punch: true });
+    while (target.action !== 'down') match.step();
+    // It deletes objects 7–9 and clears variable 14, the darkening.
+    expect(match.effects).not.toContain(beam);
+    expect(target.darken).toBe(0);
+  });
+
+  it('ends a KO and a timeout loss in KO Normal, through the lose action 59', () => {
     const ko = new Match();
     ko.fighters[0].x = 440;
     // 60% of Hit Up's 15 at desperation life.
@@ -254,9 +276,9 @@ describe('Hit Up launcher', () => {
       match.ticks = 5999;
       match.step({}, {});
       expect(match.winner).toBe('player');
-      ticks(match, ROUND_END_TICKS);
+      untilResult(match);
       expect(match.fighters[0]).toMatchObject({ action: 'win', y: 0 });
-      expect(match.fighters[1]).toMatchObject({ action: 'lose', y: 0 });
+      expect(match.fighters[1]).toMatchObject({ action: 'koLand', y: 0 });
     }
   });
 });
@@ -2085,9 +2107,8 @@ describe('IORI chain', () => {
     match.step({}, {});
     expect(match.winner).toBe('player');
     expect(match.fighters[1].action).toBe('launchDown');
-    ticks(match, ROUND_END_TICKS);
-    expect(match.fighters[1]).toMatchObject({ action: 'lose', y: 0 });
-    expect(match.resultReady).toBe(true);
+    untilResult(match);
+    expect(match.fighters[1]).toMatchObject({ action: 'koLand', y: 0 });
   });
 });
 
@@ -2424,11 +2445,9 @@ describe('prototype training rules', () => {
       );
       match.ticks = 5999;
       match.step({}, {});
-      expect(target.action).not.toBe('lose');
-      ticks(match, ROUND_END_TICKS);
-      expect(target.action).toBe('lose');
-      expect(target.y).toBe(0);
-      expect(match.resultReady).toBe(true);
+      expect(target.action).not.toBe('down');
+      untilResult(match);
+      expect(target).toMatchObject({ action: 'koLand', y: 0 });
     },
   );
 
@@ -4577,7 +4596,7 @@ describe('prototype training rules', () => {
       expect(match.fighters.map((f) => f.action)).toEqual(['land', 'land']);
       ticks(match, animationDuration('land'));
       expect(match.fighters.map((f) => f.action)).toEqual(
-        hp === LIFE ? ['draw', 'draw'] : ['win', 'lose'],
+        hp === LIFE ? ['draw', 'draw'] : ['win', 'down'],
       );
     },
   );
@@ -4659,17 +4678,18 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('shows win/loss or draw poses when time expires with both fighters alive', () => {
+  it('shows win and KO Normal, or draw poses, when time expires with both fighters alive', () => {
     for (const hp of [500, LIFE]) {
       const match = new Match('cpu');
       match.ticks = 5999;
       match.fighters[1].hp = hp;
       match.step({}, {});
       expect(match.fighters.map((f) => f.action)).toEqual(
-        hp === LIFE ? ['draw', 'draw'] : ['win', 'lose'],
+        hp === LIFE ? ['draw', 'draw'] : ['win', 'down'],
       );
-      ticks(match, ROUND_END_TICKS);
-      expect(match.resultReady).toBe(true);
+      // KO Normal's PC 607 stops the winner ten ticks.
+      expect(match.fighters[0].hitStop).toBe(hp === LIFE ? 0 : 10);
+      untilResult(match);
     }
   });
 
