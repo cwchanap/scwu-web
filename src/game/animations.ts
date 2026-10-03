@@ -393,6 +393,9 @@ export const animations = {
     false,
     clips.ko.map((frame) => frame.duration || 1),
   ),
+  // Action 61, KO NORMAL 2nd: a KO'd fighter struck again relaunches at age
+  // 6 (PC 631), holding its last pose until landing enters 62.
+  koAgain: clip(clips.koAgain),
   koLand: clip(clips.down),
   // Actions 57/65 call WIN STAND (58) once through opcode 0x09 at PCs 565/667.
   win: clip([...clips.winStand, ...clips.win], false, [

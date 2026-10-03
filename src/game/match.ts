@@ -567,6 +567,10 @@ const RESPONSE_REACTIONS: Record<
 };
 const FBH = 112;
 const FBH_POWER = 10;
+// A loss that empties life sets the lose action 59 (0x40e83e), which enters
+// KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
+// (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
+const knockedOut = (wasOut: boolean): Action => (wasOut ? 'koAgain' : 'down');
 // 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1).
 function loseLife(f: Fighter, loss: number) {
   if (loss && f.hp <= DESPERATION_HP)
@@ -1120,6 +1124,8 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
+  // PC 611's hold this tick, applied to both fighters after they move.
+  private koStop = 0;
   // The latest op 0x0e shake per axis; the renderer steps it (stepShake), and
   // a new object restarts it.
   quake: { x: Quake | null; y: Quake | null } = { x: null, y: null };
@@ -1209,7 +1215,13 @@ export class Match {
   }
 
   get resultReady() {
-    return this.winner !== null && this.endingTicks >= ROUND_END_TICKS;
+    // Authored: after the lettering, wait for each fighter to take its result
+    // or lie KO'd, as moves now run on past the round's end.
+    return (
+      this.winner !== null &&
+      this.endingTicks >= ROUND_END_TICKS &&
+      this.fighters.every((f) => ['win', 'draw', 'koLand'].includes(f.action))
+    );
   }
 
   private action(f: Fighter, action: Action, restart = false) {
@@ -1261,7 +1273,8 @@ export class Match {
       action === 'dash' ||
       action === 'backdash' ||
       aerialDrills.has(action) ||
-      action === 'down'
+      action === 'down' ||
+      action === 'koAgain'
     ) {
       f.vx = 0;
       f.gravity = 0.24;
@@ -1276,36 +1289,41 @@ export class Match {
     if (action === 'punch3') scriptMotion(f, 300, -400, 110);
   }
 
-  private showResultPose(f: Fighter, index: number) {
-    if (
-      f.hp === 0 ||
-      f.hitStop > 0 ||
-      f.y < 0 ||
-      f.vy < 0 ||
-      f.action === 'knockdown' ||
-      f.action === 'bounceDown' ||
-      Object.hasOwn(launchMotion, f.action) ||
-      (f.action === 'hitUpJump' && f.age < 8) ||
-      // A timeout release skips the rest of a throw; a toss finishes its move.
-      (Object.hasOwn(tosses, f.action) &&
-        f.age >= tosses[f.action as keyof typeof tosses].tick &&
-        f.age < animationDuration(f.action as AnimatedAction)) ||
-      ((f.action === 'land' ||
-        f.action === 'drillLand' ||
-        f.action === 'getUp') &&
-        f.age < animationDuration(f.action))
-    )
-      return;
-    // Back in neutral, 0x410ff1 enters the action word of the round's result
-    // (+0xe007): 1 win (57), 2 lose (59) or 3 draw (65). The result states
-    // (0x409444, 0x409519) give the loser 3 once the timer (0x470050) has run
-    // out, so a loser still standing takes the draw action.
-    this.action(
-      f,
-      this.winner !== 'draw' && (this.winner === 'player') === (index === 0)
-        ? 'win'
-        : 'draw',
-    );
+  // The action of a standing fighter's round result (+0xe007): 1 win (57),
+  // or 3 draw (65), which the result states (0x409444, 0x409519) also give
+  // the loser once the timer (0x470050) has run out.
+  private result(f: Fighter) {
+    const index = this.fighters.indexOf(f);
+    return this.winner !== 'draw' &&
+      (this.winner === 'player') === (index === 0)
+      ? 'win'
+      : 'draw';
+  }
+
+  // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
+  // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
+  // 631). Each lands into KO DOWN (62), which slides back for ten ticks
+  // (PCs 641–644), then lies while the round is over (PC 645).
+  private moveKO(f: Fighter) {
+    if (f.action === 'koLand') {
+      if (f.age <= 10) placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+      return true;
+    }
+    const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
+    if (!launch) return false;
+    if (f.action === 'down' && f.age === 5) this.koStop += 40;
+    if (f.age === launch) {
+      f.vx = -f.facing * 500 * SOURCE_VELOCITY_SCALE;
+      f.vy = -1520 * SOURCE_VELOCITY_SCALE;
+      f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
+      f.airAge = 0;
+    }
+    if (f.age >= launch) {
+      f.airAge++;
+      gravity(f);
+      if (f.y === 0) this.action(f, 'koLand');
+    }
+    return true;
   }
 
   private recoverKnockdown(f: Fighter) {
@@ -1421,6 +1439,8 @@ export class Match {
       target.facing = attacker.facing === 1 ? -1 : 1;
       attacker.hits++;
       attacker.damage += loseLife(target, toss.damage);
+      // A lethal toss KOs the victim where it was tossed (0x40e83e).
+      if (target.hp === 0) this.action(target, 'down');
       // Both op 0x15s add 5 power to both fighters.
       addPower(attacker, 5);
       addPower(target, 5);
@@ -1588,9 +1608,11 @@ export class Match {
       }
       case 'power':
         if (event.otherLife < 0) {
+          const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
           self.hits++;
           self.damage += damage;
+          if (other.hp === 0) this.action(other, knockedOut(wasOut), true);
         }
         addPower(self, event.selfPower);
         addPower(other, event.otherPower);
@@ -2046,6 +2068,7 @@ export class Match {
       f.action === 'shock'
     )
       return;
+    if (this.moveKO(f)) return;
     const chain = CHAINS[f.action];
     const check = chain?.checks.find(([age]) => age === f.age);
     if (chain && check) {
@@ -2260,6 +2283,12 @@ export class Match {
       f.ax = ax;
       f.gravity = JUMP_GRAVITY;
     }
+    // Back in neutral once the round is decided, 0x410ff1 enters the result's
+    // action instead of reading commands; airborne, the fall reads them.
+    if (this.winner && !airborne) {
+      this.action(f, this.result(f));
+      return;
+    }
     const direction =
       Number(Boolean(input.right)) - Number(Boolean(input.left));
     const crouched = f.action.startsWith('crouch');
@@ -2402,7 +2431,7 @@ export class Match {
         ? []
         : f.branch
           ? clipPose(f.action, 0).events
-          : f.action === 'down'
+          : f.action === 'down' || f.action === 'koAgain'
             ? script(LOSE).events
             : [];
       const events = [...(entry ?? []), ...(pose.events ?? [])];
@@ -2458,56 +2487,11 @@ export class Match {
         (e.follow !== null ||
           inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e)),
     );
-    if (this.winner) {
-      this.endingTicks++;
-      let koStop = 0;
-      this.fighters.forEach((f, index) => {
-        if (f.hitStop > 0) {
-          f.hitStop--;
-          return;
-        }
-        f.age++;
-        if (f.action === 'down') {
-          // Action 60: PC 611 holds both fighters for 40 ticks. The four
-          // opening displays total 14 action ticks, then PC 617 launches.
-          if (f.age === 5) koStop += 40;
-          if (f.age === 14) {
-            f.vx = -f.facing * 500 * SOURCE_VELOCITY_SCALE;
-            f.vy = -1520 * SOURCE_VELOCITY_SCALE;
-            f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
-            f.airAge = 0;
-          }
-          if (f.age >= 14) {
-            f.airAge++;
-            gravity(f);
-            if (f.y === 0) this.action(f, 'koLand');
-          }
-          return;
-        }
-        if (f.action === 'koLand') {
-          // Action 62, PCs 641–644: ten ticks of backward slide, then rest.
-          if (f.age <= 10)
-            placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
-          return;
-        }
-        if (this.moveLaunch(f)) return;
-        this.slideReaction(f);
-        launchHitUpJump(f);
-        slideDst(f);
-        if (f.y < 0 || f.vy < 0) {
-          f.airAge++;
-          gravity(f);
-          if (f.y === 0 && f.hp > 0)
-            this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
-        }
-        this.recoverKnockdown(f);
-        this.showResultPose(f, index);
-      });
-      // Apply together after frame entry so a double KO is iteration-independent.
-      for (const f of this.fighters) f.hitStop += koStop;
-      this.fighters.forEach((f) => this.settle(f));
-      return;
-    }
+    // After a KO or time-out the round phase stays 1 (only a debug key sets
+    // 2, 0x406231 and 0x408f38): fighters keep reading commands and
+    // striking, and each takes its result's action once back in neutral
+    // (0x410ff1). Only the timer stops (0x408e50).
+    if (this.winner) this.endingTicks++;
     if (this.fighters.some((f) => f.action === 'intro')) {
       for (const f of this.fighters) {
         f.age++;
@@ -2519,7 +2503,7 @@ export class Match {
       this.previous = [{ ...player }, { ...opponent }];
       return;
     }
-    this.ticks++;
+    if (!this.winner) this.ticks++;
     if (this.mode === 'practice') {
       for (const f of this.fighters)
         if (this.practice.maxStock && f.action === 'idle') {
@@ -2572,6 +2556,7 @@ export class Match {
     // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
     // fighter 0 then pushes against fighter 1's boxes from the last tick, so
     // its own share stays unclamped until its next move.
+    this.koStop = 0;
     move(0);
     const pixel = (v: number) => Math.floor(v / 1.5);
     for (const boxA of pushboxes(a.action, a.age)) {
@@ -2588,6 +2573,8 @@ export class Match {
       }
     }
     move(1);
+    // Applied after both move, so a double KO holds once.
+    for (const f of this.fighters) f.hitStop += this.koStop;
     // 0x40f992–0x40f9d9: after its own motion, an object following its
     // parent takes the parent's position plus its offset, mirrored by the
     // parent's facing; the fighters have moved before it.
@@ -2800,6 +2787,7 @@ export class Match {
       const body = !projectile && (!source || source === f);
       if (body) f.contact = true;
       if (fbh) addPower(f, FBH_POWER);
+      const wasOut = target.hp === 0;
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
@@ -2823,7 +2811,7 @@ export class Match {
         this.action(
           target,
           target.hp === 0
-            ? 'down'
+            ? knockedOut(wasOut)
             : (reaction ?? (airborne ? 'airHitHeavy' : 'hitHeavy')),
           true,
         );
@@ -2906,26 +2894,9 @@ export class Match {
     }
     for (const fire of objectHits) fire();
     this.resolveThrows(frozen);
-    if (a.hp === 0 || b.hp === 0 || this.seconds === 0) {
-      this.projectiles = [];
+    if (!this.winner && (a.hp === 0 || b.hp === 0 || this.seconds === 0))
       this.winner =
         a.hp === b.hp ? 'draw' : a.hp > b.hp ? 'player' : 'opponent';
-      this.fighters.forEach((f, index) => {
-        if (f.action === 'dstHeld') this.action(f, 'hit');
-        // A super's hold or cinematic ends with the round.
-        if (f.action === 'superHeld' || f.action === 'shock')
-          this.action(f, f.hp === 0 ? 'down' : f.y < 0 ? 'airHit' : 'hit');
-        if (isScripted(f.action)) {
-          f.box = null;
-          f.ax = 0;
-          if (f.y < 0) {
-            this.action(f, 'jump');
-            f.gravity = JUMP_GRAVITY;
-          }
-        }
-        this.showResultPose(f, index);
-      });
-    }
   }
 }
 

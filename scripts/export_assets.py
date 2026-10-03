@@ -248,7 +248,7 @@ def main():
         "launchUp": 81, "launchAway": 80, "sweep": 79,
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
-        "ko": 60, "down": 62, "win": 57, "winStand": 58, "draw": 65,
+        "ko": 60, "koAgain": 61, "down": 62, "win": 57, "winStand": 58, "draw": 65,
         # Action 43 'Black', the super darkening the round intro spawns.
         "black": 43,
     }

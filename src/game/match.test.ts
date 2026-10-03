@@ -258,6 +258,46 @@ describe('Hit Up launcher', () => {
     expect(target.darken).toBe(0);
   });
 
+  it("relaunches a KO'd fighter struck again through KO NORMAL 2nd (61)", () => {
+    const match = new Match();
+    const [player, target] = match.fighters;
+    player.x = 840;
+    target.x = 960;
+    target.hp = 6;
+    ticks(match, 8, { punch: true });
+    while (target.age < 20) match.step();
+    expect(target).toMatchObject({ action: 'down', hp: 0 });
+    const stops = player.hitStop;
+    // A DST missile (box y −21, PC 3164), which pauses only its victim, on
+    // KO Normal's body box (PC 619: y −100 ± 34).
+    match.projectiles = [
+      {
+        owner: 0,
+        kind: 'missile',
+        x: target.x,
+        y: target.y + (21 - 100) * 1.5,
+        vx: 0,
+        vy: 0,
+        facing: 1,
+        age: 0,
+        hit: false,
+      },
+    ];
+    match.step();
+    expect(target).toMatchObject({ action: 'koAgain', age: 0, hp: 0 });
+    // Neither PC 607's ten ticks nor PC 611's hold, and no second flash.
+    expect(player.hitStop).toBe(stops);
+    expect(match.effects.filter((e) => e.clip === '59+9')).toEqual([]);
+    while (target.age < 6) match.step();
+    // PC 631 launches again at raw −500/−1520 and gravity 90.
+    expect(target.vy).toBeCloseTo(
+      -1520 * (655 / 65536) * 1.5 + 90 * (393 / 65536) * 1.5,
+      6,
+    );
+    while (target.action === 'koAgain') match.step();
+    expect(target).toMatchObject({ action: 'koLand', y: 0 });
+  });
+
   it('keeps KO and timeout on their own ending paths', () => {
     const ko = new Match();
     ko.fighters[0].x = 440;
@@ -546,7 +586,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
     expect(target.action).not.toBe('dstHeld');
   });
 
-  it('protects the held victim and releases it on timeout without the toss', () => {
+  it('protects the held victim and keeps the hold through a time-out', () => {
     const match = new Match('cpu');
     const [attacker, target] = match.fighters;
     attacker.x = 600;
@@ -569,12 +609,18 @@ describe('Daisetsuzan Oroshi command throw', () => {
     expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
     ticks(match, 10, {}, {});
     expect(match.winner).toBe('draw');
-    expect(target.action).not.toBe('dstHeld');
-    ticks(match, 5, {}, {});
-    expect(attacker.action).toBe('draw');
+    // The round phase stays 1 (0x408f38), so the throw runs on: the toss and
+    // the missiles still take life after the round is decided.
+    expect(target.action).toBe('dstHeld');
+    while (target.action === 'dstHeld') match.step({}, {});
+    expect(target).toMatchObject({ action: 'dstToss', hp: LIFE - 10 });
+    while (target.action === 'dstToss') match.step({}, {});
+    expect(target).toMatchObject({ action: 'twist', hp: LIFE - 10 - 2 * 22 });
+    untilResult(match);
+    expect(match.fighters.map((f) => f.action)).toEqual(['draw', 'draw']);
   });
 
-  it('finishes a lethal toss and the rest of the move before celebrating', () => {
+  it('KOs the victim at a lethal toss and finishes the move before celebrating', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 600;
@@ -582,14 +628,20 @@ describe('Daisetsuzan Oroshi command throw', () => {
     // 60% of the toss's 10 at desperation life.
     target.hp = 6;
     ticks(match, 5 + 185, { dst: true });
-    expect(target).toMatchObject({ action: 'dstToss', hp: 0 });
+    // The toss's op 0x15 (PC 3112) empties life, so the victim enters the
+    // lose action 59 where it was tossed (0x40e83e).
+    expect(target).toMatchObject({ action: 'down', hp: 0, y: -144 });
     expect(match.winner).toBe('player');
-    ticks(match, 150);
-    expect(match.projectiles).toEqual([]);
-    expect(attacker.action).toBe('dstHit');
-    ticks(match, 40);
+    // DST Hit runs on and fires its missiles over the lying victim.
+    while (attacker.age < 268) match.step();
+    expect(target.action).toBe('koLand');
+    expect(match.projectiles.map((p) => p.kind)).toEqual([
+      'missile',
+      'missile',
+    ]);
+    untilResult(match);
     expect(attacker.action).toBe('win');
-    expect(target.action).toBe('knockdown');
+    expect(target.action).toBe('koLand');
   });
 });
 
@@ -2225,7 +2277,7 @@ describe('prototype training rules', () => {
         match.step({ throw: true }, {});
         ticks(match, 449);
         expect(target.hp).toBe(lethal ? 0 : LIFE - 30);
-        expect(target.action).toBe(lethal ? 'knockdown' : 'idle');
+        expect(target.action).toBe(lethal ? 'koLand' : 'idle');
       }
     },
   );
@@ -2380,7 +2432,7 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('finishes a lethal throw on the floor without getting up', () => {
+  it('KOs the victim at a lethal throw toss, which lies without getting up', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 550;
@@ -2389,14 +2441,11 @@ describe('prototype training rules', () => {
     ticks(match, 8 + THROW_TOSS_TICK, { throw: true });
     expect(match.winner).toBe('player');
     expect(attacker.action).toBe('throw');
-    expect(target).toMatchObject({ action: 'dstToss', hp: 0 });
-    ticks(match, animationDuration('throw') - THROW_TOSS_TICK - 1);
-    expect(attacker.action).toBe('throw');
-    ticks(match, ROUND_END_TICKS);
-    expect(target.action).toBe('knockdown');
-    expect(target.y).toBe(0);
+    // The toss's op 0x15 (PC 2770) KOs the victim where it was tossed.
+    expect(target).toMatchObject({ action: 'down', hp: 0, y: -144 });
+    untilResult(match);
+    expect(target).toMatchObject({ action: 'koLand', y: 0 });
     expect(attacker.action).toBe('win');
-    expect(match.resultReady).toBe(true);
   });
 
   it('protects knockdown and get-up after a throw from melee and projectile hits', () => {
@@ -2452,7 +2501,7 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('releases a held fighter when time expires and keeps throws inside the court', () => {
+  it('keeps a throw going through a time-out and inside the court', () => {
     for (const facing of [1, -1] as const) {
       const match = new Match('cpu');
       const [attacker, target] = match.fighters;
@@ -2469,11 +2518,9 @@ describe('prototype training rules', () => {
       match.ticks = 5999;
       match.step({}, {});
       expect(match.winner).toBe('draw');
-      expect(target.action).not.toBe('dstHeld');
-      ticks(match, ROUND_END_TICKS);
-      expect(target.y).toBe(0);
-      expect(target.action).toBe('draw');
-      expect(target.hp).toBe(LIFE);
+      expect(target.action).toBe('dstHeld');
+      untilResult(match);
+      expect(target).toMatchObject({ action: 'draw', y: 0, hp: LIFE - 30 });
     }
   });
 
@@ -3841,9 +3888,17 @@ describe('prototype training rules', () => {
     },
   );
 
-  it.each(['punch2', 'airKick', 'kick3', 'drill', 'airDrillSpin'] as const)(
-    'stops %s after a lethal first strike',
-    (action) => {
+  // The round phase stays 1 after a KO, so a move's later strikes hit the
+  // falling fighter again, which enters KO NORMAL 2nd (61, PC 595).
+  it.each([
+    ['punch2', 3],
+    ['airKick', 1],
+    ['kick3', 5],
+    ['drill', 5],
+    ['airDrillSpin', 2],
+  ] as const)(
+    'keeps striking with %s after a lethal first strike: %i hits',
+    (action, hits) => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.x = 500;
@@ -3854,10 +3909,15 @@ describe('prototype training rules', () => {
         f.y = target.y = -80;
         f.vy = target.vy = -8;
       }
-      ticks(match, 250);
+      const seen = new Set<string>();
+      for (let tick = 0; tick < 1000 && !match.resultReady; tick++) {
+        match.step();
+        seen.add(target.action);
+      }
       expect(match.winner).toBe('player');
-      expect(f.hits).toBe(1);
-      expect(target.hp).toBe(0);
+      expect(f.hits).toBe(hits);
+      expect(seen.has('koAgain')).toBe(hits > 1);
+      expect(target).toMatchObject({ action: 'koLand', hp: 0 });
       expect(f.action).toBe('win');
       expect(f.airDrillStage).toBe(0);
     },
@@ -4194,12 +4254,14 @@ describe('prototype training rules', () => {
     });
   });
 
-  it('clears projectiles when the round ends', () => {
+  it('keeps projectiles playing when the round ends', () => {
     const match = new Match();
     match.fighters[1].hp = 16;
     for (let i = 0; i < 100 && !match.winner; i++) match.step({ axe: true });
     expect(match.winner).toBe('player');
-    expect(match.projectiles).toHaveLength(0);
+    expect(match.projectiles).toMatchObject([{ kind: 'axe', hit: true }]);
+    ticks(match, animationDuration('axeHit'));
+    expect(match.projectiles).toEqual([]);
   });
 
   it('holds an axe through the Getter Beam freeze, which op 0x1f adds to global 6', () => {
@@ -4394,7 +4456,7 @@ describe('prototype training rules', () => {
       expect(target.age).toBe(5);
       expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
       const held = match.fighters.map((f) => [f.age, f.x, f.y]);
-      ticks(match, 40, { drill: true }, { jump: true });
+      ticks(match, 40, {}, { jump: true });
       expect(match.fighters.map((f) => [f.age, f.x, f.y])).toEqual(held);
       ticks(match, 8);
       expect(target).toMatchObject({ age: 13, x: 960, y: 0 });
@@ -4461,10 +4523,12 @@ describe('prototype training rules', () => {
     expect([player.hitStop, target.hitStop]).toEqual([10, 0]);
     ticks(match, 5);
     expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
-    ticks(match, 45);
-    expect(player.action).not.toBe('win');
-    match.step();
-    expect(player.action).toBe('win');
+    // It finishes the throw before taking its result back in neutral.
+    while (player.action === 'axeThrow') {
+      expect(player.age).toBeLessThan(animationDuration('axeThrow'));
+      match.step();
+    }
+    expect(player).toMatchObject({ action: 'win', age: 0 });
   });
 
   it('finishes both lethal launches in a draw without replaying the impact holds', () => {
@@ -4565,7 +4629,7 @@ describe('prototype training rules', () => {
       const airAge = player.airAge;
       for (let tick = 0; tick < 100 && player.y < 0; tick++) {
         expect(player.action).not.toBe('win');
-        match.step({ jump: true, punch: true });
+        match.step();
       }
       expect(player.airAge).toBeGreaterThan(airAge);
       expect(player.y).toBe(0);
@@ -4593,7 +4657,7 @@ describe('prototype training rules', () => {
       match.step({}, {});
       expect(match.fighters.map((f) => f.action)).toEqual(['jump', 'jump']);
       for (let tick = 0; tick < 100 && match.fighters[0].y < 0; tick++)
-        match.step();
+        match.step({}, {});
       expect(match.fighters.map((f) => f.action)).toEqual(['land', 'land']);
       ticks(match, animationDuration('land'));
       expect(match.fighters.map((f) => f.action)).toEqual(
@@ -4684,6 +4748,8 @@ describe('prototype training rules', () => {
       const match = new Match('cpu');
       match.ticks = 5999;
       match.fighters[1].hp = hp;
+      match.step({}, {});
+      expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
       match.step({}, {});
       // The loser still standing takes result 3, the draw action.
       expect(match.fighters.map((f) => f.action)).toEqual(
