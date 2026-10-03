@@ -124,7 +124,7 @@ describe('selected core animation assets', () => {
       fade: 0,
     });
     // DST fire 385 adds, with signed offsets (PC 5566).
-    expect(animationFrame('dstFire', 0).color).toMatchObject({
+    expect(script(385).events.find((e) => e.op === 'color')).toMatchObject({
       mode: 2,
       r: 0,
       g: -6,

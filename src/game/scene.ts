@@ -55,7 +55,10 @@ export const initialStatus: GameStatus = {
   error: '',
 };
 const ART_SCALE = 1.5;
-const effectDepth = (e: Effect) => (e.screen ? 5 : e.front ? 4 : 1);
+// A viewport object behind the fighters (the KO flash, z 15 like action 43)
+// sits over the court.
+const effectDepth = (e: Effect) =>
+  e.front ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1;
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
@@ -456,8 +459,7 @@ export class TrainingScene extends Phaser.Scene {
         const effect = effects[index];
         sprite.setVisible(!!effect);
         if (!effect) return;
-        // Viewport objects (op 0x04 flag 0x40) ignore the camera. A clip
-        // effect's frames carry their colour; a source object's events set it.
+        // Viewport objects (op 0x04 flag 0x40) ignore the camera.
         const pose = animationFrame(effect.clip, effect.age);
         this.place(
           sprite
@@ -467,7 +469,7 @@ export class TrainingScene extends Phaser.Scene {
           effect.x,
           effect.screen ? effect.y : GROUND + effect.y,
           effect.facing,
-          pose.color ?? this.faded(effect.color, effect.owner),
+          this.faded(effect.color, effect.owner),
         );
       });
       // Each object draws its afterimages, oldest first, just before itself

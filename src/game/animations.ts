@@ -41,7 +41,8 @@ export type FaderSpec = Omit<Color, 'mode'> & {
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
 // state an earlier record of its clip set, `events` the op 0x04, 0x0e,
-// 0x1f (player variables) and 0x25 records run just before it.
+// 0x1f (player variables) and 0x25 records run just before it, in a clip or
+// a flattened timeline.
 export type Pose = Frame & {
   width: number;
   height: number;
@@ -152,6 +153,8 @@ export type SourceEvent =
       op: 'spawn';
       flags: number;
       action: number;
+      // The record the object starts at (r[4], 0x412c86).
+      offset: number;
       x: number;
       y: number;
       slot: number;
@@ -345,14 +348,6 @@ export const animations = {
   twist: clip([clips.twist[0], ...clips.twisting], 1),
   twistBounce: clip([clips.twist[1], ...clips.twisting2], 1),
   dstMissile: clip(clips.dstMissile, true),
-  dstMissileSmoke: clip(clips.dstMissileSmoke),
-  dstFire: clip(clips.dstFire),
-  smokeRight: clip(clips.smokeRight),
-  smokeLeft: clip(clips.smokeLeft),
-  dashSmoke: clip(clips.dashSmoke),
-  hisaSmoke: clip(clips.hisaSmoke),
-  hisaSmokeBack: clip(clips.hisaSmokeBack),
-  landingSmoke: clip(clips.landingSmoke),
   axeThrow: clip(clips.axeThrow),
   axeFlight: clip(clips.axeFlight, true),
   axeHit: clip(clips.axeHit),

@@ -9,7 +9,6 @@ import {
   eventsAt,
   heldFrame,
   hurtboxes,
-  isObject,
   pushboxes,
   isScripted,
   NORMAL_COLOR,
@@ -498,35 +497,8 @@ const tosses = {
   throw: { tick: THROW_TOSS_TICK, damage: 30 },
   dstHit: { tick: DST_TOSS_TICK, damage: 10 },
 } as const;
-// Spawns from actions 199, 217 and 215 by DST action age (op 0x04): source
-// offsets, draw order from flag bit 0, and the spawned action's own velocity.
-function dstEffects(age: number) {
-  const spawns: {
-    clip: AnimatedAction;
-    x: number;
-    y: number;
-    front: boolean;
-    vx?: number;
-  }[] = [];
-  const slow = age - 5;
-  if (slow >= 0 && slow < 60 && slow % 20 === 0)
-    spawns.push({ clip: 'smokeLeft', x: -40, y: 0, front: true, vx: -100 });
-  if (slow >= 0 && slow < 60 && slow % 20 === 10)
-    spawns.push({ clip: 'smokeRight', x: 40, y: 0, front: true, vx: 100 });
-  const fast = age - 65;
-  if (fast >= 0 && fast < 120 && fast % 12 === 0)
-    spawns.push({ clip: 'hisaSmokeBack', x: 0, y: 0, front: true });
-  if (fast >= 0 && fast < 120 && fast % 12 === 6)
-    spawns.push({ clip: 'hisaSmoke', x: 30, y: 0, front: false });
-  if (age === DST_FIRE_TICK)
-    spawns.push(
-      { clip: 'dstFire', x: 0, y: -80, front: true },
-      { clip: 'dstFire', x: 40, y: -80, front: false },
-      { clip: 'dashSmoke', x: 0, y: 0, front: true },
-      { clip: 'hisaSmokeBack', x: 0, y: 0, front: true },
-    );
-  return spawns;
-}
+// The DST missiles (218) and the axe (227) fly as projectiles, not objects.
+const PROJECTILE_ACTIONS = new Set([218, 227]);
 // Command table entries 'G BEAM LV1', 'MUSASHI', 'CGA', 'hidden sup' and 'B G';
 // only Getter Beam lists an air action (263).
 const SUPER_COMMANDS: Record<
@@ -839,10 +811,10 @@ export interface Projectile {
 }
 // What spawns an object: a fighter, a projectile or another object.
 type Spawner = { x: number; y: number; facing: -1 | 1; screen?: boolean };
-// Spawned objects, positioned like characters by the renderer. A numeric clip
-// is a source object that runs its flattened timeline: spawns, motion, boxes.
+// Spawned source objects, positioned like characters by the renderer, each
+// running its flattened timeline: spawns, motion, boxes.
 export interface Effect {
-  clip: AnimatedAction | ObjectKey;
+  clip: ObjectKey;
   x: number;
   y: number;
   vx: number;
@@ -852,7 +824,7 @@ export interface Effect {
   facing: -1 | 1;
   age: number;
   front: boolean;
-  // Owning fighter and op 0x04 object id (r[12]; 0 = none).
+  // Owning fighter, and the owner's object slot (r[12]) it holds, or −1.
   owner: number;
   slot: number;
   // Op 0x04 flag 0x40: viewport coordinates instead of the stage.
@@ -866,8 +838,6 @@ export interface Effect {
   connected: boolean;
   color: Color;
   trail: Trail | null;
-  // A clip effect's display whose events last ran.
-  entered: Pose | null;
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -986,7 +956,7 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   age: 0,
   front: true,
   owner: 0,
-  slot: 0,
+  slot: -1,
   screen: false,
   follow: null,
   box: null,
@@ -995,7 +965,6 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   connected: false,
   color: NORMAL_COLOR,
   trail: null,
-  entered: null,
   ...fields,
 });
 const fighter = (x: number, facing: -1 | 1): Fighter => ({
@@ -1459,30 +1428,6 @@ export class Match {
     target.facing = spin.same === (attacker.facing === 1) ? 1 : -1;
   }
 
-  private spawnEffect(
-    parent: { x: number; y: number; facing: -1 | 1 },
-    effect: {
-      clip: AnimatedAction;
-      x: number;
-      y: number;
-      front: boolean;
-      vx?: number;
-      vy?: number;
-    },
-  ) {
-    this.effects.push(
-      newEffect({
-        clip: effect.clip,
-        x: parent.x + parent.facing * effect.x * 1.5,
-        y: parent.y + effect.y * 1.5,
-        vx: parent.facing * (effect.vx ?? 0) * SOURCE_VELOCITY_SCALE,
-        vy: (effect.vy ?? 0) * SOURCE_VELOCITY_SCALE,
-        facing: parent.facing,
-        front: effect.front,
-      }),
-    );
-  }
-
   // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
   private counter(f: Fighter, history: InputFrame[]) {
     const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
@@ -1508,9 +1453,11 @@ export class Match {
         this.spawnObject(f, this.fighters.indexOf(f), {
           flags: 5,
           action: 253,
+          offset: 0,
           x: 0,
           y: -80,
           slot: 0,
+          z: 0,
         });
       this.fireEvents(f);
       return true;
@@ -1557,16 +1504,6 @@ export class Match {
 
   private fireEffect(e: Effect) {
     const { clip } = e;
-    if (!isObject(clip)) {
-      // A clip effect runs the spawns its displays carry: object 396 puffs
-      // smoke 394 behind itself at ages 10, 15 and 20 (PCs 5705–5710).
-      const pose = animationFrame(clip, e.age);
-      if (pose === e.entered) return;
-      e.entered = pose;
-      for (const event of pose.events ?? [])
-        if (event.op === 'spawn') this.runEvent(e, e.owner, event);
-      return;
-    }
     rearm(e, clip, e.age);
     for (const event of eventsAt(clip, e.age)) {
       this.runEvent(e, e.owner, event);
@@ -1721,21 +1658,23 @@ export class Match {
   private spawnObject(
     parent: Spawner,
     owner: number,
-    event: {
-      flags: number;
-      action: number;
-      x: number;
-      y: number;
-      slot: number;
-    },
+    event: Omit<Extract<SourceEvent, { op: 'spawn' }>, 'op'>,
   ) {
-    // Action 0 deletes the owner's objects with that id (several may share it).
-    if (!event.action) {
+    // Without flag bit 2 (0x412a88) the record first deletes the owner's
+    // object in slot r[12], then registers the new one there (0x412caf); an
+    // object's deletion clears its slot (0x40e4a0). ponytail: a nonzero
+    // r[5:7] instead jumps the spawner to that action while the slot's object
+    // lives (0x412ac0), as axe throw 226 does into 225 while its axe flies
+    // (PC 3267); the port's axe rules leave it out.
+    const registers = !(event.flags & 4);
+    if (registers)
       this.effects = this.effects.filter(
         (e) => e.owner !== owner || e.slot !== event.slot,
       );
-      return;
-    }
+    if (!event.action) return;
+    const clip: ObjectKey = event.offset
+      ? `${event.action}+${event.offset}`
+      : event.action;
     const screen = (event.flags & 0x40) !== 0;
     // Children of viewport objects start from the same point on the stage.
     const origin =
@@ -1746,20 +1685,21 @@ export class Match {
           }
         : parent;
     const child = newEffect({
-      clip: event.action,
+      clip,
       x: screen ? event.x * 1.5 : origin.x + parent.facing * event.x * 1.5,
       y: screen ? event.y * 1.5 : origin.y + event.y * 1.5,
       facing: parent.facing,
-      // Flag bits 0–1: 0 draws behind the fighters, 1 in front, 2 at z r[13].
-      front: (event.flags & 3) !== 0,
+      // Flag bits 0–1 (0x412b83): just behind the spawner, just in front, or
+      // at z r[13], where the fighters are 0x50.
+      front: (event.flags & 3) === 2 ? event.z > 0x50 : (event.flags & 3) !== 0,
       owner,
-      slot: event.slot,
+      slot: registers ? event.slot : -1,
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
     });
     // A script without displays never advances, so its events all fire at t=0
     // (anime beam 296 only spawns 297 and 299); nothing is left to draw.
-    if (animationDuration(event.action)) this.effects.push(child);
+    if (animationDuration(clip)) this.effects.push(child);
     this.fireEffect(child);
   }
 
@@ -2428,17 +2368,22 @@ export class Match {
         });
     }
     this.run(player, opponent);
-    // A clip display carries the op 0x0e, 0x1f and 0x25 records its action
-    // runs just before it.
+    // A display carries the op 0x04, 0x0e, 0x1f and 0x25 records its action
+    // runs just before it (supers run their whole timelines in fireEvents).
     this.fighters.forEach((f, index) => {
       const pose = fighterPose(f);
       if (pose === f.entered) return;
+      // A reaction that rolled its op 0x20 draws the branch, but first ran
+      // the records before the roll: those of its own first display.
+      const events = [
+        ...((!f.entered && f.branch && clipPose(f.action, 0).events) || []),
+        ...(pose.events ?? []),
+      ];
       f.entered = pose;
-      // ponytail: fighters' clip spawns (landing, hit and guard dust, the
-      // air dash's 390/391, the KO's 59, reactions' deletes) stay off; the
-      // DST, throw, missile and axe spawns are played from their own rules.
-      for (const event of pose.events ?? [])
-        if (event.op !== 'spawn') this.runEvent(f, index, event);
+      if (isScripted(f.action)) return;
+      for (const event of events)
+        if (event.op !== 'spawn' || !PROJECTILE_ACTIONS.has(event.action))
+          this.runEvent(f, index, event);
     });
     // The tick ends counting the faders down (0x404d97); each draw then
     // writes a running one over the colour of its player's objects.
@@ -2447,8 +2392,6 @@ export class Match {
       // Type 3 (0x40cacf) blends by rand(); no Ryuko record uses it.
       if (!fader?.left || !--fader.left || fader.type > 2) return;
       const blend = faderColor(fader);
-      // ponytail: a clip effect's own frame colour still wins; no Ryuko
-      // fader runs while one is out.
       for (const actor of [f, ...this.effects.filter((e) => e.owner === owner)])
         actor.color = { ...actor.color, ...blend };
     });
@@ -2647,8 +2590,9 @@ export class Match {
     });
     this.fighters.forEach((f, owner) => {
       if (frozen[owner]) return;
-      // Action 226 deletes its object 6, the last axe (PC 3267), then spawns
-      // action 227 there at (−6, −102) (PC 3279), flying at raw 900 (PC 3293).
+      // ponytail: a new throw replaces the last axe; the source's PC 3267
+      // jumps to 225 instead while it flies (see spawnObject). Action 226
+      // spawns 227 at (−6, −102) (PC 3279), flying at raw 900 (PC 3293).
       if (f.action === 'axeThrow' && f.age === 0)
         this.projectiles = this.projectiles.filter(
           (p) => p.kind !== 'axe' || p.owner !== owner,
@@ -2665,12 +2609,6 @@ export class Match {
           age: 0,
           hit: false,
         });
-      // The throw's spins (199) spawn the same smoke as DST's.
-      if (
-        f.action === 'dstHit' ||
-        (f.action === 'throw' && f.age < THROW_TOSS_TICK)
-      )
-        for (const effect of dstEffects(f.age)) this.spawnEffect(f, effect);
       if (f.action !== 'dstHit' || f.age !== DST_FIRE_TICK) return;
       for (const [x, y] of [
         [30, -80],
@@ -2688,15 +2626,10 @@ export class Match {
           hit: false,
         };
         this.projectiles.push(missile);
-        // PC 3160: each missile leaves a smoke ring drifting at −400/+400.
-        this.spawnEffect(missile, {
-          clip: 'dstMissileSmoke',
-          x: 70,
-          y: -60,
-          front: false,
-          vx: -400,
-          vy: 400,
-        });
+        // PC 3160: each missile leaves smoke ring 219 behind it, which
+        // drifts at −400/+400 (PC 3172).
+        for (const event of animationFrame('dstMissile', 0).events ?? [])
+          if (event.op === 'spawn') this.spawnObject(missile, owner, event);
       }
     });
     // Collect contacts before applying them so same-tick attacks can trade.
@@ -2844,13 +2777,6 @@ export class Match {
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = !projectile && (!source || source === f);
       if (body) f.contact = true;
-      // Hit reactions delete the victim's objects with ids 7–9 (op 0x04, action 0).
-      if (!blocked) {
-        const victim = this.fighters.indexOf(target);
-        this.effects = this.effects.filter(
-          (e) => e.owner !== victim || e.slot < 7 || e.slot > 9,
-        );
-      }
       if (fbh) addPower(f, FBH_POWER);
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
@@ -2903,14 +2829,17 @@ export class Match {
         target.facing = facing === 1 ? -1 : 1;
       }
       // 0x40f567: a box with damage spawns its response's effect action (word
-      // 2 of the entry) through 0x406570 at the contact, facing the striker.
+      // 2 of the entry) through 0x406570 at the contact, facing the striker,
+      // in front and in no slot (flags 5).
       if (effect)
         this.spawnObject({ x, y, facing }, this.fighters.indexOf(f), {
-          flags: 1,
+          flags: 5,
           action: effect,
+          offset: 0,
           x: 0,
           y: 0,
           slot: 0,
+          z: 0,
         });
       // The guard reaction's first op 0x24 runs before its first display.
       if (blocked && target.hp > 0)

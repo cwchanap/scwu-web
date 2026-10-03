@@ -41,6 +41,34 @@ function ticks(
 const HIT_EFFECTS = new Set(RESPONSE_EFFECTS.filter(Boolean));
 const hitEffects = (match: Match) =>
   match.effects.filter((e) => HIT_EFFECTS.has(e.clip as number));
+// An object (op 0x04) of fighter `owner`, as the effect pass keeps them.
+const object = (
+  clip: Effect['clip'],
+  owner: number,
+  fields: Partial<Effect> = {},
+): Effect => ({
+  clip,
+  x: 0,
+  y: 0,
+  vx: 0,
+  vy: 0,
+  ax: 0,
+  gravity: 0,
+  facing: 1,
+  age: 0,
+  front: true,
+  owner,
+  slot: 0,
+  screen: false,
+  follow: null,
+  box: null,
+  objectBox: null,
+  responses: [],
+  connected: false,
+  color: NORMAL_COLOR,
+  trail: null,
+  ...fields,
+});
 
 describe('Hit Up launcher', () => {
   it.each([1, -1] as const)(
@@ -405,7 +433,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
         'missile',
       ]);
       expect(match.effects.map((e) => e.clip)).toEqual(
-        expect.arrayContaining(['dstFire', 'dstMissileSmoke', 'dashSmoke']),
+        expect.arrayContaining([385, 219, 396]),
       );
       ticks(match, 18);
       expect(target.action).toBe('dstToss');
@@ -542,13 +570,102 @@ describe('Daisetsuzan Oroshi command throw', () => {
   });
 });
 
-describe('nested smoke', () => {
+describe('fighter clip spawns (op 0x04)', () => {
+  it('puffs landing smoke behind a fighter as it lands (action 9, PC 115)', () => {
+    const match = new Match();
+    const [f] = match.fighters;
+    match.step({ jump: true });
+    while (f.action !== 'land') match.step();
+    // Flags 4: behind its spawner, in no slot.
+    expect(match.effects.filter((e) => e.clip === 400)).toMatchObject([
+      { owner: 0, x: f.x, y: 0, front: false, slot: -1 },
+    ]);
+  });
+
+  it('raises hit dust at the hit reaction’s second display (action 73, PC 757)', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    match.step({ punch: true });
+    while (target.action !== 'hit') match.step();
+    const dust = () =>
+      match.effects.filter((e) => e.clip === 394 && e.owner === 1);
+    while (target.age < 5) {
+      expect(dust()).toEqual([]);
+      match.step();
+    }
+    expect(dust()).toMatchObject([{ x: target.x, front: true, slot: -1 }]);
+  });
+
+  it('flashes the court behind the fighters on a KO (59 + 9, PC 600)', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    target.hp = 1;
+    match.step({ punch: true });
+    while (target.action !== 'down') match.step();
+    const flash = () => match.effects.filter((e) => e.clip === '59+9');
+    // Flags 0x46 at z 15: a viewport object behind every fighter, its panel
+    // 294 added at +25 (PC 592) for ten ticks.
+    expect(flash()).toMatchObject([
+      {
+        owner: 1,
+        x: 327 * 1.5,
+        y: 498 * 1.5,
+        screen: true,
+        front: false,
+        color: { mode: 2, r: 25, g: 25, b: 25 },
+      },
+    ]);
+    ticks(match, 9);
+    expect(flash()).toHaveLength(1);
+    match.step();
+    expect(flash()).toEqual([]);
+  });
+
+  it('registers a spawn without flag bit 2 in its owner’s slot (0x412caf)', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 120;
+    match.step({ punch: true });
+    while (f.action !== 'punchHit' || f.hitStop || f.age < 6) match.step();
+    match.step({ punch: true });
+    while (!match.effects.some((e) => e.clip === 395)) match.step();
+    // Punch 2's dust, flags 0 (PC 2394), takes slot 0 behind Ryuko.
+    expect(f).toMatchObject({ action: 'punch2', age: 13 });
+    expect(match.effects.filter((e) => e.clip === 395)).toMatchObject([
+      { owner: 0, slot: 0, front: false },
+    ]);
+  });
+
+  it('deletes only the victim’s registered objects 7–9 as a hit reaction enters, rolled or not', () => {
+    const branches = new Set<Fighter['branch']>();
+    for (let seed = 0; seed < 8; seed++) {
+      const match = new Match('practice', false, seed);
+      const [f, target] = match.fighters;
+      f.action = 'kick3';
+      target.x = f.x + 140;
+      const beam = object(398, 1, { slot: 7 });
+      const smoke = object(398, 1, { slot: -1 });
+      match.effects.push(beam, smoke);
+      while (target.action !== 'hitRapid') match.step();
+      branches.add(target.branch);
+      // Action 83's records before its roll (PCs 949–956) run either way.
+      expect(match.effects).not.toContain(beam);
+      expect(match.effects).toContain(smoke);
+      expect(match.effects.filter((e) => e.clip === 394)).toMatchObject([
+        { owner: 1, x: target.x },
+      ]);
+    }
+    expect(branches).toEqual(new Set([null, '83+18']));
+  });
+
   it("plays the DST dash smoke's own puffs (object 396, PCs 5705–5710)", () => {
     const match = new Match();
     const [f, target] = match.fighters;
     target.x = f.x + 120;
     match.step({ dst: true });
-    const dash = () => match.effects.find((e) => e.clip === 'dashSmoke');
+    const dash = () => match.effects.find((e) => e.clip === 396);
     while (!dash()) match.step();
     const smoke = dash()!;
     const puffs: { age: number; dx: number; front: boolean }[] = [];
@@ -3913,7 +4030,8 @@ describe('prototype training rules', () => {
     match.step({ axe: true });
     ticks(match, animationDuration('axeThrow'));
     expect(match.projectiles).toMatchObject([{ hit: false }]);
-    // Action 226 deletes object 6, the last axe (PC 3267), before its own.
+    // Authored: a new throw replaces the flying axe (the source's PC 3267
+    // jumps to 225 instead while it flies).
     match.step({ axe: true });
     expect(match.fighters[0].action).toBe('axeThrow');
     expect(match.projectiles).toHaveLength(0);
@@ -3948,35 +4066,6 @@ describe('prototype training rules', () => {
   });
 
   describe('the y + 2000 object layer', () => {
-    // An object (op 0x04) of fighter `owner`, as the effect pass keeps them.
-    const object = (
-      clip: Effect['clip'],
-      owner: number,
-      fields: Partial<Effect> = {},
-    ): Effect => ({
-      clip,
-      x: 0,
-      y: 0,
-      vx: 0,
-      vy: 0,
-      ax: 0,
-      gravity: 0,
-      facing: 1,
-      age: 0,
-      front: true,
-      owner,
-      slot: 0,
-      screen: false,
-      follow: null,
-      box: null,
-      objectBox: null,
-      responses: [],
-      connected: false,
-      color: NORMAL_COLOR,
-      trail: null,
-      entered: null,
-      ...fields,
-    });
     const axe = (owner: number, x: number) => ({
       owner,
       kind: 'axe' as const,

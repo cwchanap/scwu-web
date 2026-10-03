@@ -42,8 +42,8 @@ def decode_event(record):
                     ay=s16(record, 7), flags=record[9])
     if op == 0x02:  # event handler: slot 1 landing, 2 hit, 3 guard
         return dict(op="handler", slot=record[1], action=u16(record, 2), offset=record[4])
-    if op == 0x04:  # spawn an object; r[12] is the owner's object slot, r[13] explicit z
-        return dict(op="spawn", flags=record[1], action=u16(record, 2), x=s16(record, 8),
+    if op == 0x04:  # spawn an object at r[4] records in; r[12] is the owner's object slot, r[13] explicit z
+        return dict(op="spawn", flags=record[1], action=u16(record, 2), offset=record[4], x=s16(record, 8),
                     y=s16(record, 10), slot=record[12], z=record[13])
     if op == 0x07:  # place the held opponent in a pose from the held-pose table
         return dict(op="hold", flags=record[1], pose=u16(record, 2), x=s16(record, 4), y=s16(record, 6))
@@ -127,8 +127,10 @@ def flatten(p, c, index, played=(), offset=0):
     (`played`), ends the timeline with `next`. Conditions (0x10, 0x11, 0x16,
     0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
     path is the super's normal path. `offset` starts at an op 0x20 jump target.
+    Like a clip's, each display also carries the op 0x04, 0x0e, 0x1f and 0x25
+    events run just before it, for reactions drawn from their timelines.
     """
-    frames, events, bodies = [], [], {}
+    frames, events, bodies, pending = [], [], {}, []
     t, pc, stack, seen = 0, p.action(index).start + offset, [], {}
     action = index
     result = dict(loop=-1, end="end", next=None)
@@ -152,7 +154,9 @@ def flatten(p, c, index, played=(), offset=0):
         if op == 0x0c:
             frame = display_record(p, pc)
             image = c.images[frame["image"]]
-            frames.append(with_body(dict(frame, width=image.width, height=image.height, t=t), bodies))
+            frame = with_body(dict(frame, width=image.width, height=image.height, t=t), bodies)
+            frames.append(dict(frame, events=pending) if pending else frame)
+            pending = []
             if frame["duration"] == 0:
                 result["end"] = "hold"
                 break
@@ -182,6 +186,8 @@ def flatten(p, c, index, played=(), offset=0):
             event = decode_event(record)
             if event:
                 events.append(dict(event, t=t))
+            if event and event["op"] in ("spawn", "screen", "trail", "variable"):
+                pending.append(event)
         pc += 1
     else:
         sys.exit(f"Action {index} did not finish flattening; refusing to export.")
@@ -233,12 +239,10 @@ def main():
         "iori": 246, "iori2": 247, "iori3": 248,
         # CPU IORI's recovery: op 0x20 at PC 5887 jumps to action 411 + 31.
         "cpuIoriRecover": (411, 31),
-        "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218, "dstMissileSmoke": 219,
+        "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218,
         "evilDst": 221,
-        "dstFire": 385, "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
+        "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
         "twist": 85, "twisting": 86, "twisting2": 87,
-        "smokeRight": 394, "smokeLeft": 395, "dashSmoke": 396, "hisaSmoke": 398, "hisaSmokeBack": 399,
-        "landingSmoke": 400,
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
         "launchDown": 123, "slamBounce": 124, "bounceDown": 147,
         "launchUp": 81, "launchAway": 80, "sweep": 79,
@@ -318,13 +322,16 @@ def main():
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), and CPU
     # IORI (410, which jumps through 411 into iori3), the rush air hit (122), the
     # beam hits (83, 84), hits 75 and 80 for their op 0x20 rolls, air reactions
-    # whose op 0x01 commands the match plays, and every response's hit effect,
-    # each with its op 0x20 branches, keyed
+    # whose op 0x01 commands the match plays, every response's hit effect and
+    # every object the clips spawn, each with its op 0x20 branches, keyed
     # "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
+    spawned = {(e["action"], e["offset"]) for frames in clips.values() for f in frames
+               for e in f.get("events", []) if e["op"] == "spawn" and e["action"]}
     scripts, queue = {}, [(i, 0) for i in [88, 97, 174, 222, 250, 251, 253, 256, 260, 263, 264,
                           265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
                           74, 75, 76, 80, 153, 158, 167, 172, *filter(None, response_effects)]]
+    queue += sorted(spawned)
     played = set(actions.values())
     while queue:
         index, offset = key = queue.pop()
@@ -333,7 +340,9 @@ def main():
         script = scripts[key] = flatten(p, c, index, played, offset)
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         for event in script["events"]:
-            if (event["op"] == "spawn" and event["action"]) or (event["op"] == "handler" and event["slot"] == 2):
+            if event["op"] == "spawn" and event["action"]:
+                queue.append((event["action"], event["offset"]))
+            if event["op"] == "handler" and event["slot"] == 2:
                 queue.append((event["action"], 0))
             if event["op"] == "random" and event["action"]:
                 queue.append((event["action"], event["offset"]))
