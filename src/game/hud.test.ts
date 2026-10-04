@@ -6,6 +6,7 @@ import {
   gaugeCrop,
   gaugeImage,
   koFrame,
+  KO_SOUND,
   KO_TICKS,
   ROUND_END_TICKS,
   healthCrop,
@@ -65,4 +66,10 @@ it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
   expect([-1, 0, 39, 40, 80, 120, 159, 160].map(faceImage)).toEqual([
     2001, 2002, 2002, 2001, 2000, 2001, 2001, 2002,
   ]);
+});
+
+it("voices the KO lettering's 'KO' (KGT sound 1) with its seventh display", () => {
+  expect(KO_SOUND).toEqual({ tick: 31, index: 1 });
+  expect(koFrame(31)?.pc).toBe(181);
+  expect(ui.sounds).toEqual([{ index: 1, filename: 'sounds/kgt-1.wav' }]);
 });

@@ -10,6 +10,16 @@ export const KO_TICKS = ui.ko.reduce(
 // Leave the winner visible after the original lettering finishes.
 export const ROUND_END_TICKS = KO_TICKS + 100;
 
+// Action 26 plays KGT sound 1 ('KO') before the display at PC 181 (PC 180).
+export const KO_SOUND = (() => {
+  let tick = 0;
+  for (const frame of ui.ko) {
+    if ('sound' in frame) return { tick, index: frame.sound };
+    tick += frame.duration;
+  }
+  throw new Error('The KO lettering lost its sound');
+})();
+
 export function koFrame(age: number) {
   for (const frame of ui.ko) {
     if (age < frame.duration) return frame;

@@ -42,6 +42,8 @@ def decode_event(record):
                     ay=s16(record, 7), flags=record[9])
     if op == 0x02:  # event handler: slot 1 landing, 2 hit, 3 guard
         return dict(op="handler", slot=record[1], action=u16(record, 2), offset=record[4])
+    if op == 0x03:  # play sound r[2:4] of the running container's table (0x4132c8)
+        return dict(op="sound", index=u16(record, 2))
     if op == 0x04:  # spawn an object at r[4] records in; r[12] is the owner's object slot, r[13] explicit z
         return dict(op="spawn", flags=record[1], action=u16(record, 2), offset=record[4], x=s16(record, 8),
                     y=s16(record, 10), slot=record[12], z=record[13])
@@ -96,6 +98,10 @@ def decode_event(record):
     return None
 
 
+# The events a display carries: those its clip or timeline runs just before it.
+POSE_EVENTS = ("sound", "spawn", "screen", "trail", "variable")
+
+
 def color_state(record):
     return dict(op="color", mode=record[1], r=s8(record, 2), g=s8(record, 3), b=s8(record, 4),
                 fade=s8(record, 5) if record[1] == 4 else 0)
@@ -140,8 +146,8 @@ def flatten(p, c, index, played=(), offset=0):
     path is the super's normal path, and the match takes an op 0x16, 0x1f or
     0x20 branch by switching to its target's own timeline. Op 0x0b calls stay
     events. `offset` starts at a branch's jump target.
-    Like a clip's, each display also carries the op 0x04, 0x0e, 0x1f and 0x25
-    events run just before it, for reactions drawn from their timelines.
+    Like a clip's, each display also carries the op 0x03, 0x04, 0x0e, 0x1f and
+    0x25 events run just before it, for reactions drawn from their timelines.
     """
     frames, events, bodies, pending = [], [], {}, []
     t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
@@ -203,7 +209,7 @@ def flatten(p, c, index, played=(), offset=0):
                 event = None
             if event:
                 events.append(dict(event, t=t))
-            if event and event["op"] in ("spawn", "screen", "trail", "variable"):
+            if event and event["op"] in POSE_EVENTS:
                 pending.append(event)
         pc += 1
     else:
@@ -277,17 +283,17 @@ def main():
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
         # A display after an op 0x23 carries the colour state it sets, and
-        # the op 0x0e, 0x25 and player-variable events of the records just
-        # before it.
+        # the op 0x03, 0x04, 0x0e, 0x25 and player-variable events of the
+        # records just before it.
         frames, bodies, color, events = [], None, None, []
         for pc in range(action.start, action.end):
             if p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] in (0x04, 0x0e, 0x1f, 0x25) and pc >= action.start + offset:
+            elif p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1f, 0x25) and pc >= action.start + offset:
                 event = decode_event(p.records[pc])
-                if event and event["op"] in ("spawn", "screen", "trail", "variable"):
+                if event and event["op"] in POSE_EVENTS:
                     events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
@@ -369,6 +375,11 @@ def main():
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "call":
                 queue.append((event["action"], 0))
+    # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
+    sound_ids = {e["index"] for frames in clips.values() for f in frames for e in f.get("events", [])
+                 if e["op"] == "sound"}
+    sound_ids |= {e["index"] for s in scripts.values() for e in s["events"] if e["op"] == "sound"}
+    sounds = export_sounds(c, "ryuko", sound_ids)
     images = []
     for index in sorted(image_ids):
         record = c.images[index]
@@ -384,7 +395,7 @@ def main():
         if path.stem not in {str(index) for index in image_ids}:
             path.unlink()
     idle = p.action(1)
-    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, clips=clips, held=held,
+    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips, held=held,
         responses=responses, response_effects=response_effects, cpu=cpu, scripts={f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()
@@ -399,6 +410,25 @@ def main():
     print(f"Exported {len(images)} Ryuko images, Sport Court, idle program, and {len(cases)} oracle traces.")
 
 
+def export_sounds(c, prefix, indices):
+    """Write sounds `indices` of container `c`, dropping stale ones; return their files."""
+    folder = PUBLIC / "sounds"
+    folder.mkdir(exist_ok=True)
+    sounds = []
+    for index in sorted(indices):
+        entry = c.sounds[index]
+        wav = c.data[entry["data_offset"]:entry["data_offset"] + entry["size"]]
+        if wav[:4] != b"RIFF" or wav[8:12] != b"WAVE":
+            sys.exit(f"{prefix} sound {index} is not RIFF/WAVE; refusing to export.")
+        filename = f"sounds/{prefix}-{index}.wav"
+        write_if_changed(PUBLIC / filename, wav)
+        sounds.append(dict(index=index, filename=filename))
+    for path in folder.glob(f"{prefix}-*.wav"):
+        if path.name not in {Path(s["filename"]).name for s in sounds}:
+            path.unlink()
+    return sounds
+
+
 def export_ui():
     data = (RESEARCH / "extracted/SCWU.KGT").read_bytes()
     digest = hashlib.sha256(data).hexdigest()
@@ -406,8 +436,17 @@ def export_ui():
         sys.exit("SCWU UI source hash differs from the handoff; refusing to export.")
     c = Container(data)
     p = Program(c)
+    # Action 26's displays; one after an op 0x03 carries its sound (PC 180, 'KO').
     action = p.action(26)
-    ko = [display_record(p, pc) for pc in range(action.start, action.end) if p.records[pc][0] == 12]
+    ko, sound = [], None
+    for pc in range(action.start, action.end):
+        if p.records[pc][0] == 0x03:
+            sound = u16(p.records[pc], 2)
+        elif p.records[pc][0] == 12:
+            frame = display_record(p, pc)
+            ko.append(dict(frame, sound=sound) if sound is not None else frame)
+            sound = None
+    sounds = export_sounds(c, "kgt", {f["sound"] for f in ko if "sound" in f})
     # 17–20: stock digits EMPTY/100/200/300; 31–38: gauge shimmer; 135: UNDER PW.
     ids = {17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
     ids.update(range(31, 39))
@@ -421,7 +460,7 @@ def export_ui():
         filename = f"ui/{index}.png"
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
-    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, ko=ko))
+    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko))
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import data from './generated/assets.json';
 import ui from './generated/ui.json';
-import { createHud } from './hud';
+import { createHud, KO_SOUND } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import {
   animationFrame,
@@ -122,6 +122,10 @@ export class TrainingScene extends Phaser.Scene {
   private error = '';
   private lastStatus = '';
   private updateHud?: ReturnType<typeof createHud>;
+  // 0x403430 stops and rewinds every buffer of a sound before playing it
+  // (0x415f00), so each player's copy of a sound restarts rather than
+  // overlapping itself; different sounds mix.
+  private voices = new Map<string, Phaser.Sound.BaseSound>();
 
   constructor(private onStatus: (status: GameStatus) => void) {
     super('training');
@@ -133,6 +137,10 @@ export class TrainingScene extends Phaser.Scene {
       this.load.image(`ryuko-${image.index}`, BASE + image.filename);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
+    for (const sound of data.sounds)
+      this.load.audio(`ryuko-sound-${sound.index}`, BASE + sound.filename);
+    for (const sound of ui.sounds)
+      this.load.audio(`kgt-sound-${sound.index}`, BASE + sound.filename);
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
       this.report();
@@ -213,6 +221,7 @@ export class TrainingScene extends Phaser.Scene {
     this.clearInput();
     if (this.ready && !this.match.resultReady) {
       this.paused = true;
+      this.sound.pauseAll();
       this.report();
     }
   };
@@ -236,6 +245,8 @@ export class TrainingScene extends Phaser.Scene {
   togglePause() {
     if (!this.ready || this.match.resultReady) return;
     this.paused = !this.paused;
+    if (this.paused) this.sound.pauseAll();
+    else this.sound.resumeAll();
     this.clearInput();
     this.report();
   }
@@ -247,6 +258,7 @@ export class TrainingScene extends Phaser.Scene {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
     this.match = new Match(mode, mode === 'cpu', randomSeed());
     this.match.practice = { ...this.practice };
+    this.sound.stopAll();
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
@@ -254,6 +266,14 @@ export class TrainingScene extends Phaser.Scene {
     this.paused = false;
     this.clearInput();
     this.report();
+  }
+
+  private play(key: string, owner = 0) {
+    const id = `${owner}:${key}`;
+    let voice = this.voices.get(id);
+    if (!voice) this.voices.set(id, (voice = this.sound.add(key)));
+    voice.stop();
+    voice.play();
   }
 
   // Grow a hidden sprite pool to the current object count.
@@ -366,6 +386,11 @@ export class TrainingScene extends Phaser.Scene {
           this.match.step(
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
+          for (const { owner, index } of this.match.sounds)
+            this.play(`ryuko-sound-${index}`, owner);
+          const { winner, seconds, endingTicks } = this.match;
+          if (winner && seconds !== 0 && endingTicks === KO_SOUND.tick)
+            this.play(`kgt-sound-${KO_SOUND.index}`);
           this.idle.forEach((vm, i) => {
             if (
               frozen[i] ||
@@ -561,7 +586,6 @@ export function createGame(
     pixelArt: true,
     antialias: false,
     roundPixels: true,
-    audio: { noAudio: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
     banner: false,

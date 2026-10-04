@@ -40,7 +40,7 @@ export type FaderSpec = Omit<Color, 'mode'> & {
 };
 // `held` marks an op 0x07 held-pose display, drawn by heldPlacement. `body`
 // lists the op 0x19 boxes set when the pose displays, `color` the op 0x23
-// state an earlier record of its clip set, `events` the op 0x04, 0x0e,
+// state an earlier record of its clip set, `events` the op 0x03, 0x04, 0x0e,
 // 0x1f (player variables) and 0x25 records run just before it, in a clip or
 // a flattened timeline.
 export type Pose = Frame & {
@@ -49,10 +49,7 @@ export type Pose = Frame & {
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  events?: Extract<
-    SourceEvent,
-    { op: 'spawn' | 'trail' | 'screen' | 'variable' }
-  >[];
+  events?: PoseEvent[];
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
@@ -139,6 +136,17 @@ const dstHeld = () => [
 // calls inlined and op 0x0a jumps followed, plus the gameplay opcodes at their
 // action ages. The match plays their events; conditions are checked at entry.
 export type ScriptEvent = { t: number } & SourceEvent;
+export const POSE_EVENTS = [
+  'sound',
+  'spawn',
+  'screen',
+  'trail',
+  'variable',
+] as const;
+export type PoseEvent = Extract<
+  SourceEvent,
+  { op: (typeof POSE_EVENTS)[number] }
+>;
 export type SourceEvent =
   | {
       op: 'motion';
@@ -149,6 +157,8 @@ export type SourceEvent =
       flags: number;
     }
   | { op: 'handler'; slot: number; action: number; offset: number }
+  // Op 0x03 plays sound `index` of the running container's table.
+  | { op: 'sound'; index: number }
   // Op 0x0b calls an action without displays once (228/229 for the EX ball).
   | { op: 'call'; action: number }
   // Op 0x16 jumps when input condition r[7] holds, or fails with `negate`.

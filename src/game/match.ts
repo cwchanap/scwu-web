@@ -13,6 +13,7 @@ import {
   pushboxes,
   isScripted,
   NORMAL_COLOR,
+  POSE_EVENTS,
   RESPONSE_EFFECTS,
   RESPONSES,
   script,
@@ -1156,6 +1157,8 @@ export class Match {
   freeze = 0;
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
+  // This tick's op 0x03 cues: each fighter's sound table (+0x221c) and index.
+  sounds: { owner: number; index: number }[] = [];
   // The latest op 0x0e shake per axis; the renderer steps it (stepShake), and
   // a new object restarts it.
   quake: { x: Quake | null; y: Quake | null } = { x: null, y: null };
@@ -1684,6 +1687,9 @@ export class Match {
       case 'motion':
         motion(actor, event);
         break;
+      case 'sound':
+        this.sounds.push({ owner, index: event.index });
+        break;
       case 'box': {
         const box =
           event.w || event.h
@@ -1821,6 +1827,17 @@ export class Match {
         return this.branchTo(actor, sourceKey(event.action, event.offset));
     }
     return false;
+  }
+
+  // A projectile's handler enters its hit action; the axe's impact (230)
+  // plays sound 34 before its first display (PC 3334).
+  private hitProjectile(p: Projectile) {
+    p.hit = true;
+    p.age = 0;
+    if (p.kind === 'axe')
+      for (const event of animationFrame('axeHit', 0).events ?? [])
+        if (event.op === 'sound')
+          this.sounds.push({ owner: p.owner, index: event.index });
   }
 
   // Ops 0x07/0x14 move the opponent this super holds or has just tossed.
@@ -2030,8 +2047,7 @@ export class Match {
         p,
         AXE_OBJECT_BOX,
         () => {
-          p.hit = true;
-          p.age = 0;
+          this.hitProjectile(p);
         },
       ]);
     }
@@ -2552,8 +2568,46 @@ export class Match {
     );
   }
 
+  // A display carries the op 0x03, 0x04, 0x0e, 0x1f and 0x25 records its
+  // action runs just before it (supers run their whole timelines in
+  // fireEvents). The script steps into it before the hit test, so a fighter
+  // enters it as it moves; an action a contact or throw starts is entered as
+  // the tick ends.
+  private enter(f: Fighter, index: number) {
+    const pose = fighterPose(f);
+    if (pose === f.entered) return;
+    // A reaction that rolled its op 0x20 draws the branch, but first ran the
+    // records before the roll; past it lies the sound the branch skips (75,
+    // 76 and 80, PCs 795, 820, 910). A KO (+0x75a0, 0x40e83e) enters the
+    // lose action 59 first: it deletes objects 7–9 and clears variables 6, 8
+    // and 14, then jumps to KO Normal (PC 591). With global 0 at 10 it would
+    // enter 'make hikari' (63) instead (PC 590), but only the title menu
+    // writes global 0, to 1 (KGT 78, PC 497).
+    const roll = f.branch && ROLLED[f.action];
+    const rolled = roll ? script(roll).events : [];
+    const entry = f.entered
+      ? []
+      : roll
+        ? rolled
+            .slice(
+              0,
+              rolled.findIndex((e) => e.op === 'random'),
+            )
+            .filter((e) => (POSE_EVENTS as readonly string[]).includes(e.op))
+        : f.action === 'down' || f.action === 'koAgain'
+          ? script(LOSE).events
+          : [];
+    const events = [...entry, ...(pose.events ?? [])];
+    f.entered = pose;
+    if (isScripted(f.action)) return;
+    for (const event of events)
+      if (event.op !== 'spawn' || !PROJECTILE_ACTIONS.has(event.action))
+        this.runEvent(f, index, event);
+  }
+
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
+    this.sounds = [];
     // 0x412271: before its script each tick, frozen or not, an object with
     // an afterimage slot counts down and, past zero, samples its position,
     // facing and display.
@@ -2589,32 +2643,7 @@ export class Match {
         });
     }
     this.run(player, opponent);
-    // A display carries the op 0x04, 0x0e, 0x1f and 0x25 records its action
-    // runs just before it (supers run their whole timelines in fireEvents).
-    this.fighters.forEach((f, index) => {
-      const pose = fighterPose(f);
-      if (pose === f.entered) return;
-      // A reaction that rolled its op 0x20 draws the branch, but first ran
-      // the records before the roll: those of its own first display. A KO
-      // (+0x75a0, 0x40e83e) enters the lose action 59 first: it deletes
-      // objects 7–9 and clears variables 6, 8 and 14, then
-      // jumps to KO Normal (PC 591). With global 0 at 10 it would enter
-      // 'make hikari' (63) instead (PC 590), but only the title menu writes
-      // global 0, to 1 (KGT 78, PC 497).
-      const entry = f.entered
-        ? []
-        : f.branch
-          ? clipPose(f.action, 0).events
-          : f.action === 'down' || f.action === 'koAgain'
-            ? script(LOSE).events
-            : [];
-      const events = [...(entry ?? []), ...(pose.events ?? [])];
-      f.entered = pose;
-      if (isScripted(f.action)) return;
-      for (const event of events)
-        if (event.op !== 'spawn' || !PROJECTILE_ACTIONS.has(event.action))
-          this.runEvent(f, index, event);
-    });
+    this.fighters.forEach((f, index) => this.enter(f, index));
     // The tick ends counting the faders down (0x404d97); each draw then
     // writes a running one over the colour of its player's objects.
     this.fighters.forEach((f, owner) => {
@@ -2724,6 +2753,7 @@ export class Match {
       )
         this.directionTaps[i] = null;
       this.settle(f);
+      this.enter(f, i);
     };
     const [a, b] = this.fighters;
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
@@ -2957,10 +2987,8 @@ export class Match {
       source,
       bonus,
     } of contacts) {
-      if (projectile) {
-        projectile.hit = true;
-        projectile.age = 0;
-      } else if (source) source.connected = true;
+      if (projectile) this.hitProjectile(projectile);
+      else if (source) source.connected = true;
       else f.connected = true;
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = !projectile && (!source || source === f);

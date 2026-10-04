@@ -5364,7 +5364,9 @@ describe('recovered air and rapid reaction motion', () => {
   });
 
   it('rolls a beam hit’s op 0x20 on entry and draws its branch (PC 957)', () => {
-    // The victim's roll is the match's first: rand % 3 > 1 enters 83 + 18.
+    // Kick 3's beam (190) spawns 380 as it strikes, before the hit test, and
+    // 380 rolls first: rand % 4 > 2 enters 381, otherwise rand % 3 > 1 enters
+    // 382. Then the victim's: rand % 3 > 1 enters 83 + 18.
     const branches = new Set<Fighter['branch']>();
     for (let seed = 0; seed < 20; seed++) {
       const match = new Match('practice', false, seed);
@@ -5372,7 +5374,9 @@ describe('recovered air and rapid reaction motion', () => {
       f.action = 'kick3';
       target.x = f.x + 140;
       while (target.action !== 'hitRapid') match.step();
-      const branch = new CpuVM([], 0, seed).random() % 3 > 1;
+      const rand = new CpuVM([], 0, seed);
+      if (rand.random() % 4 <= 2) rand.random();
+      const branch = rand.random() % 3 > 1;
       expect(target.branch).toBe(branch ? '83+18' : null);
       branches.add(target.branch);
     }
@@ -5573,5 +5577,56 @@ describe('EX mode', () => {
     expect(shot(versus)).toMatchObject({ clip: 235, age: 0 });
     expect(versus.projectiles).toMatchObject([{ hit: true, age: 0 }]);
     expect(versus.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
+  });
+});
+
+describe('sound cues (op 0x03)', () => {
+  it("plays a display's sounds as its script steps in, before the hit test", () => {
+    const match = new Match();
+    match.fighters[1].x = match.fighters[0].x + 150;
+    match.step({ punch: true });
+    ticks(match, 6);
+    expect(match.sounds).toEqual([]);
+    // Punch 1 plays 39 before the display it strikes from (PC 2364); its hit
+    // enters 179, and the hit effect 339 plays 31 (PC 5084).
+    match.step();
+    expect(match.fighters[0].action).toBe('punchHit');
+    expect(match.sounds).toEqual([
+      { owner: 0, index: 39 },
+      { owner: 0, index: 31 },
+    ]);
+    match.step();
+    expect(match.sounds).toEqual([]);
+  });
+
+  it("skips the heavy hit's voice on its op 0x20 branch (PC 794)", () => {
+    const voiced = new Set<boolean>();
+    for (let seed = 0; seed < 10; seed++) {
+      const match = new Match('practice', false, seed);
+      match.fighters[1].x = match.fighters[0].x + 150;
+      match.step({ drill: true });
+      const target = match.fighters[1];
+      for (let tick = 0; tick < 120; tick++) {
+        const hp = target.hp;
+        match.step();
+        // Each drill strike enters 75 afresh.
+        if (target.action !== 'hitHeavy' || target.hp === hp) continue;
+        // Sound 14 sits between the roll and the branch's target (75 + 16).
+        const voice = match.sounds.some((s) => s.owner === 1 && s.index === 14);
+        expect(voice).toBe(target.branch === null);
+        voiced.add(voice);
+      }
+    }
+    expect(voiced).toEqual(new Set([true, false]));
+  });
+
+  it("plays the axe's impact (230, PC 3334) as it breaks", () => {
+    const match = new Match();
+    ticks(match, AXE_RELEASE_TICK + 4, { axe: true }, { axe: true });
+    expect(match.projectiles.map((p) => p.hit)).toEqual([true, true]);
+    expect(match.sounds).toEqual([
+      { owner: 0, index: 34 },
+      { owner: 1, index: 34 },
+    ]);
   });
 });
