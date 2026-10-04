@@ -149,6 +149,25 @@ export type SourceEvent =
       flags: number;
     }
   | { op: 'handler'; slot: number; action: number; offset: number }
+  // Op 0x0b calls an action without displays once (228/229 for the EX ball).
+  | { op: 'call'; action: number }
+  // Op 0x16 jumps when input condition r[7] holds, or fails with `negate`.
+  | {
+      op: 'input';
+      condition: number;
+      negate: boolean;
+      action: number;
+      offset: number;
+    }
+  // Op 0x1f jumps when its variable (r[4]) is == (1), > (2) or < (3) `value`.
+  | {
+      op: 'test';
+      selector: number;
+      compare: number;
+      value: number;
+      action: number;
+      offset: number;
+    }
   | {
       op: 'spawn';
       flags: number;
@@ -204,6 +223,8 @@ export interface Script {
   frames: (Pose & { t: number })[];
   events: ScriptEvent[];
   loop: number;
+  // The first event of a loop's target record.
+  loopEvent?: number;
   end: 'end' | 'hold' | 'loop' | 'jump';
   next: number | null;
 }
@@ -220,16 +241,27 @@ export function script(index: ObjectKey) {
   return found;
 }
 const scriptEvents = new Map<ObjectKey, Map<number, ScriptEvent[]>>();
-// Events that run when a scripted action or object reaches the given age.
+// Events that run when a scripted action or object reaches the given age. A
+// looping timeline repeats: each time it wraps, the records after its last
+// display run, then those from the loop's target on.
 export function eventsAt(index: ObjectKey, age: number) {
   let byTick = scriptEvents.get(index);
+  const found = script(index);
   if (!byTick) {
     byTick = new Map();
-    for (const event of script(index).events)
+    for (const event of found.events)
       byTick.set(event.t, [...(byTick.get(event.t) ?? []), event]);
     scriptEvents.set(index, byTick);
   }
-  return byTick.get(age) ?? [];
+  const duration = animationDuration(index);
+  if (found.end !== 'loop' || age < duration) return byTick.get(age) ?? [];
+  const start = found.frames[found.loop].t;
+  const t = start + ((age - start) % (duration - start));
+  if (t !== start) return byTick.get(t) ?? [];
+  return [
+    ...(byTick.get(duration) ?? []),
+    ...found.events.filter((e, i) => i >= found.loopEvent! && e.t === start),
+  ];
 }
 // A zero-length display waits for gameplay (landing); hold it like a long pose.
 const scriptClip = (index: ObjectKey) => {
@@ -267,6 +299,12 @@ export function heldFrame(pose: number, flags: number): Pose {
   };
 }
 
+// Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends.
+export const INTRO_EX_TICK = clips.intro
+  .slice(2)
+  .filter((frame) => frame.pc < 348)
+  .reduce((total, frame) => total + frame.duration, 0);
+
 // These are authored visual timelines, not execution of non-idle action bytecode.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
@@ -300,6 +338,9 @@ export const animations = {
   hitUp: clip(clips.hitUp),
   hitUpRecover: clip(clips.hitUpRecover),
   hitUpJump: clip(clips.hitUpJump, false, [8, 13, 5, 15, 1]),
+  // Actions 204/205 (EX Ch, NOR Ch): four flashing displays of image 366.
+  exChange: clip(clips.exChange),
+  norChange: clip(clips.norChange),
   iori: clip(clips.iori),
   iori2: clip(clips.iori2),
   iori3: clip(clips.iori3),
@@ -424,6 +465,8 @@ export const animations = {
   evilDstHit: scriptClip(222),
   // A guard reaction's op 0x24 enters COUNTER HIT (174), spending a stock.
   counterHit: scriptClip(174),
+  // EX mode's axe throw: action 231, with its charge branches (237, 238).
+  exFire: scriptClip(231),
   // Command 22 (CPU IORI): action 410 jumps to 411, which jumps to iori3 (248).
   cpuIori: scriptClip(410),
   cpuIoriRecover: clip(clips.cpuIoriRecover),
@@ -459,6 +502,7 @@ export const SCRIPTED = {
   changeAttackHit: 320,
   evilDstHit: 222,
   counterHit: 174,
+  exFire: 231,
   cpuIori: 410,
   scMusashi: 260,
   scGetterBeam: 265,

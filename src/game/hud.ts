@@ -35,6 +35,11 @@ export function gaugeImage(tick: number) {
   return time < 50 ? 31 : 32 + Math.floor((time - 50) / 5);
 }
 
+// Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
+// for 40 ticks each (PCs 712–730).
+export const faceImage = (face: number) =>
+  face < 0 ? 2001 : [2002, 2001, 2000, 2001][Math.floor(face / 40) % 4];
+
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
 const STOCK_OFFSETS = [
   [0, 0],
@@ -60,19 +65,17 @@ export function createHud(scene: Phaser.Scene) {
   image(39, 292, 13);
   image(40, 31, 37);
   image(41, 472, 37);
-  scene.add
-    .image(31 * scale, 36 * scale, 'ryuko-2001')
-    .setScrollFactor(0)
-    .setOrigin(0)
-    .setScale(scale)
-    .setDepth(101);
-  scene.add
-    .image(539 * scale, 36 * scale, 'ryuko-2001')
-    .setScrollFactor(0)
-    .setOrigin(0)
-    .setScale(scale)
-    .setFlipX(true)
-    .setDepth(101);
+  // The faces' display offsets put each image's top-left corner on the
+  // anchor; mirrored, the top-right one, at 609.
+  const faces = [31, 539].map((x) =>
+    scene.add
+      .image(x * scale, 36 * scale, 'ryuko-2001')
+      .setScrollFactor(0)
+      .setOrigin(0)
+      .setScale(scale)
+      .setFlipX(x > 320)
+      .setDepth(101),
+  );
   // Name placement is authored; portrait anchors above come from actions 72/73.
   scene.add
     .image(106 * scale, 38 * scale, 'ryuko-464')
@@ -138,6 +141,8 @@ export function createHud(scene: Phaser.Scene) {
       underPower[index]
         .setVisible(f.hp > 0 && f.hp <= DESPERATION_HP)
         .setAlpha(Math.floor(match.ticks / 15) % 2 ? 0.45 : 0.9);
+      const face = faces[index].setTexture(`ryuko-${faceImage(f.face)}`);
+      if (index) face.setX((609 - face.width) * scale);
     });
     life.forEach((bar, index) => {
       const crop = healthCrop(match.fighters[index].hp, index === 1);

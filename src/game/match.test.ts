@@ -23,6 +23,7 @@ import { ROUND_END_TICKS } from './hud';
 import {
   animationDuration,
   animationFrame,
+  INTRO_EX_TICK,
   NORMAL_COLOR,
   RESPONSE_EFFECTS,
 } from './animations';
@@ -5381,5 +5382,196 @@ describe('recovered air and rapid reaction motion', () => {
       [0, 3, 6, 9].map((age) => animationFrame(clip, age).image);
     expect(images('hitRapid')).toEqual([47, 52, 47, 47]);
     expect(images('83+18')).toEqual([52, 47, 52, 47]);
+  });
+});
+
+describe('EX mode', () => {
+  // EX Fire's shot: the object in its owner's slot 6.
+  const shot = (match: Match, owner = 0) =>
+    match.effects.find((e) => e.owner === owner && e.slot === 6);
+  const exMatch = () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 600;
+    f.ex = true;
+    return { match, f, target };
+  };
+
+  it('switches with EX Ch and NOR Ch for 50 power, or enters NO SUPER without it', () => {
+    const broke = new Match();
+    broke.step({ ex: true });
+    // PCs 2858–2863: under 50 power in all, NO SUPER (251).
+    expect(broke.fighters[0]).toMatchObject({ action: 'noSuper', ex: false });
+    const match = new Match();
+    const [f] = match.fighters;
+    f.power = 60;
+    match.step({ ex: true });
+    // EX Ch (204) spends 50, sets variable 0 (PC 2867) and spawns EX Obj 375.
+    expect(f).toMatchObject({ action: 'exChange', power: 10, ex: true });
+    expect(match.effects.map((e) => e.clip)).toEqual([375]);
+    expect(f.face).toBe(-1);
+    match.step();
+    // The HUD face (action 70) counts its cycle from the next tick.
+    expect(f.face).toBe(0);
+    ticks(match, animationDuration('exChange'));
+    expect(f).toMatchObject({ action: 'idle', ex: true });
+    Object.assign(f, { stock: 1, power: 0 });
+    match.step({ ex: true });
+    // In EX mode PC 2866 enters NOR Ch (205), which clears it (PC 2880).
+    expect(f).toMatchObject({
+      action: 'norChange',
+      stock: 0,
+      power: 50,
+      ex: false,
+    });
+    match.step();
+    expect(f.face).toBe(-1);
+  });
+
+  it('starts a Vs. CPU round in EX mode for down held at PC 348', () => {
+    expect(INTRO_EX_TICK).toBe(162);
+    const match = new Match('cpu', true);
+    ticks(match, INTRO_EX_TICK - 1, { crouch: true });
+    expect(match.fighters[0].ex).toBe(false);
+    match.step({ crouch: true });
+    expect(match.fighters.map((f) => f.ex)).toEqual([true, false]);
+    const late = new Match('cpu', true);
+    ticks(late, INTRO_EX_TICK);
+    late.step({ crouch: true });
+    expect(late.fighters[0].ex).toBe(false);
+  });
+
+  it('fires a tapped EX Fire (231): a 30-damage shot at raw 800 through FB', () => {
+    const { match, f, target } = exMatch();
+    match.step({ axe: true });
+    expect(f.action).toBe('exFire');
+    // Holding back doesn't charge: condition 4 is forward.
+    ticks(match, 17, { left: true });
+    expect(shot(match)).toBeUndefined();
+    // At age 18 the charge check (PC 3445) falls through to 231 + 13, which
+    // spawns 233 at (−6, −102) in slot 6; 228 moves it at raw 800.
+    match.step({ left: true });
+    const ball = shot(match)!;
+    expect(ball).toMatchObject({ clip: 233, age: 0, x: 291, y: -153 });
+    expect(ball.vx).toBeCloseTo(11.993, 3);
+    expect(ball.box).toMatchObject({ damage: 30, kind: 6 });
+    for (let tick = 0; tick < 100 && target.hp === LIFE; tick++) match.step();
+    // Response 50 → FB (110) credits the striker 10 power (PC 1442) and
+    // enters 75; objects don't pause Ryuko.
+    expect(target).toMatchObject({
+      hp: LIFE - 30,
+      action: 'hitHeavy',
+      hitStop: 15,
+    });
+    expect(f).toMatchObject({ power: 13, hitStop: 0 });
+    // The hit handler (slot 2) enters 235, a blank display for ten ticks.
+    expect(ball).toMatchObject({ clip: 235, age: 0, box: null });
+    ticks(match, 9);
+    expect(shot(match)).toBe(ball);
+    match.step();
+    expect(shot(match)).toBeUndefined();
+  });
+
+  it('charges while forward is held: EX Fire 2 after 237, Genkai after 238', () => {
+    const { match, f, target } = exMatch();
+    match.step({ axe: true, right: true });
+    const taken: unknown[] = [];
+    for (let tick = 0; tick < 56; tick++) {
+      match.step({ right: true });
+      if (f.age === 0) taken.push(f.branch);
+    }
+    // Each op 0x16 (condition 4) after a charge display takes its jump.
+    expect(taken).toEqual([
+      '237+4',
+      '237+9',
+      '237+12',
+      '237+15',
+      '237+19',
+      '237+22',
+      '237+25',
+      '237+29',
+      '237+34',
+    ]);
+    // Released, 237's last check (PC 3475) enters EX Fire 2 (232), which sets
+    // variable 12 (PC 3364): its shot calls 229, raw 1000 for 40.
+    ticks(match, 2);
+    expect(f).toMatchObject({ branch: '237+34', age: 3, exFire: 10 });
+    expect(shot(match)!.vx).toBeCloseTo(14.992, 3);
+    expect(shot(match)!.box).toMatchObject({ damage: 40 });
+    for (let tick = 0; tick < 100 && target.hp === LIFE; tick++) match.step();
+    expect(target.hp).toBe(LIFE - 40);
+    // The shot's hit (235) clears it (PC 3438).
+    expect(f.exFire).toBe(0);
+
+    const full = exMatch();
+    full.match.step({ axe: true, right: true });
+    let ticksTaken = 1;
+    while (!shot(full.match)) {
+      full.match.step({ right: true });
+      ticksTaken++;
+    }
+    // 238 jumps to EX Fire Genkai (239), which recoils at raw −1000 and
+    // spawns EFG Ball 240 (PC 3519), raw 1500 for 50.
+    expect(ticksTaken).toBe(79);
+    expect(full.f).toMatchObject({ branch: '238+30', age: 1 });
+    expect(full.f.vx).toBeCloseTo(-14.992, 3);
+    const big = shot(full.match)!;
+    expect(big).toMatchObject({ clip: 240 });
+    expect(big.vx).toBeCloseTo(22.488, 3);
+    for (let tick = 0; tick < 100 && full.target.hp === LIFE; tick++)
+      full.match.step({ right: true });
+    // Response 58 → FBH (112) → 80; the ball explodes in 243.
+    expect(full.target).toMatchObject({
+      hp: LIFE - 50,
+      action: 'launchAway',
+      hitStop: 13,
+    });
+    expect(full.f.power).toBe(13);
+    expect(big.clip).toBe(243);
+  });
+
+  it("replays the shot's display through the freeze (PC 3390)", () => {
+    const { match, f } = exMatch();
+    match.fighters[1].x = f.x + 900;
+    ticks(match, 20, { axe: true });
+    const ball = shot(match)!;
+    expect(ball).toMatchObject({ clip: 233, age: 1 });
+    match.freeze = 8;
+    ticks(match, 2);
+    // After its display, global 6 above 0 jumps it back to 234 + 8 with its
+    // motion and box cleared, through the first display after the freeze.
+    const x = ball.x;
+    expect(ball).toMatchObject({ clip: '234+8', age: 0, box: null });
+    for (let tick = 0; tick < 8; tick++) {
+      match.step();
+      expect(ball).toMatchObject({ clip: '234+8', x, box: null });
+    }
+    // The display after the freeze calls 228 again; motion resumes next tick.
+    match.step();
+    expect(ball).toMatchObject({ x, box: { damage: 30 } });
+    match.step();
+    expect(ball.x).toBeCloseTo(x + 11.993, 3);
+  });
+
+  it('stands a tick while the shot lives and breaks it on an opposing axe', () => {
+    const { match, f } = exMatch();
+    match.fighters[1].x = f.x + 1200;
+    match.step({ axe: true });
+    ticks(match, animationDuration('exFire'));
+    expect(f.action).toBe('idle');
+    match.step({ axe: true });
+    // 231's PC 3340 jumps to 225 while slot 6 lives.
+    expect(f.action).toBe('axeBusy');
+    expect(shot(match)).toMatchObject({ clip: 233 });
+    const versus = new Match();
+    versus.fighters[0].ex = true;
+    versus.step({ axe: true }, { axe: true });
+    for (let tick = 0; tick < 30 && shot(versus)?.clip !== 235; tick++)
+      versus.step();
+    // The shot's slot-1 box and the axe's (y + 2000) each reach the other's
+    // body: both break, without damage.
+    expect(shot(versus)).toMatchObject({ clip: 235, age: 0 });
+    expect(versus.projectiles).toMatchObject([{ hit: true, age: 0 }]);
+    expect(versus.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
   });
 });

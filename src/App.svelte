@@ -52,6 +52,7 @@
     { control: 'hitUp', label: 'Hit Up', symbol: 'H' },
     { control: 'iori', label: 'IORI', symbol: 'F' },
     { control: 'dst', label: 'Daisetsuzan', symbol: 'G' },
+    { control: 'ex', label: 'EX mode', symbol: 'E' },
     { control: 'getterBeam', label: 'Getter Beam', symbol: '1' },
     { control: 'musashi', label: 'Musashi', symbol: '2' },
     { control: 'changeAttack', label: 'Change Attack', symbol: '3' },
@@ -145,7 +146,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, 1 to 5 for the supers. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -285,6 +286,7 @@
           'hitUp',
           'iori',
           'dst',
+          'ex',
         ].includes(item.control)}
         class:super-control={supers.has(item.control)}
         aria-label={item.label}
@@ -317,8 +319,8 @@
     ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span><span
       ><kbd>H</kbd> Hit Up</span
     ><span><kbd>F</kbd> IORI</span><span><kbd>G</kbd> Daisetsuzan</span><span
-      ><kbd>1</kbd>–<kbd>5</kbd> Supers</span
-    >
+      ><kbd>E</kbd> EX</span
+    ><span><kbd>1</kbd>–<kbd>5</kbd> Supers</span>
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -358,6 +360,14 @@
           recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
           Only one axe per fighter can be out at a time: pressing it again while your
           axe flies does nothing. These basic specials do not spend super stock.
+        </p>
+        <p>
+          Press <kbd>E</kbd> on the ground to enter EX mode for half a stock of
+          power, and again to leave it for the same. Ryuko's HUD face shows an
+          EX mark while it lasts. In EX mode <kbd>I</kbd> fires EX Fire instead of
+          the axe: hold forward to charge it into a faster, stronger shot, or to the
+          end for a large shot that launches. In Vs. CPU, holding down as the round
+          begins starts it in EX mode.
         </p>
         <p>
           Press <kbd>H</kbd> or Hit Up on the ground for an upward kick. On a hit,

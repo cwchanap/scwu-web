@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
 import ui from './generated/ui.json';
 import {
+  faceImage,
   gaugeCrop,
   gaugeImage,
   koFrame,
@@ -58,4 +59,10 @@ it('exports every HUD and KO texture at its original dimensions', () => {
     expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
     expect(frame.duration).toBeGreaterThan(0);
   }
+});
+
+it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
+  expect([-1, 0, 39, 40, 80, 120, 159, 160].map(faceImage)).toEqual([
+    2001, 2002, 2002, 2001, 2000, 2001, 2001, 2002,
+  ]);
 });

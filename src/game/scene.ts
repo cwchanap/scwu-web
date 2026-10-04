@@ -89,6 +89,7 @@ const keyMap: Record<string, Control> = {
   KeyI: 'axe',
   KeyO: 'throw',
   KeyG: 'dst',
+  KeyE: 'ex',
   Digit1: 'getterBeam',
   Digit2: 'musashi',
   Digit3: 'changeAttack',

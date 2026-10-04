@@ -5,6 +5,7 @@ import {
   clipPose,
   DST_TOSS_TICK,
   dstHold,
+  INTRO_EX_TICK,
   entryColor,
   eventsAt,
   heldFrame,
@@ -58,6 +59,7 @@ export type Control =
   | 'throw'
   | 'dst'
   | 'cpuIori'
+  | 'ex'
   | SuperControl;
 export type Input = Partial<Record<Control, boolean>>;
 export type Mode = 'practice' | 'cpu';
@@ -549,6 +551,9 @@ const RESPONSE_REACTIONS: Record<
   159: { action: 'blockStop', stop: 10 },
   161: { action: 'crouchBlockStop', stop: 10 },
   // FBB and FBH jump to 83 and 80; FBH first adds 10 power to the attacker.
+  // FB (110) does too (PC 1442), then enters 75 on the ground (PC 1444) or 76
+  // in the air (PC 1443): the EX ball's response 50.
+  110: { action: 'hitHeavy', stop: 15 },
   111: { action: 'hitRapid', stop: 0 },
   112: { action: 'launchAway', stop: 13 },
   122: { action: 'rushAirHit', stop: 0 },
@@ -565,8 +570,8 @@ const RESPONSE_REACTIONS: Record<
   170: { action: 'crouchTimeStopGuard', stop: 0 },
   172: { action: 'airTimeStopGuard', stop: 0 },
 };
-const FBH = 112;
-const FBH_POWER = 10;
+// Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker.
+const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 // A loss that empties life sets the lose action 59 (0x40e83e), which enters
 // KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
 // (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
@@ -643,6 +648,14 @@ const ROLLED: Partial<Record<Action, number>> = {
   rushAirHit: 122,
 };
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
+// A looping script never runs out, so its object lives until deleted.
+const loops = (e: Effect) => script(e.clip).end === 'loop';
+// A jump target: an action, or "action+offset" entering mid-action.
+const sourceKey = (action: number, offset: number): ObjectKey =>
+  offset ? `${action}+${offset}` : action;
+// The timeline a scripted fighter runs: its action's, or a branch it took.
+const timeline = (f: Fighter) =>
+  f.branch ?? SCRIPTED[f.action as ScriptedAction];
 // A command entered free and a landing handler mark a player acting
 // (+0x15e & ~8 | 4, 0x411a41 and 0x4118f3); a cancel keeps the bits.
 const markActing = (f: Fighter) => (f.reaction = (f.reaction & ~8) | 4);
@@ -781,8 +794,19 @@ export interface Fighter {
   contact: boolean;
   // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
   jumpVariable: number;
-  // The op 0x20 branch this reaction rolled on entry, drawn instead of its clip.
+  // The op 0x20 branch this reaction rolled on entry, drawn instead of its
+  // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
+  // timeline.
   branch: ObjectKey | null;
+  // Op 0x1f player variable 0 at 10: EX mode, which EX Ch (204, PC 2867)
+  // sets and NOR Ch (205, PC 2880) clears. `face` counts the cycle of the HUD
+  // face (action 70's object variable 0) from EX mode's first tick, or is −1.
+  ex: boolean;
+  face: number;
+  // Player variable 12: 10 from EX Fire 2 (232, PC 3364) until EX Fire (231,
+  // PC 3341) or its shot's hit (235, PC 3438) clears it. The shot reads it
+  // each display (228, PC 3321).
+  exFire: number;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
   // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
   // fighter returns to neutral. `striker` (+0xdefd): the opponent's own box
@@ -844,6 +868,9 @@ export interface Effect {
   connected: boolean;
   color: Color;
   trail: Trail | null;
+  // Op 0x02 handlers: what a hit (slot 2) or a guard (slot 3) enters.
+  onHit?: ObjectKey;
+  onGuard?: ObjectKey;
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -1013,6 +1040,9 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   reaction: 0,
   striker: null,
   branch: null,
+  ex: false,
+  face: -1,
+  exFire: 0,
   stopped: 0,
   transfer: 0,
 });
@@ -1141,6 +1171,8 @@ export class Match {
   // CPU or with the CPU practice partner).
   private cpuDriven = false;
   private previous: [Input, Input] = [{}, {}];
+  // This tick's input, which op 0x16 reads.
+  private inputs: [Input, Input] = [{}, {}];
   private history: [InputFrame[], InputFrame[]] = [[], []];
   private directionTaps: ({ direction: number; tick: number } | null)[] = [
     null,
@@ -1465,6 +1497,17 @@ export class Match {
     return true;
   }
 
+  // The axe throw (226) enters EX Fire (231) in EX mode (PC 3266). Either
+  // jumps to 225 while its slot-6 object, an axe or a shot, lives (op 0x04's
+  // r[5:7] at PCs 3267 and 3340).
+  private fireAction(f: Fighter): Action {
+    const owner = this.fighters.indexOf(f);
+    const busy =
+      this.projectiles.some((p) => p.kind === 'axe' && p.owner === owner) ||
+      this.effects.some((e) => e.owner === owner && e.slot === 6);
+    return busy ? 'axeBusy' : f.ex ? 'exFire' : 'axeThrow';
+  }
+
   // Ops 0x11 (life) and 0x10 (stock) precede each super's first display. Check
   // them in script order: a branch enters its target, a pass spends the stock.
   private startSuper(f: Fighter, control: SuperControl, airborne: boolean) {
@@ -1514,7 +1557,7 @@ export class Match {
       action = next;
     }
     if (!action) return false;
-    this.action(f, action, true);
+    this.action(f, action === 'axeThrow' ? this.fireAction(f) : action, true);
     this.fireEvents(f);
     return true;
   }
@@ -1524,22 +1567,114 @@ export class Match {
     if (!isScripted(f.action) || f.fired === f.age) return;
     f.fired = f.age;
     const owner = this.fighters.indexOf(f);
-    rearm(f, SCRIPTED[f.action], f.age);
-    for (const event of eventsAt(SCRIPTED[f.action], f.age))
-      this.runEvent(f, owner, event);
+    const key = timeline(f);
+    rearm(f, key, f.age);
+    // A branch has run its own events instead.
+    for (const event of eventsAt(key, f.age))
+      if (this.runEvent(f, owner, event)) return;
   }
 
   private fireEffect(e: Effect) {
-    const { clip } = e;
-    rearm(e, clip, e.age);
-    for (const event of eventsAt(clip, e.age)) {
-      this.runEvent(e, e.owner, event);
-      // An op 0x20 jump has run the branch's own events instead.
-      if (e.clip !== clip) return;
-    }
+    rearm(e, e.clip, e.age);
+    for (const event of eventsAt(e.clip, e.age))
+      if (this.runEvent(e, e.owner, event)) return;
   }
 
-  private runEvent(actor: Fighter | Effect, owner: number, event: SourceEvent) {
+  // A jump to another timeline (ops 0x16, 0x1f and 0x20) runs its first
+  // records at once, in place of the rest of this step's.
+  private branchTo(actor: Fighter | Effect, key: ObjectKey) {
+    actor.age = 0;
+    if ('clip' in actor) {
+      actor.clip = key;
+      this.fireEffect(actor);
+    } else {
+      actor.branch = key;
+      actor.fired = -1;
+      this.fireEvents(actor);
+    }
+    return true;
+  }
+
+  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode) and 12 (EX
+  // Fire 2) and global 6 (the freeze): == (1), > (2) or < (3).
+  private passes(
+    self: Fighter,
+    { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
+  ) {
+    const variable =
+      selector === 0x86
+        ? this.freeze
+        : selector === 0x40
+          ? self.ex
+            ? 10
+            : 0
+          : self.exFire;
+    return compare === 1
+      ? variable === value
+      : compare === 2
+        ? variable > value
+        : variable < value;
+  }
+
+  // Op 0x16's conditions (0x412da7, table 0x413ce8) on this tick's input:
+  // 1 on the ground, 2 and 3 there without or with down, 4 forward (toward
+  // the facing at +0x5c), 5 back, 6 up, 7 down, 8 no direction.
+  private holds(f: Fighter, owner: number, condition: number) {
+    const input = this.inputs[owner];
+    const grounded = f.y >= 0 && f.vy >= 0;
+    const [forward, back] =
+      f.facing === 1 ? [input.right, input.left] : [input.left, input.right];
+    return !![
+      grounded,
+      grounded && !input.crouch,
+      grounded && input.crouch,
+      forward,
+      back,
+      input.jump,
+      input.crouch,
+      !input.left && !input.right && !input.jump && !input.crouch,
+    ][condition - 1];
+  }
+
+  // Op 0x0b calls an action once; running out returns after the call
+  // (+0x85, 0x412625). Ryuko's (228, 229) have no displays, so their
+  // records run at once, and a passing check jumps into the other.
+  private runCall(
+    actor: Fighter | Effect,
+    owner: number,
+    key: ObjectKey,
+  ): void {
+    for (const event of script(key).events)
+      if (event.op !== 'test') this.runEvent(actor, owner, event);
+      else if (this.passes(this.fighters[owner], event))
+        return this.runCall(
+          actor,
+          owner,
+          sourceKey(event.action, event.offset),
+        );
+  }
+
+  // 0x40f36a: a hit or guard enters the striking object's op 0x02 handler,
+  // an action change that drops its boxes.
+  private handle(e: Effect, guarded: boolean) {
+    const handler = guarded ? e.onGuard : e.onHit;
+    if (handler === undefined) return;
+    Object.assign(e, {
+      box: null,
+      objectBox: null,
+      responses: [],
+      onHit: undefined,
+      onGuard: undefined,
+    });
+    this.branchTo(e, handler);
+  }
+
+  // True when the actor jumped to another timeline.
+  private runEvent(
+    actor: Fighter | Effect,
+    owner: number,
+    event: SourceEvent,
+  ): boolean {
     const self = this.fighters[owner];
     const other = this.fighters[1 - owner];
     switch (event.op) {
@@ -1580,6 +1715,28 @@ export class Match {
         break;
       case 'handler':
         if (event.slot === 2 && actor === self) self.onHit = event.action;
+        else if ('clip' in actor && (event.slot === 2 || event.slot === 3))
+          actor[event.slot === 2 ? 'onHit' : 'onGuard'] = sourceKey(
+            event.action,
+            event.offset,
+          );
+        break;
+      case 'call':
+        this.runCall(actor, owner, event.action);
+        break;
+      // An object takes its checks' jumps; a fighter's are its entry's.
+      // ponytail: Getter Beam's (PC 3970) in EX mode jumps to EFS (331),
+      // which the port doesn't play yet.
+      case 'test':
+        if ('clip' in actor && this.passes(self, event))
+          return this.branchTo(actor, sourceKey(event.action, event.offset));
+        break;
+      case 'input':
+        if (
+          !('clip' in actor) &&
+          this.holds(actor, owner, event.condition) !== event.negate
+        )
+          return this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       case 'hold':
         if (!this.catchHeld(other)) break;
@@ -1627,6 +1784,8 @@ export class Match {
         break;
       case 'variable':
         if (event.index === 14) self.darken = event.value;
+        else if (event.index === 0) self.ex = event.value === 10;
+        else if (event.index === 12) self.exFire = event.value;
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
@@ -1659,13 +1818,9 @@ export class Match {
         if (!('clip' in actor)) break;
         if (this.cpu.random() % event.divisor <= event.above || !event.action)
           break;
-        actor.clip = event.offset
-          ? `${event.action}+${event.offset}`
-          : event.action;
-        actor.age = 0;
-        this.fireEffect(actor);
-        break;
+        return this.branchTo(actor, sourceKey(event.action, event.offset));
     }
+    return false;
   }
 
   // Ops 0x07/0x14 move the opponent this super holds or has just tossed.
@@ -1703,9 +1858,7 @@ export class Match {
         (e) => e.owner !== owner || e.slot !== event.slot,
       );
     if (!event.action) return;
-    const clip: ObjectKey = event.offset
-      ? `${event.action}+${event.offset}`
-      : event.action;
+    const clip = sourceKey(event.action, event.offset);
     const screen = (event.flags & 0x40) !== 0;
     // Children of viewport objects start from the same point on the stage.
     const origin =
@@ -1769,8 +1922,12 @@ export class Match {
       this.action(f, 'land');
       return true;
     }
-    const { end, next } = script(SCRIPTED[action]);
-    if (end === 'hold' || end === 'loop' || f.age < animationDuration(action))
+    const { end, next } = script(timeline(f));
+    if (
+      end === 'hold' ||
+      end === 'loop' ||
+      f.age < animationDuration(timeline(f))
+    )
       return true;
     if (next === 97) this.action(f, 'fly');
     // CPU IORI: op 0x20 at PC 5887 jumps to its recovery (411 + 31) when
@@ -1846,7 +2003,7 @@ export class Match {
         projectile: null as Projectile | null,
         blocked,
         source: source as Fighter | Effect | null,
-        fbh: victim === FBH,
+        bonus: STRIKER_POWER[victim] ?? 0,
       },
     ];
   }
@@ -1883,7 +2040,14 @@ export class Match {
       for (const body of animationFrame(e.clip, e.age).body ?? [])
         if (body.kind & 6) bodies.push([at, body]);
       if (e.objectBox && !e.connected)
-        strikers.push([at, e.objectBox, () => (e.connected = true)]);
+        strikers.push([
+          at,
+          e.objectBox,
+          () => {
+            e.connected = true;
+            this.handle(e, false);
+          },
+        ]);
     }
     this.fighters.forEach((f, owner) => {
       if (!f.objectBox || f.connected || frozen[owner]) return;
@@ -1987,16 +2151,23 @@ export class Match {
     // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
     if (fresh('dst') && ok(31))
       return start(f.hp <= DESPERATION_HP ? 'evilDst' : 'dst');
-    // Action 226's op 0x04 at PC 3267 jumps to 225 while its axe (slot 6)
-    // lives, flying or breaking.
-    if (fresh('axe') && ok(31))
-      return start(
-        this.projectiles.some(
-          (p) => p.kind === 'axe' && p.owner === this.fighters.indexOf(f),
-        )
-          ? 'axeBusy'
-          : 'axeThrow',
-      );
+    if (fresh('axe') && ok(31)) {
+      this.action(f, this.fireAction(f), true);
+      this.fireEvents(f);
+      return true;
+    }
+    // Command 15 (←↙← with the Hit Up button) enters EX Ch (204, level 31) on
+    // the ground. Its ops 0x10 and 0x15 (PCs 2858–2865) spend 50 power, or
+    // enter NO SUPER (251) with less; in EX mode PC 2866 enters NOR Ch (205).
+    if (fresh('ex') && ok(31)) {
+      if (f.stock * POWER_PER_STOCK + f.power < 50) {
+        this.action(f, 'noSuper', true);
+        this.fireEvents(f);
+        return true;
+      }
+      addPower(f, -50);
+      return start(f.ex ? 'norChange' : 'exChange');
+    }
     if (fresh('punch') && ok(21))
       return start(input.crouch ? 'crouchPunch' : 'punch');
     if (fresh('hitUp') && ok(21)) return start('hitUp');
@@ -2401,6 +2572,9 @@ export class Match {
       });
       if (trail.samples.length > trail.spec.count) trail.samples.shift();
     }
+    // The HUD face (action 70, bucket 20) also runs first: in EX mode it
+    // counts its cycle from the tick after the variable is set.
+    for (const f of this.fighters) f.face = f.ex ? f.face + 1 : -1;
     // Action 43 runs in bucket 15, before the fighters' scripts (0x50): while
     // variable 14 is 100 it shows its panel one tick opaque (PC 431), then
     // five at 50% (PC 435), checking again after each (PCs 428, 433).
@@ -2476,14 +2650,14 @@ export class Match {
       e.vy += e.gravity;
       e.x += e.vx;
       e.y += e.vy;
-      if (++e.age < animationDuration(e.clip)) this.fireEffect(e);
+      if (++e.age < animationDuration(e.clip) || loops(e)) this.fireEffect(e);
     }
     // A script that runs out reaches the next action's op 0x00, which
     // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
     // leaves the world unless it follows a parent.
     this.effects = this.effects.filter(
       (e) =>
-        e.age < animationDuration(e.clip) &&
+        (e.age < animationDuration(e.clip) || loops(e)) &&
         (e.follow !== null ||
           inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e)),
     );
@@ -2493,8 +2667,12 @@ export class Match {
     // (0x410ff1). Only the timer stops (0x408e50).
     if (this.winner) this.endingTicks++;
     if (this.fighters.some((f) => f.action === 'intro')) {
-      for (const f of this.fighters) {
+      for (const [i, f] of this.fighters.entries()) {
         f.age++;
+        // Action 33's op 0x16 at PC 348 jumps to 'Chage Character' (37)
+        // while down is held; it sets variable 0 to 10 and jumps back.
+        if (f.age === INTRO_EX_TICK && [player, opponent][i]?.crouch)
+          f.ex = true;
         if (f.age <= INTRO_WALK_TICKS)
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
         if (f.age >= animationDuration('intro')) this.action(f, 'idle');
@@ -2516,6 +2694,7 @@ export class Match {
     this.cpuDriven =
       !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
+    this.inputs = inputs;
     // The engine records every tick of input, including frozen ones.
     this.history.forEach((history, i) => {
       const [input, previous] = [inputs[i], this.previous[i]];
@@ -2694,7 +2873,7 @@ export class Match {
           projectile: null as Projectile | null,
           blocked,
           source: null as Fighter | Effect | null,
-          fbh: false,
+          bonus: 0,
         },
       ];
     });
@@ -2735,7 +2914,7 @@ export class Match {
           projectile,
           blocked: false,
           source: null,
-          fbh: false,
+          bonus: 0,
         });
         continue;
       }
@@ -2758,7 +2937,7 @@ export class Match {
         projectile,
         blocked,
         source: null,
-        fbh: false,
+        bonus: 0,
       });
     }
     const objectHits = this.objectHits(frozen);
@@ -2776,7 +2955,7 @@ export class Match {
       projectile,
       blocked,
       source,
-      fbh,
+      bonus,
     } of contacts) {
       if (projectile) {
         projectile.hit = true;
@@ -2786,7 +2965,7 @@ export class Match {
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = !projectile && (!source || source === f);
       if (body) f.contact = true;
-      if (fbh) addPower(f, FBH_POWER);
+      addPower(f, bonus);
       const wasOut = target.hp === 0;
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
@@ -2886,6 +3065,7 @@ export class Match {
         f.airDrillStage = Math.min(3, f.airDrillStage + 1);
         this.action(f, 'airDrillContact');
       }
+      if (source && 'clip' in source) this.handle(source, blocked);
       // Op 0x02 slot 2: the super's own box enters its hit branch.
       if (source === f && f.onHit && !blocked && target.hp > 0) {
         this.action(f, SOURCE_ACTIONS[f.onHit], true);
