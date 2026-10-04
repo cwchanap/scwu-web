@@ -594,6 +594,24 @@ function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
 }
 // Action 227, PC 3292, re-set every display.
 const AXE_BOX = { x: 63, y: 3, w: 39, h: 44, damage: 30, kind: 6 };
+// Its op 0x17 (PC 3288): 50 (FB, 110 → 75) standing or crouching, 4 (76) in
+// the air, and the strong guards 25–27.
+const AXE_RESPONSES = [50, 50, 4, 25, 26, 27];
+// Op 0x17 lists six responses: standing, crouching and airborne, then the
+// same three guarding. This picks the victim's.
+const responseFor = (
+  ids: readonly number[],
+  target: Fighter,
+  guarding: boolean,
+) =>
+  ids[
+    (guarding ? 3 : 0) +
+      (target.y < 0 || target.vy < 0
+        ? 2
+        : target.action.startsWith('crouch')
+          ? 1
+          : 0)
+  ];
 // Its slot-1 box (PC 3291) and slot-0 body (PC 3290) repeat the box 2000
 // pixels down, where only objects meet (a slot-1 body sits at y + 5000, PC
 // 3289).
@@ -1985,13 +2003,7 @@ export class Match {
     if (!box) return [];
     const body = struck(this.origin(source), source.facing, box, target)!;
     const guarding = this.guarding(target, source, box);
-    const stance =
-      target.y < 0 || target.vy < 0
-        ? 2
-        : target.action.startsWith('crouch')
-          ? 1
-          : 0;
-    const response = source.responses[(guarding ? 3 : 0) + stance];
+    const response = responseFor(source.responses, target, guarding);
     const victim = RESPONSES[response];
     const reaction = RESPONSE_REACTIONS[victim];
     if (!reaction) return [];
@@ -2007,7 +2019,7 @@ export class Match {
         attackerStop:
           source === attacker ? (reaction.attackerStop ?? reaction.stop) : 0,
         airDrill: false,
-        reaction: reaction.action as AnimatedAction | null,
+        reaction: reaction.action as AnimatedAction,
         facing: source.facing,
         x: body.x,
         y: body.y,
@@ -2868,14 +2880,8 @@ export class Match {
       if (!body) return [];
       // Decided on contact only: a CPU victim draws its guard roll here.
       const guarding = this.guarding(target, f, box);
-      const stance =
-        target.y < 0 || target.vy < 0
-          ? 2
-          : target.action.startsWith('crouch')
-            ? 1
-            : 0;
       const { ids, last } = ATTACK_RESPONSES[f.action];
-      const id = (finisher && last ? last : ids)[(guarding ? 3 : 0) + stance];
+      const id = responseFor(finisher && last ? last : ids, target, guarding);
       const response = RESPONSE_REACTIONS[RESPONSES[id]];
       const reaction = response.action;
       const blocked = blocks.has(reaction);
@@ -2890,7 +2896,7 @@ export class Match {
           hitStop,
           attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
           airDrill,
-          reaction: reaction as AnimatedAction | null,
+          reaction: reaction as AnimatedAction,
           facing: f.facing,
           x: body.x,
           y: body.y,
@@ -2942,26 +2948,31 @@ export class Match {
         });
         continue;
       }
-      const blocked = this.guarding(target, projectile, box);
-      // Action 227 selects FB on ground (no stop), strong hit in air.
-      const hitStop = blocked ? 10 : target.y < 0 || target.vy < 0 ? 15 : 0;
+      const response = responseFor(
+        AXE_RESPONSES,
+        target,
+        this.guarding(target, projectile, box),
+      );
+      const victim = RESPONSES[response];
+      const { action: reaction, stop } = RESPONSE_REACTIONS[victim];
+      const blocked = blocks.has(reaction);
       contacts.push({
         f,
         target,
         damage: boxDamage(AXE_BOX, body.taken, blocked),
-        // Responses 50 and 4 name effect 340; guards 25–27 name 370.
-        effect: RESPONSE_EFFECTS[blocked ? 25 : 50],
-        hitStop,
-        attackerStop: hitStop,
+        effect: RESPONSE_EFFECTS[response],
+        // The reaction's op 0x1a stops the thrower too (0x4136ae).
+        hitStop: stop,
+        attackerStop: stop,
         airDrill: false,
-        reaction: null,
+        reaction: reaction as AnimatedAction,
         facing: projectile.facing,
         x: body.x,
         y: body.y,
         projectile,
         blocked,
         source: null,
-        bonus: 0,
+        bonus: STRIKER_POWER[victim] ?? 0,
       });
     }
     const objectHits = this.objectHits(frozen);
@@ -2992,28 +3003,13 @@ export class Match {
       f.damage += loseLife(target, strength);
       f.hitStop += attackerStop;
       target.hitStop += hitStop;
-      const airborne = target.y < 0 || target.vy < 0;
-      // Only the axe leaves its reaction to stance: action 227's strong
-      // responses (50 → FB → 75, 4, 25–27). A chip that empties life still
-      // KOs (0x40e7c0).
-      if (blocked && target.hp > 0)
-        this.action(
-          target,
-          reaction ??
-            (airborne
-              ? 'airBlockHeavy'
-              : target.action.startsWith('crouch')
-                ? 'crouchBlockHeavy'
-                : 'blockHeavy'),
-          true,
-        );
+      // A chip that empties life still KOs (0x40e7c0).
+      if (blocked && target.hp > 0) this.action(target, reaction, true);
       else {
         if (!blocked) f.hits++;
         this.action(
           target,
-          target.hp === 0
-            ? knockedOut(wasOut)
-            : (reaction ?? (airborne ? 'airHitHeavy' : 'hitHeavy')),
+          target.hp === 0 ? knockedOut(wasOut) : reaction,
           true,
         );
       }
@@ -3025,11 +3021,9 @@ export class Match {
       if (body) target.striker = 'body';
       else if (source && 'clip' in source && source.follow)
         target.striker = 'object';
-      // Axe response 50 (action 110) credits only the thrower on the ground.
-      const [victimPower, attackerPower] =
-        projectile?.kind === 'axe' && target.action === 'hitHeavy'
-          ? [0, 10]
-          : (REACTION_POWER[target.action] ?? [0, 0]);
+      const [victimPower, attackerPower] = REACTION_POWER[target.action] ?? [
+        0, 0,
+      ];
       addPower(target, victimPower);
       addPower(f, attackerPower);
       // Reactions with recovered motion (and every super response) stop

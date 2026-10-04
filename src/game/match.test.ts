@@ -1558,15 +1558,17 @@ describe('recovered power gauge', () => {
     expect(blocker.fighters[0].power).toBe(0);
   });
 
-  it('credits only the thrower for a grounded axe hit and both sides of a throw', () => {
+  it('credits both sides of a grounded axe hit and of a throw', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 500;
     target.x = 900;
     match.step({ axe: true });
     for (let i = 0; i < 100 && target.action === 'idle'; i++) match.step();
-    expect(target).toMatchObject({ action: 'hitHeavy', power: 0 });
-    expect(attacker.power).toBe(10);
+    // Response 50 → FB (110) adds 10 to the thrower (PC 1442), then 75 adds
+    // 5 and 3 (PC 790), and both stop 15 ticks (PC 791).
+    expect(target).toMatchObject({ action: 'hitHeavy', power: 5, hitStop: 15 });
+    expect(attacker).toMatchObject({ power: 13, hitStop: 15 });
     const thrower = new Match();
     thrower.fighters[1].x = thrower.fighters[0].x + 100;
     ticks(thrower, 8 + THROW_TOSS_TICK, { throw: true });
@@ -4120,7 +4122,12 @@ describe('prototype training rules', () => {
     expect(match.projectiles).toEqual([axe]);
     match.step();
     expect(f.action).toBe('idle');
-    for (let tick = 0; tick < 1000 && match.projectiles.length; tick++)
+    // The hit stops the thrower too, which reads no command meanwhile.
+    for (
+      let tick = 0;
+      tick < 1000 && (match.projectiles.length || f.hitStop);
+      tick++
+    )
       match.step();
     expect(match.projectiles).toEqual([]);
     match.step({ axe: true });
@@ -4513,7 +4520,7 @@ describe('prototype training rules', () => {
     expect(target).toMatchObject({ action: 'koLand', y: 0 });
   });
 
-  it('holds a projectile winner before celebration even when the attack adds no hit-stop', () => {
+  it('holds a projectile winner before celebration', () => {
     const match = new Match();
     const [player, target] = match.fighters;
     target.hp = 1;
@@ -4521,8 +4528,10 @@ describe('prototype training rules', () => {
     for (let tick = 0; tick < 100 && !match.winner; tick++) match.step();
     expect(match.winner).toBe('player');
     expect(player.action).not.toBe('win');
-    expect([player.hitStop, target.hitStop]).toEqual([10, 0]);
-    ticks(match, 5);
+    // FB's 75 stops both 15 ticks; KO Normal adds 10 to the thrower (PC 607),
+    // then holds both 40 at its age 5 (PC 611).
+    expect([player.hitStop, target.hitStop]).toEqual([25, 15]);
+    ticks(match, 20);
     expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
     // It finishes the throw before taking its result back in neutral.
     while (player.action === 'axeThrow') {
@@ -4628,7 +4637,7 @@ describe('prototype training rules', () => {
       expect(player.action).toBe(attack === 'melee' ? 'airPunch' : 'jump');
       const end = match.ticks;
       const airAge = player.airAge;
-      for (let tick = 0; tick < 100 && player.y < 0; tick++) {
+      for (let tick = 0; tick < 200 && player.y < 0; tick++) {
         expect(player.action).not.toBe('win');
         match.step();
       }
