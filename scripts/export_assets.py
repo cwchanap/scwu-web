@@ -429,6 +429,33 @@ def export_sounds(c, prefix, indices):
     return sounds
 
 
+def kgt_timeline(p, action):
+    """A KGT lettering's displays, following op 0x0a jumps until op 0x05 or its end: each
+    with the op 0x23 blit mode in force and the op 0x03 sounds just before it, and the
+    header's r[1:3], the wait the round manager counts for it (0x4068e0)."""
+    current, pc = action, p.action(action).start
+    frames, sounds, mode = [], [], 0
+    for _ in range(1000):
+        if pc >= p.action(current).end or p.records[pc][0] == 0x05:
+            break
+        record = p.records[pc]
+        if record[0] == 0x0a and u16(record, 1):
+            current = u16(record, 1)
+            pc = p.action(current).start + record[3]
+            continue
+        if record[0] == 0x03:
+            sounds.append(u16(record, 2))
+        elif record[0] == 0x23:
+            mode = record[1]
+        elif record[0] == 0x0c:
+            f = display_record(p, pc)
+            frame = dict(pc=pc, image=f["image"], duration=f["duration"], dx=f["dx"], dy=f["dy"], mode=mode)
+            frames.append(dict(frame, sounds=sounds) if sounds else frame)
+            sounds = []
+        pc += 1
+    return dict(wait=u16(p.records[p.action(action).start], 1), frames=frames)
+
+
 def export_ui():
     data = (RESEARCH / "extracted/SCWU.KGT").read_bytes()
     digest = hashlib.sha256(data).hexdigest()
@@ -436,22 +463,20 @@ def export_ui():
         sys.exit("SCWU UI source hash differs from the handoff; refusing to export.")
     c = Container(data)
     p = Program(c)
-    # Action 26's displays; one after an op 0x03 carries its sound (PC 180, 'KO').
-    action = p.action(26)
-    ko, sound = [], None
-    for pc in range(action.start, action.end):
-        if p.records[pc][0] == 0x03:
-            sound = u16(p.records[pc], 2)
-        elif p.records[pc][0] == 12:
-            frame = display_record(p, pc)
-            ko.append(dict(frame, sound=sound) if sound is not None else frame)
-            sound = None
-    sounds = export_sounds(c, "kgt", {f["sound"] for f in ko if "sound" in f})
+    # The letterings the round manager spawns (0x408c80-0x408e03, 0x409444): the
+    # round-start animation's logo wipe (13 spawns 115 on Vs. CPU's path, PC 94),
+    # 'DRESS 1' (15, jumping to R1, 90), 'SHOW TIME' (25) and the KO lettering
+    # (26), which YOU WIN, YOU LOSE, DRAW and DOUBLE KO (28, 29, 32, 33) repeat.
+    ko = kgt_timeline(p, 26)
+    calls = dict(start=u16(p.records[p.action(13).start], 1), logo=kgt_timeline(p, 115),
+                 dress=kgt_timeline(p, 15), fight=kgt_timeline(p, 25))
+    timelines = [ko, *(t for t in calls.values() if isinstance(t, dict))]
+    sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])})
     # 17–20: stock digits EMPTY/100/200/300; 31–38: gauge shimmer; 135: UNDER PW.
     ids = {17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
     ids.update(range(31, 39))
     ids.update(range(47, 93, 5))
-    ids.update(frame["image"] for frame in ko)
+    ids.update(f["image"] for t in timelines for f in t["frames"] if c.images[f["image"]].width > 1)
     (PUBLIC / "ui").mkdir(exist_ok=True)
     images = []
     for index in sorted(ids):
@@ -460,7 +485,7 @@ def export_ui():
         filename = f"ui/{index}.png"
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
-    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko))
+    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls))
 
 
 if __name__ == "__main__":

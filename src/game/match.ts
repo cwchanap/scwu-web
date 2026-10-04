@@ -35,7 +35,7 @@ import type {
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
-import { ROUND_END_TICKS } from './hud';
+import { FIGHT_TICK, ROUND_END_TICKS } from './hud';
 export const SUPER_CONTROLS = [
   'getterBeam',
   'musashi',
@@ -1164,6 +1164,10 @@ export class Match {
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
+  // Ticks since round setup, and whether this round plays the Vs. CPU intro
+  // and its round calls.
+  roundTicks = 0;
+  readonly calls: boolean;
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
@@ -1203,6 +1207,7 @@ export class Match {
     seed = 0,
   ) {
     this.cpu = new CpuVM(RYUKO_CPU, CPU_LEVEL, seed);
+    this.calls = intro;
     if (!intro) return;
     // Authored start: both walk-ins end 360 pixels apart around the stage center.
     this.fighters = [
@@ -2701,8 +2706,13 @@ export class Match {
     // striking, and each takes its result's action once back in neutral
     // (0x410ff1). Only the timer stops (0x408e50).
     if (this.winner) this.endingTicks++;
-    if (this.fighters.some((f) => f.action === 'intro')) {
+    // Round phase 0 (0x47004c) lasts until the fight lettering sets 1:
+    // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
+    // fighters finish their intro and stand.
+    this.roundTicks++;
+    if (this.calls && this.roundTicks < FIGHT_TICK) {
       for (const [i, f] of this.fighters.entries()) {
+        if (f.action !== 'intro') continue;
         f.age++;
         // Action 33's op 0x16 at PC 348 jumps to 'Chage Character' (37)
         // while down is held; it sets variable 0 to 10 and jumps back.

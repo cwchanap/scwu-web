@@ -5,9 +5,11 @@ import {
   faceImage,
   gaugeCrop,
   gaugeImage,
+  DRESS_TICK,
+  FIGHT_TICK,
   koFrame,
-  KO_SOUND,
   KO_TICKS,
+  letteringSounds,
   ROUND_END_TICKS,
   healthCrop,
 } from './hud';
@@ -47,7 +49,7 @@ it('anchors power bars at their inner ends and cycles the recovered shimmer', ()
     expect(ui.images.some((image) => image.index === index)).toBe(true);
 });
 
-it('exports every HUD and KO texture at its original dimensions', () => {
+it('exports every HUD and lettering texture at its original dimensions', () => {
   for (const image of ui.images) {
     const png = readFileSync(
       new URL(`../../public/assets/${image.filename}`, import.meta.url),
@@ -56,10 +58,12 @@ it('exports every HUD and KO texture at its original dimensions', () => {
     expect(png.readUInt32BE(16)).toBe(image.width);
     expect(png.readUInt32BE(20)).toBe(image.height);
   }
-  for (const frame of ui.ko) {
-    expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
-    expect(frame.duration).toBeGreaterThan(0);
-  }
+  const { logo, dress, fight } = ui.calls;
+  for (const { frames } of [ui.ko, logo, dress, fight])
+    for (const frame of frames) {
+      expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
+      expect(frame.duration).toBeGreaterThan(0);
+    }
 });
 
 it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
@@ -68,8 +72,36 @@ it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
   ]);
 });
 
-it("voices the KO lettering's 'KO' (KGT sound 1) with its seventh display", () => {
-  expect(KO_SOUND).toEqual({ tick: 31, index: 1 });
+it("voices the KO lettering's 'KO' (KGT sound 1, PC 180) for every result", () => {
   expect(koFrame(31)?.pc).toBe(181);
-  expect(ui.sounds).toEqual([{ index: 1, filename: 'sounds/kgt-1.wav' }]);
+  for (const timeUp of [false, true]) {
+    const match = new Match('cpu');
+    if (timeUp) match.ticks = 5999;
+    else match.fighters[1].hp = 1;
+    match.fighters[0].x = match.fighters[1].x - 130;
+    for (let tick = 0; !match.winner; tick++) match.step({ punch: tick === 0 });
+    const heard: number[] = [];
+    while (match.endingTicks < 40) {
+      match.step();
+      if (letteringSounds(match).length) heard.push(match.endingTicks);
+    }
+    expect(heard).toEqual([31]);
+  }
+});
+
+it('calls the Vs. CPU round: DRESS 1, then SHOW TIME and control', () => {
+  expect([DRESS_TICK, FIGHT_TICK]).toEqual([351, 631]);
+  const match = new Match('cpu', true);
+  const heard: [number, number[]][] = [];
+  while (match.roundTicks < FIGHT_TICK) {
+    match.step({ punch: true });
+    const sounds = letteringSounds(match);
+    if (sounds.length) heard.push([match.roundTicks, sounds]);
+  }
+  // 15 plays 7 and 3 ('ROUND1'); 25 plays 2 ('FIGHT') and 8.
+  expect(heard).toEqual([
+    [351, [7, 3]],
+    [631, [2, 8]],
+  ]);
+  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 7, 8]);
 });

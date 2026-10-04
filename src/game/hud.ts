@@ -3,28 +3,71 @@ import { DESPERATION_HP, LIFE, POWER_PER_STOCK } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
-export const KO_TICKS = ui.ko.reduce(
+// A KGT lettering: displays (image, ticks, top-left dx/dy in the 640 × 480
+// screen, op 0x23 blit mode) with the sounds just before each, and the wait
+// the round manager counts for it.
+type Lettering = {
+  wait: number;
+  frames: {
+    pc: number;
+    image: number;
+    duration: number;
+    dx: number;
+    dy: number;
+    mode: number;
+    sounds?: number[];
+  }[];
+};
+const { ko, calls } = ui as unknown as {
+  ko: Lettering;
+  calls: { start: number } & Record<'logo' | 'dress' | 'fight', Lettering>;
+};
+export const KO_TICKS = ko.frames.reduce(
   (total, frame) => total + frame.duration,
   0,
 );
 // Leave the winner visible after the original lettering finishes.
 export const ROUND_END_TICKS = KO_TICKS + 100;
+// The round manager (0x408c24–0x408e41): round setup spawns the round-start
+// animation (KGT 13) and counts its header's 350 ticks, then the round
+// lettering (15, 'DRESS 1') and its 280, then the fight lettering (25, 'SHOW
+// TIME') with round phase 1, when commands, the CPU and the timer start.
+export const DRESS_TICK = calls.start + 1;
+export const FIGHT_TICK = DRESS_TICK + calls.dress.wait;
 
-// Action 26 plays KGT sound 1 ('KO') before the display at PC 181 (PC 180).
-export const KO_SOUND = (() => {
-  let tick = 0;
-  for (const frame of ui.ko) {
-    if ('sound' in frame) return { tick, index: frame.sound };
-    tick += frame.duration;
-  }
-  throw new Error('The KO lettering lost its sound');
-})();
-
-export function koFrame(age: number) {
-  for (const frame of ui.ko) {
+function letteringFrame({ frames }: Lettering, age: number) {
+  if (age < 0) return;
+  for (const frame of frames) {
     if (age < frame.duration) return frame;
     age -= frame.duration;
   }
+}
+export const koFrame = (age: number) => letteringFrame(ko, age);
+
+// The letterings a match shows, by age: in Vs. CPU the round-start logo wipe
+// (13's 115), 'DRESS 1' and 'SHOW TIME'; then every result's KO lettering
+// (26, or 28, 29, 32 and 33, which jump to it).
+function letterings(match: Match): [Lettering, number][] {
+  const shown: [Lettering, number][] = [];
+  if (match.calls)
+    shown.push(
+      [calls.logo, match.roundTicks],
+      [calls.dress, match.roundTicks - DRESS_TICK],
+      [calls.fight, match.roundTicks - FIGHT_TICK],
+    );
+  if (match.winner) shown.push([ko, match.endingTicks]);
+  return shown;
+}
+
+// The KGT sounds of the lettering displays starting at this tick.
+export function letteringSounds(match: Match) {
+  return letterings(match).flatMap(([{ frames }, age]) => {
+    for (const frame of frames) {
+      if (age === 0) return frame.sounds ?? [];
+      age -= frame.duration;
+    }
+    return [];
+  });
 }
 
 export function healthCrop(hp: number, right: boolean) {
@@ -122,20 +165,9 @@ export function createHud(scene: Phaser.Scene) {
     .setScrollFactor(0)
     .setOrigin(0.5)
     .setDepth(101);
-  const ko = image(97, 183, 126).setDepth(110).setVisible(false);
-  const timeout = scene.add
-    .text(320 * scale, 185 * scale, 'TIME UP', {
-      fontFamily: 'Arial Black, Arial',
-      fontStyle: 'bold italic',
-      fontSize: '64px',
-      color: '#ffffff',
-      stroke: '#555555',
-      strokeThickness: 8,
-    })
-    .setScrollFactor(0)
-    .setOrigin(0.5)
-    .setDepth(110)
-    .setVisible(false);
+  const shown = [0, 1, 2, 3].map(() =>
+    image(97, 0, 0).setDepth(110).setVisible(false),
+  );
 
   return (match: Match) => {
     match.fighters.forEach((f, index) => {
@@ -168,17 +200,17 @@ export function createHud(scene: Phaser.Scene) {
       if (finite) digit.setTexture(`ui-${47 + Number(value[i]) * 5}`);
     });
     infinity.setVisible(!finite);
-    const ending = match.winner !== null;
-    const frame =
-      ending && match.seconds !== 0 ? koFrame(match.endingTicks) : undefined;
-    ko.setVisible(!!frame);
-    if (frame)
-      ko.setTexture(`ui-${frame.image}`).setPosition(
-        frame.dx * scale,
-        frame.dy * scale,
-      );
-    timeout.setVisible(
-      ending && match.seconds === 0 && match.endingTicks < KO_TICKS,
-    );
+    // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds.
+    const current = letterings(match);
+    shown.forEach((sprite, i) => {
+      const frame = current[i] && letteringFrame(...current[i]);
+      sprite.setVisible(!!frame);
+      if (frame)
+        sprite
+          .setTexture(`ui-${frame.image}`)
+          .setPosition(frame.dx * scale, frame.dy * scale)
+          .setBlendMode(frame.mode === 2 ? 'ADD' : 'NORMAL')
+          .setAlpha(frame.mode === 1 ? 0.5 : 1);
+    });
   };
 }

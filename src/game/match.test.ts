@@ -19,7 +19,7 @@ import type { Effect, Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
 import { CpuVM } from './cpu';
 import type { CpuEntry } from './cpu';
-import { ROUND_END_TICKS } from './hud';
+import { FIGHT_TICK, ROUND_END_TICKS } from './hud';
 import {
   animationDuration,
   animationFrame,
@@ -426,7 +426,7 @@ describe('recovered neutral and round animations', () => {
     },
   );
 
-  it('walks both fighters in for the recovered intro before the clock starts', () => {
+  it('walks both fighters in for the recovered intro, then waits for SHOW TIME', () => {
     const match = new Match('cpu', true);
     const [player, cpu] = match.fighters;
     expect(animationDuration('intro')).toBe(199);
@@ -444,6 +444,10 @@ describe('recovered neutral and round animations', () => {
     expect(match).toMatchObject({ ticks: 0, seconds: 60 });
     match.step({ punch: true });
     expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
+    // Round phase 0 lasts until the fight lettering: no commands or clock.
+    ticks(match, FIGHT_TICK - 200, { punch: true });
+    expect(player.action).toBe('idle');
+    expect(match).toMatchObject({ roundTicks: FIGHT_TICK - 1, ticks: 0 });
     match.step({ punch: true });
     expect(player.action).toBe('idle');
     expect(match.ticks).toBe(1);

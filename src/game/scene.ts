@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import data from './generated/assets.json';
 import ui from './generated/ui.json';
-import { createHud, KO_SOUND } from './hud';
+import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import {
   animationFrame,
@@ -388,9 +388,8 @@ export class TrainingScene extends Phaser.Scene {
           );
           for (const { owner, index } of this.match.sounds)
             this.play(`ryuko-sound-${index}`, owner);
-          const { winner, seconds, endingTicks } = this.match;
-          if (winner && seconds !== 0 && endingTicks === KO_SOUND.tick)
-            this.play(`kgt-sound-${KO_SOUND.index}`);
+          for (const index of letteringSounds(this.match))
+            this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {
             if (
               frozen[i] ||
