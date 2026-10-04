@@ -5578,6 +5578,61 @@ describe('EX mode', () => {
     expect(versus.projectiles).toMatchObject([{ hit: true, age: 0 }]);
     expect(versus.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
   });
+
+  it.each([
+    [1, LIFE, false, 'efs', 0],
+    [0, LIFE, false, 'noSuper', 0],
+    // Its check of variable 0 (PC 3970) precedes EVIL's of life (PC 3974).
+    [1, 147, false, 'efs', 0],
+    [2, LIFE, true, 'efsCancel', 0],
+    [1, LIFE, true, 'noSuper', 1],
+  ] as const)(
+    'enters EFS for Getter Beam with %i stocks at %i health (IORI: %s): %s',
+    (stock, hp, iori, action, left) => {
+      const { match, f, target } = exMatch();
+      Object.assign(f, { stock, hp });
+      if (iori) {
+        target.x = f.x + 150;
+        match.step({ iori: true });
+        while (!f.contact) match.step();
+      }
+      match.step({ getterBeam: true });
+      // EFS (331) checks variable 6 (PC 4918) for EFS SC (332), which spawns
+      // GENGAI! (253) itself.
+      expect(f).toMatchObject({ action, stock: left });
+      expect(match.effects.some((e) => e.clip === 253)).toBe(
+        action === 'efsCancel',
+      );
+    },
+  );
+
+  it('keeps the air Getter Beam (263) in EX mode', () => {
+    const { match, f } = exMatch();
+    Object.assign(f, { stock: 1, action: 'jump', y: -200 });
+    match.step({ getterBeam: true });
+    expect(f.action).toBe('airGetterBeam');
+  });
+
+  it('fires four EFS Att Balls (336) and the final one (337)', () => {
+    const { match, f, target } = exMatch();
+    f.stock = 1;
+    match.step({ getterBeam: true });
+    const losses: [number, string][] = [];
+    for (let tick = 0; tick < 300; tick++) {
+      const hp = target.hp;
+      match.step();
+      if (target.hp < hp) losses.push([hp - target.hp, target.action]);
+    }
+    // Each calls 243 on contact; 51 → FBB (111) → 83, and the final's 58 →
+    // FBH (112) → 80.
+    expect(losses).toEqual([
+      [20, 'hitRapid'],
+      [20, 'hitRapid'],
+      [20, 'hitRapid'],
+      [20, 'hitRapid'],
+      [20, 'launchAway'],
+    ]);
+  });
 });
 
 describe('sound cues (op 0x03)', () => {

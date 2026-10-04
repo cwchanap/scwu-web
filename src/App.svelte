@@ -364,10 +364,11 @@
         <p>
           Press <kbd>E</kbd> on the ground to enter EX mode for half a stock of
           power, and again to leave it for the same. Ryuko's HUD face shows an
-          EX mark while it lasts. In EX mode <kbd>I</kbd> fires EX Fire instead of
-          the axe: hold forward to charge it into a faster, stronger shot, or to the
-          end for a large shot that launches. In Vs. CPU, holding down as the round
-          begins starts it in EX mode.
+          EX mark while it lasts. In EX mode <kbd>I</kbd> fires EX Fire instead
+          of the axe: hold forward to charge it into a faster, stronger shot, or
+          to the end for a large shot that launches. <kbd>1</kbd> on the ground fires
+          EFS instead of Getter Beam: four shots and a launching final one. In Vs.
+          CPU, holding down as the round begins starts it in EX mode.
         </p>
         <p>
           Press <kbd>H</kbd> or Hit Up on the ground for an upward kick. On a hit,

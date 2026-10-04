@@ -235,20 +235,17 @@ const CANCELS: Partial<Record<Action, ReturnType<typeof cancelRange>>> = {
 };
 const IORI = new Set<Action>(['iori', 'iori2', 'iori3']);
 // A super entered while op 0x1f player variable 6 is 100 (set during each IORI
-// stage, PCs 3606/3638/3673) takes its super-cancel path. Getter Beam checks
-// it itself (PC 3972 → 265); the others go through action 254, which needs
-// two stocks (else NO SUPER), spends them and spawns GENGAI! (253). The hidden
-// super's entry (254 + 9) also enters NO SUPER at 150 life or more.
+// stage, PCs 3606/3638/3673) takes its super-cancel path. Getter Beam and EFS
+// check it themselves (PCs 3972 → 265, 4918 → 332); the others go through
+// action 254, which needs two stocks (else NO SUPER), spends them and spawns
+// GENGAI! (253). The hidden super's entry (254 + 9) also enters NO SUPER at
+// 150 life or more.
 const SUPER_CANCELS: Partial<
-  Record<
-    SuperControl,
-    { action: ScriptedAction; via254: boolean; life?: number }
-  >
+  Record<SuperControl, { action: ScriptedAction; life?: number }>
 > = {
-  getterBeam: { action: 'scGetterBeam', via254: false },
-  musashi: { action: 'scMusashi', via254: true }, // 254 + 0 → 260
-  changeAttack: { action: 'scChangeAttack', via254: true }, // 254 + 14 → 318
-  blackRush: { action: 'blackRush', via254: true, life: 150 }, // 254 + 9 → 286 + 5
+  musashi: { action: 'scMusashi' }, // 254 + 0 → 260
+  changeAttack: { action: 'scChangeAttack' }, // 254 + 14 → 318
+  blackRush: { action: 'blackRush', life: 150 }, // 254 + 9 → 286 + 5
 };
 // Op 0x24 in the standing and crouching guard reactions: with a stock (their
 // op 0x10 otherwise enters a twin without these checks), a fresh Hit Up
@@ -1516,7 +1513,7 @@ export class Match {
   private startSuper(f: Fighter, control: SuperControl, airborne: boolean) {
     const command = SUPER_COMMANDS[control];
     const cancel = IORI.has(f.action) ? SUPER_CANCELS[control] : undefined;
-    if (cancel?.via254) {
+    if (cancel) {
       const life = f.hp;
       const enter =
         f.stock >= 2 && (cancel.life === undefined || life < cancel.life);
@@ -1535,23 +1532,23 @@ export class Match {
       this.fireEvents(f);
       return true;
     }
-    let action: Action | undefined = airborne
-      ? command.air
-      : (cancel?.action ?? command.ground);
+    let action: Action | undefined = airborne ? command.air : command.ground;
     const entered = new Set<Action>();
     while (action && isScripted(action) && !entered.has(action)) {
       entered.add(action);
       let next: Action | undefined;
       for (const event of eventsAt(SCRIPTED[action], 0)) {
         const life = f.hp;
-        const branch =
+        // Op 0x1f checks (Getter Beam's variable 0 → EFS, PC 3970) jump too.
+        const target =
           event.op === 'life'
-            ? event.below
-              ? life <= event.value
-              : life >= event.value
-            : event.op === 'stock' && f.stock <= event.min;
-        if (branch && (event.op === 'life' || event.op === 'stock')) {
-          next = SOURCE_ACTIONS[event.target];
+            ? (event.below ? life <= event.value : life >= event.value) &&
+              event.target
+            : event.op === 'stock'
+              ? f.stock <= event.min && event.target
+              : event.op === 'test' && this.passes(f, event) && event.action;
+        if (target) {
+          next = SOURCE_ACTIONS[target];
           break;
         }
         if (event.op === 'stock') f.stock += event.add;
@@ -1598,20 +1595,19 @@ export class Match {
     return true;
   }
 
-  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode) and 12 (EX
-  // Fire 2) and global 6 (the freeze): == (1), > (2) or < (3).
+  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode), 6 (100
+  // through an IORI stage) and 12 (EX Fire 2) and global 6 (the freeze): ==
+  // (1), > (2) or < (3).
   private passes(
     self: Fighter,
     { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
   ) {
-    const variable =
-      selector === 0x86
-        ? this.freeze
-        : selector === 0x40
-          ? self.ex
-            ? 10
-            : 0
-          : self.exFire;
+    const variable = {
+      0x40: self.ex ? 10 : 0,
+      0x46: IORI.has(self.action) ? 100 : 0,
+      0x4c: self.exFire,
+      0x86: this.freeze,
+    }[selector]!;
     return compare === 1
       ? variable === value
       : compare === 2
@@ -1731,8 +1727,6 @@ export class Match {
         this.runCall(actor, owner, event.action);
         break;
       // An object takes its checks' jumps; a fighter's are its entry's.
-      // ponytail: Getter Beam's (PC 3970) in EX mode jumps to EFS (331),
-      // which the port doesn't play yet.
       case 'test':
         if ('clip' in actor && this.passes(self, event))
           return this.branchTo(actor, sourceKey(event.action, event.offset));

@@ -72,9 +72,9 @@ def decode_event(record):
         return dict(op="input", condition=record[7], negate=bool(record[1] & 1), action=u16(record, 2),
                     offset=record[4])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
-    # evaluates player variables 0 (EX mode) and 12 (EX Fire 2) and global 6 (the
-    # freeze); other tests keep their fall-through path.
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x4c, 0x86):
+    # evaluates player variables 0 (EX mode), 6 (an IORI cancel) and 12 (EX Fire 2) and
+    # global 6 (the freeze); other tests keep their fall-through path.
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x46, 0x4c, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer

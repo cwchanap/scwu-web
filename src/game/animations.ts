@@ -485,6 +485,9 @@ export const animations = {
   scGetterBeam: scriptClip(265),
   scEvilBeam: scriptClip(279),
   scChangeAttack: scriptClip(318),
+  // EX mode's Getter Beam: EFS (331) and its IORI cancel version (332).
+  efs: scriptClip(331),
+  efsCancel: scriptClip(332),
   // Responses 43 (action 97, looping 98 until landing) and 33 (88, looping 90).
   fly: scriptClip(97),
   shock: scriptClip(88),
@@ -518,6 +521,8 @@ export const SCRIPTED = {
   scGetterBeam: 265,
   scEvilBeam: 279,
   scChangeAttack: 318,
+  efs: 331,
+  efsCancel: 332,
 } satisfies Partial<Record<Action, number>>;
 export type ScriptedAction = keyof typeof SCRIPTED;
 export const isScripted = (action: Action): action is ScriptedAction =>
