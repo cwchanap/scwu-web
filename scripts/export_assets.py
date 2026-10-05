@@ -391,11 +391,15 @@ def main():
     pixels, palette, _ = stage.pixels_and_palette(0)
     record = stage.images[0]
     write_if_changed(PUBLIC / "sport-court.png", indexed_png(record.width, record.height, pixels, palette))
+    # Sport Court's 75-second track ('Sprotmorning.WAV', type 0x11, so it loops), which
+    # stage actions 2 and 3 play only after SIN's, KAY's or DIDO's supers: the port's
+    # optional music.
+    music = export_sounds(stage, "stage", [2])[0]
     for path in (PUBLIC / "ryuko").glob("*.png"):
         if path.stem not in {str(index) for index in image_ids}:
             path.unlink()
     idle = p.action(1)
-    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips, held=held,
+    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, music=music, clips=clips, held=held,
         responses=responses, response_effects=response_effects, cpu=cpu, scripts={f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()

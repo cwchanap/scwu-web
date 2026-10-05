@@ -126,6 +126,11 @@ export class TrainingScene extends Phaser.Scene {
   // (0x415f00), so each player's copy of a sound restarts rather than
   // overlapping itself; different sounds mix.
   private voices = new Map<string, Phaser.Sound.BaseSound>();
+  // Authored: Sport Court's looping track (stage sound 2), off by default and
+  // loaded on first use. The original plays it only after SIN's, KAY's or
+  // DIDO's supers; like a stage load (0x40677c), each match starts it over.
+  private music = false;
+  private track?: Phaser.Sound.BaseSound;
 
   constructor(private onStatus: (status: GameStatus) => void) {
     super('training');
@@ -259,6 +264,7 @@ export class TrainingScene extends Phaser.Scene {
     this.match = new Match(mode, mode === 'cpu', randomSeed());
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
+    this.playMusic();
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
     this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
@@ -266,6 +272,23 @@ export class TrainingScene extends Phaser.Scene {
     this.paused = false;
     this.clearInput();
     this.report();
+  }
+
+  setMusic(on: boolean) {
+    this.music = on;
+    if (!on) this.track?.stop();
+    else if (this.cache.audio.exists('music')) this.playMusic();
+    else {
+      this.load.audio('music', BASE + data.music.filename);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.playMusic());
+      this.load.start();
+    }
+  }
+  private playMusic() {
+    if (!this.music || !this.cache.audio.exists('music')) return;
+    this.track ??= this.sound.add('music', { loop: true });
+    this.track.play();
+    if (this.paused) this.track.pause();
   }
 
   private play(key: string, owner = 0) {

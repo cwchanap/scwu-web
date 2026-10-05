@@ -130,6 +130,16 @@
         onclick={() => reset('cpu')}>Vs. CPU</button
       >
     </div>
+    <label class="music-toggle"
+      ><input
+        type="checkbox"
+        disabled={!status.ready}
+        onchange={(event) => {
+          session?.scene.setMusic(event.currentTarget.checked);
+          focusArena();
+        }}
+      /> Music</label
+    >
     <button
       class="text-button"
       onclick={openHelp}

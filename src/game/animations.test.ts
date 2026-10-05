@@ -42,6 +42,15 @@ describe('selected core animation assets', () => {
     });
   });
 
+  it("exports Sport Court's 75-second track for the optional music", () => {
+    const wav = readFileSync(
+      new URL(`../../public/assets/${data.music.filename}`, import.meta.url),
+    );
+    expect(wav.subarray(8, 12).toString()).toBe('WAVE');
+    // Seconds: payload bytes over the fmt chunk's byte rate.
+    expect(Math.round(wav.length / wav.readUInt32LE(28))).toBe(75);
+  });
+
   it('has loadable, non-empty textures for every selected display', () => {
     for (const image of data.images) {
       const png = readFileSync(

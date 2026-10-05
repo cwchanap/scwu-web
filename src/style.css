@@ -91,6 +91,19 @@ h1 span {
   padding: 8px 0;
   color: #aeb8c2;
 }
+.music-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font:
+    600 12px Arial,
+    sans-serif;
+  color: #aeb8c2;
+}
+.music-toggle input {
+  accent-color: var(--accent);
+  margin: 0;
+}
 .cabinet {
   background: #141a20;
   border: 1px solid #3d4753;
@@ -366,7 +379,8 @@ kbd {
     padding: 7px 8px;
     font-size: 10px;
   }
-  .text-button {
+  .text-button,
+  .music-toggle {
     font-size: 10px;
   }
   .match-footer {
