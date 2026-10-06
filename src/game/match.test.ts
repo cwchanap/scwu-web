@@ -123,8 +123,8 @@ describe('Hit Up launcher', () => {
     },
   );
 
-  it.each([2, 16, 40, 72])(
-    'buffers a fresh Jump at tick %i into the on-hit chase window',
+  it.each([2, 16, 40])(
+    'chases on up held from tick %i through the check at recovery age 5 (PC 2837)',
     (jumpTick) => {
       const match = new Match();
       const [attacker] = match.fighters;
@@ -145,13 +145,34 @@ describe('Hit Up launcher', () => {
     },
   );
 
+  // Contact at tick 15 stops Hit Up 33 ticks; 201 reaches age 5 at tick 53.
+  it.each([
+    [33, false],
+    [34, true],
+    [53, true],
+    [54, false],
+  ] as const)(
+    'reads one tick of up at tick %i against the 20-tick window: %s',
+    (tick, chased) => {
+      const match = new Match();
+      const [attacker] = match.fighters;
+      attacker.x = 440;
+      const actions = new Set<string>();
+      for (let t = 0; t < 120; t++) {
+        match.step({ hitUp: t === 0, jump: t === tick }, {});
+        actions.add(attacker.action);
+      }
+      expect(actions.has('hitUpJump')).toBe(chased);
+    },
+  );
+
   it('lets the chase connect aerial attacks and keeps the flight in view', () => {
     const match = new Match();
     match.fighters[0].x = 440;
     let highestCamera = 0;
     for (let tick = 0; tick < 260; tick++) {
       match.step(
-        { hitUp: tick === 0, jump: tick === 16, kick: tick === 70 },
+        { hitUp: tick === 0, jump: tick === 40, kick: tick === 70 },
         {},
       );
       highestCamera = Math.min(highestCamera, match.cameraY);
@@ -216,15 +237,12 @@ describe('Hit Up launcher', () => {
         }
       }
       expect(actions.has('hitUpJump')).toBe(false);
-      expect(match.fighters[0]).toMatchObject({
-        action: 'idle',
-        nextJump: false,
-      });
+      expect(match.fighters[0].action).toBe('idle');
       expect(match.fighters[1].hp).toBe(outcome === 'late' ? LIFE - 15 : LIFE);
     },
   );
 
-  it('clears the chase buffer when interrupted and does not restore it on a trade', () => {
+  it('takes the hit when interrupted, trade or not', () => {
     for (const trade of [false, true]) {
       const match = new Match();
       match.fighters[0].x = 440;
@@ -233,10 +251,7 @@ describe('Hit Up launcher', () => {
           { hitUp: tick === 0, jump: tick === 2 },
           { punch: tick === (trade ? 8 : 7) },
         );
-      expect(match.fighters[0]).toMatchObject({
-        action: 'hit',
-        nextJump: false,
-      });
+      expect(match.fighters[0].action).toBe('hit');
       // The punching victim's body box takes 120% of Hit Up's 15.
       expect(match.fighters[1].hp).toBe(trade ? LIFE - 18 : LIFE);
       ticks(match, 250);

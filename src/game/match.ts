@@ -258,6 +258,12 @@ const CHAINS: Partial<
     ],
     next: [[IORI_STEPS, 'iori3']],
   },
+  // PC 2837, after 201's first five-tick display: any up in the last 20
+  // ticks, held or not, chases into 202.
+  hitUpRecover: {
+    checks: [[5, 20]],
+    next: [[[0x200b], 'hitUpJump']],
+  },
 };
 // Op 0x1e cancel windows, read at 0x41193a: from `age` (until `until`), a
 // command whose action level (header byte 2: normals 21–22, specials 31,
@@ -824,7 +830,6 @@ export interface Fighter {
   damage: number;
   doubleJumped: boolean;
   airDashed: boolean;
-  nextJump: boolean;
   power: number;
   stock: number;
   // Scripted (super) state: the last age whose events ran, op 0x01 horizontal
@@ -1080,7 +1085,6 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   damage: 0,
   doubleJumped: false,
   airDashed: false,
-  nextJump: false,
   power: 0,
   stock: 0,
   fired: -1,
@@ -1399,7 +1403,6 @@ export class Match {
     if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
       f.branch = `${roll.action}+${roll.offset}`;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
-    f.nextJump = false;
     f.fired = -1;
     f.ax = 0;
     f.box = null;
@@ -2363,12 +2366,6 @@ export class Match {
   ) {
     if (f.hitStop === 0) f.age++;
     if (this.cancel(f, other, history)) return;
-    if (
-      (f.action === 'hitUp' || (f.action === 'hitUpRecover' && f.age < 25)) &&
-      input.jump &&
-      !previous.jump
-    )
-      f.nextJump = true;
     if (f.hitStop > 0) {
       f.hitStop--;
       return;
@@ -2464,15 +2461,11 @@ export class Match {
     // Action 202 lifts off at PC 2848, after the controller has scanned
     // commands on the floor; its first airborne scan is the next tick's.
     if (f.action === 'hitUpJump' && f.age === 8) return;
-    if (f.action === 'hitUpRecover') {
-      // Action 201 opens command 202 after its first five-tick display.
-      // Early Jump taps are buffered using the training mode's input policy.
-      if (f.age >= 5 && f.age < 25 && f.nextJump) {
-        this.action(f, 'hitUpJump');
-        return;
-      }
-      if (f.age < animationDuration('hitUpRecover')) return;
-    }
+    if (
+      f.action === 'hitUpRecover' &&
+      f.age < animationDuration('hitUpRecover')
+    )
+      return;
     if (aerialDrills.has(f.action)) {
       if (
         f.action !== 'airDrillSpin' &&
@@ -3154,9 +3147,7 @@ export class Match {
         !source &&
         target.hp > 0
       ) {
-        const nextJump = f.nextJump;
         this.action(f, 'hitUpRecover');
-        f.nextJump = nextJump;
       }
       // Op 0x02 slots 2 and 3 (hit, guard) enter 179/187 at contact.
       if ((f.action === 'punch' || f.action === 'kick') && !projectile)

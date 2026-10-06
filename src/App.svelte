@@ -390,9 +390,9 @@
         </p>
         <p>
           Press <kbd>H</kbd> or Hit Up on the ground for an upward kick. On a hit,
-          tap Jump during the impact pause or early recovery to chase the opponent
-          into the air, then use an aerial attack. Early Jump taps are remembered;
-          a blocked or missed kick cannot trigger the chase.
+          press or hold Jump near the end of the impact pause, or just after it, to
+          chase the opponent into the air, then use an aerial attack. A press earlier
+          in the pause is too early; a blocked or missed kick cannot trigger the chase.
         </p>
         <p>
           Press <kbd>F</kbd> or IORI on the ground for an advancing strike. Press
