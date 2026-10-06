@@ -32,6 +32,16 @@ import type {
   SourceEvent,
   TrailSpec,
 } from './animations';
+import {
+  commanded,
+  CONTROLS,
+  HISTORY_TICKS,
+  inject,
+  inputWord,
+  KEYS,
+  NEAR,
+  scan,
+} from './commands';
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
@@ -181,21 +191,37 @@ const ATTACK_RESPONSES: Record<
   airDrill: { ids: [56, 56, 56, 34, 35, 80] },
   airDrillSpin: { ids: [56, 56, 56, 34, 35, 80] }, // PCs 2984/3014
 };
-const followUps = { iori: 'iori2', iori2: 'iori3' } as const;
 // Op 0x24 (handler 0x413a50) at these action ages runs the command check at
-// 0x410a50 over the last `window` ticks of input: the newest fresh P (checked
-// first) or K press, preceded by a neutral frame. A match enters that attack.
+// 0x410a50 over the last `window` ticks of input, trying each command in
+// turn; a match enters its action. The chains look for a neutral tick, then a
+// fresh P (checked first) or K.
+const P_CHAIN = [0x3001, 0x2080];
+const K_CHAIN = [0x3001, 0x2010];
+// IORI's stages look for ↓← and P: any down, anything, any back, then P.
+const IORI_STEPS = [0x300d, 0x3000, 0x300a, 0x2080];
 const CHAINS: Partial<
   Record<
     Action,
     {
       checks: [age: number, window: number][];
-      next: [AnimatedAction, AnimatedAction];
+      next: [steps: number[], action: AnimatedAction][];
     }
   >
 > = {
-  punchHit: { checks: [[8, 20]], next: ['punch2', 'kick2'] }, // PCs 2380–2381
-  kickHit: { checks: [[8, 25]], next: ['punch2', 'kick2'] }, // PCs 2572–2573
+  punchHit: {
+    checks: [[8, 20]],
+    next: [
+      [P_CHAIN, 'punch2'],
+      [K_CHAIN, 'kick2'],
+    ],
+  }, // PCs 2380–2381
+  kickHit: {
+    checks: [[8, 25]],
+    next: [
+      [P_CHAIN, 'punch2'],
+      [K_CHAIN, 'kick2'],
+    ],
+  }, // PCs 2572–2573
   // PCs 2403–2404, 2409–2410 and 2416–2417, after each strike.
   punch2: {
     checks: [
@@ -203,9 +229,35 @@ const CHAINS: Partial<
       [27, 10],
       [33, 30],
     ],
-    next: ['punch3', 'kick3'],
+    next: [
+      [P_CHAIN, 'punch3'],
+      [K_CHAIN, 'kick3'],
+    ],
   },
-  kick2: { checks: [[26, 30]], next: ['punch3', 'kick3'] }, // PCs 2597–2598
+  kick2: {
+    checks: [[26, 30]],
+    next: [
+      [P_CHAIN, 'punch3'],
+      [K_CHAIN, 'kick3'],
+    ],
+  }, // PCs 2597–2598
+  // PCs 3625/3628/3630 and 3661/3663/3665, after each stage's strike.
+  iori: {
+    checks: [
+      [29, 30],
+      [49, 30],
+      [54, 20],
+    ],
+    next: [[IORI_STEPS, 'iori2']],
+  },
+  iori2: {
+    checks: [
+      [31, 30],
+      [51, 30],
+      [56, 20],
+    ],
+    next: [[IORI_STEPS, 'iori3']],
+  },
 };
 // Op 0x1e cancel windows, read at 0x41193a: from `age` (until `until`), a
 // command whose action level (header byte 2: normals 21–22, specials 31,
@@ -237,6 +289,8 @@ const CANCELS: Partial<Record<Action, ReturnType<typeof cancelRange>>> = {
   airDash: cancelRange(20, 50, false, 3), // 16
   airBackdash: cancelRange(20, 50, false, 3), // 17
   counterHit: cancelRange(30, 50, true, 0, 50), // 174
+  // Standing up from a crouch (20, PC 246) accepts levels 0–50 always.
+  stand: cancelRange(0, 50, false),
 };
 const IORI = new Set<Action>(['iori', 'iori2', 'iori3']);
 // A super entered while op 0x1f player variable 6 is 100 (set during each IORI
@@ -281,29 +335,7 @@ const GUARD_COUNTERS: Partial<Record<Action, [number, number][]>> = {
   timeStopGuard: guardChecks(10), // 168, PCs 2275–2283
   crouchTimeStopGuard: guardChecks(10), // 170, PCs 2300–2308
 };
-// The input history those checks read: direction and fresh buttons per tick.
-interface InputFrame {
-  neutral: boolean;
-  punch: boolean;
-  kick: boolean;
-  hitUp: boolean;
-}
-const HISTORY_TICKS = 30;
-// Newest fresh press first, then (for two-step commands) an earlier neutral frame.
-function commanded(
-  history: InputFrame[],
-  button: 'punch' | 'kick' | 'hitUp',
-  window: number,
-  afterNeutral = true,
-) {
-  let pressed = false;
-  for (let i = history.length - 1; i >= history.length - window && i >= 0; i--)
-    if (!pressed) {
-      pressed = history[i][button];
-      if (pressed && !afterNeutral) return true;
-    } else if (history[i].neutral) return true;
-  return false;
-}
+const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
 const dashes = new Set<Action>(['dash', 'backdash', 'airDash', 'airBackdash']);
 const aerialDrills = new Set<Action>([
   'airDrill',
@@ -429,6 +461,8 @@ const ATTACK_POWER: Partial<Record<Action, number>> = {
   iori3: 3,
   dst: 8,
   evilDst: 8,
+  dstFar: 8,
+  evilDstFar: 8,
 };
 // Victim reaction scripts add opcode 0x15 power to themselves and the attacker.
 const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
@@ -475,7 +509,10 @@ export const AXE_RELEASE_TICK = 16;
 export { THROW_TOSS_TICK } from './animations';
 // One-tick op 0x18 grab boxes with responses 30: action 196 at age 7 (PC 2750)
 // and 214 at age 4 (PC 3091). PC 3082 (op 0x11) enters EVIL DST (221) at 153 of
-// 510 life or less; its box and timing match 214's (PC 3206).
+// 510 life or less; its box and timing match 214's (PC 3206). DST's command
+// enters DST FAR (220) beyond the near distance, whose op 0x11 (PC 3180)
+// enters EVIL DST FAR (224). They differ only in a shorter box (PCs 3189,
+// 3252).
 const THROW_BOX: ScriptBox = {
   x: 35,
   y: 6,
@@ -485,6 +522,7 @@ const THROW_BOX: ScriptBox = {
   kind: 0xa8,
 };
 const DST_BOX: ScriptBox = { x: 67, y: 6, w: 70, h: 1, damage: 0, kind: 8 };
+const DST_FAR_BOX: ScriptBox = { ...DST_BOX, x: 37, w: 40 };
 // Action 215 slides back at raw velocity −400 from PC 3120 to PC 3132 and
 // fires two missiles (218) at raw velocity 1000/−1000 from PCs 3127–3128.
 const DST_FIRE_TICK = 268;
@@ -493,6 +531,8 @@ const grabs = {
   grab: { startup: 7, box: THROW_BOX, hold: 'throw' },
   dst: { startup: 4, box: DST_BOX, hold: 'dstHit' },
   evilDst: { startup: 4, box: DST_BOX, hold: 'evilDstHit' },
+  dstFar: { startup: 4, box: DST_FAR_BOX, hold: 'dstHit' },
+  evilDstFar: { startup: 4, box: DST_FAR_BOX, hold: 'evilDstHit' },
 } as const;
 const held = {
   throw: 'dstHeld',
@@ -785,7 +825,6 @@ export interface Fighter {
   damage: number;
   doubleJumped: boolean;
   airDashed: boolean;
-  nextAttack: keyof typeof ATTACKS | null;
   nextJump: boolean;
   power: number;
   stock: number;
@@ -1042,7 +1081,6 @@ const fighter = (x: number, facing: -1 | 1): Fighter => ({
   damage: 0,
   doubleJumped: false,
   airDashed: false,
-  nextAttack: null,
   nextJump: false,
   power: 0,
   stock: 0,
@@ -1212,7 +1250,7 @@ export class Match {
   private previous: [Input, Input] = [{}, {}];
   // This tick's input, which op 0x16 reads.
   private inputs: [Input, Input] = [{}, {}];
-  private history: [InputFrame[], InputFrame[]] = [[], []];
+  private history = [blankHistory(), blankHistory()];
   private directionTaps: ({ direction: number; tick: number } | null)[] = [
     null,
     null,
@@ -1273,9 +1311,25 @@ export class Match {
     this.clearInput();
   }
 
+  // 0x4146d0 records each player's input word every tick, frozen or not.
+  // The CPU clears its history first (0x411307), then writes the command it
+  // enters (commands.ts). Authored: the player's command keys do the same, so
+  // a key enters its own command whatever was typed before it.
+  private record(i: number, input: Input) {
+    const history = this.history[i];
+    const [f, other] = [this.fighters[i], this.fighters[1 - i]];
+    const key = KEYS.find(
+      ([control]) => input[control] && !this.previous[i][control],
+    );
+    if (key || (this.cpuDriven && i === 1)) history.fill(0);
+    history.push(inputWord(input, other.x >= f.x));
+    history.shift();
+    if (key) inject(history, key[1]);
+  }
+
   clearInput() {
     this.previous = [{}, {}];
-    this.history = [[], []];
+    this.history = [blankHistory(), blankHistory()];
     this.directionTaps = [null, null];
   }
 
@@ -1365,7 +1419,6 @@ export class Match {
     if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
       f.branch = `${roll.action}+${roll.offset}`;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
-    f.nextAttack = null;
     f.nextJump = false;
     f.fired = -1;
     f.ax = 0;
@@ -1568,9 +1621,9 @@ export class Match {
   }
 
   // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
-  private counter(f: Fighter, history: InputFrame[]) {
+  private counter(f: Fighter, history: number[]) {
     const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
-    if (!check || !f.stock || !commanded(history, 'hitUp', check[1], false))
+    if (!check || !f.stock || !commanded(history, [0x2020], check[1]))
       return false;
     this.action(f, 'counterHit', true);
     this.fireEvents(f);
@@ -2196,72 +2249,96 @@ export class Match {
     this.action(f, 'doubleJump');
   }
 
-  // Command entry. Each command carries its action's level (header byte 2);
-  // a cancel window passes only the levels it accepts.
+  // Command entry (0x411a01, and 0x41195a in a cancel window): the scan picks
+  // the command (see commands.ts), and a cancel window passes only the levels
+  // it accepts (header byte 2); a refused command enters nothing.
   private command(
     f: Fighter,
-    input: Input,
-    previous: Input,
-    airborne: boolean,
+    other: Fighter,
+    history: number[],
     ok: (level: number) => boolean = () => true,
   ) {
-    const fresh = (control: Control) => !!input[control] && !previous[control];
+    const found = scan(history, {
+      air: f.y < 0,
+      still: f.y === 0 && f.vy === 0,
+      landing: f.y < 0 && f.y > -50 * 1.5 && f.vy > 0,
+      near: Math.trunc(Math.abs(f.x - other.x) / 1.5) <= NEAR,
+    });
+    if (!found) return false;
+    const { stance } = found;
+    const air = stance === 'air';
     const start = (action: Action) => {
       this.action(f, action, true);
       return true;
     };
-    for (const control of SUPER_CONTROLS)
-      if (
-        fresh(control) &&
-        ok(control === 'megaBeam' ? 42 : 41) &&
-        this.startSuper(f, control, airborne)
-      )
-        return true;
-    if (fresh('drill') && ok(31)) return start(airborne ? 'airDrill' : 'drill');
-    if (airborne) {
-      if (fresh('punch') && ok(21)) return start('airPunch');
-      if (fresh('kick') && ok(22)) return start('airKick');
-      return false;
-    }
-    if (fresh('iori') && ok(31)) return start('iori');
-    // Command 22 enters CPU IORI (410, level 31) on button 0x40, which only
-    // the CPU injects.
-    if (fresh('cpuIori') && ok(31)) {
-      this.action(f, 'cpuIori', true);
-      this.fireEvents(f);
-      return true;
-    }
-    if (fresh('throw') && ok(21)) return start('grab');
-    // PC 3082 (op 0x11) enters EVIL DST at 153 of 510 life or less.
-    if (fresh('dst') && ok(31))
-      return start(f.hp <= DESPERATION_HP ? 'evilDst' : 'dst');
-    if (fresh('axe') && ok(31)) {
-      this.action(f, this.fireAction(f), true);
-      this.fireEvents(f);
-      return true;
-    }
-    // Command 15 (←↙← with the Hit Up button) enters EX Ch (204, level 31) on
-    // the ground. Its ops 0x10 and 0x15 (PCs 2858–2865) spend 50 power, or
-    // enter NO SUPER (251) with less; in EX mode PC 2866 enters NOR Ch (205).
-    if (fresh('ex') && ok(31)) {
-      if (f.stock * POWER_PER_STOCK + f.power < 50) {
-        this.action(f, 'noSuper', true);
+    const control = CONTROLS[found.entry][0];
+    switch (control) {
+      case 'punch':
+        return (
+          ok(21) &&
+          start(
+            air ? 'airPunch' : stance === 'crouch' ? 'crouchPunch' : 'punch',
+          )
+        );
+      case 'kick':
+        return air
+          ? ok(22) && start('airKick')
+          : ok(21) && start(stance === 'crouch' ? 'crouchKick' : 'kick');
+      case 'hitUp':
+        return ok(21) && start('hitUp');
+      case 'throw':
+        return ok(21) && start('grab');
+      case 'drill':
+        return ok(31) && start(air ? 'airDrill' : 'drill');
+      case 'iori':
+        return ok(31) && start('iori');
+      // Command 22 enters CPU IORI (410) on button 0x40, which only the CPU
+      // writes.
+      case 'cpuIori':
+        if (!ok(31)) return false;
+        this.action(f, 'cpuIori', true);
         this.fireEvents(f);
         return true;
+      // PCs 3082 and 3180 (op 0x11) enter EVIL DST at 153 of 510 life or less.
+      case 'dst': {
+        if (!ok(31)) return false;
+        const evil = f.hp <= DESPERATION_HP;
+        if (stance === 'far') return start(evil ? 'evilDstFar' : 'dstFar');
+        return start(evil ? 'evilDst' : 'dst');
       }
-      addPower(f, -50);
-      return start(f.ex ? 'norChange' : 'exChange');
+      case 'axe':
+        if (!ok(31)) return false;
+        this.action(f, this.fireAction(f), true);
+        this.fireEvents(f);
+        return true;
+      // Command 15 enters EX Ch (204). Its ops 0x10 and 0x15 (PCs
+      // 2858–2865) spend 50 power, or enter NO SUPER (251) with less; in EX
+      // mode PC 2866 enters NOR Ch (205).
+      case 'ex':
+        if (!ok(31)) return false;
+        if (f.stock * POWER_PER_STOCK + f.power < 50) {
+          this.action(f, 'noSuper', true);
+          this.fireEvents(f);
+          return true;
+        }
+        addPower(f, -50);
+        return start(f.ex ? 'norChange' : 'exChange');
+      default:
+        return (
+          ok(control === 'megaBeam' ? 42 : 41) &&
+          this.startSuper(f, control as SuperControl, air)
+        );
     }
-    if (fresh('punch') && ok(21))
-      return start(input.crouch ? 'crouchPunch' : 'punch');
-    if (fresh('hitUp') && ok(21)) return start('hitUp');
-    if (fresh('kick') && ok(21))
-      return start(input.crouch ? 'crouchKick' : 'kick');
-    return false;
   }
 
   // Op 0x1e windows (CANCELS), read on every tick, contact stops included.
-  private cancel(f: Fighter, input: Input, previous: Input) {
+  private cancel(
+    f: Fighter,
+    other: Fighter,
+    input: Input,
+    previous: Input,
+    history: number[],
+  ) {
     const range = CANCELS[f.action];
     if (
       !range ||
@@ -2290,7 +2367,7 @@ export class Match {
       );
       return true;
     }
-    return this.command(f, input, previous, airborne, ok);
+    return this.command(f, other, history, ok);
   }
 
   private move(
@@ -2299,14 +2376,10 @@ export class Match {
     input: Input,
     previous: Input,
     doubleTap: boolean,
-    history: InputFrame[],
+    history: number[],
   ) {
     if (f.hitStop === 0) f.age++;
-    if (this.cancel(f, input, previous)) return;
-    const followUp = followUps[f.action as keyof typeof followUps];
-    const ioriFollowUp =
-      !!followUp && f.age < animationDuration(f.action as 'iori' | 'iori2');
-    if (ioriFollowUp && input.iori && !previous.iori) f.nextAttack = followUp;
+    if (this.cancel(f, other, input, previous, history)) return;
     if (
       (f.action === 'hitUp' || (f.action === 'hitUpRecover' && f.age < 25)) &&
       input.jump &&
@@ -2327,11 +2400,9 @@ export class Match {
     const chain = CHAINS[f.action];
     const check = chain?.checks.find(([age]) => age === f.age);
     if (chain && check) {
-      const next = commanded(history, 'punch', check[1])
-        ? chain.next[0]
-        : commanded(history, 'kick', check[1])
-          ? chain.next[1]
-          : null;
+      const next = chain.next.find(([steps]) =>
+        commanded(history, steps, check[1]),
+      )?.[1];
       if (next) {
         this.action(f, next, true);
         return;
@@ -2432,15 +2503,6 @@ export class Match {
       return;
     }
     if (
-      ioriFollowUp &&
-      f.nextAttack &&
-      f.age >= (f.action === 'iori' ? 29 : 31)
-    ) {
-      // Actions 246/247 open follow-up commands after their active display.
-      this.action(f, f.nextAttack, true);
-      return;
-    }
-    if (
       f.action !== 'idle' &&
       (isAttack(f.action) ||
         f.action === 'axeThrow' ||
@@ -2456,6 +2518,10 @@ export class Match {
           'throw',
           'dst',
           'evilDst',
+          'dstFar',
+          'evilDstFar',
+          'exChange',
+          'norChange',
           'dstHit',
           'getUp',
         ].includes(f.action)) &&
@@ -2596,7 +2662,9 @@ export class Match {
       markActing(f);
       return;
     }
-    if (this.command(f, input, previous, airborne)) {
+    // The free state scans commands (0x411a01) after the port's own guard,
+    // jump and dash keys.
+    if (this.command(f, other, history)) {
       markActing(f);
       return;
     }
@@ -2773,6 +2841,8 @@ export class Match {
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
     // fighters finish their intro and stand.
     this.roundTicks++;
+    this.cpuDriven =
+      !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     if (this.calls && this.roundTicks < FIGHT_TICK) {
       for (const [i, f] of this.fighters.entries()) {
         if (f.action !== 'intro') continue;
@@ -2785,7 +2855,10 @@ export class Match {
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
         if (f.age >= animationDuration('intro')) this.action(f, 'idle');
       }
-      // Held buttons must be pressed again once control begins.
+      // History keeps recording, so a button held through the intro must be
+      // pressed again once control begins.
+      this.record(0, player);
+      this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
       return;
     }
@@ -2799,21 +2872,9 @@ export class Match {
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(this.fighters[0].hp, DESPERATION_HP);
     }
-    this.cpuDriven =
-      !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     this.inputs = inputs;
-    // The engine records every tick of input, including frozen ones.
-    this.history.forEach((history, i) => {
-      const [input, previous] = [inputs[i], this.previous[i]];
-      history.push({
-        neutral: !input.left && !input.right && !input.jump && !input.crouch,
-        punch: !!input.punch && !previous.punch,
-        kick: !!input.kick && !previous.kick,
-        hitUp: !!input.hitUp && !previous.hitUp,
-      });
-      if (history.length > HISTORY_TICKS) history.shift();
-    });
+    inputs.forEach((input, i) => this.record(i, input));
     const frozen = this.fighters.map((f) => f.hitStop > 0);
     const move = (i: number) => {
       const f = this.fighters[i];

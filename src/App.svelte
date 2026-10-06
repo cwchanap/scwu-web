@@ -163,7 +163,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -375,7 +375,8 @@
           with a weaker strike while you stay in range. Landing ends it with its
           recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
           Only one axe per fighter can be out at a time: pressing it again while your
-          axe flies does nothing. These basic specials do not spend super stock.
+          axe flies only makes Ryuko stand. These basic specials do not spend super
+          stock.
         </p>
         <p>
           Press <kbd>E</kbd> on the ground to enter EX mode for half a stock of
@@ -393,9 +394,9 @@
           a blocked or missed kick cannot trigger the chase.
         </p>
         <p>
-          Press <kbd>F</kbd> or IORI on the ground for an advancing strike. Tap again
-          to queue the second strike, then once more for the knockdown finisher. Early
-          taps are remembered; each follow-up begins after the current strike. Holding
+          Press <kbd>F</kbd> or IORI on the ground for an advancing strike. Press
+          it again near the end of the strike for the second, then once more for the
+          knockdown finisher; each follow-up begins after the current strike. Holding
           the button performs only one stage.
         </p>
         <p>
@@ -405,11 +406,11 @@
           Jumping avoids a grab, and a strike can interrupt its startup.
         </p>
         <p>
-          Press <kbd>G</kbd> or Daisetsuzan for Ryuko's longer-reaching command throw.
-          Ryuko transforms, spins the opponent overhead, hurls them into the sky,
-          then fires two missiles that can catch them as they fall. A miss leaves
-          a long recovery. At 30% health or less it becomes EVIL DST, striking the
-          held opponent five times first.
+          Press <kbd>G</kbd> or Daisetsuzan for Ryuko's command throw. Ryuko transforms,
+          spins the opponent overhead, hurls them into the sky, then fires two missiles
+          that can catch them as they fall. A miss leaves a long recovery. At 30%
+          health or less it becomes EVIL DST, striking the held opponent five times
+          first.
         </p>
         <p>
           Landing hits, blocking, and taking damage fill the power gauge at the
@@ -427,6 +428,17 @@
           IORI takes a faster form for two stocks. While blocking with a stock,
           press
           <kbd>H</kbd> to spend it on COUNTER HIT.
+        </p>
+        <p>
+          Ryuko's original motion commands work too, read toward the opponent:
+          ↓→ <kbd>J</kbd> axe, ↓← <kbd>K</kbd> Drill Punch, ↓← <kbd>J</kbd> IORI
+          and its follow-ups, ←↓→ <kbd>K</kbd> Daisetsuzan, ↓ ↓ <kbd>H</kbd> EX
+          mode, ↓→↓→ <kbd>J</kbd> Getter Beam, ↓→↓→ <kbd>K</kbd> Mega Getter
+          Beam, ↓←↓→
+          <kbd>J</kbd> Black Getter Mega Rush, and →↓←→↓← with <kbd>J</kbd> for
+          Musashi or <kbd>K</kbd> for the Getter Change Attack. Hold the last direction
+          a moment before the button. A button or motion is remembered briefly, so
+          one entered during another move comes out when that move ends.
         </p>
         <p>
           Free practice has no timer. Below the arena, choose how the partner

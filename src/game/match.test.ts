@@ -535,12 +535,14 @@ describe('Daisetsuzan Oroshi command throw', () => {
       const match = new Match();
       const [attacker, target] = match.fighters;
       attacker.x = facing === 1 ? 600 : 1300;
-      target.x = attacker.x + facing * 190;
+      // Beyond the near distance the command enters DST FAR (220), whose
+      // box still reaches 169 arena pixels.
+      target.x = attacker.x + facing * 169;
       // A turning fighter (23/24) has no body box low enough to grab.
       attacker.facing = facing;
       target.facing = facing === 1 ? -1 : 1;
       ticks(match, 4, { dst: true });
-      expect(attacker).toMatchObject({ action: 'dst', age: 3 });
+      expect(attacker).toMatchObject({ action: 'dstFar', age: 3 });
       match.step();
       expect(attacker).toMatchObject({ action: 'dstHit', age: 0 });
       expect(target).toMatchObject({
@@ -603,14 +605,17 @@ describe('Daisetsuzan Oroshi command throw', () => {
   );
 
   it('switches to EVIL DST at 30% health: five held strikes, then the DST spin', () => {
-    const normal = new Match();
-    normal.fighters[0].hp = 154;
-    normal.step({ dst: true });
-    expect(normal.fighters[0].action).toBe('dst');
+    // From afar, DST FAR's op 0x11 (PC 3180) enters EVIL DST FAR (224).
+    for (const hp of [154, 153]) {
+      const far = new Match();
+      far.fighters[0].hp = hp;
+      far.step({ dst: true });
+      expect(far.fighters[0].action).toBe(hp > 153 ? 'dstFar' : 'evilDstFar');
+    }
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 600;
-    target.x = 790;
+    target.x = 750;
     attacker.hp = 153;
     ticks(match, 4, { dst: true });
     // PC 3082 (op 0x11) enters action 221 at 153 of 510 life or less.
@@ -646,11 +651,11 @@ describe('Daisetsuzan Oroshi command throw', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 600;
-    // Just past the box's reach (259.5 arena pixels).
-    target.x = 600 + 260;
+    // Just past DST FAR's reach.
+    target.x = 600 + 170;
     match.step({ dst: true });
-    ticks(match, animationDuration('dst') - 1);
-    expect(attacker.action).toBe('dst');
+    ticks(match, animationDuration('dstFar') - 1);
+    expect(attacker.action).toBe('dstFar');
     match.step();
     expect(attacker.action).toBe('idle');
     expect(target.hp).toBe(LIFE);
@@ -1478,8 +1483,10 @@ describe('recovered cancels', () => {
     for (let tick = 1; tick < animationDuration('punch'); tick++)
       whiff.step({ drill: tick === 10 });
     expect(whiff.fighters[0].action).toBe('punch');
+    // The press stays within the drill's 40-tick window, so the free state
+    // enters it once the punch ends.
     whiff.step();
-    expect(whiff.fighters[0].action).toBe('idle');
+    expect(whiff.fighters[0]).toMatchObject({ action: 'drill', age: 0 });
   });
 
   it.each([
@@ -1993,6 +2000,11 @@ describe('recovered supers', () => {
 });
 
 describe('IORI chain', () => {
+  // The F key writes IORI's ↓← and P; each stage's op 0x24 reads them at age
+  // 29 or 31 (PCs 3625, 3661). Press one tick before.
+  const followUp = (f: Fighter) =>
+    (f.action === 'iori' && f.age === 28) ||
+    (f.action === 'iori2' && f.age === 30);
   it.each([1, -1] as const)(
     'plays all three strikes and the knockdown facing %i',
     (facing) => {
@@ -2006,9 +2018,7 @@ describe('IORI chain', () => {
         for (let tick = 0; tick < 320; tick++) {
           match.step(
             {
-              iori:
-                tick === 0 ||
-                ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+              iori: tick === 0 || followUp(f),
             },
             { guard: blocked },
           );
@@ -2020,11 +2030,7 @@ describe('IORI chain', () => {
         expect(contacts).toEqual(blocked ? [22, 63, 102] : [22, 68, 112]);
         // Boxes of 15, 18 and 20 (kind 7), or 20% chip of each on guard.
         const damage = blocked ? 3 + 3 + 4 : 15 + 18 + 20;
-        expect(f).toMatchObject({
-          hits: blocked ? 0 : 3,
-          damage,
-          nextAttack: null,
-        });
+        expect(f).toMatchObject({ hits: blocked ? 0 : 3, damage });
         expect(target).toMatchObject({
           hp: LIFE - damage,
           y: 0,
@@ -2046,9 +2052,7 @@ describe('IORI chain', () => {
       let previous = f.action;
       for (let tick = 0; tick < 140; tick++) {
         match.step({
-          iori:
-            tick === 0 ||
-            ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+          iori: tick === 0 || followUp(f),
         });
         if (
           f.action !== previous &&
@@ -2066,25 +2070,32 @@ describe('IORI chain', () => {
     },
   );
 
-  it('buffers during hit-stop and opens the next stage only after the active display', () => {
-    const match = new Match();
-    const [f, target] = match.fighters;
-    f.x = 440;
-    ticks(match, 22, { iori: true });
-    expect(f).toMatchObject({ action: 'iori', age: 21, hitStop: 15 });
-    const positions = [f.x, target.x];
-    match.step();
-    match.step({ iori: true });
-    ticks(match, 13);
-    expect(f).toMatchObject({ age: 21, hitStop: 0, nextAttack: 'iori2' });
-    expect([f.x, target.x]).toEqual(positions);
-    ticks(match, 7);
-    expect(f).toMatchObject({ action: 'iori', age: 28 });
-    match.step();
-    expect(f).toMatchObject({ action: 'iori2', age: 0, nextAttack: null });
+  it('reads a press during hit-stop at the check after the active display', () => {
+    // After contact, the cancel window (PC 3603) scans every tick, and each
+    // match of IORI's 40-tick command clears all but the last 20 ticks
+    // (0x41073e): a press early in the hit-stop has lost its ↓← by age 29.
+    for (const early of [true, false]) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      f.x = 440;
+      ticks(match, 22, { iori: true });
+      expect(f).toMatchObject({ action: 'iori', age: 21, hitStop: 15 });
+      const positions = [f.x, target.x];
+      ticks(match, early ? 1 : 11);
+      match.step({ iori: true });
+      ticks(match, early ? 13 : 3);
+      expect(f).toMatchObject({ age: 21, hitStop: 0 });
+      expect([f.x, target.x]).toEqual(positions);
+      ticks(match, 7);
+      expect(f).toMatchObject({ action: 'iori', age: 28 });
+      match.step();
+      expect(f).toMatchObject(
+        early ? { action: 'iori', age: 29 } : { action: 'iori2', age: 0 },
+      );
+    }
   });
 
-  it('accepts late recovery input, but a held button never chains or repeats', () => {
+  it('chains only at its checks, and a held button never chains or repeats', () => {
     for (const late of [false, true]) {
       const match = new Match();
       match.fighters[1].x = 1700;
@@ -2097,18 +2108,25 @@ describe('IORI chain', () => {
         expect(match.fighters[0]).toMatchObject({ action: 'iori', age: 0 });
       } else {
         ticks(match, 100, { iori: true });
-        expect(match.fighters[0]).toMatchObject({
-          action: 'idle',
-          nextAttack: null,
-        });
+        expect(match.fighters[0].action).toBe('idle');
       }
     }
-    const late = new Match();
-    late.fighters[1].x = 1700;
-    late.step({ iori: true });
-    ticks(late, 57);
-    late.step({ iori: true });
-    expect(late.fighters[0]).toMatchObject({ action: 'iori2', age: 0 });
+    // The last check reads 20 ticks at age 54 (PC 3630). A press after it
+    // stays buffered in IORI's 40-tick window and starts IORI again.
+    for (const age of [54, 55]) {
+      const late = new Match();
+      late.fighters[1].x = 1700;
+      late.step({ iori: true });
+      ticks(late, age - 1);
+      late.step({ iori: true });
+      expect(late.fighters[0]).toMatchObject(
+        age === 54 ? { action: 'iori2', age: 0 } : { action: 'iori', age },
+      );
+      if (age === 55) {
+        ticks(late, 4);
+        expect(late.fighters[0]).toMatchObject({ action: 'iori', age: 0 });
+      }
+    }
   });
 
   it.each([1, -1] as const)(
@@ -2182,19 +2200,19 @@ describe('IORI chain', () => {
           { kick: tick === (trade ? 14 : 0) },
         );
       expect(f.action).toBe('hit');
-      expect(f.nextAttack).toBeNull();
       expect(f.hits).toBe(trade ? 1 : 0);
       ticks(match, 160);
       expect(f.action).toBe('idle');
     },
   );
 
-  it('rejects airborne starts and uses the normal KO path on a lethal finisher', () => {
+  it('has no air action and uses the normal KO path on a lethal finisher', () => {
+    // In the air IORI's command has no action, so its P makes the air punch.
     const match = new Match();
     match.step({ jump: true });
     ticks(match, 20);
     match.step({ iori: true });
-    expect(match.fighters[0].action).toBe('jump');
+    expect(match.fighters[0].action).toBe('airPunch');
     const ko = new Match();
     Object.assign(ko.fighters[0], { x: 530, action: 'iori3', age: 20 });
     // 60% of IORI 3's 20 at desperation life.
@@ -2214,9 +2232,7 @@ describe('IORI chain', () => {
       f.x = target.x - facing * 130;
       for (let tick = 0; tick < 220; tick++) {
         match.step({
-          iori:
-            tick === 0 ||
-            ((f.action === 'iori' || f.action === 'iori2') && f.age === 2),
+          iori: tick === 0 || followUp(f),
         });
         expect(f.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
         expect(f.x).toBeLessThanOrEqual(STAGE_WIDTH - FIGHTER_MARGIN);
@@ -2418,12 +2434,13 @@ describe('prototype training rules', () => {
 
   it.each([
     ['grab', 7, 167, 168],
-    ['dst', 4, 259, 260],
+    ['dst', 4, 169, 170],
   ] as const)(
     "grabs when %s's op 0x18 box meets the idle body box",
     (move, startup, reached, missed) => {
-      // Action 196's box (35, 6) ±(41, 3) (PC 2750) and 214's (67, 6) ±(70, 1)
-      // (PC 3091) against idle's (−1, −92) ±(37, 102), both mirrored.
+      // Action 196's box (35, 6) ±(41, 3) (PC 2750) and, beyond the near
+      // distance, 220's (37, 6) ±(40, 1) (PC 3189) against idle's (−1, −92)
+      // ±(37, 102), both mirrored.
       for (const gap of [reached, missed]) {
         const match = new Match();
         const [attacker, target] = match.fighters;
@@ -2557,6 +2574,8 @@ describe('prototype training rules', () => {
     }
     expect(target.action).toBe('getUp');
     match.projectiles = [];
+    // Out of reach of the attacker's latest punch.
+    attacker.x = target.x - 400;
     match.step();
     expect(target.action).toBe('idle');
   });
@@ -3330,12 +3349,16 @@ describe('prototype training rules', () => {
           expect(f).toMatchObject({ action: `${second}2`, age: 0 });
           expect(match.ticks - contact).toBe(18);
         }
-    // A whiff has no branch, so the same presses do nothing.
-    const { match, f } = chainMatch(400);
-    match.step({ punch: true });
-    for (let tick = 1; tick <= animationDuration('punch'); tick++)
-      match.step({ punch: tick % 4 === 0 && tick < 25 });
-    expect(f.action).toBe('idle');
+    // A whiff has no branch, so the same presses do nothing, though one in
+    // P's 10-tick window before the punch ends starts another.
+    const end = animationDuration('punch');
+    for (const last of [end - 10, end - 9]) {
+      const { match, f } = chainMatch(400);
+      match.step({ punch: true });
+      for (let tick = 1; tick <= end; tick++)
+        match.step({ punch: (tick % 4 === 0 && tick < 20) || tick === last });
+      expect(f.action).toBe(last === end - 10 ? 'idle' : 'punch');
+    }
   });
 
   it.each([
@@ -3861,7 +3884,7 @@ describe('prototype training rules', () => {
           const contacts: number[] = [];
           for (let tick = 0; tick < 120; tick++) {
             const hp = target.hp;
-            match.step({ punch: true, drill: true }, { guard: guarded });
+            match.step({ punch: true }, { guard: guarded });
             const impact = hitEffects(match).find((e) => e.age === 0);
             if (impact) {
               contacts.push(tick + 1);
@@ -4191,16 +4214,24 @@ describe('prototype training rules', () => {
     const [axe] = match.projectiles;
     expect(axe).toMatchObject({ hit: false });
     // While its axe (slot 6) lives, 226 jumps to 225 (PC 3267): one display,
-    // then neutral, and the axe flies on.
+    // then neutral, and the axe flies on. The command stays in its 40-tick
+    // window, so the free state enters it again until the axe's hit stops
+    // the thrower; once that axe is gone, it throws another.
     match.step({ axe: true });
     expect(f.action).toBe('axeBusy');
     expect(match.projectiles).toEqual([axe]);
+    for (let tick = 1; tick < 22; tick++) {
+      match.step();
+      expect(f.action).toBe('axeBusy');
+      expect(match.projectiles.length).toBeLessThanOrEqual(1);
+    }
     match.step();
-    expect(f.action).toBe('idle');
+    expect(f.action).toBe('axeThrow');
     // The hit stops the thrower too, which reads no command meanwhile.
     for (
       let tick = 0;
-      tick < 1000 && (match.projectiles.length || f.hitStop);
+      tick < 1000 &&
+      (match.projectiles.length || f.hitStop || f.action !== 'idle');
       tick++
     )
       match.step();

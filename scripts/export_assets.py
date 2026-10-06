@@ -264,7 +264,7 @@ def main():
         # CPU IORI's recovery: op 0x20 at PC 5887 jumps to action 411 + 31.
         "cpuIoriRecover": (411, 31),
         "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218,
-        "evilDst": 221,
+        "evilDst": 221, "dstFar": 220, "evilDstFar": 224,
         "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
         "twist": 85, "twisting": 86, "twisting2": 87,
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
@@ -304,6 +304,19 @@ def main():
                 events = []
                 image_ids.add(frame["image"])
         clips[name] = frames
+    # The command table the loader reads into player +0x4da2 (0x403b64): 23
+    # entries of 82 bytes, each a name, the window of input-history ticks
+    # (+0x20), the actions entered airborne, near, far and crouching
+    # (+0x22–0x28) and ten u16 steps (+0x2a), kept through the last marked 0x2000.
+    if struct.unpack_from("<I", data, c.common_end)[0] != 23:
+        sys.exit("Unexpected command table layout; refusing to export.")
+    commands = []
+    for i in range(23):
+        entry = c.common_end + 4 + 82 * i
+        window, air, near, far, crouch, *steps = struct.unpack_from("<15H", data, entry + 0x20)
+        last = max((k for k, step in enumerate(steps) if step & 0x2000), default=-1)
+        commands.append(dict(name=data[entry:entry + 0x20].split(b"\0")[0].decode("cp932").strip(),
+                             window=window, air=air, near=near, far=far, crouch=crouch, steps=steps[:last + 1]))
     # Op 0x07 replaces a held fighter's display with an entry of this 15 x 6-byte
     # table (image, dx, dy), read by the engine into player offset 0x70ca.
     held_offset = c.common_end + 4 + 23 * 82 + 4 + 83 * 4 + 4
@@ -341,6 +354,10 @@ def main():
                         min=u16(data, entry + 0x22), max=u16(data, entry + 0x24), steps=steps))
     while cpu and not cpu[-1]["probability"]:
         cpu.pop()
+    # The loader reads the CPU block, then 0x74b bytes into player +0x757a
+    # (0x403c0b). Its s16 at +0x7ca3 splits a command's near and far actions
+    # (0x41080e), in source pixels.
+    near = struct.unpack_from("<h", data, cpu_offset - 10 + 0x2b66 + 0x7ca3 - 0x757a)[0]
     # Super timelines, their hit branches (handler slot 2) and every spawned object,
     # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
@@ -400,7 +417,7 @@ def main():
             path.unlink()
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, music=music, clips=clips, held=held,
-        responses=responses, response_effects=response_effects, cpu=cpu, scripts={f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())},
+        responses=responses, response_effects=response_effects, cpu=cpu, commands=dict(near=near, entries=commands), scripts={f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())},
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     export_ui()
     # Python is an independent oracle. Keep fixtures out of the browser bundle.

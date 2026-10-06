@@ -389,6 +389,9 @@ export const animations = {
   dst: clip(clips.dst),
   // Action 221 repeats DST's grab and 58-tick miss with its own images.
   evilDst: clip(clips.evilDst),
+  // DST FAR (220) and EVIL DST FAR (224) repeat 214 and 221 with a shorter box.
+  dstFar: clip(clips.dstFar),
+  evilDstFar: clip(clips.evilDstFar),
   dstHit: clip([clips.dstHit[0], ...dstSpins, ...clips.dstHit.slice(1)]),
   dstHeld: clip(dstHeld()),
   // Response 31 enters action 129, which jumps to the spinning loop 130; its

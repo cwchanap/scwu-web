@@ -135,7 +135,8 @@ describe('CPU decision and playback', () => {
     expect(command(11)).toEqual({ jump: true, right: true });
     expect(command(14)).toEqual({ dash: true, left: true });
     expect(command(22)).toEqual({ cpuIori: true });
-    expect(command(15)).toEqual({});
+    expect(command(15)).toEqual({ ex: true });
+    expect(command(16)).toEqual({});
   });
 
   it('stays off at level 0 without drawing', () => {

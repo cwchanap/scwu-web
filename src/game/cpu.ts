@@ -1,8 +1,9 @@
 // Port of the engine's CPU (routine 0x411270, control type 1 at 0x4112f9),
 // driven by the character's CPU table. It only produces input, so the CPU plays
 // through the same rules as the player.
+import { CONTROLS } from './commands';
 import data from './generated/assets.json';
-import type { Control, Fighter, Input } from './match';
+import type { Fighter, Input } from './match';
 import { rand } from './standing';
 
 export interface CpuStep {
@@ -43,29 +44,6 @@ const DIRECTIONS = [
   '',
   '',
 ];
-// Ryuko's command table (1-based) as the port's single-button controls, with
-// the direction a jump or dash command carries.
-const COMMANDS: Record<number, [Control, string?]> = {
-  1: ['changeAttack'],
-  2: ['megaBeam'],
-  3: ['musashi'],
-  4: ['getterBeam'],
-  5: ['blackRush'],
-  6: ['axe'],
-  7: ['dst'],
-  8: ['drill'],
-  9: ['iori'],
-  10: ['jump'],
-  11: ['jump', 'F'],
-  12: ['jump', 'B'],
-  13: ['dash'],
-  14: ['dash', 'B'],
-  17: ['hitUp'],
-  18: ['throw'],
-  19: ['punch'],
-  20: ['kick'],
-  22: ['cpuIori'],
-};
 type Body = Pick<Fighter, 'x' | 'y'>;
 const airborne = (f: Body) => f.y < 0;
 
@@ -149,7 +127,7 @@ export class CpuVM {
       if (direction.includes('D')) input.crouch = true;
     };
     hold(DIRECTIONS[step.direction]);
-    const command = COMMANDS[step.command];
+    const command = CONTROLS[step.command];
     if (command) {
       const [control, direction] = command;
       hold(direction);
