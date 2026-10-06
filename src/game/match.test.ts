@@ -1300,7 +1300,7 @@ describe('recovered afterimages (op 0x25)', () => {
     match.step({ dash: true });
     const trail = f.trail;
     expect(trail?.spec).toMatchObject({ count: 2, interval: 5, mode: 4 });
-    ticks(match, 2);
+    ticks(match, 10);
     match.step({ punch: true });
     // Action 182 has no op 0x25, and 0x410cf0 keeps the slot.
     expect(f).toMatchObject({ action: 'airPunch', trail });
@@ -1557,11 +1557,16 @@ describe('recovered cancels', () => {
     jump.match.step({ jump: true });
     expect(jump.f.action).toBe('doubleJump');
     // After an air dash (variable 1 = 20), 183 caps the range at 50.
-    const dashed = airPunch((f) => (f.jumpVariable = 20));
-    dashed.match.step({ jump: true });
-    expect(dashed.f.action).toBe('airPunch');
-    dashed.match.step({ kick: true });
-    expect(dashed.f.action).toBe('airKick');
+    const dashed = () => airPunch((f) => (f.jumpVariable = 20));
+    const refused = dashed();
+    refused.match.step({ jump: true });
+    expect(refused.f.action).toBe('airPunch');
+    // Jump 2 still matches first for its 10 ticks, and enters nothing.
+    refused.match.step({ kick: true });
+    expect(refused.f.action).toBe('airPunch');
+    const kicked = dashed();
+    kicked.match.step({ kick: true });
+    expect(kicked.f.action).toBe('airKick');
   });
 
   it('attacks out of an air dash from its third tick with the floatier variant', () => {
@@ -1571,15 +1576,46 @@ describe('recovered cancels', () => {
     ticks(match, 20);
     match.step({ dash: true });
     expect(f).toMatchObject({ action: 'airDash', jumpVariable: 20 });
-    match.step({ punch: true });
+    // Window from age 3 (PC 207), levels 20–50.
+    match.step();
+    match.step({ drill: true });
     expect(f.action).toBe('airDash');
     match.step();
-    match.step({ punch: true });
-    // Window from age 3 (PC 207), levels 20–50; 183 sets acceleration 45.
-    expect(f).toMatchObject({ action: 'airPunch', jumpVariable: 20 });
-    expect(f.gravity).toBeCloseTo(45 * (393 / 65536) * 1.5);
-    while (f.y < 0) match.step();
-    expect(f.jumpVariable).toBe(0);
+    expect(f.action).toBe('airDrill');
+    const punched = new Match();
+    const p = punched.fighters[0];
+    punched.step({ jump: true });
+    ticks(punched, 20);
+    punched.step({ dash: true });
+    // DASH F matches first, refused at level 254, until its first step is
+    // 13 ticks old; 183 then sets acceleration 45.
+    ticks(punched, 9);
+    punched.step({ punch: true });
+    expect(p.action).toBe('airDash');
+    punched.step();
+    expect(p).toMatchObject({ action: 'airPunch', jumpVariable: 20 });
+    expect(p.gravity).toBeCloseTo(45 * (393 / 65536) * 1.5);
+    while (p.y < 0) punched.step();
+    expect(p.jumpVariable).toBe(0);
+  });
+
+  it('enters no movement command from an air attack fall (action 7, PC 94)', () => {
+    const match = new Match();
+    const f = match.fighters[0];
+    match.step({ jump: true });
+    ticks(match, 12);
+    match.step({ kick: true });
+    f.y = -2000;
+    while (f.action === 'airKick') match.step();
+    expect(f).toMatchObject({ action: 'jump', doubleJumped: true });
+    match.step({ jump: true });
+    expect(f.action).toBe('jump');
+    // Past Jump 2's 10 ticks, so DASH F is the first match.
+    ticks(match, 10);
+    match.step({ right: true });
+    match.step();
+    match.step({ right: true });
+    expect(f.action).toBe('jump');
   });
 
   it.each(['punch', 'kick'] as const)(
@@ -1590,8 +1626,7 @@ describe('recovered cancels', () => {
       match.step({ jump: true });
       ticks(match, 20);
       match.step({ dash: true });
-      match.step();
-      match.step();
+      ticks(match, 10);
       match.step({ [button]: true });
       f.y = -2000;
       const action = button === 'punch' ? 'airPunch' : 'airKick';
@@ -2990,18 +3025,18 @@ describe('prototype training rules', () => {
     const [f, target] = match.fighters;
     f.x = 185;
     target.x = 775;
-    match.step({ jump: true });
-    ticks(match, 63);
+    // Rising, as no air command comes within 50 source pixels of the floor
+    // on the way down (0x410096).
+    Object.assign(f, { action: 'jump', y: -10, vy: -5, gravity: 0.72 });
     match.step({ dash: true });
     ticks(match, 2);
     const height = f.y;
-    expect(height).toBeCloseTo(-29.563751, 5);
     ticks(match, 30);
     expect(f.y).toBe(height);
-    ticks(match, 8);
-    expect(f.action).toBe('airDash');
-    expect(f.y).toBeLessThan(0);
-    match.step();
+    while (f.y < 0) {
+      expect(f.action).toBe('airDash');
+      match.step();
+    }
     expect(f.action).toBe('land');
     expect(f.vx).toBe(0);
     expect(f.airDashed).toBe(false);
@@ -3010,22 +3045,13 @@ describe('prototype training rules', () => {
     expect(f.x).toBe(landedX);
   });
 
-  it('lands during air-dash preparation when the incoming fall reaches the floor', () => {
+  it('takes no air dash within 50 source pixels of the floor on the way down (0x410096)', () => {
     const match = new Match();
     const f = match.fighters[0];
     match.step({ jump: true });
     ticks(match, 65);
     match.step({ dash: true });
-    expect(f.action).toBe('airDash');
-    const x = f.x;
-    match.step();
-    expect(f.y).toBeCloseTo(-8.845139, 5);
-    match.step();
-    expect(f.action).toBe('land');
-    expect(f.airDashed).toBe(false);
-    expect(f.vx).toBe(0);
-    ticks(match, 10);
-    expect(f.x).toBe(x);
+    expect(f).toMatchObject({ action: 'jump', airDashed: false });
   });
 
   it.each([1, 10])(
@@ -3176,7 +3202,9 @@ describe('prototype training rules', () => {
         expect(match.fighters[0].action).toBe(
           direction === facing ? 'walk' : 'backwalk',
         );
-        ticks(match, 19);
+        // DASH F and B: the direction, neutral, then the direction again,
+        // all within 13 ticks.
+        ticks(match, 11);
         match.step(input);
         expect(match.fighters[0].action).toBe(
           direction === facing ? 'dash' : 'backdash',
@@ -3188,22 +3216,17 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('requires fresh same-direction taps within 200 ms and clears stale input', () => {
-    for (const interruption of [
-      'timeout',
-      'opposite',
-      'both',
+  it('needs a neutral tick between the taps, all within the window', () => {
+    for (const between of [
+      Array<Input>(12).fill({}),
+      [{ left: true }],
+      [{ right: true, crouch: true }],
       'clear',
-      'attack',
-    ]) {
+    ] as const) {
       const match = new Match();
       match.step({ right: true });
-      if (interruption === 'timeout') ticks(match, 20);
-      else if (interruption === 'opposite') match.step({ left: true });
-      else if (interruption === 'both') match.step({ left: true, right: true });
-      else if (interruption === 'clear') match.clearInput();
-      else match.step({ punch: true });
-      match.step();
+      if (between === 'clear') match.clearInput();
+      else between.forEach((input) => match.step(input));
       match.step({ right: true });
       expect(match.fighters[0].action).not.toBe('dash');
     }
@@ -3213,7 +3236,7 @@ describe('prototype training rules', () => {
   });
 
   it.each([1, -1] as const)(
-    'single-taps either direction for an air dash relative to facing %i',
+    'double-taps either direction for an air dash relative to facing %i',
     (facing) => {
       for (const direction of [1, -1]) {
         const match = new Match();
@@ -3224,6 +3247,8 @@ describe('prototype training rules', () => {
         ticks(match, 25);
         const input = { left: direction === -1, right: direction === 1 };
         match.step(input);
+        match.step();
+        match.step(input);
         expect(f.action).toBe(direction === facing ? 'airDash' : 'airBackdash');
         expect(f.airDashed).toBe(true);
         const start = f.x;
@@ -3233,7 +3258,7 @@ describe('prototype training rules', () => {
     },
   );
 
-  it('ignores simultaneous directions in the air and requires a fresh press', () => {
+  it('ignores simultaneous directions in the air and needs neutral between taps', () => {
     const match = new Match();
     match.step({ jump: true });
     ticks(match, 20);
@@ -3246,10 +3271,12 @@ describe('prototype training rules', () => {
     expect(match.fighters[0].action).toBe('airDash');
   });
 
-  it('single-taps for only one air dash per flight', () => {
+  it('takes only one air dash per flight', () => {
     const match = new Match();
     match.step({ jump: true });
     ticks(match, 25);
+    match.step({ left: true });
+    match.step();
     match.step({ left: true });
     expect(match.fighters[0].action).toBe('airBackdash');
     ticks(match, animationDuration('airBackdash'));
@@ -5290,29 +5317,32 @@ describe('recovered CPU', () => {
     expect(partner.action).toBe('hit');
   });
 
-  it('dashes only through its DASH commands', () => {
-    const jumpToward: CpuEntry = {
-      flags: 1,
-      probability: 100,
-      min: 0,
-      max: 2000,
-      steps: [{ direction: 9, command: 0, duration: 5 }],
+  it('air dashes through its DASH F command, which it writes (0x4115e3)', () => {
+    const airborne = (direction: number, command: number) => {
+      const { match, cpu } = vsCpu(
+        new CpuVM(
+          [
+            {
+              flags: 1,
+              probability: 100,
+              min: 0,
+              max: 2000,
+              steps: [{ direction, command, duration: 5 }],
+            },
+          ],
+          100,
+        ),
+        400,
+      );
+      Object.assign(cpu, { action: 'jump', y: -200, vy: 0 });
+      match.step();
+      return cpu.action;
     };
-    const spent = {
-      action: 'jump',
-      y: -200,
-      vy: 0,
-      doubleJumped: true,
-    } as const;
-    const { match, cpu } = vsCpu(new CpuVM([jumpToward], 100), 400);
-    Object.assign(cpu, spent);
-    match.step();
-    expect(cpu).toMatchObject({ action: 'jump', airDashed: false });
-    // The same press from a player-driven opponent takes the air-dash shortcut.
-    const player = vsCpu(new CpuVM([], 100), 400);
-    Object.assign(player.cpu, spent);
-    player.match.step({}, { left: true, jump: true });
-    expect(player.cpu.action).toBe('airDash');
+    // Its history holds only this tick (0x411307), so holding → is no motion,
+    // but its cleared ticks read as neutral before ↗: Jump 2 F.
+    expect(airborne(2, 0)).toBe('jump');
+    expect(airborne(9, 0)).toBe('doubleJump');
+    expect(airborne(0, 13)).toBe('airDash');
   });
 
   it('plays from the recovered table against an idle player', () => {

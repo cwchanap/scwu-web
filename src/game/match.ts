@@ -501,7 +501,6 @@ for (const action of [
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim.
 REACTION_POWER.drillDown = [5, 0];
-const DOUBLE_TAP_TICKS = 20;
 // Action 33 walks at raw velocity 200 until PC 339, after its first 50 ticks.
 const INTRO_WALK_TICKS = 50;
 const INTRO_WALK = INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE;
@@ -1251,10 +1250,6 @@ export class Match {
   // This tick's input, which op 0x16 reads.
   private inputs: [Input, Input] = [{}, {}];
   private history = [blankHistory(), blankHistory()];
-  private directionTaps: ({ direction: number; tick: number } | null)[] = [
-    null,
-    null,
-  ];
 
   constructor(
     public mode: Mode = 'practice',
@@ -1322,31 +1317,16 @@ export class Match {
       ([control]) => input[control] && !this.previous[i][control],
     );
     if (key || (this.cpuDriven && i === 1)) history.fill(0);
-    history.push(inputWord(input, other.x >= f.x));
+    const word = inputWord(input, other.x >= f.x);
+    history.push(word);
     history.shift();
-    if (key) inject(history, key[1]);
+    if (key)
+      inject(history, key[0] === 'dash' && (word & 3) === 1 ? 14 : key[1]);
   }
 
   clearInput() {
     this.previous = [{}, {}];
     this.history = [blankHistory(), blankHistory()];
-    this.directionTaps = [null, null];
-  }
-
-  private doubleTap(input: Input, index: number) {
-    if (input.left && input.right) {
-      this.directionTaps[index] = null;
-      return false;
-    }
-    const direction =
-      Number(Boolean(input.right)) - Number(Boolean(input.left));
-    if (!direction || this.previous[index][direction === 1 ? 'right' : 'left'])
-      return false;
-    const tap = this.directionTaps[index];
-    const dash =
-      tap?.direction === direction && this.ticks - tap.tick <= DOUBLE_TAP_TICKS;
-    this.directionTaps[index] = dash ? null : { direction, tick: this.ticks };
-    return dash;
   }
 
   // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
@@ -2084,7 +2064,8 @@ export class Match {
       this.action(f, 'dstHit');
       if (target.action === 'superHeld') this.action(target, 'dstHeld');
     } else if (f.y < 0) {
-      // Op 0x0a into action 7: the ordinary fall.
+      // Op 0x0a into action 7: the ordinary fall, levels 0–250 (PC 94).
+      f.doubleJumped = f.airDashed = true;
       this.action(f, 'jump');
       f.gravity = JUMP_GRAVITY;
     } else {
@@ -2271,8 +2252,31 @@ export class Match {
       this.action(f, action, true);
       return true;
     };
-    const control = CONTROLS[found.entry][0];
+    const [control, direction] = CONTROLS[found.entry];
     switch (control) {
+      // Jump 2 (entries 10–12) enters double jump 10, 11 or 12, level 255
+      // (their op 0x00 headers). The flag stands in for the windows that
+      // refuse it until landing: 10's own (PC 130, 1–254) and action 7's.
+      case 'jump': {
+        if (!ok(255) || f.doubleJumped) return false;
+        const toward = other.x >= f.x ? 1 : -1;
+        this.doubleJump(
+          f,
+          direction === 'F' ? toward : direction === 'B' ? -toward : 0,
+        );
+        return true;
+      }
+      // DASH F and B (13, 14): ground dashes 13 (level 30) and 14 (level 0),
+      // air dashes 16 and 17 (level 254).
+      case 'dash': {
+        const back = direction === 'B';
+        if (!air) return ok(back ? 0 : 30) && start(back ? 'backdash' : 'dash');
+        if (!ok(254) || f.airDashed) return false;
+        // An air dash ends in action 7 (PC 215), whose window (PC 94, levels
+        // 0–250) takes neither a double jump nor another air dash.
+        f.doubleJumped = f.airDashed = true;
+        return start(back ? 'airBackdash' : 'airDash');
+      }
       case 'punch':
         return (
           ok(21) &&
@@ -2332,13 +2336,7 @@ export class Match {
   }
 
   // Op 0x1e windows (CANCELS), read on every tick, contact stops included.
-  private cancel(
-    f: Fighter,
-    other: Fighter,
-    input: Input,
-    previous: Input,
-    history: number[],
-  ) {
+  private cancel(f: Fighter, other: Fighter, history: number[]) {
     const range = CANCELS[f.action];
     if (
       !range ||
@@ -2353,20 +2351,6 @@ export class Match {
         ? 50
         : range.max;
     const ok = (level: number) => level >= range.min && level <= max;
-    const airborne = f.y < 0 || f.vy < 0;
-    if (
-      airborne &&
-      ok(255) &&
-      input.jump &&
-      !previous.jump &&
-      !f.doubleJumped
-    ) {
-      this.doubleJump(
-        f,
-        Number(Boolean(input.right)) - Number(Boolean(input.left)),
-      );
-      return true;
-    }
     return this.command(f, other, history, ok);
   }
 
@@ -2375,11 +2359,10 @@ export class Match {
     other: Fighter,
     input: Input,
     previous: Input,
-    doubleTap: boolean,
     history: number[],
   ) {
     if (f.hitStop === 0) f.age++;
-    if (this.cancel(f, other, input, previous, history)) return;
+    if (this.cancel(f, other, history)) return;
     if (
       (f.action === 'hitUp' || (f.action === 'hitUpRecover' && f.age < 25)) &&
       input.jump &&
@@ -2478,6 +2461,9 @@ export class Match {
       return;
     }
     if (f.action === 'doubleJump' && f.age < 3) return;
+    // Action 202 lifts off at PC 2848, after the controller has scanned
+    // commands on the floor; its first airborne scan is the next tick's.
+    if (f.action === 'hitUpJump' && f.age === 8) return;
     if (f.action === 'hitUpRecover') {
       // Action 201 opens command 202 after its first five-tick display.
       // Early Jump taps are buffered using the training mode's input policy.
@@ -2599,7 +2585,12 @@ export class Match {
         f.action === 'airKick')
     ) {
       const { ax } = f;
-      if (AIR_REACTIONS[f.action]) toNeutral(f);
+      // 0x411a80 frees a fighter whose air reaction ends; an air attack stays
+      // acting into action 7, whose window (PC 94, levels 0–250) takes no
+      // double jump (255) or air dash (254) before landing.
+      const free = Boolean(AIR_REACTIONS[f.action]);
+      if (free) toNeutral(f);
+      f.doubleJumped = f.airDashed = !free;
       this.action(f, 'jump');
       f.ax = ax;
       f.gravity = JUMP_GRAVITY;
@@ -2623,47 +2614,15 @@ export class Match {
       );
       return;
     }
-    if (input.jump && !previous.jump) {
-      if (!airborne) {
-        this.action(f, 'takeoff');
-        f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
-        return;
-      }
-      if (!f.doubleJumped) {
-        this.doubleJump(f, direction);
-        markActing(f);
-        return;
-      }
-    }
-    // The dash shortcuts are keyboard/touch input choices; the CPU dashes only
-    // through its DASH commands.
-    const shortcuts = !(this.cpuDriven && f === this.fighters[1]);
-    const directionalDash =
-      shortcuts &&
-      (airborne
-        ? direction !== 0 && !previous[direction === 1 ? 'right' : 'left']
-        : doubleTap);
-    if (
-      ((input.dash && !previous.dash) || directionalDash) &&
-      (!airborne || !f.airDashed)
-    ) {
-      const backwards = direction !== 0 && direction !== f.facing;
-      this.action(
-        f,
-        airborne
-          ? backwards
-            ? 'airBackdash'
-            : 'airDash'
-          : backwards
-            ? 'backdash'
-            : 'dash',
-      );
-      if (airborne) f.airDashed = true;
-      markActing(f);
+    // Authored: a fresh press jumps from the ground, where the source's
+    // 0x410dc0 jumps while up is held.
+    if (input.jump && !previous.jump && !airborne) {
+      this.action(f, 'takeoff');
+      f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
       return;
     }
-    // The free state scans commands (0x411a01) after the port's own guard,
-    // jump and dash keys.
+    // The free state scans commands (0x411a01) after the port's own guard
+    // and jump keys.
     if (this.command(f, other, history)) {
       markActing(f);
       return;
@@ -2883,15 +2842,8 @@ export class Match {
         this.fighters[1 - i],
         inputs[i],
         this.previous[i],
-        this.doubleTap(inputs[i], i),
         this.history[i],
       );
-      if (
-        !['idle', 'walk', 'backwalk', 'turn', 'jump', 'doubleJump'].includes(
-          f.action,
-        )
-      )
-        this.directionTaps[i] = null;
       this.settle(f);
       this.enter(f, i);
     };

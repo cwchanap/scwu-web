@@ -124,6 +124,43 @@ describe('recovered command recognizer', () => {
     );
   });
 
+  it('double jumps on neutral, then up within 10 ticks (Jump 2)', () => {
+    const held = new Match();
+    for (let t = 0; t < 30; t++) held.step({ jump: true });
+    expect(held.fighters[0]).toMatchObject({ action: 'jump', vx: 0 });
+    for (const [input, vx] of [
+      [{ jump: true }, 0],
+      [{ jump: true, right: true }, 1],
+      [{ jump: true, left: true }, -1],
+    ] as const) {
+      const match = new Match();
+      const f = match.fighters[0];
+      match.fighters[1].x = f.x + 150;
+      ticks2(match, { jump: true });
+      for (let t = 0; t < 12; t++) match.step({});
+      match.step(input);
+      expect(f.action).toBe('doubleJump');
+      expect(Math.sign(f.vx)).toBe(vx);
+    }
+  });
+
+  it('cancels a connected punch into a forward dash (level 30), not a backdash (0)', () => {
+    for (const [direction, dashed] of [
+      ['f', true],
+      ['b', false],
+    ] as const) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 110;
+      match.step({ punch: true });
+      for (let t = 0; t < 30 && f.hitStop === 0; t++) match.step();
+      expect(f.action).toBe('punchHit');
+      for (const input of [KEYS[direction], {}, KEYS[direction]])
+        match.step(input);
+      expect(f.action === 'dash' || f.action === 'backdash').toBe(dashed);
+    }
+  });
+
   it('reads no air command within 50 source pixels of the floor on the way down', () => {
     for (const [y, action] of [
       [-75, 'jump'],

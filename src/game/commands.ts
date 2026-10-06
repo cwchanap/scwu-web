@@ -23,7 +23,7 @@ export const NEAR = data.commands.near;
 export const DOWN = 8;
 const BUTTONS = { kick: 0x10, hitUp: 0x20, punch: 0x80, throw: 0x100 };
 // Entries (1-based) as the port's controls, with the direction a jump or
-// dash carries; the port's own movement plays those (10–14).
+// dash carries.
 export const CONTROLS: Record<number, [Control, string?]> = {
   1: ['changeAttack'],
   2: ['megaBeam'],
@@ -46,7 +46,6 @@ export const CONTROLS: Record<number, [Control, string?]> = {
   20: ['kick'],
   22: ['cpuIori'],
 };
-const MOVEMENT = new Set<Control | undefined>(['jump', 'dash']);
 // Authored: the port's command keys, in the order one is taken when several
 // are pressed together. Each writes its entry's steps as the CPU does.
 export const KEYS: [Control, number][] = [
@@ -61,6 +60,8 @@ export const KEYS: [Control, number][] = [
   ['dst', 7],
   ['axe', 6],
   ['ex', 15],
+  // Shift: DASH F, or DASH B (14) while back is held (Match.record).
+  ['dash', 13],
 ];
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
@@ -129,9 +130,7 @@ export function scan(
   if (fighter.landing) return null;
   const now = history[history.length - 1];
   for (const [index, entry] of ENTRIES.entries()) {
-    // ponytail: the port's own movement plays jumps and dashes (entries
-    // 10–14), so they never take a later command's place.
-    if (!entry.window || MOVEMENT.has(CONTROLS[index + 1]?.[0])) continue;
+    if (!entry.window) continue;
     // An entry without steps ends the scan (0x410141).
     if (!entry.steps.length) return null;
     if (!commanded(history, entry.steps, entry.window)) continue;

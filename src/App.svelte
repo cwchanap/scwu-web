@@ -163,7 +163,7 @@
         tabindex="-1"
         role="application"
         aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left/right for a ground dash or tap once in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
+        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, J to punch, K to kick, H for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, L to guard, Shift to dash, double-tap left or right to dash on the ground or in the air, U for Drill Punch, I for Axe throw, O to grab and throw, G for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
       ></div>
       <div class="sr-only" aria-label="Match health">
         <div
@@ -359,15 +359,16 @@
         </p>
         <p>
           Hold left or right when jumping to travel in that direction; releasing
-          it keeps your momentum. Tap jump again in the air for a double jump,
-          choosing a new direction. Double-tap left or right for a ground dash;
-          in the air, tap either direction once to dash that way. This also
-          works on touch. Holding a direction through takeoff keeps your normal
-          jump; release and press again for an air dash. You can also press <kbd
+          it keeps your momentum. In the air, let go of every direction, then
+          press jump again, with left or right to steer, for a double jump.
+          Double-tap left or right, letting go in between, to dash that way on
+          the ground or in the air. This also works on touch. You can also press <kbd
             >Shift</kbd
           >
-          or the Dash button to dash forward, or hold away to backdash. You can dash
-          once in the air before landing.
+          or the Dash button to dash forward, or hold away to backdash. Each jump
+          allows one double jump and one air dash, a double jump can still air dash,
+          and an air dash or a finished aerial attack allows neither. Neither comes
+          out near the floor on the way down.
         </p>
         <p>
           Press <kbd>U</kbd> for a six-hit Drill Punch on the ground, or an
