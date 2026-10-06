@@ -455,6 +455,77 @@ describe('recovered neutral and round animations', () => {
     match.step({ punch: true });
     expect(player.action).toBe('punch');
   });
+
+  describe('Vs. CPU match', () => {
+    // Play the round to SHOW TIME, then KO a side (both for a double KO).
+    const ko = (match: Match, losers: number[], winnerHp = LIFE) => {
+      while (match.roundTicks < FIGHT_TICK) match.step();
+      match.fighters.forEach(
+        (f, i) => (f.hp = losers.includes(i) ? 0 : winnerHp),
+      );
+      match.step();
+    };
+
+    it('sets up the next round after the result waits, keeping stock and power (0x411f2d)', () => {
+      const match = new Match('cpu', true);
+      ko(match, [1], 500);
+      expect(match).toMatchObject({
+        winner: 'player',
+        wins: [1, 0],
+        roundEnd: 651,
+      });
+      ticks(match, 651 + 50);
+      expect(match.round).toBe(1);
+      Object.assign(match.fighters[0], { stock: 2, power: 40, ex: true });
+      match.step();
+      expect(match).toMatchObject({
+        round: 2,
+        roundTicks: 0,
+        ticks: 0,
+        winner: null,
+      });
+      expect(match.effects).toEqual([]);
+      expect(
+        match.fighters.map(({ action, hp, stock, power, ex }) => [
+          action,
+          hp,
+          stock,
+          power,
+          ex,
+        ]),
+      ).toEqual([
+        ['intro', LIFE, 2, 40, false],
+        ['intro', LIFE, 0, 0, false],
+      ]);
+    });
+
+    it('credits a double KO to both and ends the match at three wins (state 902)', () => {
+      const match = new Match('cpu', true);
+      ko(match, [1]);
+      // PERFECT (27) adds a tick.
+      expect(match.roundEnd).toBe(652);
+      ticks(match, 652 + 51);
+      ko(match, [0, 1]);
+      expect(match).toMatchObject({
+        winner: 'draw',
+        wins: [2, 1],
+        roundEnd: 301,
+      });
+      ticks(match, 301 + 51);
+      ko(match, [1]);
+      expect(match).toMatchObject({
+        round: 3,
+        wins: [3, 1],
+        matchOver: true,
+        matchWinner: 'player',
+      });
+      ticks(match, 651);
+      expect(match.resultReady).toBe(false);
+      match.step();
+      expect(match.resultReady).toBe(true);
+      expect(match.round).toBe(3);
+    });
+  });
 });
 
 describe('Daisetsuzan Oroshi command throw', () => {

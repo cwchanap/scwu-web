@@ -39,6 +39,7 @@ export interface GameStatus {
   damage: number;
   action: string;
   winner: Match['winner'];
+  matchWinner: Match['winner'];
   resultReady: boolean;
   error: string;
 }
@@ -51,6 +52,7 @@ export const initialStatus: GameStatus = {
   damage: 0,
   action: 'idle',
   winner: null,
+  matchWinner: null,
   resultReady: false,
   error: '',
 };
@@ -267,11 +269,16 @@ export class TrainingScene extends Phaser.Scene {
     this.playMusic();
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
-    this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
-    this.idle.forEach((vm) => vm.tick());
+    this.resetIdle();
     this.paused = false;
     this.clearInput();
     this.report();
+  }
+
+  // Each round's fighters start their idle programs afresh.
+  private resetIdle() {
+    this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
+    this.idle.forEach((vm) => vm.tick());
   }
 
   setMusic(on: boolean) {
@@ -406,9 +413,11 @@ export class TrainingScene extends Phaser.Scene {
           ]);
           this.pressed.clear();
           const frozen = this.match.fighters.map((f) => f.hitStop > 0);
+          const { round } = this.match;
           this.match.step(
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
+          if (this.match.round !== round) this.resetIdle();
           for (const { owner, index } of this.match.sounds)
             this.play(`ryuko-sound-${index}`, owner);
           for (const index of letteringSounds(this.match))
@@ -583,6 +592,7 @@ export class TrainingScene extends Phaser.Scene {
       damage: a.damage,
       action: a.action.replace(/([A-Z])/g, ' $1'),
       winner: this.match.winner,
+      matchWinner: this.match.resultReady ? this.match.matchWinner : null,
       resultReady: this.match.resultReady,
       error: this.error,
     };

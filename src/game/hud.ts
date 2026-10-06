@@ -1,13 +1,14 @@
 import type Phaser from 'phaser';
-import { DESPERATION_HP, LIFE, POWER_PER_STOCK } from './match';
+import { DESPERATION_HP, LIFE, POWER_PER_STOCK, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
 // A KGT lettering: displays (image, ticks, top-left dx/dy in the 640 × 480
-// screen, op 0x23 blit mode) with the sounds just before each, and the wait
-// the round manager counts for it.
+// screen, op 0x23 blit mode) with the sounds just before each, the wait the
+// round manager counts for it, and the display a jump back repeats from.
 type Lettering = {
   wait: number;
+  loop?: number;
   frames: {
     pc: number;
     image: number;
@@ -20,7 +21,11 @@ type Lettering = {
 };
 const { ko, calls } = ui as unknown as {
   ko: Lettering;
-  calls: { start: number } & Record<'logo' | 'dress' | 'fight', Lettering>;
+  calls: {
+    start: number;
+    rounds: Lettering[];
+    results: Record<'win' | 'perfect' | 'draw', number>;
+  } & Record<'logo' | 'fight' | 'transition', Lettering>;
 };
 export const KO_TICKS = ko.frames.reduce(
   (total, frame) => total + frame.duration,
@@ -33,29 +38,46 @@ export const ROUND_END_TICKS = KO_TICKS + 100;
 // lettering (15, 'DRESS 1') and its 280, then the fight lettering (25, 'SHOW
 // TIME') with round phase 1, when commands, the CPU and the timer start.
 export const DRESS_TICK = calls.start + 1;
-export const FIGHT_TICK = DRESS_TICK + calls.dress.wait;
+export const FIGHT_TICK = DRESS_TICK + calls.rounds[0].wait;
 
-function letteringFrame({ frames }: Lettering, age: number) {
+// Counted from the KO lettering's spawn, the result states (0x409444–
+// 0x4095e8) wait out KO (26) and 1P/2P WIN (30, 31), then at full life spawn
+// PERFECT (27) and wait it out the tick after; a draw or double KO waits out
+// DRAW or DOUBLE KO (32, 33). The tick after, state 900 (0x4096c0) spawns the
+// transition (KGT 14), and when its wait runs out state 902 returns to round
+// setup (state 100) for the next tick.
+export function roundEndTick(winner: Match['winner'], perfect: boolean) {
+  const { win, perfect: bonus, draw } = calls.results;
+  if (winner === 'draw') return draw + 1;
+  return ko.wait + win + (perfect ? bonus + 1 : 0) + 1;
+}
+export const NEXT_ROUND_TICKS = calls.transition.wait + 1;
+
+function letteringFrame({ frames, loop }: Lettering, age: number) {
   if (age < 0) return;
-  for (const frame of frames) {
-    if (age < frame.duration) return frame;
-    age -= frame.duration;
+  for (let i = 0; i < frames.length; i++) {
+    if (age < frames[i].duration) return frames[i];
+    age -= frames[i].duration;
+    if (i === frames.length - 1 && loop !== undefined) i = loop - 1;
   }
 }
 export const koFrame = (age: number) => letteringFrame(ko, age);
 
 // The letterings a match shows, by age: in Vs. CPU the round-start logo wipe
-// (13's 115), 'DRESS 1' and 'SHOW TIME'; then every result's KO lettering
-// (26, or 28, 29, 32 and 33, which jump to it).
+// (13's 115), the round's 'DRESS' and 'SHOW TIME'; then every result's KO
+// lettering (26, or 28, 29, 32 and 33, which jump to it), and before another
+// round 14's logo wipe back in (116). A match lasts at most five rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
   if (match.calls)
     shown.push(
       [calls.logo, match.roundTicks],
-      [calls.dress, match.roundTicks - DRESS_TICK],
+      [calls.rounds[match.round - 1], match.roundTicks - DRESS_TICK],
       [calls.fight, match.roundTicks - FIGHT_TICK],
     );
   if (match.winner) shown.push([ko, match.endingTicks]);
+  if (match.winner && !match.matchOver)
+    shown.push([calls.transition, match.endingTicks - match.roundEnd]);
   return shown;
 }
 
@@ -142,7 +164,17 @@ export function createHud(scene: Phaser.Scene) {
     .setOrigin(0)
     .setScale(scale * 0.7)
     .setDepth(101);
-  const wins = [image(30, 240, 40), image(30, 370, 40)];
+  // Type 13 (0x409d82) lines up a mark per round to win from the KGT 76/77
+  // headers: 1P from (240, 40) stepping −35, 2P from (370, 40) stepping 35.
+  // Each shows KGT 56 (112: image 30) until that round is won, when state 1
+  // (0x40a584) switches the next to 55 (112 + 4: image 29 at +1, +1).
+  const marks = [-35, 35].map((step, side) =>
+    Array.from(
+      { length: ROUNDS_TO_WIN },
+      (_, i) => (side ? 370 : 240) + step * i,
+    ),
+  );
+  const wins = marks.map((xs) => xs.map((x) => image(30, x, 40)));
   image(26, 30, 443);
   const gauges = [image(31, 99, 443), image(31, 414, 443).setFlipX(true)];
   // Stock anchors come from KGT actions 74/75.
@@ -189,9 +221,12 @@ export function createHud(scene: Phaser.Scene) {
     life.forEach((bar, index) => {
       const crop = healthCrop(match.fighters[index].hp, index === 1);
       bar.setCrop(crop.x, 0, crop.width, 14).setVisible(crop.width > 0);
-      wins[index].setTexture(
-        `ui-${match.winner === (index === 0 ? 'player' : 'opponent') ? 29 : 30}`,
-      );
+      wins[index].forEach((mark, i) => {
+        const won = match.wins[index] > i ? 1 : 0;
+        mark
+          .setTexture(`ui-${won ? 29 : 30}`)
+          .setPosition((marks[index][i] + won) * scale, (40 + won) * scale);
+      });
     });
     const finite = Number.isFinite(match.seconds);
     const value = String(match.seconds).padStart(2, '0');
@@ -201,9 +236,11 @@ export function createHud(scene: Phaser.Scene) {
     });
     infinity.setVisible(!finite);
     // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds.
-    const current = letterings(match);
+    const current = letterings(match).flatMap(
+      (lettering) => letteringFrame(...lettering) ?? [],
+    );
     shown.forEach((sprite, i) => {
-      const frame = current[i] && letteringFrame(...current[i]);
+      const frame = current.at(i);
       sprite.setVisible(!!frame);
       if (frame)
         sprite

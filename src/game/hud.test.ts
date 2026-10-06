@@ -10,6 +10,8 @@ import {
   koFrame,
   KO_TICKS,
   letteringSounds,
+  NEXT_ROUND_TICKS,
+  roundEndTick,
   ROUND_END_TICKS,
   healthCrop,
 } from './hud';
@@ -58,8 +60,8 @@ it('exports every HUD and lettering texture at its original dimensions', () => {
     expect(png.readUInt32BE(16)).toBe(image.width);
     expect(png.readUInt32BE(20)).toBe(image.height);
   }
-  const { logo, dress, fight } = ui.calls;
-  for (const { frames } of [ui.ko, logo, dress, fight])
+  const { logo, rounds, fight, transition } = ui.calls;
+  for (const { frames } of [ui.ko, logo, ...rounds, fight, transition])
     for (const frame of frames) {
       expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
       expect(frame.duration).toBeGreaterThan(0);
@@ -103,5 +105,29 @@ it('calls the Vs. CPU round: DRESS 1, then SHOW TIME and control', () => {
     [351, [7, 3]],
     [631, [2, 8]],
   ]);
-  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 7, 8]);
+  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 7, 8]);
+});
+
+it("waits out the results, then calls round 2 with 'DRESS 2' (KGT 16, sound 4)", () => {
+  expect([
+    roundEndTick('player', false),
+    roundEndTick('opponent', true),
+    roundEndTick('draw', false),
+    NEXT_ROUND_TICKS,
+  ]).toEqual([651, 652, 301, 51]);
+  const match = new Match('cpu', true);
+  while (match.roundTicks < FIGHT_TICK) match.step();
+  match.fighters[1].hp = 0;
+  match.step();
+  const heard: [number, number[]][] = [];
+  while (match.round === 1 || match.roundTicks < DRESS_TICK) {
+    match.step();
+    const sounds = letteringSounds(match);
+    if (sounds.length) heard.push([match.round, sounds]);
+  }
+  // KO (26) voices 1 at age 31; the transition (116) is silent.
+  expect(heard).toEqual([
+    [1, [1]],
+    [2, [7, 4]],
+  ]);
 });

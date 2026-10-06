@@ -35,7 +35,12 @@ import type {
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
-import { FIGHT_TICK, ROUND_END_TICKS } from './hud';
+import {
+  FIGHT_TICK,
+  NEXT_ROUND_TICKS,
+  roundEndTick,
+  ROUND_END_TICKS,
+} from './hud';
 export const SUPER_CONTROLS = [
   'getterBeam',
   'musashi',
@@ -403,6 +408,9 @@ export const MAX_STOCK = 3;
 // in 0x40e7c0, shrinks every loss to 60%.
 export const LIFE = 510;
 export const DESPERATION_HP = 153;
+// Vs. single play's rounds to win (0x470048, 0x4087da): GAME.INI's
+// Editor.TestPlay.VSSinglePlay, 3 (0x414afc).
+export const ROUNDS_TO_WIN = 3;
 // Opcode 0x15 self power in each attack's script, credited when it starts.
 const ATTACK_POWER: Partial<Record<Action, number>> = {
   punch2: 3,
@@ -1159,15 +1167,24 @@ function slideDst(f: Fighter) {
     placeX(f, f.x - f.facing * 400 * SOURCE_VELOCITY_SCALE);
 }
 
+// Authored start: both walk-ins end 360 pixels apart around the stage center.
+const introFighters = (): [Fighter, Fighter] => [
+  { ...fighter(STAGE_WIDTH / 2 - 180 - INTRO_WALK, 1), action: 'intro' },
+  { ...fighter(STAGE_WIDTH / 2 + 180 + INTRO_WALK, -1), action: 'intro' },
+];
+
 export class Match {
   fighters: [Fighter, Fighter] = [fighter(300, 1), fighter(660, -1)];
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
-  // Ticks since round setup, and whether this round plays the Vs. CPU intro
-  // and its round calls.
+  // Ticks since round setup, and whether the match plays the Vs. CPU intro,
+  // round calls and rounds.
   roundTicks = 0;
   readonly calls: boolean;
+  // The round (0x470044) and each side's won rounds (0x4dfc6d, 0x4edcac).
+  round = 1;
+  wins: [number, number] = [0, 0];
   projectiles: Projectile[] = [];
   effects: Effect[] = [];
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
@@ -1208,13 +1225,52 @@ export class Match {
   ) {
     this.cpu = new CpuVM(RYUKO_CPU, CPU_LEVEL, seed);
     this.calls = intro;
-    if (!intro) return;
-    // Authored start: both walk-ins end 360 pixels apart around the stage center.
-    this.fighters = [
-      fighter(STAGE_WIDTH / 2 - 180 - INTRO_WALK, 1),
-      fighter(STAGE_WIDTH / 2 + 180 + INTRO_WALK, -1),
-    ];
-    for (const f of this.fighters) f.action = 'intro';
+    if (intro) this.fighters = introFighters();
+  }
+
+  // State 902 (0x40970a) ends a Vs. match once either side has won enough
+  // rounds; a single round otherwise.
+  get matchOver() {
+    return !this.calls || this.wins.some((wins) => wins >= ROUNDS_TO_WIN);
+  }
+
+  get matchWinner() {
+    if (!this.calls) return this.winner;
+    const [a, b] = this.wins.map((wins) => wins >= ROUNDS_TO_WIN);
+    return a && b ? 'draw' : a ? 'player' : b ? 'opponent' : null;
+  }
+
+  // Ticks after the KO until the transition to another round, or the match's
+  // end: authored, the port ends where the source wipes to its post-match
+  // screen, and a single round after the KO lettering and one more second.
+  get roundEnd() {
+    if (!this.calls) return ROUND_END_TICKS;
+    const winner = this.fighters[this.winner === 'player' ? 0 : 1];
+    return roundEndTick(this.winner, winner.hp === LIFE);
+  }
+
+  // State 100 (0x408970) counts the round and sets it up again: the fighters
+  // re-enter at full life (0x411ca5) with their variables cleared
+  // (0x4121cc), keeping their stock and power from round 2 (0x411f2d).
+  private nextRound() {
+    const fighters = introFighters();
+    fighters.forEach((f, i) => {
+      f.stock = this.fighters[i].stock;
+      f.power = this.fighters[i].power;
+    });
+    this.fighters = fighters;
+    this.round++;
+    this.ticks = 0;
+    this.winner = null;
+    this.endingTicks = 0;
+    this.roundTicks = 0;
+    this.projectiles = [];
+    this.effects = [];
+    this.freeze = 0;
+    this.koStop = 0;
+    this.quake.x = this.quake.y = null;
+    this.camera = null;
+    this.clearInput();
   }
 
   clearInput() {
@@ -1274,7 +1330,8 @@ export class Match {
     // or lie KO'd, as moves now run on past the round's end.
     return (
       this.winner !== null &&
-      this.endingTicks >= ROUND_END_TICKS &&
+      this.matchOver &&
+      this.endingTicks >= this.roundEnd &&
       this.fighters.every((f) => ['win', 'draw', 'koLand'].includes(f.action))
     );
   }
@@ -2670,6 +2727,12 @@ export class Match {
     // after the fighters (0x50) and their axes and missiles (op 0x04 flag 1,
     // one in front), so it moves after they have read it.
     if (this.freeze > 0) this.freeze--;
+    if (
+      this.winner &&
+      !this.matchOver &&
+      this.endingTicks >= this.roundEnd + NEXT_ROUND_TICKS
+    )
+      this.nextRound();
   }
 
   private run(player: Input, opponent?: Input) {
@@ -3100,9 +3163,14 @@ export class Match {
     }
     for (const fire of objectHits) fire();
     this.resolveThrows(frozen);
-    if (!this.winner && (a.hp === 0 || b.hp === 0 || this.seconds === 0))
+    if (!this.winner && (a.hp === 0 || b.hp === 0 || this.seconds === 0)) {
       this.winner =
         a.hp === b.hp ? 'draw' : a.hp > b.hp ? 'player' : 'opponent';
+      // The result states credit the winner (0x40948a, 0x40955f), and a
+      // draw or double KO both (0x409394, 0x40966b).
+      if (this.winner !== 'opponent') this.wins[0]++;
+      if (this.winner !== 'player') this.wins[1]++;
+    }
   }
 }
 

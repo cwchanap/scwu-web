@@ -32,6 +32,7 @@
     damage: 0,
     action: 'idle',
     winner: null,
+    matchWinner: null,
     resultReady: false,
     error: '',
   });
@@ -101,6 +102,12 @@
     if (help && status.ready && !status.paused && !status.resultReady)
       session?.scene.togglePause();
   }
+  const sayWinner = (winner: GameStatus['winner']) =>
+    winner === 'draw'
+      ? 'Draw.'
+      : winner === 'player'
+        ? 'Player 1 wins.'
+        : 'Player 2 wins.';
   function press(event: PointerEvent, control: Control) {
     if (!status.ready || status.paused || status.winner) return;
     event.preventDefault();
@@ -206,19 +213,18 @@
       {/if}
       <div class="sr-only" aria-live="polite">
         {#if status.winner}{status.seconds === 0 ? 'Time up.' : 'KO.'}
-          {status.winner === 'draw'
-            ? 'Draw.'
-            : status.winner === 'player'
-              ? 'Player 1 wins.'
-              : 'Player 2 wins.'}{/if}
+          {sayWinner(status.winner)}
+          {#if status.matchWinner}Match over: {sayWinner(
+              status.matchWinner,
+            )}{/if}{/if}
       </div>
     </div>
     <div class="match-footer">
       {#if status.resultReady}
         <strong class="result-label"
-          >{status.winner === 'draw'
+          >{status.matchWinner === 'draw'
             ? 'DRAW GAME'
-            : status.winner === 'player'
+            : status.matchWinner === 'player'
               ? '1P WIN'
               : '2P WIN'}</strong
         >

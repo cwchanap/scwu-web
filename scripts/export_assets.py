@@ -436,16 +436,21 @@ def export_sounds(c, prefix, indices):
 def kgt_timeline(p, action):
     """A KGT lettering's displays, following op 0x0a jumps until op 0x05 or its end: each
     with the op 0x23 blit mode in force and the op 0x03 sounds just before it, and the
-    header's r[1:3], the wait the round manager counts for it (0x4068e0)."""
+    header's r[1:3], the wait the round manager counts for it (0x4068e0). A jump
+    back to a record already run ends it, with `loop` the frame it repeats from."""
     current, pc = action, p.action(action).start
-    frames, sounds, mode = [], [], 0
+    frames, sounds, mode, seen, loop = [], [], 0, {}, None
     for _ in range(1000):
         if pc >= p.action(current).end or p.records[pc][0] == 0x05:
             break
+        seen.setdefault(pc, len(frames))
         record = p.records[pc]
         if record[0] == 0x0a and u16(record, 1):
             current = u16(record, 1)
             pc = p.action(current).start + record[3]
+            if pc in seen:
+                loop = seen[pc]
+                break
             continue
         if record[0] == 0x03:
             sounds.append(u16(record, 2))
@@ -457,7 +462,8 @@ def kgt_timeline(p, action):
             frames.append(dict(frame, sounds=sounds) if sounds else frame)
             sounds = []
         pc += 1
-    return dict(wait=u16(p.records[p.action(action).start], 1), frames=frames)
+    timeline = dict(wait=u16(p.records[p.action(action).start], 1), frames=frames)
+    return timeline if loop is None else dict(timeline, loop=loop)
 
 
 def export_ui():
@@ -469,12 +475,19 @@ def export_ui():
     p = Program(c)
     # The letterings the round manager spawns (0x408c80-0x408e03, 0x409444): the
     # round-start animation's logo wipe (13 spawns 115 on Vs. CPU's path, PC 94),
-    # 'DRESS 1' (15, jumping to R1, 90), 'SHOW TIME' (25) and the KO lettering
-    # (26), which YOU WIN, YOU LOSE, DRAW and DOUBLE KO (28, 29, 32, 33) repeat.
+    # rounds 1-5's 'DRESS 1'-'DRESS 5' (the word at 0x4451c4 + round x 2,
+    # 0x408d70: 15-19), 'SHOW TIME' (25) and the KO lettering (26), which YOU
+    # WIN, YOU LOSE, DRAW and DOUBLE KO (28, 29, 32, 33) repeat. Between rounds
+    # (state 900, 0x4096c0) KGT 14 counts its 50 ticks while its 116 (PC 103)
+    # wipes the logo back in and holds it. The result states wait out 1P/2P WIN
+    # (30, 31), PERFECT (27) and DRAW/DOUBLE KO (32, 33), which show nothing
+    # or jump to 26.
+    wait = lambda action: u16(p.records[p.action(action).start], 1)
     ko = kgt_timeline(p, 26)
-    calls = dict(start=u16(p.records[p.action(13).start], 1), logo=kgt_timeline(p, 115),
-                 dress=kgt_timeline(p, 15), fight=kgt_timeline(p, 25))
-    timelines = [ko, *(t for t in calls.values() if isinstance(t, dict))]
+    calls = dict(start=wait(13), logo=kgt_timeline(p, 115), rounds=[kgt_timeline(p, 15 + i) for i in range(5)],
+                 fight=kgt_timeline(p, 25), transition=dict(kgt_timeline(p, 116), wait=wait(14)),
+                 results=dict(win=wait(30), perfect=wait(27), draw=wait(32)))
+    timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"]]
     sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])})
     # 17–20: stock digits EMPTY/100/200/300; 31–38: gauge shimmer; 135: UNDER PW.
     ids = {17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
