@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import { BLACK } from './animations';
 import { ATTACKS, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
@@ -42,7 +43,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('zoma')[id]]] : [],
     );
-    expect(paired).toHaveLength(53);
+    expect(paired).toHaveLength(55);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
@@ -274,10 +275,11 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(ryuko.action).toBe('chuckToss');
     for (let t = 0; t < 40 && !match.effects.some((e) => e.clip === 202); t++)
       steps({});
-    // PC 2815 throws TOMAHU (202).
+    // PC 2815 throws TOMAHU (202), which catches the toss with response
+    // 32 (Ryuko's 85) for 20.
     expect(match.effects.some((e) => e.clip === 202)).toBe(true);
-    for (let t = 0; t < 100 && ryuko.y < 0; t++) steps({});
-    expect(ryuko.action).toBe('knockdown');
+    for (let t = 0; t < 100 && ryuko.action !== 'twist'; t++) steps({});
+    expect(ryuko).toMatchObject({ action: 'twist', hp: 490 });
   });
 
   it('counters a guard with Hit Up for a stock: COUNTER HIT (174)', () => {
@@ -397,5 +399,107 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(zoma.branch).toBe(229);
     steps({}, 60);
     expect(zoma.variables[0]).toBe(0);
+  });
+
+  it('shouts NO SUPER (233) for a super without stock (op 0x10)', () => {
+    const { zoma, steps } = zomaPlayer(200);
+    steps({}, 2);
+    steps({ getterBeam: true });
+    expect(zoma).toMatchObject({ action: 'script', branch: 233 });
+  });
+
+  it('dashes through with SPAKE on ↓→↓→ P for a stock, under his own panel', () => {
+    const { match, zoma, ryuko, steps } = zomaPlayer(300);
+    zoma.stock = 1;
+    steps({}, 2);
+    for (let k = 0; k < 2; k++)
+      for (const input of [{ crouch: true }, { right: true }]) steps(input, 2);
+    steps({ punch: true });
+    // Op 0x10 at PC (239) takes the stock; variable 14 darkens the stage.
+    expect(zoma).toMatchObject({ branch: 239, stock: 0, darken: 100 });
+    expect(match.freeze).toBeGreaterThan(0);
+    steps({});
+    expect(zoma.black.shown).toBe('opaque');
+    expect(BLACK.zoma.opaque.image).toBe(1009);
+    for (let t = 0; t < 120 && ryuko.hp === 510; t++) steps({});
+    // The dash's object (242) strikes with response 43 for 84.
+    expect(ryuko).toMatchObject({ action: 'fly', hp: 426 });
+  });
+
+  it('grabs with DST, then juggles and finishes the tossed victim', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(90);
+    zoma.stock = 1;
+    steps({}, 2);
+    steps({ musashi: true });
+    expect(zoma.branch).toBe(251);
+    for (let t = 0; t < 80 && ryuko.action !== 'superHeld'; t++) steps({});
+    // The kind 8 box (PC 3500) catches with response 30; slot 2 enters 253.
+    expect(zoma.branch).toBe(253);
+    const seen = new Set<string>();
+    for (let t = 0; t < 500 && ryuko.action !== 'getUp'; t++) {
+      steps({});
+      seen.add(ryuko.action);
+    }
+    // Response 31 tosses; ops 0x14 re-place the struck victim (+0xdef9)
+    // through 21s and 60, whose stun the last box's 120 replaces at once,
+    // sending it flying.
+    expect([...seen]).toEqual([
+      'superHeld',
+      'dstToss',
+      'airHitRapid',
+      'fly',
+      'knockdown',
+    ]);
+    expect(ryuko.hp).toBe(390);
+  });
+
+  it('cancels DRAGON into DST for two stocks (variable 6, 236 + 9)', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(90);
+    zoma.stock = 3;
+    steps({}, 2);
+    steps({ drill: true });
+    for (let t = 0; t < 20 && ryuko.action !== 'uppercut'; t++) steps({});
+    // DRAGON's window (PC 2896) passes levels 40–41 once it has connected.
+    steps({ musashi: true });
+    expect(zoma).toMatchObject({ branch: '236+9', stock: 1 });
+  });
+
+  it('needs three stocks for EN300, whose sun ball stuns', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(300);
+    zoma.stock = 2;
+    steps({}, 2);
+    steps({ changeAttack: true });
+    expect(zoma.branch).toBe(233);
+    // The refused command stays in its 50-tick window, so it shouts again
+    // once the first NO SUPER ends.
+    steps({}, 110);
+    expect(zoma.action).toBe('idle');
+    zoma.stock = 3;
+    steps({ changeAttack: true });
+    expect(zoma).toMatchObject({ branch: 265, stock: 0 });
+    const seen = new Set<string>();
+    for (let t = 0; t < 700 && zoma.action === 'script'; t++) {
+      steps({});
+      seen.add(ryuko.action);
+    }
+    // Its burst (273) alternates responses 51 and 59 (Ryuko's 108).
+    expect(seen).toContain('hitRapid');
+    expect(seen).toContain('stun');
+  });
+
+  it('turns Shin Spark into BOMB at 147 life or more (op 0x11)', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(200);
+    zoma.stock = 3;
+    steps({}, 2);
+    steps({ blackRush: true });
+    expect(zoma.branch).toBe(222);
+    steps({}, 120);
+    zoma.hp = 146;
+    zoma.stock = 3;
+    steps({ blackRush: true });
+    expect(zoma).toMatchObject({ branch: 279, stock: 0 });
+    for (let t = 0; t < 100 && ryuko.hp === 510; t++) steps({});
+    // Its dash strikes with response 32 (Ryuko's 85).
+    expect(ryuko.action).toBe('twist');
   });
 });

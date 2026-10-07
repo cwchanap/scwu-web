@@ -214,8 +214,15 @@ describe('selected core animation assets', () => {
     ).toEqual([24, 304, 305, 306, 306, 24, 31]);
     expect(eventsAt(264, 0)).toEqual(
       expect.arrayContaining([
-        { t: 0, op: 'stock', target: 251, min: 0, add: -1 },
-        { t: 0, op: 'life', target: 278, below: true, value: 153 },
+        { t: 0, op: 'stock', target: 251, offset: 0, min: 0, add: -1 },
+        {
+          t: 0,
+          op: 'life',
+          target: 278,
+          offset: 0,
+          below: true,
+          value: 153,
+        },
         { t: 0, op: 'stop', self: 0, other: 10 },
       ]),
     );
@@ -223,6 +230,7 @@ describe('selected core animation assets', () => {
       t: 0,
       op: 'stock',
       target: 251,
+      offset: 0,
       min: 2,
       add: -3,
     });

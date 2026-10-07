@@ -20,18 +20,8 @@ export interface CommandEntry {
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25) and the
 // distance in source pixels that splits their near and far actions (+0x7ca3).
-// ponytail: Zoma's supers (entries 1-4) come later, so they enter nothing
-// yet; matching one still clears the history as below.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
-  {
-    ryuko: data.commands,
-    zoma: {
-      ...zoma.commands,
-      entries: zoma.commands.entries.map((entry, index) =>
-        index < 4 ? { ...entry, air: 0, near: 0, far: 0, crouch: 0 } : entry,
-      ),
-    },
-  };
+  { ryuko: data.commands, zoma: zoma.commands };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
 export const ENTRIES = entriesOf('ryuko');
@@ -79,11 +69,16 @@ const RYUKO_KEYS: [Control, number][] = [
   // Shift: DASH F, or DASH B (14) while back is held (Match.record).
   ['dash', 13],
 ];
-// Zoma's specials take Ryuko's special keys: DRAGON (6), dragon 2 p (9),
-// BOMB (11), FIRE (10) and g beam (5), then DASH F (15) and DASH B (16).
+// Zoma's moves take Ryuko's keys: SPAKE (3), DST (1), EN300 (4) and his
+// 'コマンド 1', Shin Spark (2), on 1-4, DRAGON (6), dragon 2 p (9), BOMB
+// (11), FIRE (10) and g beam (5), then DASH F (15) and DASH B (16).
 export const KEYS: Record<Who, [Control, number][]> = {
   ryuko: RYUKO_KEYS,
   zoma: [
+    ['getterBeam', 3],
+    ['musashi', 1],
+    ['changeAttack', 4],
+    ['blackRush', 2],
     ['drill', 6],
     ['iori', 9],
     ['dst', 11],

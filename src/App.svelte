@@ -70,6 +70,10 @@
   const supers = new Set<Control>(SUPER_CONTROLS);
   // Zoma's specials take Ryuko's special keys (commands.ts).
   const zomaLabels: Partial<Record<Control, string>> = {
+    getterBeam: 'Spake',
+    musashi: 'DST',
+    changeAttack: 'EN300',
+    blackRush: 'Shin Spark',
     drill: 'Dragon',
     axe: 'Fire',
     iori: 'Dragon 2',
@@ -342,7 +346,7 @@
     </div>
   </section>
   <div class="touch-controls" aria-label="Touch controls">
-    {#each touchControls as item (item.control)}
+    {#each touchControls.filter((item) => fighter === 'ryuko' || item.control !== 'megaBeam') as item (item.control)}
       <button
         class:attack-control={[
           'punch',
@@ -389,7 +393,7 @@
       ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
     ><span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span><span
       ><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-    ><span><kbd>1</kbd>–<kbd>5</kbd> Supers</span>
+    ><span><kbd>1</kbd>–<kbd>{fighter === 'zoma' ? 4 : 5}</kbd> Supers</span>
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -513,7 +517,14 @@
           striking from ahead (↓← <kbd>K</kbd> farther, ↓← <kbd>J</kbd> +
           <kbd>K</kbd> in place), <kbd>G</kbd> or ↓→ <kbd>K</kbd> BOMB, three
           bombs falling on marks ahead (five, then he reloads), and <kbd>E</kbd>
-          or ↓→↓→ <kbd>K</kbd> G Beam. His supers come later.
+          or ↓→↓→ <kbd>K</kbd> G Beam. His supers spend stock: <kbd>1</kbd> or
+          ↓→↓→ <kbd>J</kbd> SPAKE, a charging dash (also in the air),
+          <kbd>2</kbd> or →↓←→↓← <kbd>J</kbd> DST, a close command grab that
+          tosses, juggles and blasts the opponent, <kbd>3</kbd> or ↓←↓←
+          <kbd>K</kbd>
+          EN300 for three stocks, and <kbd>4</kbd> or ↓←↓→ <kbd>K</kbd> Shin Spark,
+          three stocks below 30% health (BOMB otherwise). After DRAGON connects, SPAKE
+          or DST cancels it for two stocks.
         </p>
         <p>
           Free practice has no timer. Below the arena, choose your fighter and

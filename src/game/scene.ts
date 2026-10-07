@@ -526,12 +526,10 @@ export class TrainingScene extends Phaser.Scene {
         const { shown } = f.black;
         if (shown === 'none') this.blacks[i].setVisible(false);
         else
-          // ponytail: Ryuko's panel (image 294); a Zoma super would show his
-          // own action 40's, which comes with his supers.
           this.place(
             this.blacks[i],
-            'ryuko',
-            BLACK[shown],
+            f.who,
+            BLACK[f.who][shown],
             327 * ART_SCALE,
             498 * ART_SCALE,
             1,

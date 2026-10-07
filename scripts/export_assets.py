@@ -50,10 +50,11 @@ def decode_event(record):
                     y=s16(record, 10), slot=record[12], z=record[13], busy=u16(record, 5), busyOffset=record[7])
     if op == 0x07:  # place the held opponent in a pose from the held-pose table
         return dict(op="hold", flags=record[1], pose=u16(record, 2), x=s16(record, 4), y=s16(record, 6))
-    if op == 0x10:  # stock check: stock <= min enters target (NO SUPER); otherwise stock += add
-        return dict(op="stock", target=u16(record, 2), min=record[6], add=s16(record, 7))
-    if op == 0x11:  # life check: bit 0 of r[5] jumps at or below the value, otherwise at or above
-        return dict(op="life", target=u16(record, 2), below=bool(record[5] & 1), value=u16(record, 6))
+    if op == 0x10:  # stock check (0x413500): stock <= min jumps to target + r[4] (NO SUPER); otherwise stock += add
+        return dict(op="stock", target=u16(record, 2), offset=record[4], min=record[6], add=s16(record, 7))
+    if op == 0x11:  # life check (0x413164): bit 0 of r[5] jumps at or below the value, otherwise at or above
+        return dict(op="life", target=u16(record, 2), offset=record[4], below=bool(record[5] & 1),
+                    value=u16(record, 6))
     if op == 0x14:  # apply a response to the held opponent at an offset
         return dict(op="apply", flags=record[1], response=u16(record, 2), x=s16(record, 4), y=s16(record, 6))
     if op == 0x15:  # life and power changes, in the source's 510-life units
@@ -112,7 +113,7 @@ def decode_event(record):
 
 
 # The events a display carries: those its clip or timeline runs just before it.
-POSE_EVENTS = ("sound", "spawn", "screen", "trail", "variable")
+POSE_EVENTS = ("sound", "spawn", "screen", "trail", "variable", "window")
 
 
 def color_state(record):
@@ -317,7 +318,7 @@ def pose_clips(p, c, actions, image_ids):
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1f, 0x25) and pc >= action.start + offset:
+            elif p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1e, 0x1f, 0x25) and pc >= action.start + offset:
                 event = decode_event(p.records[pc])
                 if event and event["op"] in POSE_EVENTS:
                     events.append(event)
@@ -356,6 +357,8 @@ def flatten_queue(p, c, queue, played, image_ids):
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "call":
                 queue.append((event["action"], 0))
+            if event["op"] in ("stock", "life") and event["target"]:
+                queue.append((event["target"], event["offset"]))
     return {f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())}
 
 
@@ -466,7 +469,7 @@ def export_zoma(ryuko):
         "hitRapid": (83, 84), "airHitRapid": (84, 85), "rushAirHit": (122, 123),
         "fly": (97, 98), "flySpin": (98, 99), "shock": (88, 90), "shockLoop": (90, 91),
         "fb": (110, 111), "fbb": (111, 112), "fbh": (112, 113), "chuckToss": (132, 133),
-        "uppercut": (96, 97),
+        "uppercut": (96, 97), "stun": (108, 109), "airStun": (109, 110),
     }
     # Twins that differ, beyond their numbering and layout:
     differ = {
@@ -483,7 +486,7 @@ def export_zoma(ryuko):
         # for landing (1205 ticks, not 0).
         "knockdown", "bounceDown", "shock", "ko", "down",
         # Display lengths after the reaction's motion commands.
-        "dstTossSpin2", "airHitRapid", "rushAirHit", "shockLoop",
+        "dstTossSpin2", "airHitRapid", "rushAirHit", "shockLoop", "airStun",
         # Ryuko's deletes objects 7-9 and rolls whether to skip its sound.
         "chuckToss",
         # Ryuko's also deletes object 7, and rolls rand % 6 > 2 to his rand % 3 > 1.
@@ -495,25 +498,27 @@ def export_zoma(ryuko):
     # As in Ryuko's export, these play from their timelines (or only open
     # one), not as clips, so flattening follows their jumps.
     timelines = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
-                 "fb", "fbb", "fbh"}
+                 "fb", "fbb", "fbh", "stun", "airStun"}
     actions = dict(neutral, **{name: z for name, (_, z) in twins.items() if name not in timelines},
                    # Results: WIN and the draw call DEMO STAND once (PCs 542, 630).
-                   win=56, winStand=41, draw=63)
+                   win=56, winStand=41, draw=63,
+                   # His super darkening panel, image 1009 (action 40).
+                   black=40)
     # 2001: the HUD face action 71 shows; 340: the name *name (64) shows.
     image_ids = {2001, 340}
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
     # His moves play from their timelines: the actions of command entries
-    # 5-20 (g beam to K; the supers before them come later), each with its
-    # level (header r[2]), which a cancel window compares.
-    entries = tables["commands"]["entries"][4:20]
+    # 1-20 (DST to K), each with its level (header r[2]), which a cancel
+    # window compares.
+    entries = tables["commands"]["entries"][:20]
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
     # match plays, the lose action (57) that opens every KO, every response's
     # hit effect and every object the clips spawn; his moves, COUNTER HIT
     # (174) and the guard reactions whose op 0x24 enters it.
-    queue = [(i, 0) for i in [75, 76, 77, 78, 81, 84, 85, 90, 97, 98, 123, 153, 158, 167, 172, 57,
+    queue = [(i, 0) for i in [75, 76, 77, 78, 81, 84, 85, 90, 97, 98, 109, 110, 123, 153, 158, 167, 172, 57,
                               *filter(None, tables["response_effects"]), *moves, 174,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
@@ -594,7 +599,7 @@ def main():
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 174, 222, 231, 250, 251, 253, 256, 260, 263, 264,
              265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-             74, 75, 76, 80, 96, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"])]]
+             74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"])]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))

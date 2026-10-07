@@ -421,6 +421,9 @@ const launchMotion: Partial<
   launchUp: { tick: 25, vx: -160, vy: -1700, gravity: 60, land: 'knockdown' },
   // Response 42 (Zoma's DRAGON) → action 96 (PC 1163), landing into 146.
   uppercut: { tick: 5, vx: -200, vy: -1620, gravity: 70, land: 'knockdown' },
+  // Response 60 (Zoma's DST) → action 109: nine ticks of shaking, then PC
+  // 1434 drops it into 146 (PC 1433).
+  airStun: { tick: 9, vx: 0, vy: -830, gravity: 80, land: 'knockdown' },
   launchAway: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
   // A chuck's response 41 → action 132 (PC 1793), landing into 146 (PC 1792).
   chuckToss: { tick: 6, vx: -600, vy: -1920, gravity: 90, land: 'knockdown' },
@@ -521,9 +524,11 @@ for (const action of [
   'uppercut',
 ] as const)
   REACTION_POWER[action] = [5, 3];
-// Action 135 credits only the victim, as does 132 (PC 1783).
+// Action 135 credits only the victim, as do 132 (PC 1783) and 108–109 (PCs
+// 1400, 1421).
 REACTION_POWER.drillDown = [5, 0];
 REACTION_POWER.chuckToss = [8, 0];
+REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929).
 const reactionPower = (f: Fighter): [number, number] => {
   const [victim, attacker] = REACTION_POWER[f.action] ?? [0, 0];
@@ -611,6 +616,11 @@ const RESPONSE_REACTIONS: Record<
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
   96: { action: 'uppercut', stop: 13 },
+  // Ryuko's missiles enter 85 by hand; Zoma's hatchets and Shin Spark reach
+  // it through response 32 (PC 1000: 13 stop ticks).
+  85: { action: 'twist', stop: 13 },
+  108: { action: 'stun', stop: 0 },
+  109: { action: 'airStun', stop: 0 },
   // PC 932: ten ticks for the victim, 33 for the attacker.
   81: { action: 'launchUp', stop: 10, attackerStop: 33 },
   83: { action: 'hitRapid', stop: 0 },
@@ -732,10 +742,12 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
-// 1159, 1619, 1787): 75, 76, 80, 96 and 132 only skip a sound, while 83, 84
-// and 122 swap their first three poses.
+// 1159, 1403, 1425, 1619, 1787): 75, 76, 80, 96 and 132 only skip a sound,
+// while 83, 84, 108, 109 and 122 swap their first three poses.
 const ROLLED: Partial<Record<Action, number>> = {
   uppercut: 96,
+  stun: 108,
+  airStun: 109,
   hitHeavy: 75,
   airHitHeavy: 76,
   launchAway: 80,
@@ -868,6 +880,7 @@ const reactions = new Set<Action>([
   'jumpHit',
   'hitPull',
   'shock',
+  'stun',
   ...blocks,
 ]);
 export interface Fighter {
@@ -1502,9 +1515,8 @@ export class Match {
     f.responses = [];
     // 0x40e510 clears the handlers.
     f.onHit = f.onGuard = f.onLand = 0;
-    // A source action's own op 0x23 sets its colour. ponytail: the window a
-    // clip action's script would set isn't read (reactions clear it, J Lend
-    // passes only level 1, which nothing has).
+    // A source action's own op 0x23 sets its colour, and a clip action's op
+    // 0x1e its window as its display starts (enter).
     if (action !== 'script') {
       f.color = entryColor(action, f.who) ?? f.color;
       f.window = null;
@@ -2041,7 +2053,12 @@ export class Match {
         break;
       case 'apply': {
         const reaction = RESPONSE_REACTIONS[victimOf(other, event.response)];
-        if (!reaction || !this.catchHeld(other)) break;
+        // Op 0x14 (0x413057) reaches whoever this player's box last struck
+        // (+0xdef9, 0x40f2e0), held or not: DST juggles its tossed victim.
+        const caught =
+          this.catchHeld(other) ||
+          (other.striker !== null && other.hp > 0 && markHeld(other));
+        if (!reaction || !caught) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         this.action(other, reaction.action, true);
@@ -2082,6 +2099,25 @@ export class Match {
       case 'add':
         self.variables[event.index] =
           (self.variables[event.index] ?? 0) + event.value;
+        break;
+      // Ops 0x10 and 0x11 (0x413500, 0x413164) jump to their target on too
+      // little stock, which otherwise pays the super, or past a life
+      // threshold. Ryuko's resolve on entry (startSuper).
+      case 'stock':
+        if ('clip' in actor || actor.action !== 'script') break;
+        if (self.stock <= event.min)
+          return this.branchTo(actor, sourceKey(event.target, event.offset));
+        self.stock = Math.max(0, Math.min(MAX_STOCK, self.stock + event.add));
+        if (self.stock === MAX_STOCK) self.power = 0;
+        break;
+      case 'life':
+        if (
+          !('clip' in actor) &&
+          actor.action === 'script' &&
+          event.target &&
+          (event.below ? self.hp <= event.value : self.hp >= event.value)
+        )
+          return this.branchTo(actor, sourceKey(event.target, event.offset));
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the

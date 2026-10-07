@@ -150,6 +150,8 @@ export const POSE_EVENTS = [
   'screen',
   'trail',
   'variable',
+  // A clip action's op 0x1e window, which Zoma's stand (20) opens.
+  'window',
 ] as const;
 export type PoseEvent = Extract<
   SourceEvent,
@@ -201,8 +203,14 @@ export type SourceEvent =
       busyOffset: number;
     }
   | { op: 'hold'; flags: number; pose: number; x: number; y: number }
-  | { op: 'stock'; target: number; min: number; add: number }
-  | { op: 'life'; target: number; below: boolean; value: number }
+  | { op: 'stock'; target: number; offset: number; min: number; add: number }
+  | {
+      op: 'life';
+      target: number;
+      offset: number;
+      below: boolean;
+      value: number;
+    }
   | { op: 'apply'; flags: number; response: number; x: number; y: number }
   | {
       op: 'power';
@@ -413,6 +421,10 @@ export const animations = {
   chuckToss: clip(clips.chuckToss, false, [2, 2, 2, 25, 1]),
   // Response 42 (Zoma's DRAGON) → action 96, waiting for its landing.
   uppercut: clip(clips.uppercut, false, [5, 30, 10, 1]),
+  // Responses 59 and 60 (Zoma's EN300 and DST) → actions 108 and 109, whose
+  // op 0x20 reorders their shaking (+17, +18).
+  stun: scriptClip(108),
+  airStun: scriptClip(109),
   kick3: clip([
     ...clips.kick3.slice(0, 3),
     ...Array.from({ length: 8 }, () => clips.kick3Repeat).flat(),
@@ -637,6 +649,8 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
   sweep: clip(z.sweep, false, waits(z.sweep)),
   chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
   uppercut: clip(z.uppercut, false, waits(z.uppercut)),
+  stun: scriptClip(109, 'zoma'),
+  airStun: scriptClip(110, 'zoma'),
   dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
   tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
   twist: clip([z.twist[0], ...z.twisting], 1),
@@ -686,8 +700,12 @@ function bodies(action: Shown, age: number, who: Who): BodyBox[] {
   return clipPose(action, age, who).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
-// (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436).
-export const BLACK = { opaque: clips.black[1], half: clips.black[2] };
+// (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436);
+// Zoma's action 40 shows his image 1009 alike.
+export const BLACK: Record<Who, { opaque: Pose; half: Pose }> = {
+  ryuko: { opaque: clips.black[1], half: clips.black[2] },
+  zoma: { opaque: zomaClips.black[1], half: zomaClips.black[2] },
+};
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
 export const entryColor = (action: Shown, who: Who = 'ryuko') =>
