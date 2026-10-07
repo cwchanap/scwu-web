@@ -14,16 +14,6 @@ export const DUMMY_BEHAVIORS = [
   'cpu',
 ] as const;
 export type DummyBehavior = (typeof DUMMY_BEHAVIORS)[number];
-// Authored: Zoma's partner attacks with his own punch and air kick, timed by
-// Ryuko's reach; his CPU table comes later.
-export const ZOMA_BEHAVIORS: readonly DummyBehavior[] = [
-  'stand',
-  'guard',
-  'crouchGuard',
-  'airGuard',
-  'attack',
-  'jumpIn',
-];
 
 // Presses alternate with releases so that each one is fresh.
 const press = (tick: number) => tick % 2 === 0;
@@ -50,6 +40,7 @@ export function dummyInput(
       return { guard: true, crouch: true };
     case 'airGuard':
       return grounded(self) ? { jump: press(tick) } : { guard: true };
+    // Zoma attacks with his own punch and air kick, timed by Ryuko's reach.
     case 'attack':
       return {
         punch:

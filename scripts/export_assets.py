@@ -503,15 +503,18 @@ def export_zoma(ryuko):
                    # Results: WIN and the draw call DEMO STAND once (PCs 542, 630).
                    win=56, winStand=41, draw=63,
                    # His super darkening panel, image 1009 (action 40).
-                   black=40)
+                   black=40,
+                   # The Vs. intro: 28 jumps to 30 + 3 (PCs 265, 301), which
+                   # jumps to Start N (31) + 2 (PC 306), as Ryuko's 30 to 33 + 4.
+                   intro=(31, 2))
     # 2001: the HUD face action 71 shows; 340: the name *name (64) shows.
     image_ids = {2001, 340}
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
-    # His moves play from their timelines: the actions of command entries
-    # 1-20 (DST to K), each with its level (header r[2]), which a cancel
-    # window compares.
-    entries = tables["commands"]["entries"][:20]
+    # His moves play from their timelines: the actions of his command entries
+    # (DST to K, and the CPU's dashes 22-24), each with its level (header
+    # r[2]), which a cancel window compares.
+    entries = tables["commands"]["entries"]
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the

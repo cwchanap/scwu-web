@@ -1,8 +1,20 @@
 import { describe, expect, it } from 'vitest';
-import { CpuVM, RYUKO_CPU } from './cpu';
+import { CPU_CONTROLS, CPU_TABLES, CpuVM, RYUKO_CPU } from './cpu';
 import type { CpuEntry, CpuStep } from './cpu';
 
 describe('recovered CPU table', () => {
+  it("exports Zoma's 44 used entries", () => {
+    expect(CPU_TABLES.zoma).toHaveLength(44);
+    // Entry 40: 'cpu dash j' (command 24) from 400 to 640 source pixels.
+    expect(CPU_TABLES.zoma[39]).toEqual({
+      flags: 0,
+      probability: 40,
+      min: 400,
+      max: 640,
+      steps: [{ direction: 0, command: 24, duration: 1 }],
+    });
+  });
+
   it("exports Ryuko's 43 used entries", () => {
     expect(RYUKO_CPU).toHaveLength(43);
     // 登録1: walk forward for 20 ticks, 10%, 0–1400 source pixels.
@@ -136,7 +148,16 @@ describe('CPU decision and playback', () => {
     expect(command(14)).toEqual({ dash: true, left: true });
     expect(command(22)).toEqual({ cpuIori: true });
     expect(command(15)).toEqual({ ex: true });
-    expect(command(16)).toEqual({});
+    // Ryuko's table never uses 16, which has no key: it goes to the match.
+    expect(command(16)).toEqual({ command: 16 });
+  });
+
+  it("writes Zoma's commands, with the step's direction held", () => {
+    const vm = new CpuVM([entry([step(4, 19)])], 100, 0, CPU_CONTROLS.zoma);
+    expect(run(vm, 2)).toEqual([
+      { crouch: true, command: 19 },
+      { crouch: true, command: 19 },
+    ]);
   });
 
   it('stays off at level 0 without drawing', () => {

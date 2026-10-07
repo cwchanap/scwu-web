@@ -179,10 +179,15 @@ export function scan(
 
 // 0x4115e3–0x41166a: the CPU enters a command by writing its marked steps
 // into its history, the last at this tick, each as its direction's bits from
-// 0x41f138 plus its buttons.
-export function inject(history: number[], entry: number, who: Who = 'ryuko') {
+// 0x41f138 plus its buttons, and `direction`'s bits.
+export function inject(
+  history: number[],
+  entry: number,
+  who: Who = 'ryuko',
+  direction = 0,
+) {
   const words = entriesOf(who)
     [entry - 1].steps.filter((step) => step & 0x2000)
-    .map((step) => DIRECTIONS[step & 15] | (step & 0x3f0));
+    .map((step) => DIRECTIONS[step & 15] | (step & 0x3f0) | direction);
   history.splice(history.length - words.length, words.length, ...words);
 }

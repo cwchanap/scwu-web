@@ -3,7 +3,7 @@
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Who } from './game/characters';
-  import { DUMMY_BEHAVIORS, ZOMA_BEHAVIORS } from './game/dummy';
+  import { DUMMY_BEHAVIORS } from './game/dummy';
   import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
 
@@ -17,9 +17,6 @@
   });
   let fighter = $state<Who>('ryuko');
   let opponent = $state<Who>('zoma');
-  const partners = $derived(
-    opponent === 'zoma' ? ZOMA_BEHAVIORS : DUMMY_BEHAVIORS,
-  );
   const partnerLabels: Record<DummyBehavior, string> = {
     stand: 'Stand',
     guard: 'Guard',
@@ -121,7 +118,6 @@
   }
   function setOpponent(who: Who) {
     opponent = who;
-    if (!partners.includes(practice.partner)) setPractice({ partner: 'stand' });
     session?.scene.setOpponent(who);
     focusArena();
   }
@@ -266,35 +262,30 @@
           <strong>{status.damage}</strong> DAMAGE</span
         >
       {/if}
-      {#if mode === 'practice'}
-        <div
-          class="practice-options"
-          role="group"
-          aria-label="Practice settings"
+      <div class="practice-options" role="group" aria-label="Match settings">
+        <label
+          >Fighter
+          <select
+            value={fighter}
+            disabled={!status.ready}
+            onchange={(event) => setFighter(event.currentTarget.value as Who)}
+          >
+            <option value="ryuko">Ryuko</option>
+            <option value="zoma">Zoma</option>
+          </select></label
         >
-          <label
-            >Fighter
-            <select
-              value={fighter}
-              disabled={!status.ready}
-              onchange={(event) => setFighter(event.currentTarget.value as Who)}
-            >
-              <option value="ryuko">Ryuko</option>
-              <option value="zoma">Zoma</option>
-            </select></label
+        <label
+          >Opponent
+          <select
+            value={opponent}
+            disabled={!status.ready}
+            onchange={(event) => setOpponent(event.currentTarget.value as Who)}
           >
-          <label
-            >Opponent
-            <select
-              value={opponent}
-              disabled={!status.ready}
-              onchange={(event) =>
-                setOpponent(event.currentTarget.value as Who)}
-            >
-              <option value="zoma">Zoma</option>
-              <option value="ryuko">Ryuko</option>
-            </select></label
-          >
+            <option value="zoma">Zoma</option>
+            <option value="ryuko">Ryuko</option>
+          </select></label
+        >
+        {#if mode === 'practice'}
           <label
             >Partner
             <select
@@ -305,7 +296,7 @@
                   partner: event.currentTarget.value as DummyBehavior,
                 })}
             >
-              {#each partners as behavior (behavior)}
+              {#each DUMMY_BEHAVIORS as behavior (behavior)}
                 <option value={behavior}>{partnerLabels[behavior]}</option>
               {/each}
             </select></label
@@ -328,8 +319,8 @@
                 setPractice({ lowHealth: event.currentTarget.checked })}
             /> Low health</label
           >
-        </div>
-      {/if}
+        {/if}
+      </div>
       <div class="match-actions">
         <button
           disabled={!status.ready || status.resultReady || !!status.error}
@@ -527,15 +518,15 @@
           or DST cancels it for two stocks.
         </p>
         <p>
-          Free practice has no timer. Below the arena, choose your fighter and
-          the opponent, Zoma or Ryuko, and how the partner behaves: standing,
-          guarding high or low, guarding in the air, attacking in range, jumping
-          in, or playing as the original CPU, which Zoma doesn't offer yet. Max
-          stock refills your supers whenever you stand idle, and Low health
+          Below the arena, choose your fighter and the opponent, Zoma or Ryuko,
+          in either mode. Free practice has no timer, and you also choose how
+          the partner behaves: standing, guarding high or low, guarding in the
+          air, attacking in range, jumping in, or playing as the original CPU.
+          Max stock refills your supers whenever you stand idle, and Low health
           keeps you at 30% for desperation moves. Vs. CPU is the original game's
-          CPU, playing Ryuko's own moves, specials and supers. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes
-          starts a fresh match.
+          CPU, playing the opponent's own moves, specials and supers. Reduce
+          their health to zero, or lead on health when time runs out. Changing
+          modes or fighters starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

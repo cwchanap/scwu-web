@@ -615,6 +615,8 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
   stand: clip(z.stand),
   turn: clip(z.turn),
   crouchTurn: clip(z.crouchTurn),
+  // Start N (31) from PC 309: no op 0x01, so he stands where he starts.
+  intro: clip(z.intro),
   guard: clip(z.guard.slice(0, 1)),
   crouchGuard: clip(z.crouchGuard.slice(0, 1)),
   airGuard: clip(z.airGuard.slice(0, 1)),

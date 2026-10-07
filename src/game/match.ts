@@ -53,7 +53,7 @@ import {
   nearOf,
   scan,
 } from './commands';
-import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
+import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
 import {
@@ -88,7 +88,8 @@ export type Control =
   | 'cpuIori'
   | 'ex'
   | SuperControl;
-export type Input = Partial<Record<Control, boolean>>;
+// The CPU's command entry, written as 0x4115e3 does (cpu.ts).
+export type Input = Partial<Record<Control, boolean>> & { command?: number };
 export type Mode = 'practice' | 'cpu';
 // Free-practice settings (authored): the partner's behavior, stock topped up
 // to three whenever a fighter is idle, and Ryuko's health held at 30%.
@@ -536,8 +537,10 @@ const reactionPower = (f: Fighter): [number, number] => {
   return [victim + extra, attacker];
 };
 // Action 33 walks at raw velocity 200 until PC 339, after its first 50 ticks.
+// Zoma's Start N (31) has no op 0x01, so he starts where Ryuko's walk ends.
 const INTRO_WALK_TICKS = 50;
-const INTRO_WALK = INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE;
+const introWalk = (who: Who) =>
+  who === 'ryuko' ? INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE : 0;
 export const AXE_RELEASE_TICK = 16;
 export { THROW_TOSS_TICK } from './animations';
 // One-tick op 0x18 grab boxes with responses 30: action 196 at age 7 (PC 2750)
@@ -1304,8 +1307,8 @@ function slideDst(f: Fighter) {
 
 // Authored start: both walk-ins end 360 pixels apart around the stage center.
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
-  { ...fighter(STAGE_WIDTH / 2 - 180 - INTRO_WALK, 1, a), action: 'intro' },
-  { ...fighter(STAGE_WIDTH / 2 + 180 + INTRO_WALK, -1, b), action: 'intro' },
+  { ...fighter(STAGE_WIDTH / 2 - 180 - introWalk(a), 1, a), action: 'intro' },
+  { ...fighter(STAGE_WIDTH / 2 + 180 + introWalk(b), -1, b), action: 'intro' },
 ];
 
 export class Match {
@@ -1356,7 +1359,8 @@ export class Match {
     // Player 1's and player 2's characters.
     readonly characters: [Who, Who] = ['ryuko', 'ryuko'],
   ) {
-    this.cpu = new CpuVM(RYUKO_CPU, CPU_LEVEL, seed);
+    const cpu = characters[1];
+    this.cpu = new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]);
     this.calls = intro;
     this.fighters = intro
       ? introFighters(characters)
@@ -1428,6 +1432,8 @@ export class Match {
         key[0] === 'dash' && (word & 3) === 1 ? BACK_DASH[f.who] : key[1],
         f.who,
       );
+    // Each word takes the step's direction too (0x411644).
+    else if (input.command) inject(history, input.command, f.who, word & 15);
   }
 
   clearInput() {
@@ -3081,9 +3087,11 @@ export class Match {
         f.age++;
         // Action 33's op 0x16 at PC 348 jumps to 'Chage Character' (37)
         // while down is held; it sets variable 0 to 10 and jumps back.
-        if (f.age === INTRO_EX_TICK && [player, opponent][i]?.crouch)
+        // Zoma's intro has no such check.
+        const ryuko = f.who === 'ryuko';
+        if (ryuko && f.age === INTRO_EX_TICK && [player, opponent][i]?.crouch)
           f.ex = true;
-        if (f.age <= INTRO_WALK_TICKS)
+        if (ryuko && f.age <= INTRO_WALK_TICKS)
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
         if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }

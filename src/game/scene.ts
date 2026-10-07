@@ -103,22 +103,16 @@ const keyMap: Record<string, Control> = {
   Digit5: 'megaBeam',
 };
 
-// Authored: free practice's fighters; Vs. CPU stays Ryuko's mirror match
-// until Zoma's specials, supers and CPU table are in.
-const characters = (mode: Mode, fighter: Who, opponent: Who): [Who, Who] =>
-  mode === 'practice' ? [fighter, opponent] : ['ryuko', 'ryuko'];
 const idleVM = (who: Who, seed?: number) =>
   new StandingVM(CHARACTERS[who].idle, seed);
 
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
-  match = new Match(
-    'practice',
-    false,
-    randomSeed(),
-    characters('practice', this.fighter, this.opponent),
-  );
+  match = new Match('practice', false, randomSeed(), [
+    this.fighter,
+    this.opponent,
+  ]);
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
@@ -291,12 +285,10 @@ export class TrainingScene extends Phaser.Scene {
   }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    this.match = new Match(
-      mode,
-      mode === 'cpu',
-      randomSeed(),
-      characters(mode, this.fighter, this.opponent),
-    );
+    this.match = new Match(mode, mode === 'cpu', randomSeed(), [
+      this.fighter,
+      this.opponent,
+    ]);
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.playMusic();

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
-import { BLACK } from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { ATTACKS, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
@@ -501,5 +501,45 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     for (let t = 0; t < 100 && ryuko.hp === 510; t++) steps({});
     // Its dash strikes with response 32 (Ryuko's 85).
     expect(ryuko.action).toBe('twist');
+  });
+
+  it("stands through his Vs. intro (31 + 2) where Ryuko's walk ends", () => {
+    const match = new Match('cpu', true, 0, ['ryuko', 'zoma']);
+    const [ryuko, zoma] = match.fighters;
+    expect(animationDuration('intro', 'zoma')).toBe(200);
+    expect(
+      [0, 40, 48, 63, 73, 113, 123, 131, 199].map(
+        (age) => animationFrame('intro', age, 'zoma').image,
+      ),
+    ).toEqual([280, 281, 282, 283, 287, 284, 285, 286, 286]);
+    expect(zoma).toMatchObject({ action: 'intro', x: 1140 });
+    // Start N has no op 0x16, so down held through it starts no EX mode.
+    for (let t = 0; t < 199; t++) match.step({}, { crouch: true });
+    expect([ryuko.action, zoma.action]).toEqual(['idle', 'intro']);
+    expect([ryuko.x, zoma.x]).toEqual([780, 1140]);
+    match.step({}, { crouch: true });
+    expect(zoma).toMatchObject({ action: 'idle', x: 1140, ex: false });
+  });
+
+  it("enters a command the CPU writes, with its step's direction (0x411644)", () => {
+    const { match, zoma } = versus(200);
+    match.step({}, { command: 10 });
+    expect(zoma).toMatchObject({ action: 'script', branch: 204 });
+    const crouching = versus(200);
+    crouching.match.step({}, { command: 19, crouch: true });
+    // Down in the written word picks P's crouching action, P SIT (188).
+    expect(crouching.zoma.branch).toBe(188);
+  });
+
+  it('plays his own CPU table in Vs. CPU, keyless commands included', () => {
+    const match = new Match('cpu', false, 0, ['ryuko', 'zoma']);
+    const zoma = match.fighters[1];
+    const entered = new Set<unknown>();
+    for (let t = 0; t < 1500; t++) {
+      match.step({});
+      if (zoma.action === 'script') entered.add(zoma.branch);
+    }
+    // FIRE, BOMB and Hit Up have keys; dragon 2 k (214, entry 8) has none.
+    expect([...entered]).toEqual(expect.arrayContaining([204, 222, 197, 214]));
   });
 });

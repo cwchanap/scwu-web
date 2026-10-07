@@ -1,9 +1,11 @@
 // Port of the engine's CPU (routine 0x411270, control type 1 at 0x4112f9),
 // driven by the character's CPU table. It only produces input, so the CPU plays
 // through the same rules as the player.
+import type { Who } from './characters';
 import { CONTROLS } from './commands';
 import data from './generated/assets.json';
-import type { Fighter, Input } from './match';
+import zoma from './generated/zoma.json';
+import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
 export interface CpuStep {
@@ -18,8 +20,20 @@ export interface CpuEntry {
   max: number;
   steps: CpuStep[];
 }
-// Ryuko's table: 100 slots of 111 bytes after the held-pose table, 43 used.
+// Ryuko's table: 100 slots of 111 bytes after the held-pose table, 43 used;
+// Zoma's uses 44.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
+export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
+  ryuko: RYUKO_CPU,
+  zoma: zoma.cpu,
+};
+// Ryuko's CPU presses the port's keys for its commands (authored); Zoma's,
+// with no keys for his CPU dashes (entries 22-24), writes every command into
+// its history as the engine does (0x4115e3).
+export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
+  ryuko: CONTROLS,
+  zoma: {},
+};
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;
 // The scan draws a roll for every slot, used or not.
@@ -60,6 +74,7 @@ export class CpuVM {
     private entries: readonly CpuEntry[] = RYUKO_CPU,
     public level = CPU_LEVEL,
     public seed = 0,
+    private controls = CONTROLS,
   ) {}
 
   // Authored: the engine shares one rand seed with everything; the CPU keeps
@@ -115,7 +130,8 @@ export class CpuVM {
   // 0x411644 adds the step's direction to the command's input. The engine
   // clears the CPU's input history every tick (0x403300) and rewrites the
   // command, so a command step re-enters it each tick; a port button needs a
-  // release to count again, so it presses on alternate ticks (authored).
+  // release to count again, so it presses on alternate ticks (authored). A
+  // command without a key goes to the match to write each tick.
   private stepInput(step: CpuStep, self: Body, opponent: Body): Input {
     const toward = self.x > opponent.x ? 'left' : 'right';
     const away = toward === 'left' ? 'right' : 'left';
@@ -127,12 +143,12 @@ export class CpuVM {
       if (direction.includes('D')) input.crouch = true;
     };
     hold(DIRECTIONS[step.direction]);
-    const command = CONTROLS[step.command];
+    const command = this.controls[step.command];
     if (command) {
       const [control, direction] = command;
       hold(direction);
       input[control] = !this.last[control];
-    }
+    } else if (step.command) input.command = step.command;
     return input;
   }
 
