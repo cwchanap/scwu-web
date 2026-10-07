@@ -15,6 +15,7 @@
     maxStock: false,
     lowHealth: false,
   });
+  let fighter = $state<Who>('ryuko');
   let opponent = $state<Who>('zoma');
   const partners = $derived(
     opponent === 'zoma' ? ZOMA_BEHAVIORS : DUMMY_BEHAVIORS,
@@ -97,6 +98,11 @@
   function setPractice(changes: Partial<PracticeOptions>) {
     practice = { ...practice, ...changes };
     session?.scene.setPractice(practice);
+    focusArena();
+  }
+  function setFighter(who: Who) {
+    fighter = who;
+    session?.scene.setFighter(who);
     focusArena();
   }
   function setOpponent(who: Who) {
@@ -252,6 +258,17 @@
           role="group"
           aria-label="Practice settings"
         >
+          <label
+            >Fighter
+            <select
+              value={fighter}
+              disabled={!status.ready}
+              onchange={(event) => setFighter(event.currentTarget.value as Who)}
+            >
+              <option value="ryuko">Ryuko</option>
+              <option value="zoma">Zoma</option>
+            </select></label
+          >
           <label
             >Opponent
             <select
@@ -466,15 +483,30 @@
           one entered during another move comes out when that move ends.
         </p>
         <p>
-          Free practice has no timer. Below the arena, choose the opponent, Zoma
-          or Ryuko, and how the partner behaves: standing, guarding high or low,
-          guarding in the air, attacking in range, jumping in, or playing as the
-          original CPU. Zoma so far only stands, moves and guards, so he offers
-          the first four. Max stock refills your supers whenever you stand idle,
-          and Low health keeps Ryuko at 30% for her desperation moves. Vs. CPU
-          is the original game's CPU, playing Ryuko's own moves, specials and
-          supers. Reduce their health to zero, or lead on health when time runs
-          out. Changing modes starts a fresh match.
+          Choose Fighter: Zoma below the arena to play Zoma in free practice.
+          <kbd>J</kbd> and <kbd>K</kbd> punch and kick; on a hit or block press
+          either again for the second strike, then again for the third. Hold
+          down for his crouching punch and sweep, and attack in the air for his
+          air punch and kick. <kbd>Shift</kbd> or → → runs while you hold
+          forward; up during the run leaps high. With back held it hops back
+          instead. Up in the air double jumps, and → → there air dashes.
+          <kbd>H</kbd>
+          is his Hit Up (up on a hit chases), and <kbd>O</kbd> his chuck, a
+          close grab that slams and tosses the opponent, then throws a hatchet.
+          Blocking with a stock, <kbd>H</kbd> early or <kbd>J</kbd> +
+          <kbd>K</kbd> late spends it on COUNTER HIT. His specials and supers come
+          later.
+        </p>
+        <p>
+          Free practice has no timer. Below the arena, choose your fighter and
+          the opponent, Zoma or Ryuko, and how the partner behaves: standing,
+          guarding high or low, guarding in the air, attacking in range, jumping
+          in, or playing as the original CPU, which Zoma doesn't offer yet. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you at 30% for desperation moves. Vs. CPU is the original game's
+          CPU, playing Ryuko's own moves, specials and supers. Reduce their
+          health to zero, or lead on health when time runs out. Changing modes
+          starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

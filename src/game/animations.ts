@@ -220,6 +220,24 @@ export type SourceEvent =
       damage: number;
     }
   | { op: 'stop'; self: number; other: number }
+  // Op 0x1e's cancel window: mode 1 after contact, 2 always; type 0 levels
+  // [min, max], 1 only `action`.
+  | {
+      op: 'window';
+      mode: number;
+      type: number;
+      min: number;
+      max: number;
+      action: number;
+    }
+  // Op 0x24 jumps when `steps` matched within the last `window` ticks.
+  | {
+      op: 'command';
+      action: number;
+      offset: number;
+      window: number;
+      steps: number[];
+    }
   | { op: 'freeze'; add: number }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
@@ -385,6 +403,8 @@ export const animations = {
   launchUp: clip(clips.launchUp, false, [25, 30, 10, 1]),
   launchAway: clip(clips.launchAway, false, [2, 2, 2, 25, 1]),
   sweep: clip(clips.sweep, false, [2, 2, 2, 25, 1]),
+  // Response 41 (a chuck's toss) → action 132, waiting for its landing.
+  chuckToss: clip(clips.chuckToss, false, [2, 2, 2, 25, 1]),
   kick3: clip([
     ...clips.kick3.slice(0, 3),
     ...Array.from({ length: 8 }, () => clips.kick3Repeat).flat(),
@@ -517,7 +537,11 @@ export const animations = {
   superHeld: clip(clips.grabbed.slice(0, 1)),
 };
 export type AnimatedAction = keyof typeof animations;
-export type Action = 'idle' | AnimatedAction;
+// 'script' runs the source action in the fighter's `branch` from its own
+// timeline: Zoma's moves, entered by number.
+export type Action = 'idle' | 'script' | AnimatedAction;
+// What a fighter shows: an action's clip, or a source action's timeline.
+export type Shown = Exclude<Action, 'script'> | ObjectKey;
 // Actions whose events the match runs, by source action.
 export const SCRIPTED = {
   noSuper: 251,
@@ -545,8 +569,10 @@ export const SCRIPTED = {
   efsCancel: 332,
 } satisfies Partial<Record<Action, number>>;
 export type ScriptedAction = keyof typeof SCRIPTED;
-export const isScripted = (action: Action): action is ScriptedAction =>
-  Object.hasOwn(SCRIPTED, action);
+export const isScripted = (
+  action: Action,
+): action is ScriptedAction | 'script' =>
+  action === 'script' || Object.hasOwn(SCRIPTED, action);
 
 // A display of 0 or 1000-odd ticks waits for gameplay (landing or a jump
 // back to itself): play it as one held tick.
@@ -601,6 +627,7 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
   launchUp: clip(z.launchUp, false, waits(z.launchUp)),
   launchAway: clip(z.launchAway, false, waits(z.launchAway)),
   sweep: clip(z.sweep, false, waits(z.sweep)),
+  chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
   dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
   tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
   twist: clip([z.twist[0], ...z.twisting], 1),
@@ -642,11 +669,11 @@ export function animationDuration(
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
 // A fighter action's display at an age; idle stands for action 1's first,
 // as scene.ts draws idle from its VM.
-export const clipPose = (action: Action, age: number, who: Who = 'ryuko') =>
+export const clipPose = (action: Shown, age: number, who: Who = 'ryuko') =>
   action === 'idle'
     ? (who === 'ryuko' ? clips : zomaClips).idle[0]
     : animationFrame(action, age, who);
-function bodies(action: Action, age: number, who: Who): BodyBox[] {
+function bodies(action: Shown, age: number, who: Who): BodyBox[] {
   return clipPose(action, age, who).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
@@ -654,10 +681,10 @@ function bodies(action: Action, age: number, who: Who): BodyBox[] {
 export const BLACK = { opaque: clips.black[1], half: clips.black[2] };
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
-export const entryColor = (action: Action, who: Who = 'ryuko') =>
+export const entryColor = (action: Shown, who: Who = 'ryuko') =>
   clipPose(action, 0, who).color;
 export function hurtboxes(
-  action: Action,
+  action: Shown,
   age: number,
   who: Who = 'ryuko',
 ): BodyBox[] {
@@ -665,7 +692,7 @@ export function hurtboxes(
 }
 // Kind bit 0 pushes (0x40fce9), walked from the last slot down.
 export function pushboxes(
-  action: Action,
+  action: Shown,
   age: number,
   who: Who = 'ryuko',
 ): BodyBox[] {

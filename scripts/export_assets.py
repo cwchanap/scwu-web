@@ -71,10 +71,20 @@ def decode_event(record):
     if op == 0x16:  # input check (0x412da7): jump to r[2:4] + r[4] if condition r[7] holds (fails with r[1] bit 0)
         return dict(op="input", condition=record[7], negate=bool(record[1] & 1), action=u16(record, 2),
                     offset=record[4])
+    if op == 0x1e:  # cancel window (0x413782, read at 0x41193a): r[1] bits 0-2 the mode (1 once the
+        # box has connected, 2 always), bits 3-5 the type (0 levels r[2] to r[5], 1 only action r[3:5])
+        return dict(op="window", mode=record[1] & 7, type=record[1] >> 3 & 7, min=record[2], max=record[5],
+                    action=u16(record, 3))
+    if op == 0x24:  # command check (0x413a50, 0x410a50): jump to r[1:3] + r[3] if the steps at r[5:15],
+        # through the last marked 0x2000, matched within the last r[4] ticks
+        steps = [u16(record, 5 + 2 * k) for k in range(5)]
+        last = max((k for k, step in enumerate(steps) if step & 0x2000), default=-1)
+        return dict(op="command", action=u16(record, 1), offset=record[3], window=record[4], steps=steps[:last + 1])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
-    # evaluates player variables 0 (EX mode), 6 (an IORI cancel) and 12 (EX Fire 2) and
-    # global 6 (the freeze); other tests keep their fall-through path.
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x46, 0x4c, 0x86):
+    # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 6 (an IORI
+    # cancel) and 12 (EX Fire 2) and global 6 (the freeze); other tests keep their
+    # fall-through path.
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x46, 0x4c, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer
@@ -150,6 +160,11 @@ def flatten(p, c, index, played=(), offset=0):
     0x25 events run just before it, for reactions drawn from their timelines.
     """
     frames, events, bodies, pending = [], [], {}, []
+    # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
+    # its own action, as Zoma's run loops, starts with those its earlier records set.
+    for pc in range(p.action(index).start, p.action(index).start + offset):
+        if p.records[pc][0] == 0x19:
+            bodies = body_boxes(bodies, p.records[pc])
     t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
     action = index
     result = dict(loop=-1, end="end", next=None)
@@ -205,7 +220,7 @@ def flatten(p, c, index, played=(), offset=0):
         else:
             event = decode_event(record)
             # A branch can't return to a caller, so a call keeps its checks' fall-through path.
-            if event and stack and event["op"] in ("input", "test"):
+            if event and stack and event["op"] in ("input", "test", "command"):
                 event = None
             if event:
                 events.append(dict(event, t=t))
@@ -329,7 +344,7 @@ def flatten_queue(p, c, queue, played, image_ids):
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "handler" and event["slot"] in (2, 3):
                 queue.append((event["action"], event["offset"]))
-            if event["op"] in ("random", "input", "test") and event["action"]:
+            if event["op"] in ("random", "input", "test", "command") and event["action"]:
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "call":
                 queue.append((event["action"], 0))
@@ -440,7 +455,7 @@ def export_zoma(ryuko):
         "ko": (60, 58), "koAgain": (61, 59), "down": (62, 60), "lose": (59, 57),
         "hitRapid": (83, 84), "airHitRapid": (84, 85), "rushAirHit": (122, 123),
         "fly": (97, 98), "flySpin": (98, 99), "shock": (88, 90), "shockLoop": (90, 91),
-        "fb": (110, 111), "fbb": (111, 112), "fbh": (112, 113),
+        "fb": (110, 111), "fbb": (111, 112), "fbh": (112, 113), "chuckToss": (132, 133),
     }
     # Twins that differ, beyond their numbering and layout:
     differ = {
@@ -458,6 +473,8 @@ def export_zoma(ryuko):
         "knockdown", "bounceDown", "shock", "ko", "down",
         # Display lengths after the reaction's motion commands.
         "dstTossSpin2", "airHitRapid", "rushAirHit", "shockLoop",
+        # Ryuko's deletes objects 7-9 and rolls whether to skip its sound.
+        "chuckToss",
     }
     for name, (r, z) in twins.items():
         if (gameplay(ryuko, r) == gameplay(p, z)) == (name in differ):
@@ -473,17 +490,26 @@ def export_zoma(ryuko):
     image_ids = {2001, 340}
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
+    # His moves play from their timelines: the actions of command entries
+    # 12-20 (JUMP 2 to K; the specials and supers before them come later),
+    # each with its level (header r[2]), which a cancel window compares.
+    entries = tables["commands"]["entries"][11:20]
+    moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
+    levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
     # match plays, the lose action (57) that opens every KO, every response's
-    # hit effect and every object the clips spawn.
+    # hit effect and every object the clips spawn; his moves, COUNTER HIT
+    # (174) and the guard reactions whose op 0x24 enters it.
     queue = [(i, 0) for i in [75, 76, 77, 78, 81, 84, 85, 90, 98, 123, 153, 158, 167, 172, 57,
-                              *filter(None, tables["response_effects"])]]
+                              *filter(None, tables["response_effects"]), *moves, 174,
+                              149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     sounds = export_sounds(c, "zoma", cued(clips, scripts))
     images = export_images(c, "zoma", image_ids)
     idle = p.action(1)
     write_json(GENERATED / "zoma.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins={r: z for r, z in twins.values()},
+        neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     return len(images)
 
@@ -530,7 +556,7 @@ def main():
         "twist": 85, "twisting": 86, "twisting2": 87,
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
         "launchDown": 123, "slamBounce": 124, "bounceDown": 147,
-        "launchUp": 81, "launchAway": 80, "sweep": 79,
+        "launchUp": 81, "launchAway": 80, "sweep": 79, "chuckToss": 132,
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
         "ko": 60, "koAgain": 61, "down": 62, "win": 57, "winStand": 58, "draw": 65,
@@ -547,7 +573,7 @@ def main():
     # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), EX Fire
     # (231) and every charge and freeze branch its checks take, and CPU
     # IORI (410, which jumps through 411 into iori3), the rush air hit (122), the
-    # beam hits (83, 84), hits 75 and 80 for their op 0x20 rolls, air reactions
+    # beam hits (83, 84), hits 75, 80 and 132 for their op 0x20 rolls, air reactions
     # whose op 0x01 commands the match plays, the lose action (59) whose records
     # open every KO, every response's hit effect and every object the clips
     # spawn, each with its op 0x20 branches, keyed
@@ -555,7 +581,7 @@ def main():
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 174, 222, 231, 250, 251, 253, 256, 260, 263, 264,
              265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-             74, 75, 76, 80, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"])]]
+             74, 75, 76, 80, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"])]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))

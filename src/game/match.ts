@@ -27,10 +27,12 @@ import type {
   Pose,
   Quake,
   ScriptedAction,
+  Shown,
   SourceEvent,
   TrailSpec,
 } from './animations';
 import {
+  CHARACTERS,
   desperationOf,
   lifeOf,
   responseEffectsOf,
@@ -40,13 +42,15 @@ import {
 } from './characters';
 import type { Who } from './characters';
 import {
+  BACK_DASH,
   commanded,
   CONTROLS,
+  entriesOf,
   HISTORY_TICKS,
   inject,
   inputWord,
   KEYS,
-  NEAR,
+  nearOf,
   scan,
 } from './commands';
 import { CPU_LEVEL, CpuVM, RYUKO_CPU } from './cpu';
@@ -416,6 +420,8 @@ const launchMotion: Partial<
 > = {
   launchUp: { tick: 25, vx: -160, vy: -1700, gravity: 60, land: 'knockdown' },
   launchAway: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
+  // A chuck's response 41 → action 132 (PC 1793), landing into 146 (PC 1792).
+  chuckToss: { tick: 6, vx: -600, vy: -1920, gravity: 90, land: 'knockdown' },
   // Crouching kick response 7 selects action 79: a lower pop into knockdown.
   sweep: { tick: 6, vx: -300, vy: -1020, gravity: 90, land: 'knockdown' },
   launchDown: { tick: 9, vx: -500, vy: 2000, gravity: 100, land: 'slamBounce' },
@@ -512,8 +518,9 @@ for (const action of [
   'fly',
 ] as const)
   REACTION_POWER[action] = [5, 3];
-// Action 135 credits only the victim.
+// Action 135 credits only the victim, as does 132 (PC 1783).
 REACTION_POWER.drillDown = [5, 0];
+REACTION_POWER.chuckToss = [8, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929).
 const reactionPower = (f: Fighter): [number, number] => {
   const [victim, attacker] = REACTION_POWER[f.action] ?? [0, 0];
@@ -623,6 +630,7 @@ const RESPONSE_REACTIONS: Record<
   122: { action: 'rushAirHit', stop: 0 },
   128: { action: 'superHeld', stop: 0 },
   129: { action: 'dstToss', stop: 0 },
+  132: { action: 'chuckToss', stop: 0 },
   154: { action: 'blockHeavy', stop: 10 },
   156: { action: 'crouchBlockHeavy', stop: 10 },
   158: { action: 'airBlockHeavy', stop: 10 },
@@ -674,14 +682,10 @@ const responseFor = (
   ids: readonly number[],
   target: Fighter,
   guarding: boolean,
+  crouching: boolean,
 ) =>
   ids[
-    (guarding ? 3 : 0) +
-      (target.y < 0 || target.vy < 0
-        ? 2
-        : target.action.startsWith('crouch')
-          ? 1
-          : 0)
+    (guarding ? 3 : 0) + (target.y < 0 || target.vy < 0 ? 2 : crouching ? 1 : 0)
   ];
 // Its slot-1 box (PC 3291) and slot-0 body (PC 3290) repeat the box 2000
 // pixels down, where only objects meet (a slot-1 body sits at y + 5000, PC
@@ -707,7 +711,7 @@ function struck(
   const y = origin.y + box.y * 1.5;
   const mid = (a: number, r: number, b: number, s: number) =>
     (Math.min(a + r, b + s) + Math.max(a - r, b - s)) / 2;
-  for (const body of hurtboxes(target.action, target.age, target.who)) {
+  for (const body of hurtboxes(shown(target), target.age, target.who)) {
     const bx = target.x + target.facing * body.x * 1.5;
     const by = target.y + body.y * 1.5;
     if (
@@ -724,23 +728,24 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
-// 1619): 75, 76 and 80 only skip a sound, while 83, 84 and 122 swap their
-// first three poses.
+// 1619, 1787): 75, 76, 80 and 132 only skip a sound, while 83, 84 and 122
+// swap their first three poses.
 const ROLLED: Partial<Record<Action, number>> = {
   hitHeavy: 75,
   airHitHeavy: 76,
   launchAway: 80,
+  chuckToss: 132,
   hitRapid: 83,
   airHitRapid: 84,
   rushAirHit: 122,
 };
-// Zoma's twins roll alike, as does his jump hit (78, PC 784).
+// Zoma's twins roll alike, but for his chuck toss (133), as does his jump
+// hit (78, PC 784).
 const ZOMA_ROLLED: Partial<Record<Action, number>> = {
   ...Object.fromEntries(
-    Object.entries(ROLLED).map(([action, index]) => [
-      action,
-      twin('zoma', index),
-    ]),
+    Object.entries(ROLLED)
+      .filter(([action]) => action !== 'chuckToss')
+      .map(([action, index]) => [action, twin('zoma', index)]),
   ),
   jumpHit: 78,
 };
@@ -754,6 +759,20 @@ const sourceKey = (action: number, offset: number): ObjectKey =>
 // The timeline a scripted fighter runs: its action's, or a branch it took.
 const timeline = (f: Fighter) =>
   f.branch ?? SCRIPTED[f.action as ScriptedAction];
+// What a fighter shows: under 'script', its source action's timeline.
+const shown = (f: Fighter): Shown =>
+  f.action === 'script' ? f.branch! : f.action;
+// Zoma's engine states by number (export_zoma's `neutral`), which a handler
+// enters as the port's actions, and his moves' levels (header r[2]).
+const ZOMA_NEUTRAL = CHARACTERS.zoma.neutral as Record<string, Action>;
+const ZOMA_LEVELS = CHARACTERS.zoma.levels as Record<string, number>;
+// Each victim action's source number (Ryuko's), for the guard reactions.
+const REACTION_INDEX = new Map(
+  Object.entries(RESPONSE_REACTIONS).map(([index, { action }]) => [
+    action as Action,
+    Number(index),
+  ]),
+);
 // A command entered free and a landing handler mark a player acting
 // (+0x15e & ~8 | 4, 0x411a41 and 0x4118f3); a cancel keeps the bits.
 const markActing = (f: Fighter) => (f.reaction = (f.reaction & ~8) | 4);
@@ -762,6 +781,7 @@ const markActing = (f: Fighter) => (f.reaction = (f.reaction & ~8) | 4);
 function toNeutral(f: Fighter) {
   f.reaction &= f.y < 0 ? ~0xc : ~0xf;
   f.striker = null;
+  f.window = null;
 }
 // A script step that starts a display first re-arms an object holding an
 // attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
@@ -877,6 +897,12 @@ export interface Fighter {
   objectBox: ScriptBox | null;
   responses: number[];
   onHit: number;
+  // Op 0x02 slots 3 (guard) and 1 (landing), which Zoma's moves take.
+  onGuard: number;
+  onLand: number;
+  // Op 0x1e's cancel window (+0xdf91): action changes keep it, and the
+  // return to neutral clears it (0x411b0c). Zoma's moves read it.
+  window: Window | null;
   // Op 0x23 and 0x25: action changes (0x410cf0) keep them. `entered` is the
   // display whose events last ran.
   color: Color;
@@ -920,6 +946,7 @@ export interface Fighter {
   stopped: number;
   transfer: number;
 }
+type Window = Extract<SourceEvent, { op: 'window' }>;
 export interface ScriptBox {
   x: number;
   y: number;
@@ -1080,7 +1107,7 @@ export function fighterPose(f: Fighter): Pose {
   if (f.action === 'superHeld' && f.held?.pose)
     return heldFrame(f.held.pose, f.held.flags, f.who);
   if (f.branch) return animationFrame(f.branch, f.age, f.who);
-  return clipPose(f.action, f.action === 'jump' ? f.airAge : f.age, f.who);
+  return clipPose(shown(f), f.action === 'jump' ? f.airAge : f.age, f.who);
 }
 const newEffect = (
   fields: Partial<Effect> & Pick<Effect, 'clip' | 'who'>,
@@ -1133,6 +1160,9 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   objectBox: null,
   responses: [],
   onHit: 0,
+  onGuard: 0,
+  onLand: 0,
+  window: null,
   color: NORMAL_COLOR,
   trail: null,
   entered: null,
@@ -1361,7 +1391,7 @@ export class Match {
   private record(i: number, input: Input) {
     const history = this.history[i];
     const [f, other] = [this.fighters[i], this.fighters[1 - i]];
-    const key = KEYS.find(
+    const key = KEYS[f.who].find(
       ([control]) => input[control] && !this.previous[i][control],
     );
     if (key || (this.cpuDriven && i === 1)) history.fill(0);
@@ -1369,7 +1399,11 @@ export class Match {
     history.push(word);
     history.shift();
     if (key)
-      inject(history, key[0] === 'dash' && (word & 3) === 1 ? 14 : key[1]);
+      inject(
+        history,
+        key[0] === 'dash' && (word & 3) === 1 ? BACK_DASH[f.who] : key[1],
+        f.who,
+      );
   }
 
   clearInput() {
@@ -1447,17 +1481,33 @@ export class Match {
     if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
       f.branch = `${roll.action}+${roll.offset}`;
     if (!aerialDrills.has(action) || action === 'airDrill') f.airDrillStage = 0;
+    // 0x410d50 stops a player entering an action on the ground, and keeps an
+    // airborne one's motion: Zoma's moves take this.
+    const flying = action === 'script' && (f.y < 0 || f.vy !== 0);
     f.fired = -1;
-    f.ax = 0;
+    if (!flying) f.ax = 0;
     f.box = null;
     f.objectBox = null;
     f.responses = [];
-    f.onHit = 0;
-    f.color = entryColor(action, f.who) ?? f.color;
+    // 0x40e510 clears the handlers.
+    f.onHit = f.onGuard = f.onLand = 0;
+    // A source action's own op 0x23 sets its colour. ponytail: the window a
+    // clip action's script would set isn't read (reactions clear it, J Lend
+    // passes only level 1, which nothing has).
+    if (action !== 'script') {
+      f.color = entryColor(action, f.who) ?? f.color;
+      f.window = null;
+    }
     f.entered = null;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
-    if (isScripted(action) || action === 'superHeld' || action === 'shock') {
+    if (action === 'script') {
+      if (!flying) f.vx = f.vy = f.gravity = 0;
+    } else if (
+      isScripted(action) ||
+      action === 'superHeld' ||
+      action === 'shock'
+    ) {
       f.vx = f.vy = 0;
       f.gravity = 0;
     } else if (f.gravity === 0) f.gravity = 0.24;
@@ -1650,14 +1700,28 @@ export class Match {
 
   // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
   private counter(f: Fighter, history: number[]) {
-    // ponytail: Zoma's checks (P+K at age 18) enter his own COUNTER HIT,
-    // which comes with his moves.
-    if (f.who !== 'ryuko') return false;
+    if (!Object.hasOwn(GUARD_COUNTERS, f.action)) return false;
+    if (f.who !== 'ryuko') return this.sourceCounter(f, history);
     const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
     if (!check || !f.stock || !commanded(history, [0x2020], check[1]))
       return false;
     this.action(f, 'counterHit', true);
     this.fireEvents(f);
+    return true;
+  }
+
+  // Zoma's guard reactions run their own op 0x24 checks, Hit Up at ages 0
+  // and 8 and P+K (0x2090) at 18, each over 10 ticks, once their op 0x10 has
+  // found a stock (else it enters a twin without them, 150/152).
+  private sourceCounter(f: Fighter, history: number[]) {
+    const key = twin(f.who, REACTION_INDEX.get(f.action)!);
+    const stock = script(key, f.who).events.find((e) => e.op === 'stock');
+    if (stock?.op === 'stock' && f.stock <= stock.min) return false;
+    const check = eventsAt(key, f.age, f.who).find(
+      (e) => e.op === 'command' && commanded(history, e.steps, e.window),
+    );
+    if (check?.op !== 'command') return false;
+    this.enterSource(f, check.action, check.offset);
     return true;
   }
 
@@ -1701,7 +1765,7 @@ export class Match {
     while (action && isScripted(action) && !entered.has(action)) {
       entered.add(action);
       let next: Action | undefined;
-      for (const event of eventsAt(SCRIPTED[action], 0)) {
+      for (const event of eventsAt(SCRIPTED[action as ScriptedAction], 0)) {
         const life = f.hp;
         // Op 0x1f checks (Getter Beam's variable 0 → EFS, PC 3970) jump too.
         const target =
@@ -1744,8 +1808,18 @@ export class Match {
       if (this.runEvent(e, e.owner, event)) return;
   }
 
-  // A jump to another timeline (ops 0x16, 0x1f and 0x20) runs its first
-  // records at once, in place of the rest of this step's.
+  // An action change (0x410cf0) by number, for Zoma: his engine states play
+  // as the port's actions, and any other source action runs its timeline.
+  private enterSource(f: Fighter, index: number, offset = 0) {
+    const named = offset ? undefined : ZOMA_NEUTRAL[index];
+    if (named) return this.action(f, named, true);
+    this.action(f, 'script', true);
+    f.branch = sourceKey(index, offset);
+    this.fireEvents(f);
+  }
+
+  // A jump to another timeline (ops 0x16, 0x1f, 0x20 and 0x24) runs its
+  // first records at once, in place of the rest of this step's.
   private branchTo(actor: Fighter | Effect, key: ObjectKey) {
     actor.age = 0;
     if ('clip' in actor) {
@@ -1759,15 +1833,16 @@ export class Match {
     return true;
   }
 
-  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode), 6 (100
-  // through an IORI stage) and 12 (EX Fire 2) and global 6 (the freeze): ==
-  // (1), > (2) or < (3).
+  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode), 1 (10 after
+  // a double jump, 20 in an air dash), 6 (100 through an IORI stage) and 12
+  // (EX Fire 2) and global 6 (the freeze): == (1), > (2) or < (3).
   private passes(
     self: Fighter,
     { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
   ) {
     const variable = {
       0x40: self.ex ? 10 : 0,
+      0x41: self.jumpVariable,
       0x46: IORI.has(self.action) ? 100 : 0,
       0x4c: self.exFire,
       0x86: this.freeze,
@@ -1865,8 +1940,14 @@ export class Match {
         // Slot 1 boxes sit 2000 pixels down: they meet objects, not fighters.
         if (event.slot !== 0) actor.objectBox = box;
         else actor.box = box;
-        // Op 0x18 re-arms a player for a box of kind bit 1 (0x412d49).
-        if (box && box.kind & 2 && !('clip' in actor)) actor.connected = false;
+        // Op 0x18 re-arms a player for a box of kind bit 1 (0x412d49), and
+        // restarts its contact counter (0x412d2b). ponytail: a box without
+        // kind bit 0 leaves the counter at 0, so no contact raises it; none of
+        // Zoma's moves opens a window after one.
+        if (box && !('clip' in actor)) {
+          actor.contact = false;
+          if (box.kind & 2) actor.connected = false;
+        }
         break;
       }
       case 'responses':
@@ -1880,8 +1961,11 @@ export class Match {
         this.freeze += event.add;
         break;
       case 'handler':
-        if (event.slot === 2 && actor === self) self.onHit = event.action;
-        else if ('clip' in actor && (event.slot === 2 || event.slot === 3))
+        if (!('clip' in actor)) {
+          if (event.slot === 1) actor.onLand = event.action;
+          else if (event.slot === 2) actor.onHit = event.action;
+          else if (event.slot === 3) actor.onGuard = event.action;
+        } else if (event.slot === 2 || event.slot === 3)
           actor[event.slot === 2 ? 'onHit' : 'onGuard'] = sourceKey(
             event.action,
             event.offset,
@@ -1890,10 +1974,26 @@ export class Match {
       case 'call':
         this.runCall(actor, owner, event.action);
         break;
-      // An object takes its checks' jumps; a fighter's are its entry's.
+      // An object and Zoma take their checks' jumps; Ryuko's are his
+      // entry's.
       case 'test':
-        if ('clip' in actor && this.passes(self, event))
+        if (
+          ('clip' in actor || actor.action === 'script') &&
+          this.passes(self, event)
+        )
           return this.branchTo(actor, sourceKey(event.action, event.offset));
+        break;
+      // Op 0x24 jumps when its steps match in the input history (0x410a50).
+      case 'command':
+        if (
+          !('clip' in actor) &&
+          actor.action === 'script' &&
+          commanded(this.history[owner], event.steps, event.window)
+        )
+          return this.branchTo(actor, sourceKey(event.action, event.offset));
+        break;
+      case 'window':
+        if (!('clip' in actor)) actor.window = event;
         break;
       case 'input':
         if (
@@ -1946,6 +2046,7 @@ export class Match {
         break;
       case 'variable':
         if (event.index === 14) self.darken = event.value;
+        else if (event.index === 1) self.jumpVariable = event.value;
         else if (event.index === 0) self.ex = event.value === 10;
         else if (event.index === 12) self.exFire = event.value;
         break;
@@ -2080,7 +2181,7 @@ export class Match {
 
   // A scripted fighter's own motion; false when its timeline has ended on foot.
   private moveScripted(f: Fighter) {
-    const action = f.action as ScriptedAction;
+    const action = f.action as ScriptedAction | 'script';
     this.fireEvents(f);
     const airborne = f.y < 0 || f.vy < 0;
     f.vx += f.ax;
@@ -2088,13 +2189,16 @@ export class Match {
     placeX(f, f.x + f.vx);
     f.y = Math.min(0, f.y + f.vy);
     if (f.action !== action) return true;
-    // Airborne supers end on landing (handler slot 1 enters a landing action).
+    // Airborne supers end on landing: 0x411810 enters the slot-1 handler's
+    // action (Ryuko's supers land in 9), or without one ends the action.
     if (airborne && f.y === 0) {
       f.vx = f.vy = 0;
       f.doubleJumped = f.airDashed = false;
       f.jumpVariable = 0;
+      if (f.action === 'script' && !f.onLand) return false;
       markActing(f);
-      this.action(f, 'land');
+      if (f.action === 'script') this.enterSource(f, f.onLand);
+      else this.action(f, 'land');
       return true;
     }
     const { end, next } = script(timeline(f), f.who);
@@ -2150,7 +2254,12 @@ export class Match {
     if (!box) return [];
     const body = struck(this.origin(source), source.facing, box, target)!;
     const guarding = this.guarding(target, source, box);
-    const response = responseFor(source.responses, target, guarding);
+    const response = responseFor(
+      source.responses,
+      target,
+      guarding,
+      this.crouching(target),
+    );
     const victim = victimOf(target, response);
     const reaction = RESPONSE_REACTIONS[victim];
     if (!reaction) return [];
@@ -2273,6 +2382,13 @@ export class Match {
     return guard && !(box.kind & 0x40);
   }
 
+  // 0x40f4be: down in the victim's input word this tick picks the crouching
+  // responses, as do the port's crouching actions.
+  private crouching(target: Fighter) {
+    const input = this.inputs[this.fighters.indexOf(target)];
+    return target.action.startsWith('crouch') || Boolean(input.crouch);
+  }
+
   private doubleJump(f: Fighter, direction: number) {
     f.doubleJumped = true;
     f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
@@ -2288,18 +2404,28 @@ export class Match {
     f: Fighter,
     other: Fighter,
     history: number[],
-    ok: (level: number) => boolean = () => true,
+    ok: (level: number, action?: number) => boolean = () => true,
   ) {
-    // ponytail: Zoma's command table isn't read yet; it comes with his moves.
-    if (f.who !== 'ryuko') return false;
-    const found = scan(history, {
-      air: f.y < 0,
-      still: f.y === 0 && f.vy === 0,
-      landing: f.y < 0 && f.y > -50 * 1.5 && f.vy > 0,
-      near: Math.trunc(Math.abs(f.x - other.x) / 1.5) <= NEAR,
-    });
+    const found = scan(
+      history,
+      {
+        air: f.y < 0,
+        still: f.y === 0 && f.vy === 0,
+        landing: f.y < 0 && f.y > -50 * 1.5 && f.vy > 0,
+        near: Math.trunc(Math.abs(f.x - other.x) / 1.5) <= nearOf(f.who),
+      },
+      f.who,
+    );
     if (!found) return false;
     const { stance } = found;
+    // Zoma's entries enter their stance's action, which plays from its own
+    // timeline; a window passes it by that action's level.
+    if (f.who !== 'ryuko') {
+      const index = entriesOf(f.who)[found.entry - 1][stance];
+      if (!ok(ZOMA_LEVELS[index], index)) return false;
+      this.enterSource(f, index);
+      return true;
+    }
     const air = stance === 'air';
     const start = (action: Action) => {
       this.action(f, action, true);
@@ -2390,6 +2516,7 @@ export class Match {
 
   // Op 0x1e windows (CANCELS), read on every tick, contact stops included.
   private cancel(f: Fighter, other: Fighter, history: number[]) {
+    if (f.who !== 'ryuko') return this.windowCancel(f, other, history);
     const range = CANCELS[f.action];
     if (
       !range ||
@@ -2405,6 +2532,21 @@ export class Match {
         : range.max;
     const ok = (level: number) => level >= range.min && level <= max;
     return this.command(f, other, history, ok);
+  }
+
+  // Zoma's moves set the window themselves (op 0x1e), which 0x41193a reads:
+  // mode 1 once the move's box has connected, 2 always; type 0 passes a
+  // command whose action's level lies in [min, max], type 1 only the action
+  // it names.
+  private windowCancel(f: Fighter, other: Fighter, history: number[]) {
+    const window = f.window;
+    if (!window || !(window.mode === 2 || (window.mode === 1 && f.contact)))
+      return false;
+    return this.command(f, other, history, (level, action) =>
+      window.type === 0
+        ? level >= window.min && level <= window.max
+        : window.type === 1 && action === window.action,
+    );
   }
 
   private move(
@@ -2533,6 +2675,7 @@ export class Match {
     }
     if (
       f.action !== 'idle' &&
+      f.action !== 'script' &&
       (isAttack(f.action) ||
         f.action === 'axeThrow' ||
         reactions.has(f.action) ||
@@ -2599,7 +2742,7 @@ export class Match {
         );
       return;
     }
-    if (dashes.has(f.action) && f.action !== 'idle') {
+    if (dashes.has(f.action) && f.action !== 'idle' && f.action !== 'script') {
       if (f.action === 'dash' || f.action === 'backdash') {
         const backwards = f.action === 'backdash';
         const startup = backwards ? 10 : 5;
@@ -2910,10 +3053,10 @@ export class Match {
     this.koStop = 0;
     move(0);
     const pixel = (v: number) => Math.floor(v / 1.5);
-    for (const boxA of pushboxes(a.action, a.age, a.who)) {
+    for (const boxA of pushboxes(shown(a), a.age, a.who)) {
       const ax = pixel(a.x) + a.facing * boxA.x;
       const ay = pixel(a.y) + boxA.y;
-      for (const boxB of pushboxes(b.action, b.age, b.who)) {
+      for (const boxB of pushboxes(shown(b), b.age, b.who)) {
         const bx = pixel(b.x) + b.facing * boxB.x;
         const by = pixel(b.y) + boxB.y;
         const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
@@ -3017,7 +3160,12 @@ export class Match {
       // Decided on contact only: a CPU victim draws its guard roll here.
       const guarding = this.guarding(target, f, box);
       const { ids, last } = ATTACK_RESPONSES[f.action];
-      const id = responseFor(finisher && last ? last : ids, target, guarding);
+      const id = responseFor(
+        finisher && last ? last : ids,
+        target,
+        guarding,
+        this.crouching(target),
+      );
       const response = RESPONSE_REACTIONS[victimOf(target, id)];
       const reaction = response.action;
       const blocked = blocks.has(reaction);
@@ -3088,6 +3236,7 @@ export class Match {
         AXE_RESPONSES,
         target,
         this.guarding(target, projectile, box),
+        this.crouching(target),
       );
       const victim = victimOf(target, response);
       const { action: reaction, stop } = RESPONSE_REACTIONS[victim];
@@ -3214,8 +3363,14 @@ export class Match {
         this.action(f, 'airDrillContact');
       }
       if (source && 'clip' in source) this.handle(source, blocked);
+      // Op 0x02 slots 2 and 3: Zoma's own box enters its hit or guard
+      // handler's action.
+      if (source === f && f.action === 'script') {
+        const handler = blocked ? f.onGuard : f.onHit;
+        if (handler) this.enterSource(f, handler);
+      }
       // Op 0x02 slot 2: the super's own box enters its hit branch.
-      if (source === f && f.onHit && !blocked && target.hp > 0) {
+      else if (source === f && f.onHit && !blocked && target.hp > 0) {
         this.action(f, SOURCE_ACTIONS[f.onHit], true);
         this.fireEvents(f);
       }

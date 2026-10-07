@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { ATTACKS, fighterPose, Match } from './match';
-import type { Fighter } from './match';
+import type { Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
 
 const ZOMA_IMAGES = new Set(CHARACTERS.zoma.images.map(({ index }) => index));
@@ -13,6 +13,16 @@ function versus(gap = 120, partner: DummyBehavior = 'stand', seed = 0) {
   const [ryuko, zoma] = match.fighters;
   zoma.x = ryuko.x + gap;
   return { match, ryuko, zoma };
+}
+// Zoma as player 1, driven by input, `gap` from a standing Ryuko.
+function zomaPlayer(gap = 120) {
+  const match = new Match('practice', false, 0, ['zoma', 'ryuko']);
+  const [zoma, ryuko] = match.fighters;
+  ryuko.x = zoma.x + gap;
+  const steps = (input: Input, ticks = 1) => {
+    for (let t = 0; t < ticks; t++) match.step(input);
+  };
+  return { match, zoma, ryuko, steps };
 }
 // The step before the attack's first strike.
 function strike(f: Fighter, action: keyof typeof ATTACKS) {
@@ -32,7 +42,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('zoma')[id]]] : [],
     );
-    expect(paired).toHaveLength(51);
+    expect(paired).toHaveLength(52);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
@@ -127,5 +137,162 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     for (let t = 0; t < 10; t++) match.step();
     expect(zoma.action).toBe('win');
     expect(ZOMA_IMAGES.has(fighterPose(zoma).image)).toBe(true);
+  });
+
+  it("reads his own command table, entering each move's source action", () => {
+    expect(CHARACTERS.zoma.levels).toMatchObject({
+      11: 255, // JUMP 2
+      14: 0, // DASH F
+      16: 254, // DASH A F
+      178: 21, // P 1
+      193: 22, // K J
+    });
+    const { zoma, steps } = zomaPlayer();
+    steps({}, 2);
+    steps({ punch: true });
+    expect(zoma).toMatchObject({ action: 'script', branch: 178, age: 0 });
+  });
+
+  it('chains P 1 into P 2 through P1 HIT (179) and its op 0x24 at age 8', () => {
+    const { zoma, ryuko, steps } = zomaPlayer();
+    steps({}, 2);
+    steps({ punch: true });
+    // The box (PC 2256) strikes at age 7; slots 2 and 3 enter 179 (PCs 2252–2253).
+    steps({}, 6);
+    expect(ryuko.hp).toBe(510);
+    steps({});
+    expect(ryuko).toMatchObject({ action: 'hit', hp: 500 });
+    expect(zoma).toMatchObject({ branch: 179, age: 0, hitStop: 10 });
+    // A fresh P during the stop counts toward PC 2269's 20-tick window.
+    steps({}, 4);
+    steps({ punch: true });
+    steps({}, 12);
+    expect(zoma).toMatchObject({ branch: 179, age: 7 });
+    steps({});
+    expect(zoma).toMatchObject({ branch: 180, age: 0 });
+  });
+
+  it('ends a whiffed punch in neutral after its 27 ticks', () => {
+    const { zoma, steps } = zomaPlayer(400);
+    steps({}, 2);
+    steps({ punch: true });
+    steps({}, 26);
+    expect(zoma).toMatchObject({ action: 'script', branch: 178 });
+    steps({});
+    expect(zoma.action).toBe('idle');
+  });
+
+  it('sweeps from the crouch with K SIT (189)', () => {
+    const { zoma, ryuko, steps } = zomaPlayer();
+    steps({}, 2);
+    steps({ crouch: true }, 5);
+    steps({ crouch: true, kick: true });
+    expect(zoma.branch).toBe(189);
+    for (let t = 0; t < 30 && ryuko.action !== 'sweep'; t++)
+      steps({ crouch: true });
+    // Response 7 (PC 2552) → Ryuko's 79, for the box's 30 (PC 2553).
+    expect(ryuko).toMatchObject({ action: 'sweep', hp: 480 });
+  });
+
+  it('jumps again with JUMP 2 (11), whose variable 1 turns P into P J 2 (192)', () => {
+    const { zoma, steps } = zomaPlayer(400);
+    steps({}, 2);
+    steps({ jump: true });
+    steps({}, 20);
+    steps({ jump: true });
+    expect(zoma).toMatchObject({ action: 'script', branch: 11 });
+    steps({}, 3);
+    expect(zoma.jumpVariable).toBe(10);
+    steps({ punch: true });
+    // JUMP 2 (entry 12) still matches its own neutral-then-up and comes
+    // first: its level 255 is refused (11's window passes 1–254, PC 131),
+    // holding P back until that neutral tick leaves its 10.
+    steps({}, 4);
+    expect(zoma).toMatchObject({ branch: 11, age: 8 });
+    steps({});
+    // PC 2561 jumps to 192 while variable 1 is 10.
+    expect(zoma).toMatchObject({ branch: 192, age: 0 });
+    for (let t = 0; t < 120 && zoma.y < 0; t++) steps({});
+    // The landing handler (slot 1 → 10) enters J Lend.
+    expect(zoma.action).toBe('land');
+  });
+
+  it('runs with DASH F while forward is held, and stops when released', () => {
+    const { zoma, steps } = zomaPlayer(600);
+    steps({}, 2);
+    steps({ dash: true, right: true });
+    expect(zoma.branch).toBe(14);
+    steps({ right: true }, 10);
+    // PC 176's op 0x16 loops the run while forward is held.
+    expect(zoma.branch).toBe('14+12');
+    steps({ right: true }, 5);
+    expect(zoma.branch).toBe('14+7');
+    const x = zoma.x;
+    // Released, the checks fall through: raw 200 (PC 183), then the stop.
+    steps({}, 29);
+    expect(zoma.branch).toBe('14+7');
+    expect(zoma.x).toBeGreaterThan(x);
+    steps({});
+    expect(zoma.action).toBe('idle');
+  });
+
+  it('leaps from the run into HIGH JUMP (6) on up (PC 175)', () => {
+    const { zoma, steps } = zomaPlayer(600);
+    steps({}, 2);
+    steps({ dash: true, right: true });
+    steps({ right: true }, 9);
+    steps({ right: true, jump: true });
+    expect(zoma).toMatchObject({ branch: 6, age: 0 });
+    steps({}, 10);
+    expect(zoma.y).toBeLessThan(0);
+  });
+
+  it('chases a Hit Up (197 → 198) into JUMP CANCEL (199) on up', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(90);
+    steps({}, 2);
+    steps({ hitUp: true });
+    for (let t = 0; t < 30 && zoma.branch === 197; t++) steps({});
+    // Response 19 → Ryuko's 81; slot 2 enters 198 (PC 2726).
+    expect(ryuko).toMatchObject({ action: 'launchUp', hp: 495 });
+    expect(zoma.branch).toBe(198);
+    for (let t = 0; t < 40 && zoma.branch === 198; t++) steps({ jump: true });
+    expect(zoma.branch).toBe(199);
+    steps({}, 10);
+    expect(zoma.y).toBeLessThan(0);
+  });
+
+  it('chucks: grabs (response 30), slams, then tosses with response 41', () => {
+    const { match, zoma, ryuko, steps } = zomaPlayer(70);
+    steps({}, 2);
+    steps({ throw: true });
+    steps({}, 7);
+    // The kind 0xa8 box at age 7 (PC 2770) catches; slot 2 enters 201.
+    expect(ryuko.action).toBe('superHeld');
+    expect(zoma.branch).toBe(201);
+    steps({}, 43);
+    // PC 2806 applies response 41: Ryuko's 132, launched at its age 6.
+    expect(ryuko.action).toBe('chuckToss');
+    for (let t = 0; t < 40 && !match.effects.some((e) => e.clip === 202); t++)
+      steps({});
+    // PC 2815 throws TOMAHU (202).
+    expect(match.effects.some((e) => e.clip === 202)).toBe(true);
+    for (let t = 0; t < 100 && ryuko.y < 0; t++) steps({});
+    expect(ryuko.action).toBe('knockdown');
+  });
+
+  it('counters a guard with Hit Up for a stock: COUNTER HIT (174)', () => {
+    const { zoma, ryuko, steps } = zomaPlayer();
+    zoma.stock = 1;
+    steps({ guard: true });
+    strike(ryuko, 'punch');
+    steps({ guard: true });
+    expect(zoma).toMatchObject({ action: 'block', hitStop: 10 });
+    steps({ guard: true }, 15);
+    // 149's op 0x24 at age 8 reads Hit Up over the last 10 ticks.
+    steps({ guard: true, hitUp: true });
+    steps({ guard: true }, 2);
+    expect(zoma).toMatchObject({ action: 'script', branch: 174 });
+    // Its op 0x15 spends the stock (PC 2218).
+    expect(zoma.stock).toBe(0);
   });
 });

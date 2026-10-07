@@ -103,22 +103,21 @@ const keyMap: Record<string, Control> = {
   Digit5: 'megaBeam',
 };
 
-// Authored: free practice's opponent; Vs. CPU stays Ryuko's mirror match
-// until Zoma's moves and CPU table are in.
-const characters = (mode: Mode, opponent: Who): [Who, Who] => [
-  'ryuko',
-  mode === 'practice' ? opponent : 'ryuko',
-];
+// Authored: free practice's fighters; Vs. CPU stays Ryuko's mirror match
+// until Zoma's specials, supers and CPU table are in.
+const characters = (mode: Mode, fighter: Who, opponent: Who): [Who, Who] =>
+  mode === 'practice' ? [fighter, opponent] : ['ryuko', 'ryuko'];
 const idleVM = (who: Who, seed?: number) =>
   new StandingVM(CHARACTERS[who].idle, seed);
 
 export class TrainingScene extends Phaser.Scene {
+  private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
   match = new Match(
     'practice',
     false,
     randomSeed(),
-    characters('practice', this.opponent),
+    characters('practice', this.fighter, this.opponent),
   );
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
@@ -282,6 +281,10 @@ export class TrainingScene extends Phaser.Scene {
     this.practice = { ...options };
     this.match.practice = { ...options };
   }
+  setFighter(who: Who) {
+    this.fighter = who;
+    this.reset(this.match.mode);
+  }
   setOpponent(who: Who) {
     this.opponent = who;
     this.reset(this.match.mode);
@@ -292,7 +295,7 @@ export class TrainingScene extends Phaser.Scene {
       mode,
       mode === 'cpu',
       randomSeed(),
-      characters(mode, this.opponent),
+      characters(mode, this.fighter, this.opponent),
     );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
@@ -640,7 +643,11 @@ export class TrainingScene extends Phaser.Scene {
       seconds: this.match.seconds,
       hits: a.hits,
       damage: a.damage,
-      action: a.action.replace(/([A-Z])/g, ' $1'),
+      // Zoma's moves are source actions, named by number.
+      action:
+        a.action === 'script'
+          ? `action ${a.branch}`
+          : a.action.replace(/([A-Z])/g, ' $1'),
       winner: this.match.winner,
       matchWinner: this.match.resultReady ? this.match.matchWinner : null,
       resultReady: this.match.resultReady,
