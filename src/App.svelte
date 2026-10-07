@@ -68,6 +68,16 @@
     { control: 'megaBeam', label: 'Mega Beam', symbol: '5' },
   ];
   const supers = new Set<Control>(SUPER_CONTROLS);
+  // Zoma's specials take Ryuko's special keys (commands.ts).
+  const zomaLabels: Partial<Record<Control, string>> = {
+    drill: 'Dragon',
+    axe: 'Fire',
+    iori: 'Dragon 2',
+    dst: 'Bomb',
+    ex: 'G Beam',
+  };
+  const labelOf = (control: Control, label: string) =>
+    (fighter === 'zoma' && zomaLabels[control]) || label;
 
   onMount(() => {
     let disposed = false;
@@ -346,7 +356,7 @@
           'ex',
         ].includes(item.control)}
         class:super-control={supers.has(item.control)}
-        aria-label={item.label}
+        aria-label={labelOf(item.control, item.label)}
         disabled={!status.ready || status.paused || !!status.winner}
         onpointerdown={(event) => press(event, item.control)}
         onpointerup={() => session?.scene.control(item.control, false)}
@@ -361,7 +371,7 @@
         onkeyup={() => session?.scene.control(item.control, false)}
         onblur={() => session?.scene.control(item.control, false)}
         ><strong>{item.symbol}</strong><span
-          >{item.label.replace('Move ', '')}</span
+          >{labelOf(item.control, item.label).replace('Move ', '')}</span
         ></button
       >
     {/each}
@@ -372,11 +382,13 @@
     ><span><kbd>S</kbd> Crouch</span><span><kbd>J</kbd> Punch</span><span
       ><kbd>K</kbd> Kick</span
     ><span><kbd>L</kbd> Guard</span><span><kbd>Shift</kbd> Dash</span><span
-      ><kbd>U</kbd> Drill</span
-    ><span><kbd>I</kbd> Axe</span><span><kbd>O</kbd> Throw</span><span
-      ><kbd>H</kbd> Hit Up</span
-    ><span><kbd>F</kbd> IORI</span><span><kbd>G</kbd> Daisetsuzan</span><span
-      ><kbd>E</kbd> EX</span
+      ><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
+    ><span><kbd>I</kbd> {labelOf('axe', 'Axe')}</span><span
+      ><kbd>O</kbd> Throw</span
+    ><span><kbd>H</kbd> Hit Up</span><span
+      ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
+    ><span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span><span
+      ><kbd>E</kbd> {labelOf('ex', 'EX')}</span
     ><span><kbd>1</kbd>–<kbd>5</kbd> Supers</span>
   </p>
   {#if help}
@@ -494,8 +506,14 @@
           is his Hit Up (up on a hit chases), and <kbd>O</kbd> his chuck, a
           close grab that slams and tosses the opponent, then throws a hatchet.
           Blocking with a stock, <kbd>H</kbd> early or <kbd>J</kbd> +
-          <kbd>K</kbd> late spends it on COUNTER HIT. His specials and supers come
-          later.
+          <kbd>K</kbd> late spends it on COUNTER HIT. His specials: <kbd>U</kbd>
+          or →↓↘ <kbd>J</kbd> DRAGON (also in the air), <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> FIRE (one fireball at a time; again while it flies, he
+          punches), <kbd>F</kbd> or ↓← <kbd>J</kbd> dragon 2, vanishing and
+          striking from ahead (↓← <kbd>K</kbd> farther, ↓← <kbd>J</kbd> +
+          <kbd>K</kbd> in place), <kbd>G</kbd> or ↓→ <kbd>K</kbd> BOMB, three
+          bombs falling on marks ahead (five, then he reloads), and <kbd>E</kbd>
+          or ↓→↓→ <kbd>K</kbd> G Beam. His supers come later.
         </p>
         <p>
           Free practice has no timer. Below the arena, choose your fighter and

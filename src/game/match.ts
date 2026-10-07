@@ -419,6 +419,8 @@ const launchMotion: Partial<
   >
 > = {
   launchUp: { tick: 25, vx: -160, vy: -1700, gravity: 60, land: 'knockdown' },
+  // Response 42 (Zoma's DRAGON) → action 96 (PC 1163), landing into 146.
+  uppercut: { tick: 5, vx: -200, vy: -1620, gravity: 70, land: 'knockdown' },
   launchAway: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
   // A chuck's response 41 → action 132 (PC 1793), landing into 146 (PC 1792).
   chuckToss: { tick: 6, vx: -600, vy: -1920, gravity: 90, land: 'knockdown' },
@@ -516,6 +518,7 @@ for (const action of [
   'launchDown',
   'twist',
   'fly',
+  'uppercut',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as does 132 (PC 1783).
@@ -607,6 +610,7 @@ const RESPONSE_REACTIONS: Record<
   77: { action: 'jumpHit', stop: 15 },
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
+  96: { action: 'uppercut', stop: 13 },
   // PC 932: ten ticks for the victim, 33 for the attacker.
   81: { action: 'launchUp', stop: 10, attackerStop: 33 },
   83: { action: 'hitRapid', stop: 0 },
@@ -728,9 +732,10 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
-// 1619, 1787): 75, 76, 80 and 132 only skip a sound, while 83, 84 and 122
-// swap their first three poses.
+// 1159, 1619, 1787): 75, 76, 80, 96 and 132 only skip a sound, while 83, 84
+// and 122 swap their first three poses.
 const ROLLED: Partial<Record<Action, number>> = {
+  uppercut: 96,
   hitHeavy: 75,
   airHitHeavy: 76,
   launchAway: 80,
@@ -935,6 +940,9 @@ export interface Fighter {
   // PC 3341) or its shot's hit (235, PC 3438) clears it. The shot reads it
   // each display (228, PC 3321).
   exFire: number;
+  // Op 0x1f's other player variables by number (0x4dfa75 + player): Zoma's
+  // 0 counts his bombs, ten each, and 6 marks DRAGON.
+  variables: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
   // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
   // fighter returns to neutral. `striker` (+0xdefd): the opponent's own box
@@ -1002,6 +1010,8 @@ export interface Effect {
   // Op 0x02 handlers: what a hit (slot 2) or a guard (slot 3) enters.
   onHit?: ObjectKey;
   onGuard?: ObjectKey;
+  // Slot 1: what landing on the floor enters (0x41241c).
+  onLand?: ObjectKey;
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -1178,6 +1188,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   ex: false,
   face: -1,
   exFire: 0,
+  variables: {},
   stopped: 0,
   transfer: 0,
 });
@@ -1833,20 +1844,27 @@ export class Match {
     return true;
   }
 
-  // Op 0x1f's checks (0x4137a4) of player variables 0 (EX mode), 1 (10 after
-  // a double jump, 20 in an air dash), 6 (100 through an IORI stage) and 12
-  // (EX Fire 2) and global 6 (the freeze): == (1), > (2) or < (3).
+  // Op 0x1f's checks (0x4137a4) of player variables (selectors 0x40 up) and
+  // global 6 (the freeze): == (1), > (2) or < (3). Ryuko's 0 is EX mode, 6
+  // is 100 through an IORI stage and 12 EX Fire 2; 1 is 10 after a double
+  // jump and 20 in an air dash.
   private passes(
     self: Fighter,
     { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
   ) {
-    const variable = {
+    const ryuko: Record<number, number> = {
       0x40: self.ex ? 10 : 0,
-      0x41: self.jumpVariable,
       0x46: IORI.has(self.action) ? 100 : 0,
       0x4c: self.exFire,
-      0x86: this.freeze,
-    }[selector]!;
+    };
+    const variable =
+      selector === 0x86
+        ? this.freeze
+        : selector === 0x41
+          ? self.jumpVariable
+          : self.who === 'ryuko'
+            ? ryuko[selector]
+            : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -1917,6 +1935,17 @@ export class Match {
     const other = this.fighters[1 - owner];
     switch (event.op) {
       case 'spawn':
+        // 0x412ac0: Zoma's spawn into his slot r[12] while its object lives
+        // jumps to r[5:7] instead, if set (FIRE enters P 1 while its
+        // fireball flies).
+        if (
+          event.busy &&
+          !(event.flags & 4) &&
+          !('clip' in actor) &&
+          actor.action === 'script' &&
+          this.effects.some((e) => e.owner === owner && e.slot === event.slot)
+        )
+          return this.branchTo(actor, sourceKey(event.busy, event.busyOffset));
         this.spawnObject(actor, owner, event);
         break;
       case 'motion':
@@ -1965,11 +1994,9 @@ export class Match {
           if (event.slot === 1) actor.onLand = event.action;
           else if (event.slot === 2) actor.onHit = event.action;
           else if (event.slot === 3) actor.onGuard = event.action;
-        } else if (event.slot === 2 || event.slot === 3)
-          actor[event.slot === 2 ? 'onHit' : 'onGuard'] = sourceKey(
-            event.action,
-            event.offset,
-          );
+        } else if (event.slot >= 1 && event.slot <= 3)
+          actor[(['onLand', 'onHit', 'onGuard'] as const)[event.slot - 1]] =
+            sourceKey(event.action, event.offset);
         break;
       case 'call':
         this.runCall(actor, owner, event.action);
@@ -2045,10 +2072,16 @@ export class Match {
         actor.trail = startTrail(event);
         break;
       case 'variable':
+        self.variables[event.index] = event.value;
         if (event.index === 14) self.darken = event.value;
         else if (event.index === 1) self.jumpVariable = event.value;
-        else if (event.index === 0) self.ex = event.value === 10;
+        else if (event.index === 0 && self.who === 'ryuko')
+          self.ex = event.value === 10;
         else if (event.index === 12) self.exFire = event.value;
+        break;
+      case 'add':
+        self.variables[event.index] =
+          (self.variables[event.index] ?? 0) + event.value;
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
@@ -2118,7 +2151,10 @@ export class Match {
   private spawnObject(
     parent: Spawner,
     owner: number,
-    event: Omit<Extract<SourceEvent, { op: 'spawn' }>, 'op'>,
+    event: Omit<
+      Extract<SourceEvent, { op: 'spawn' }>,
+      'op' | 'busy' | 'busyOffset'
+    >,
   ) {
     // Without flag bit 2 (0x412a88) the record first deletes the owner's
     // object in slot r[12], then registers the new one there (0x412caf); an
@@ -2969,6 +3005,17 @@ export class Match {
       e.vy += e.gravity;
       e.x += e.vx;
       e.y += e.vy;
+      // 0x41241c: an object falling to the floor (y 920) stops there, and
+      // its landing handler (slot 1) enters its action, dropping its boxes.
+      if (!e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
+        Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
+        const land = e.onLand;
+        if (land !== undefined) {
+          Object.assign(e, { box: null, objectBox: null, onLand: undefined });
+          this.branchTo(e, land);
+          continue;
+        }
+      }
       if (++e.age < animationDuration(e.clip, e.who) || loops(e))
         this.fireEffect(e);
     }

@@ -42,7 +42,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('zoma')[id]]] : [],
     );
-    expect(paired).toHaveLength(52);
+    expect(paired).toHaveLength(53);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
@@ -294,5 +294,108 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(zoma).toMatchObject({ action: 'script', branch: 174 });
     // Its op 0x15 spends the stock (PC 2218).
     expect(zoma.stock).toBe(0);
+  });
+
+  it('throws FIRE on ↓→ P: its fireball (205) hits for 25 through response 50', () => {
+    const { match, zoma, ryuko, steps } = zomaPlayer(400);
+    steps({}, 2);
+    steps({ crouch: true }, 2);
+    steps({ right: true }, 2);
+    steps({ punch: true });
+    expect(zoma.branch).toBe(204);
+    steps({}, 20);
+    // PC 2858 spawns it into slot 1 at age 20.
+    expect(match.effects.find((e) => e.slot === 1)?.clip).toBe(205);
+    for (let t = 0; t < 60 && ryuko.hp === 510; t++) steps({});
+    // Response 50 → Ryuko's FB (110), which enters 75.
+    expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 485 });
+  });
+
+  it('punches instead of throwing FIRE while its fireball flies (0x412ac0)', () => {
+    const { match, zoma, ryuko, steps } = zomaPlayer(300);
+    zoma.x = ryuko.x = 900;
+    ryuko.x += 300;
+    steps({ axe: true });
+    steps({}, 15);
+    // Out of the fireball's way, so it flies on.
+    ryuko.x = zoma.x - 300;
+    steps({}, 50);
+    expect(match.effects.some((e) => e.slot === 1 && e.clip === 205)).toBe(
+      true,
+    );
+    steps({ axe: true });
+    // PC 2846 finds slot 1 alive and jumps to P 1 (178).
+    expect(zoma).toMatchObject({ action: 'script', branch: 178 });
+  });
+
+  it('rises with DRAGON on →↓↘ P, launching with its last strike', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(90);
+    steps({}, 2);
+    // Each direction step follows an any-direction step (0x3000), so each
+    // takes two ticks.
+    steps({ right: true }, 2);
+    steps({ crouch: true }, 2);
+    steps({ crouch: true, right: true }, 2);
+    steps({ punch: true });
+    expect(zoma.branch).toBe(208);
+    const reactions = new Set<string>();
+    for (let t = 0; t < 250 && zoma.action !== 'idle'; t++) {
+      steps({});
+      if (ryuko.action !== 'idle') reactions.add(ryuko.action);
+    }
+    // Response 42 → Ryuko's 96; the last box's 18 → 80.
+    expect([...reactions].slice(0, 3)).toEqual([
+      'uppercut',
+      'launchAway',
+      'knockdown',
+    ]);
+    expect(ryuko.hp).toBe(474);
+    // Landing (slot 1, PC 2906) enters DRAGON LEND (210), then neutral.
+    expect(zoma.action).toBe('idle');
+  });
+
+  it('vanishes and reappears with dragon 2 P, 225 pixels ahead', () => {
+    const { zoma, ryuko, steps } = zomaPlayer(400);
+    steps({}, 2);
+    const x = zoma.x;
+    steps({ iori: true });
+    expect(zoma.branch).toBe(213);
+    // Raw 15000 for one tick (PC 3021), then 216's rising strike.
+    steps({}, 22);
+    expect(zoma.x - x).toBeCloseTo(15000 * (655 / 65536) * 1.5, 6);
+    for (let t = 0; t < 30 && ryuko.hp === 510; t++) steps({});
+    expect(ryuko).toMatchObject({ action: 'launchAway', hp: 475 });
+  });
+
+  it('fires g beam (219): its beam (220) strikes three times', () => {
+    const { ryuko, steps } = zomaPlayer(250);
+    steps({}, 2);
+    steps({ ex: true });
+    steps({}, 100);
+    // Response 51 → FBB (111) → 83 per strike of 20.
+    expect(ryuko.hp).toBe(450);
+  });
+
+  it('drops BOMB on three marks, and reloads after five', () => {
+    const { match, zoma, ryuko, steps } = zomaPlayer(300);
+    steps({}, 2);
+    steps({ dst: true });
+    steps({}, 21);
+    // PC 3154 adds 10 to player variable 0 per bomb.
+    expect(zoma.variables[0]).toBe(10);
+    expect(match.effects.filter((e) => e.clip === 223)).toHaveLength(1);
+    for (let t = 0; t < 400 && ryuko.hp === 510; t++) steps({});
+    // A bomb (227) falls on the second mark: response 50, 20.
+    expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 490 });
+    for (let k = 0; k < 4; k++) {
+      steps({ dst: true });
+      steps({}, 95);
+    }
+    expect(zoma.variables[0]).toBe(50);
+    steps({ dst: true });
+    // PC 3146 jumps to BOMB RELORD (229) at 50, which clears it.
+    expect(zoma.branch).toBe(229);
+    steps({}, 60);
+    expect(zoma.variables[0]).toBe(0);
   });
 });

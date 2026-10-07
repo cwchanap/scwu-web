@@ -196,6 +196,9 @@ export type SourceEvent =
       y: number;
       slot: number;
       z: number;
+      // While the slot's object lives, a player jumps here instead.
+      busy: number;
+      busyOffset: number;
     }
   | { op: 'hold'; flags: number; pose: number; x: number; y: number }
   | { op: 'stock'; target: number; min: number; add: number }
@@ -242,6 +245,7 @@ export type SourceEvent =
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
   | { op: 'variable'; index: number; value: number }
+  | { op: 'add'; index: number; value: number }
   | {
       op: 'screen';
       fader: FaderSpec | null;
@@ -321,8 +325,10 @@ function objectClip(index: ObjectKey, who: Who) {
     );
   return objectClips.get(key)!;
 }
-// Image 0 (a solid marker block) and 8191 are the source's blank displays.
-export const isBlank = (pose: Pose) => pose.image === 0 || pose.image === 8191;
+// Image 0 (a solid marker block) and 8191 are the source's blank displays,
+// as is an empty image (Zoma's 2000).
+export const isBlank = (pose: Pose) =>
+  pose.image === 0 || pose.image === 8191 || !pose.width;
 // Op 0x07 draws the held opponent with an entry of its held-pose table. Bit 2
 // faces the holder's way with a mirrored image; bit 3 flips it vertically.
 export function heldFrame(
@@ -405,6 +411,8 @@ export const animations = {
   sweep: clip(clips.sweep, false, [2, 2, 2, 25, 1]),
   // Response 41 (a chuck's toss) → action 132, waiting for its landing.
   chuckToss: clip(clips.chuckToss, false, [2, 2, 2, 25, 1]),
+  // Response 42 (Zoma's DRAGON) → action 96, waiting for its landing.
+  uppercut: clip(clips.uppercut, false, [5, 30, 10, 1]),
   kick3: clip([
     ...clips.kick3.slice(0, 3),
     ...Array.from({ length: 8 }, () => clips.kick3Repeat).flat(),
@@ -628,6 +636,7 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
   launchAway: clip(z.launchAway, false, waits(z.launchAway)),
   sweep: clip(z.sweep, false, waits(z.sweep)),
   chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
+  uppercut: clip(z.uppercut, false, waits(z.uppercut)),
   dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
   tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
   twist: clip([z.twist[0], ...z.twisting], 1),
