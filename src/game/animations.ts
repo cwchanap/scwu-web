@@ -1,4 +1,7 @@
+import { CHARACTERS } from './characters';
+import type { Who } from './characters';
 import data from './generated/assets.json';
+import zoma from './generated/zoma.json';
 import type { Frame } from './standing';
 
 // Op 0x19 box in source pixels: centre and half size from the fighter's origin.
@@ -53,6 +56,10 @@ export type Pose = Frame & {
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
+const zomaClips = zoma.clips as unknown as Record<
+  keyof typeof zoma.clips,
+  Pose[]
+>;
 interface Clip {
   frames: Pose[];
   ticks: number[];
@@ -123,11 +130,12 @@ export function dstHold(age: number) {
   }
   return null;
 }
-const dstHeld = () => [
-  { ...clips.grabbed[0], duration: clips.dstHit[0].duration },
+// The victim's poses (its grabbed pose and held table) to Ryuko's timing.
+const dstHeld = (grabbed: Pose[], who: Who) => [
+  { ...grabbed[0], duration: clips.dstHit[0].duration },
   // Op 0x07 selects held pose 1 from the victim's table and adds the bit 2 flip.
   ...dstSpins.map((frame, index) => ({
-    ...heldFrame(1, DST_HOLDS[index % DST_HOLDS.length].same ? 4 : 0),
+    ...heldFrame(1, DST_HOLDS[index % DST_HOLDS.length].same ? 4 : 0, who),
     duration: frame.duration,
   })),
 ];
@@ -238,32 +246,35 @@ export interface Script {
   end: 'end' | 'hold' | 'loop' | 'jump';
   next: number | null;
 }
-const scripts = data.scripts as unknown as Record<string, Script>;
+const scripts = {
+  ryuko: data.scripts,
+  zoma: zoma.scripts,
+} as unknown as Record<Who, Record<string, Script>>;
 // A source action, or "action+offset" for an op 0x20 branch entering mid-action.
 export type ObjectKey = number | `${number}+${number}`;
 // The victim action selected by each op 0x17 response id.
 export const RESPONSES: readonly number[] = data.responses;
 // The hit-effect action each response spawns at contact (0 = none).
 export const RESPONSE_EFFECTS: readonly number[] = data.response_effects;
-export function script(index: ObjectKey) {
-  const found = scripts[index];
+export function script(index: ObjectKey, who: Who = 'ryuko') {
+  const found = scripts[who][index];
   if (!found) throw new Error(`Source action ${index} was not exported`);
   return found;
 }
-const scriptEvents = new Map<ObjectKey, Map<number, ScriptEvent[]>>();
+const scriptEvents = new Map<string, Map<number, ScriptEvent[]>>();
 // Events that run when a scripted action or object reaches the given age. A
 // looping timeline repeats: each time it wraps, the records after its last
 // display run, then those from the loop's target on.
-export function eventsAt(index: ObjectKey, age: number) {
-  let byTick = scriptEvents.get(index);
-  const found = script(index);
+export function eventsAt(index: ObjectKey, age: number, who: Who = 'ryuko') {
+  let byTick = scriptEvents.get(`${who}:${index}`);
+  const found = script(index, who);
   if (!byTick) {
     byTick = new Map();
     for (const event of found.events)
       byTick.set(event.t, [...(byTick.get(event.t) ?? []), event]);
-    scriptEvents.set(index, byTick);
+    scriptEvents.set(`${who}:${index}`, byTick);
   }
-  const duration = animationDuration(index);
+  const duration = animationDuration(index, who);
   if (found.end !== 'loop' || age < duration) return byTick.get(age) ?? [];
   const start = found.frames[found.loop].t;
   const t = start + ((age - start) % (duration - start));
@@ -274,36 +285,42 @@ export function eventsAt(index: ObjectKey, age: number) {
   ];
 }
 // A zero-length display waits for gameplay (landing); hold it like a long pose.
-const scriptClip = (index: ObjectKey) => {
-  const { frames, loop } = script(index);
+const scriptClip = (index: ObjectKey, who: Who = 'ryuko') => {
+  const { frames, loop } = script(index, who);
   return clip(
     frames,
     loop >= 0 ? loop : false,
     frames.map((frame) => frame.duration || 1),
   );
 };
-const objectClips = new Map<ObjectKey, Clip | null>();
-function objectClip(index: ObjectKey) {
-  if (!objectClips.has(index))
+const objectClips = new Map<string, Clip | null>();
+function objectClip(index: ObjectKey, who: Who) {
+  const key = `${who}:${index}`;
+  if (!objectClips.has(key))
     objectClips.set(
-      index,
-      script(index).frames.length ? scriptClip(index) : null,
+      key,
+      script(index, who).frames.length ? scriptClip(index, who) : null,
     );
-  return objectClips.get(index)!;
+  return objectClips.get(key)!;
 }
 // Image 0 (a solid marker block) and 8191 are the source's blank displays.
 export const isBlank = (pose: Pose) => pose.image === 0 || pose.image === 8191;
 // Op 0x07 draws the held opponent with an entry of its held-pose table. Bit 2
 // faces the holder's way with a mirrored image; bit 3 flips it vertically.
-export function heldFrame(pose: number, flags: number): Pose {
+export function heldFrame(
+  pose: number,
+  flags: number,
+  who: Who = 'ryuko',
+): Pose {
+  const held = CHARACTERS[who].held[pose];
   return {
-    ...data.held[pose],
+    ...held,
     pc: 0,
     duration: 1,
     flip_x: (flags & 4) !== 0,
     flip_y: (flags & 8) !== 0,
     ignore_facing: false,
-    packed_image: data.held[pose].image,
+    packed_image: held.image,
     extra_bytes: '',
     held: true,
   };
@@ -393,7 +410,7 @@ export const animations = {
   dstFar: clip(clips.dstFar),
   evilDstFar: clip(clips.evilDstFar),
   dstHit: clip([clips.dstHit[0], ...dstSpins, ...clips.dstHit.slice(1)]),
-  dstHeld: clip(dstHeld()),
+  dstHeld: clip(dstHeld(clips.grabbed, 'ryuko')),
   // Response 31 enters action 129, which jumps to the spinning loop 130; its
   // landing branch bounces through PC 1752 into the slower loop 131.
   dstToss: clip([clips.dstToss[0], ...clips.dstTossSpin], 1),
@@ -531,14 +548,93 @@ export type ScriptedAction = keyof typeof SCRIPTED;
 export const isScripted = (action: Action): action is ScriptedAction =>
   Object.hasOwn(SCRIPTED, action);
 
+// A display of 0 or 1000-odd ticks waits for gameplay (landing or a jump
+// back to itself): play it as one held tick.
+const waits = (frames: Pose[]) =>
+  frames.map(({ duration }) =>
+    duration > 0 && duration < 1000 ? duration : 1,
+  );
+const z = zomaClips;
+// Zoma's neutral, guard, victim and result clips: the engine's own states
+// and the twins of Ryuko's victim actions (export_zoma), shaped like his.
+const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
+  walk: clip(z.walk, true),
+  backwalk: clip(z.backwalk, true),
+  takeoff: clip(z.jump.slice(0, 1)),
+  jump: clip(z.jump.slice(1), false, waits(z.jump.slice(1))),
+  land: clip(z.land),
+  crouchEnter: clip(z.crouchEnter),
+  // Action 19 holds a single zero-length display.
+  crouch: clip(z.crouch, true, waits(z.crouch)),
+  stand: clip(z.stand),
+  turn: clip(z.turn),
+  crouchTurn: clip(z.crouchTurn),
+  guard: clip(z.guard.slice(0, 1)),
+  crouchGuard: clip(z.crouchGuard.slice(0, 1)),
+  airGuard: clip(z.airGuard.slice(0, 1)),
+  block: clip(z.guard),
+  crouchBlock: clip(z.crouchGuard),
+  airBlock: clip(z.airGuard),
+  blockHeavy: clip(z.blockHeavy),
+  crouchBlockHeavy: clip(z.crouchBlockHeavy),
+  airBlockHeavy: clip(z.airBlockHeavy),
+  blockRapid: clip(z.blockRapid),
+  crouchBlockRapid: clip(z.crouchBlockRapid),
+  airBlockRapid: clip(z.airBlockRapid),
+  timeStopGuard: clip(z.timeStopGuard),
+  crouchTimeStopGuard: clip(z.crouchTimeStopGuard),
+  airTimeStopGuard: clip(z.airTimeStopGuard),
+  blockStop: clip(z.blockStop),
+  crouchBlockStop: clip(z.crouchBlockStop),
+  hit: clip(z.hit),
+  hitHeavy: clip(z.hitHeavy),
+  airHit: clip(z.airHit),
+  airHitHeavy: clip(z.airHitHeavy),
+  jumpHit: clip(z.jumpHit),
+  hitPull: clip(z.hitPull),
+  hitRapid: scriptClip(84, 'zoma'),
+  airHitRapid: scriptClip(85, 'zoma'),
+  drillDown: clip(z.drillDown, false, waits(z.drillDown)),
+  launchDown: clip(z.launchDown, false, waits(z.launchDown)),
+  slamBounce: clip(z.slamBounce, false, waits(z.slamBounce)),
+  bounceDown: clip(z.bounceDown),
+  launchUp: clip(z.launchUp, false, waits(z.launchUp)),
+  launchAway: clip(z.launchAway, false, waits(z.launchAway)),
+  sweep: clip(z.sweep, false, waits(z.sweep)),
+  dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
+  tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
+  twist: clip([z.twist[0], ...z.twisting], 1),
+  twistBounce: clip([z.twist[1], ...z.twisting2], 1),
+  dstHeld: clip(dstHeld(z.grabbed, 'zoma')),
+  superHeld: clip(z.grabbed.slice(0, 1)),
+  knockdown: clip(z.knockdown),
+  getUp: clip(z.getUp),
+  down: clip(z.ko, false, waits(z.ko)),
+  koAgain: clip(z.koAgain),
+  koLand: clip(z.down),
+  // WIN (56) and the draw (63) call DEMO STAND (41) once, then hold.
+  win: clip([...z.winStand, ...z.win]),
+  draw: clip([...z.winStand, ...z.draw]),
+  fly: scriptClip(98, 'zoma'),
+  shock: scriptClip(90, 'zoma'),
+  rushAirHit: scriptClip(123, 'zoma'),
+};
+
 // Object keys name a spawned source object, played from its flattened timeline.
 export const isObject = (
   action: AnimatedAction | ObjectKey,
 ): action is ObjectKey => !Object.hasOwn(animations, action);
-const clipOf = (action: AnimatedAction | ObjectKey) =>
-  isObject(action) ? objectClip(action) : animations[action];
-export function animationDuration(action: AnimatedAction | ObjectKey) {
-  const found = clipOf(action);
+function clipOf(action: AnimatedAction | ObjectKey, who: Who) {
+  if (isObject(action)) return objectClip(action, who);
+  const found = who === 'ryuko' ? animations[action] : zomaAnimations[action];
+  if (!found) throw new Error(`Zoma has no ${action} clip yet`);
+  return found;
+}
+export function animationDuration(
+  action: AnimatedAction | ObjectKey,
+  who: Who = 'ryuko',
+) {
+  const found = clipOf(action, who);
   return found ? found.ticks.reduce((total, ticks) => total + ticks, 0) : 0;
 }
 
@@ -546,23 +642,34 @@ export function animationDuration(action: AnimatedAction | ObjectKey) {
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
 // A fighter action's display at an age; idle stands for action 1's first,
 // as scene.ts draws idle from its VM.
-export const clipPose = (action: Action, age: number): Pose =>
-  action === 'idle' ? clips.idle[0] : animationFrame(action, age);
-function bodies(action: Action, age: number): BodyBox[] {
-  return clipPose(action, age).body ?? [];
+export const clipPose = (action: Action, age: number, who: Who = 'ryuko') =>
+  action === 'idle'
+    ? (who === 'ryuko' ? clips : zomaClips).idle[0]
+    : animationFrame(action, age, who);
+function bodies(action: Action, age: number, who: Who): BodyBox[] {
+  return clipPose(action, age, who).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
 // (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436).
 export const BLACK = { opaque: clips.black[1], half: clips.black[2] };
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
-export const entryColor = (action: Action) => clipPose(action, 0).color;
-export function hurtboxes(action: Action, age: number): BodyBox[] {
-  return bodies(action, age).filter((box) => box.kind & 6);
+export const entryColor = (action: Action, who: Who = 'ryuko') =>
+  clipPose(action, 0, who).color;
+export function hurtboxes(
+  action: Action,
+  age: number,
+  who: Who = 'ryuko',
+): BodyBox[] {
+  return bodies(action, age, who).filter((box) => box.kind & 6);
 }
 // Kind bit 0 pushes (0x40fce9), walked from the last slot down.
-export function pushboxes(action: Action, age: number): BodyBox[] {
-  return bodies(action, age)
+export function pushboxes(
+  action: Action,
+  age: number,
+  who: Who = 'ryuko',
+): BodyBox[] {
+  return bodies(action, age, who)
     .filter((box) => box.kind & 1)
     .reverse();
 }
@@ -570,11 +677,12 @@ export function pushboxes(action: Action, age: number): BodyBox[] {
 export function animationFrame(
   action: AnimatedAction | ObjectKey,
   age: number,
+  who: Who = 'ryuko',
 ): Pose {
-  const found = clipOf(action);
+  const found = clipOf(action, who);
   if (!found) throw new Error(`Source object ${action} has no displays`);
   const { frames, ticks, loopStart } = found;
-  const duration = animationDuration(action);
+  const duration = animationDuration(action, who);
   const intro = ticks
     .slice(0, Math.max(0, loopStart))
     .reduce((total, n) => total + n, 0);

@@ -13,6 +13,7 @@ Use the relevant sections for the requested actions; mark unrelated checks N/A. 
 
 - [ ] Identify the actual checkout, dirty files, and browser server. Determine whether the URL serves Vite development output or `dist/`. A preview server needs a fresh build and reload after changes. Identify the exact tab the user is playing, not just its URL. If several tabs share that URL or the user still sees the old behavior, compare the loaded script bundle names with the current build before changing gameplay again; refreshing a separate test tab is insufficient.
 - [ ] Read the character's handoff, action program, and existing exporter before selecting sprites. Reuse the decoder, placement logic, fixed clock, and shared match logic already present.
+- [ ] For another character, pair its actions with Ryuko's through the response table (a response id selects each one's own victim action) and compare their gameplay records with the exporter's `gameplay()` before writing rules. Where they match, run the action through its Ryuko twin's rules with the character's own clips, timelines and tables (`characters.ts`, `export_zoma`); record each difference and handle it. Victim actions come from the victim's table, hit effects from the striker's.
 - [ ] For each affected action, record source action IDs, relevant instruction offsets/branches, frame IDs, durations, motion changes, contact events, and exit conditions. Label each conclusion **recovered**, **authored**, or **unknown**.
 - [ ] Use original footage when available for visual comparison. Static decoding, screenshots of the port, and unit tests prove different things; none alone establishes original-game parity. Do not turn an unavailable original runtime into a blocker for authorized training-mode work.
 
@@ -114,6 +115,7 @@ Paths are relative to the SCWU web repository; confirm them in the current check
 | Visual clips and shared throw timing      | `src/game/animations.ts`, `animations.test.ts`                                                                    |
 | Movement, commands, contacts, round state | `src/game/match.ts`, `match.test.ts`                                                                              |
 | Command recognizer and input history      | `src/game/commands.ts`, `commands.test.ts`                                                                        |
+| Per-character data and twins              | `src/game/characters.ts`, `export_zoma` in `scripts/export_assets.py`, `zoma.test.ts`                             |
 | Recovered CPU and practice partners       | `src/game/cpu.ts`, `cpu.test.ts`, `src/game/dummy.ts`                                                             |
 | Keyboard lifecycle and Phaser rendering   | `src/game/scene.ts`                                                                                               |
 | HUD/KO and touch/help                     | `src/game/hud.ts`, `src/App.svelte`                                                                               |

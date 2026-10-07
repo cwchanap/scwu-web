@@ -14,8 +14,6 @@ import {
   isScripted,
   NORMAL_COLOR,
   POSE_EVENTS,
-  RESPONSE_EFFECTS,
-  RESPONSES,
   script,
   SCRIPTED,
   THROW_TOSS_TICK,
@@ -32,6 +30,15 @@ import type {
   SourceEvent,
   TrailSpec,
 } from './animations';
+import {
+  desperationOf,
+  lifeOf,
+  responseEffectsOf,
+  responsesOf,
+  ryukoTwin,
+  twin,
+} from './characters';
+import type { Who } from './characters';
 import {
   commanded,
   CONTROLS,
@@ -507,6 +514,12 @@ for (const action of [
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim.
 REACTION_POWER.drillDown = [5, 0];
+// Zoma's crouching guard (151) adds 2 more to him (PC 1929).
+const reactionPower = (f: Fighter): [number, number] => {
+  const [victim, attacker] = REACTION_POWER[f.action] ?? [0, 0];
+  const extra = f.who === 'zoma' && f.action === 'crouchBlock' ? 2 : 0;
+  return [victim + extra, attacker];
+};
 // Action 33 walks at raw velocity 200 until PC 339, after its first 50 ticks.
 const INTRO_WALK_TICKS = 50;
 const INTRO_WALK = INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE;
@@ -621,6 +634,11 @@ const RESPONSE_REACTIONS: Record<
   170: { action: 'crouchTimeStopGuard', stop: 0 },
   172: { action: 'airTimeStopGuard', stop: 0 },
 };
+// 0x40f539: a response id selects the victim action from the victim's own
+// table. A Zoma victim's follows its Ryuko twin's rules (export_zoma), so
+// this gives Ryuko's number for it.
+const victimOf = (target: Fighter, id: number) =>
+  ryukoTwin(target.who, responsesOf(target.who)[id]);
 // Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker.
 const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 // A loss that empties life sets the lose action 59 (0x40e83e), which enters
@@ -629,7 +647,7 @@ const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 const knockedOut = (wasOut: boolean): Action => (wasOut ? 'koAgain' : 'down');
 // 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1).
 function loseLife(f: Fighter, loss: number) {
-  if (loss && f.hp <= DESPERATION_HP)
+  if (loss && f.hp <= desperationOf(f.who))
     loss = Math.max(1, Math.trunc((loss * 60) / 100));
   f.hp = Math.max(0, f.hp - loss);
   return loss;
@@ -689,7 +707,7 @@ function struck(
   const y = origin.y + box.y * 1.5;
   const mid = (a: number, r: number, b: number, s: number) =>
     (Math.min(a + r, b + s) + Math.max(a - r, b - s)) / 2;
-  for (const body of hurtboxes(target.action, target.age)) {
+  for (const body of hurtboxes(target.action, target.age, target.who)) {
     const bx = target.x + target.facing * body.x * 1.5;
     const by = target.y + body.y * 1.5;
     if (
@@ -716,9 +734,20 @@ const ROLLED: Partial<Record<Action, number>> = {
   airHitRapid: 84,
   rushAirHit: 122,
 };
+// Zoma's twins roll alike, as does his jump hit (78, PC 784).
+const ZOMA_ROLLED: Partial<Record<Action, number>> = {
+  ...Object.fromEntries(
+    Object.entries(ROLLED).map(([action, index]) => [
+      action,
+      twin('zoma', index),
+    ]),
+  ),
+  jumpHit: 78,
+};
+const rolls = (who: Who) => (who === 'ryuko' ? ROLLED : ZOMA_ROLLED);
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
 // A looping script never runs out, so its object lives until deleted.
-const loops = (e: Effect) => script(e.clip).end === 'loop';
+const loops = (e: Effect) => script(e.clip, e.who).end === 'loop';
 // A jump target: an action, or "action+offset" entering mid-action.
 const sourceKey = (action: number, offset: number): ObjectKey =>
   offset ? `${action}+${offset}` : action;
@@ -738,7 +767,11 @@ function toNeutral(f: Fighter) {
 // attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
 function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
   const kinds = (actor.box?.kind ?? 0) | (actor.objectBox?.kind ?? 0);
-  if (kinds & 2 && age > 0 && script(index).frames.some((f) => f.t === age))
+  if (
+    kinds & 2 &&
+    age > 0 &&
+    script(index, actor.who).frames.some((f) => f.t === age)
+  )
     actor.connected = false;
 }
 // 0x40f010 skips a player victim by the box's kind (0x40f12d–0x40f18e): 0x10
@@ -813,6 +846,8 @@ const reactions = new Set<Action>([
   ...blocks,
 ]);
 export interface Fighter {
+  // Whose container the fighter plays: actions, art, sounds and tables.
+  who: Who;
   x: number;
   y: number;
   vx: number;
@@ -912,6 +947,8 @@ type Spawner = { x: number; y: number; facing: -1 | 1; screen?: boolean };
 // running its flattened timeline: spawns, motion, boxes.
 export interface Effect {
   clip: ObjectKey;
+  // The owner's container, which holds the object's action.
+  who: Who;
   x: number;
   y: number;
   vx: number;
@@ -1041,11 +1078,13 @@ export function faderColor({ start, target, left, ticks }: Fader) {
 // The display a fighter shows.
 export function fighterPose(f: Fighter): Pose {
   if (f.action === 'superHeld' && f.held?.pose)
-    return heldFrame(f.held.pose, f.held.flags);
-  if (f.branch) return animationFrame(f.branch, f.age);
-  return clipPose(f.action, f.action === 'jump' ? f.airAge : f.age);
+    return heldFrame(f.held.pose, f.held.flags, f.who);
+  if (f.branch) return animationFrame(f.branch, f.age, f.who);
+  return clipPose(f.action, f.action === 'jump' ? f.airAge : f.age, f.who);
 }
-const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
+const newEffect = (
+  fields: Partial<Effect> & Pick<Effect, 'clip' | 'who'>,
+): Effect => ({
   x: 0,
   y: 0,
   vx: 0,
@@ -1067,13 +1106,14 @@ const newEffect = (fields: Partial<Effect> & Pick<Effect, 'clip'>): Effect => ({
   trail: null,
   ...fields,
 });
-const fighter = (x: number, facing: -1 | 1): Fighter => ({
+const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
+  who,
   x,
   y: 0,
   vx: 0,
   vy: 0,
   gravity: 0.24,
-  hp: LIFE,
+  hp: lifeOf(who),
   facing,
   action: 'idle',
   age: 0,
@@ -1209,13 +1249,13 @@ function slideDst(f: Fighter) {
 }
 
 // Authored start: both walk-ins end 360 pixels apart around the stage center.
-const introFighters = (): [Fighter, Fighter] => [
-  { ...fighter(STAGE_WIDTH / 2 - 180 - INTRO_WALK, 1), action: 'intro' },
-  { ...fighter(STAGE_WIDTH / 2 + 180 + INTRO_WALK, -1), action: 'intro' },
+const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
+  { ...fighter(STAGE_WIDTH / 2 - 180 - INTRO_WALK, 1, a), action: 'intro' },
+  { ...fighter(STAGE_WIDTH / 2 + 180 + INTRO_WALK, -1, b), action: 'intro' },
 ];
 
 export class Match {
-  fighters: [Fighter, Fighter] = [fighter(300, 1), fighter(660, -1)];
+  fighters: [Fighter, Fighter];
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
@@ -1259,10 +1299,14 @@ export class Match {
     public mode: Mode = 'practice',
     intro = false,
     seed = 0,
+    // Player 1's and player 2's characters.
+    readonly characters: [Who, Who] = ['ryuko', 'ryuko'],
   ) {
     this.cpu = new CpuVM(RYUKO_CPU, CPU_LEVEL, seed);
     this.calls = intro;
-    if (intro) this.fighters = introFighters();
+    this.fighters = intro
+      ? introFighters(characters)
+      : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
   }
 
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
@@ -1283,14 +1327,14 @@ export class Match {
   get roundEnd() {
     if (!this.calls) return ROUND_END_TICKS;
     const winner = this.fighters[this.winner === 'player' ? 0 : 1];
-    return roundEndTick(this.winner, winner.hp === LIFE);
+    return roundEndTick(this.winner, winner.hp === lifeOf(winner.who));
   }
 
   // State 100 (0x408970) counts the round and sets it up again: the fighters
   // re-enter at full life (0x411ca5) with their variables cleared
   // (0x4121cc), keeping their stock and power from round 2 (0x411f2d).
   private nextRound() {
-    const fighters = introFighters();
+    const fighters = introFighters(this.characters);
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
       f.power = this.fighters[i].power;
@@ -1396,9 +1440,9 @@ export class Match {
     // A reaction rolls its op 0x20 at its first script step, before the hit
     // effect's objects (the fighters' bucket 0x50 runs before their 0x5d).
     f.branch = null;
-    const rolled = ROLLED[action];
+    const rolled = rolls(f.who)[action];
     const roll = rolled
-      ? script(rolled).events.find((e) => e.op === 'random')
+      ? script(rolled, f.who).events.find((e) => e.op === 'random')
       : undefined;
     if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
       f.branch = `${roll.action}+${roll.offset}`;
@@ -1409,7 +1453,7 @@ export class Match {
     f.objectBox = null;
     f.responses = [];
     f.onHit = 0;
-    f.color = entryColor(action) ?? f.color;
+    f.color = entryColor(action, f.who) ?? f.color;
     f.entered = null;
     if (action !== 'superHeld') f.held = null;
     // Scripts own their motion: each starts still until its op 0x01 commands.
@@ -1478,7 +1522,7 @@ export class Match {
     if (
       (f.action === 'knockdown' || f.action === 'bounceDown') &&
       f.hp > 0 &&
-      f.age >= animationDuration(f.action)
+      f.age >= animationDuration(f.action, f.who)
     )
       this.action(f, 'getUp');
   }
@@ -1511,7 +1555,8 @@ export class Match {
     const slide = reactionSlides[f.action];
     if (slide) {
       if (
-        f.age >= (slide.until ?? animationDuration(f.action as AnimatedAction))
+        f.age >=
+        (slide.until ?? animationDuration(f.action as AnimatedAction, f.who))
       )
         f.vx = 0;
       else if (f.age >= slide.start) {
@@ -1605,6 +1650,9 @@ export class Match {
 
   // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
   private counter(f: Fighter, history: number[]) {
+    // ponytail: Zoma's checks (P+K at age 18) enter his own COUNTER HIT,
+    // which comes with his moves.
+    if (f.who !== 'ryuko') return false;
     const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
     if (!check || !f.stock || !commanded(history, [0x2020], check[1]))
       return false;
@@ -1686,13 +1734,13 @@ export class Match {
     const key = timeline(f);
     rearm(f, key, f.age);
     // A branch has run its own events instead.
-    for (const event of eventsAt(key, f.age))
+    for (const event of eventsAt(key, f.age, f.who))
       if (this.runEvent(f, owner, event)) return;
   }
 
   private fireEffect(e: Effect) {
     rearm(e, e.clip, e.age);
-    for (const event of eventsAt(e.clip, e.age))
+    for (const event of eventsAt(e.clip, e.age, e.who))
       if (this.runEvent(e, e.owner, event)) return;
   }
 
@@ -1759,7 +1807,7 @@ export class Match {
     owner: number,
     key: ObjectKey,
   ): void {
-    for (const event of script(key).events)
+    for (const event of script(key, actor.who).events)
       if (event.op !== 'test') this.runEvent(actor, owner, event);
       else if (this.passes(this.fighters[owner], event))
         return this.runCall(
@@ -1865,16 +1913,14 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
-        const reaction = RESPONSE_REACTIONS[RESPONSES[event.response]];
+        const reaction = RESPONSE_REACTIONS[victimOf(other, event.response)];
         if (!reaction || !this.catchHeld(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         this.action(other, reaction.action, true);
         other.hitStop += reaction.stop;
         self.hitStop += reaction.stop;
-        const [victimPower, attackerPower] = REACTION_POWER[
-          reaction.action
-        ] ?? [0, 0];
+        const [victimPower, attackerPower] = reactionPower(other);
         addPower(other, victimPower);
         addPower(self, attackerPower);
         break;
@@ -1995,8 +2041,10 @@ export class Match {
             y: parent.y + this.cameraY - GROUND,
           }
         : parent;
+    const who = this.fighters[owner].who;
     const child = newEffect({
       clip,
+      who,
       x: screen ? event.x * 1.5 : origin.x + parent.facing * event.x * 1.5,
       y: screen ? event.y * 1.5 : origin.y + event.y * 1.5,
       facing: parent.facing,
@@ -2010,7 +2058,7 @@ export class Match {
     });
     // A script without displays never advances, so its events all fire at t=0
     // (anime beam 296 only spawns 297 and 299); nothing is left to draw.
-    if (animationDuration(clip)) this.effects.push(child);
+    if (animationDuration(clip, who)) this.effects.push(child);
     this.fireEffect(child);
   }
 
@@ -2049,11 +2097,11 @@ export class Match {
       this.action(f, 'land');
       return true;
     }
-    const { end, next } = script(timeline(f));
+    const { end, next } = script(timeline(f), f.who);
     if (
       end === 'hold' ||
       end === 'loop' ||
-      f.age < animationDuration(timeline(f))
+      f.age < animationDuration(timeline(f), f.who)
     )
       return true;
     if (next === 97) this.action(f, 'fly');
@@ -2103,7 +2151,7 @@ export class Match {
     const body = struck(this.origin(source), source.facing, box, target)!;
     const guarding = this.guarding(target, source, box);
     const response = responseFor(source.responses, target, guarding);
-    const victim = RESPONSES[response];
+    const victim = victimOf(target, response);
     const reaction = RESPONSE_REACTIONS[victim];
     if (!reaction) return [];
     const blocked = blocks.has(reaction.action);
@@ -2112,7 +2160,7 @@ export class Match {
         f: attacker,
         target,
         damage: boxDamage(box, body.taken, blocked),
-        effect: box.damage ? RESPONSE_EFFECTS[response] : 0,
+        effect: box.damage ? responseEffectsOf(attacker.who)[response] : 0,
         hitStop: reaction.stop,
         // Objects, like DST's missiles, pause without pausing Ryuko.
         attackerStop:
@@ -2158,7 +2206,7 @@ export class Match {
     }
     for (const e of this.effects) {
       const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
-      for (const body of animationFrame(e.clip, e.age).body ?? [])
+      for (const body of animationFrame(e.clip, e.age, e.who).body ?? [])
         if (body.kind & 6) bodies.push([at, body]);
       if (e.objectBox && !e.connected)
         strikers.push([
@@ -2242,6 +2290,8 @@ export class Match {
     history: number[],
     ok: (level: number) => boolean = () => true,
   ) {
+    // ponytail: Zoma's command table isn't read yet; it comes with his moves.
+    if (f.who !== 'ryuko') return false;
     const found = scan(history, {
       air: f.y < 0,
       still: f.y === 0 && f.vy === 0,
@@ -2397,7 +2447,7 @@ export class Match {
     // Commands before a reaction's first display apply on its first moving tick.
     const reaction = AIR_REACTIONS[f.action];
     if (reaction)
-      for (const event of script(reaction).events)
+      for (const event of script(twin(f.who, reaction), f.who).events)
         if (event.op === 'motion' && Math.max(event.t, 1) === f.age)
           motion(f, event);
     if (f.y < 0 || f.vy < 0) {
@@ -2452,7 +2502,7 @@ export class Match {
     this.recoverKnockdown(f);
     if (f.action === 'knockdown' || f.action === 'bounceDown') return;
     if (f.action === 'takeoff') {
-      if (f.age < animationDuration('takeoff')) return;
+      if (f.age < animationDuration('takeoff', f.who)) return;
       launchJump(f);
       this.action(f, 'jump');
       return;
@@ -2504,7 +2554,7 @@ export class Match {
           'dstHit',
           'getUp',
         ].includes(f.action)) &&
-      f.age < animationDuration(f.action)
+      f.age < animationDuration(f.action, f.who)
     ) {
       slideDst(f);
       // Action 207 moves before its first strike, then slides during recovery.
@@ -2565,7 +2615,7 @@ export class Match {
         // The source dash holds its final airborne pose until landing.
         return;
       }
-      if (f.age < animationDuration(f.action)) return;
+      if (f.age < animationDuration(f.action, f.who)) return;
     }
     const airborne = f.y < 0 || f.vy < 0;
     // Air attacks jump into action 7 (PCs 2485/2507/2528, 2664/2692/2719) and
@@ -2625,12 +2675,15 @@ export class Match {
     if (
       turning ||
       ((f.action === 'turn' || f.action === 'crouchTurn') &&
-        f.age < animationDuration(f.action))
+        f.age < animationDuration(f.action, f.who))
     ) {
       this.action(f, turning ? (crouched ? 'crouchTurn' : 'turn') : f.action);
       return;
     }
-    if (f.action === 'crouchEnter' && f.age < animationDuration('crouchEnter'))
+    if (
+      f.action === 'crouchEnter' &&
+      f.age < animationDuration('crouchEnter', f.who)
+    )
       return;
     if (!airborne && crouched && !input.crouch) {
       this.action(f, 'stand');
@@ -2645,7 +2698,7 @@ export class Match {
       f,
       airborne
         ? (f.action === 'doubleJump' || f.action === 'hitUpJump') &&
-          f.age < animationDuration(f.action)
+          f.age < animationDuration(f.action, f.who)
           ? f.action
           : 'jump'
         : direction
@@ -2671,8 +2724,8 @@ export class Match {
     // and 14, then jumps to KO Normal (PC 591). With global 0 at 10 it would
     // enter 'make hikari' (63) instead (PC 590), but only the title menu
     // writes global 0, to 1 (KGT 78, PC 497).
-    const roll = f.branch && ROLLED[f.action];
-    const rolled = roll ? script(roll).events : [];
+    const roll = f.branch && rolls(f.who)[f.action];
+    const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered
       ? []
       : roll
@@ -2683,7 +2736,7 @@ export class Match {
             )
             .filter((e) => (POSE_EVENTS as readonly string[]).includes(e.op))
         : f.action === 'down' || f.action === 'koAgain'
-          ? script(LOSE).events
+          ? script(twin(f.who, LOSE), f.who).events
           : [];
     const events = [...entry, ...(pose.events ?? [])];
     f.entered = pose;
@@ -2709,7 +2762,7 @@ export class Match {
         facing: actor.facing,
         pose:
           'clip' in actor
-            ? animationFrame(actor.clip, actor.age)
+            ? animationFrame(actor.clip, actor.age, actor.who)
             : fighterPose(actor),
       });
       if (trail.samples.length > trail.spec.count) trail.samples.shift();
@@ -2773,14 +2826,15 @@ export class Match {
       e.vy += e.gravity;
       e.x += e.vx;
       e.y += e.vy;
-      if (++e.age < animationDuration(e.clip) || loops(e)) this.fireEffect(e);
+      if (++e.age < animationDuration(e.clip, e.who) || loops(e))
+        this.fireEffect(e);
     }
     // A script that runs out reaches the next action's op 0x00, which
     // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
     // leaves the world unless it follows a parent.
     this.effects = this.effects.filter(
       (e) =>
-        (e.age < animationDuration(e.clip) || loops(e)) &&
+        (e.age < animationDuration(e.clip, e.who) || loops(e)) &&
         (e.follow !== null ||
           inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e)),
     );
@@ -2805,7 +2859,7 @@ export class Match {
           f.ex = true;
         if (f.age <= INTRO_WALK_TICKS)
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
-        if (f.age >= animationDuration('intro')) this.action(f, 'idle');
+        if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }
       // History keeps recording, so a button held through the intro must be
       // pressed again once control begins.
@@ -2822,7 +2876,10 @@ export class Match {
           f.power = 0;
         }
       if (this.practice.lowHealth)
-        this.fighters[0].hp = Math.min(this.fighters[0].hp, DESPERATION_HP);
+        this.fighters[0].hp = Math.min(
+          this.fighters[0].hp,
+          desperationOf(this.fighters[0].who),
+        );
     }
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     this.inputs = inputs;
@@ -2853,10 +2910,10 @@ export class Match {
     this.koStop = 0;
     move(0);
     const pixel = (v: number) => Math.floor(v / 1.5);
-    for (const boxA of pushboxes(a.action, a.age)) {
+    for (const boxA of pushboxes(a.action, a.age, a.who)) {
       const ax = pixel(a.x) + a.facing * boxA.x;
       const ay = pixel(a.y) + boxA.y;
-      for (const boxB of pushboxes(b.action, b.age)) {
+      for (const boxB of pushboxes(b.action, b.age, b.who)) {
         const bx = pixel(b.x) + b.facing * boxB.x;
         const by = pixel(b.y) + boxB.y;
         const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
@@ -2961,7 +3018,7 @@ export class Match {
       const guarding = this.guarding(target, f, box);
       const { ids, last } = ATTACK_RESPONSES[f.action];
       const id = responseFor(finisher && last ? last : ids, target, guarding);
-      const response = RESPONSE_REACTIONS[RESPONSES[id]];
+      const response = RESPONSE_REACTIONS[victimOf(target, id)];
       const reaction = response.action;
       const blocked = blocks.has(reaction);
       // Aerial drill pauses are applied by the attacker's contact branch instead.
@@ -2971,7 +3028,7 @@ export class Match {
           f,
           target,
           damage: boxDamage(box, body.taken, blocked),
-          effect: box.damage ? RESPONSE_EFFECTS[id] : 0,
+          effect: box.damage ? responseEffectsOf(f.who)[id] : 0,
           hitStop,
           attackerStop: airDrill ? 0 : (response.attackerStop ?? response.stop),
           airDrill,
@@ -3006,7 +3063,7 @@ export class Match {
           f,
           target,
           damage: boxDamage(MISSILE_BOX, body.taken, false),
-          effect: RESPONSE_EFFECTS[32],
+          effect: responseEffectsOf(f.who)[32],
           // Action 85, PC 1000: 13 stop ticks, once for simultaneous missiles.
           // The missile, not Ryuko, pauses.
           hitStop: contacts.some(
@@ -3032,14 +3089,14 @@ export class Match {
         target,
         this.guarding(target, projectile, box),
       );
-      const victim = RESPONSES[response];
+      const victim = victimOf(target, response);
       const { action: reaction, stop } = RESPONSE_REACTIONS[victim];
       const blocked = blocks.has(reaction);
       contacts.push({
         f,
         target,
         damage: boxDamage(AXE_BOX, body.taken, blocked),
-        effect: RESPONSE_EFFECTS[response],
+        effect: responseEffectsOf(f.who)[response],
         // The reaction's op 0x1a stops the thrower too (0x4136ae).
         hitStop: stop,
         attackerStop: stop,
@@ -3100,9 +3157,7 @@ export class Match {
       if (body) target.striker = 'body';
       else if (source && 'clip' in source && source.follow)
         target.striker = 'object';
-      const [victimPower, attackerPower] = REACTION_POWER[target.action] ?? [
-        0, 0,
-      ];
+      const [victimPower, attackerPower] = reactionPower(target);
       addPower(target, victimPower);
       addPower(f, attackerPower);
       // Reactions with recovered motion (and every super response) stop

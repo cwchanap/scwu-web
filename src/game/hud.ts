@@ -1,5 +1,7 @@
 import type Phaser from 'phaser';
-import { DESPERATION_HP, LIFE, POWER_PER_STOCK, ROUNDS_TO_WIN } from './match';
+import { desperationOf, lifeOf } from './characters';
+import type { Who } from './characters';
+import { LIFE, POWER_PER_STOCK, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -92,8 +94,8 @@ export function letteringSounds(match: Match) {
   });
 }
 
-export function healthCrop(hp: number, right: boolean) {
-  const width = Math.round((254 * Math.max(0, Math.min(LIFE, hp))) / LIFE);
+export function healthCrop(hp: number, right: boolean, life = LIFE) {
+  const width = Math.round((254 * Math.max(0, Math.min(life, hp))) / life);
   return { x: right ? 254 - width : 0, width };
 }
 
@@ -111,9 +113,12 @@ export function gaugeImage(tick: number) {
 }
 
 // Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
-// for 40 ticks each (PCs 712–730).
+// for 40 ticks each (PCs 712–730). Zoma's action 71 shows 2001 (PC 677).
 export const faceImage = (face: number) =>
   face < 0 ? 2001 : [2002, 2001, 2000, 2001][Math.floor(face / 40) % 4];
+// The *NAME action's image: Ryuko's 66 shows 464 (PC 675), Zoma's 64 340
+// (PC 637).
+const NAMES: Record<Who, number> = { ryuko: 464, zoma: 340 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
 const STOCK_OFFSETS = [
@@ -152,18 +157,14 @@ export function createHud(scene: Phaser.Scene) {
       .setDepth(101),
   );
   // Name placement is authored; portrait anchors above come from actions 72/73.
-  scene.add
-    .image(106 * scale, 38 * scale, 'ryuko-464')
-    .setScrollFactor(0)
-    .setOrigin(0)
-    .setScale(scale * 0.7)
-    .setDepth(101);
-  scene.add
-    .image(474 * scale, 38 * scale, 'ryuko-464')
-    .setScrollFactor(0)
-    .setOrigin(0)
-    .setScale(scale * 0.7)
-    .setDepth(101);
+  const names = [106, 474].map((x) =>
+    scene.add
+      .image(x * scale, 38 * scale, 'ryuko-464')
+      .setScrollFactor(0)
+      .setOrigin(0)
+      .setScale(scale * 0.7)
+      .setDepth(101),
+  );
   // Type 13 (0x409d82) lines up a mark per round to win from the KGT 76/77
   // headers: 1P from (240, 40) stepping −35, 2P from (370, 40) stepping 35.
   // Each shows KGT 56 (112: image 30) until that round is won, when state 1
@@ -213,13 +214,15 @@ export function createHud(scene: Phaser.Scene) {
         .setTexture(`ui-${17 + f.stock}`)
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
       underPower[index]
-        .setVisible(f.hp > 0 && f.hp <= DESPERATION_HP)
+        .setVisible(f.hp > 0 && f.hp <= desperationOf(f.who))
         .setAlpha(Math.floor(match.ticks / 15) % 2 ? 0.45 : 0.9);
-      const face = faces[index].setTexture(`ryuko-${faceImage(f.face)}`);
+      const face = faces[index].setTexture(`${f.who}-${faceImage(f.face)}`);
       if (index) face.setX((609 - face.width) * scale);
+      names[index].setTexture(`${f.who}-${NAMES[f.who]}`);
     });
     life.forEach((bar, index) => {
-      const crop = healthCrop(match.fighters[index].hp, index === 1);
+      const { hp, who } = match.fighters[index];
+      const crop = healthCrop(hp, index === 1, lifeOf(who));
       bar.setCrop(crop.x, 0, crop.width, 14).setVisible(crop.width > 0);
       wins[index].forEach((mark, i) => {
         const won = match.wins[index] > i ? 1 : 0;

@@ -14,6 +14,13 @@ export const DUMMY_BEHAVIORS = [
   'cpu',
 ] as const;
 export type DummyBehavior = (typeof DUMMY_BEHAVIORS)[number];
+// Authored: Zoma reads no commands yet, so he can't attack or play his CPU.
+export const ZOMA_BEHAVIORS: readonly DummyBehavior[] = [
+  'stand',
+  'guard',
+  'crouchGuard',
+  'airGuard',
+];
 
 // Presses alternate with releases so that each one is fresh.
 const press = (tick: number) => tick % 2 === 0;

@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
-  import { DUMMY_BEHAVIORS } from './game/dummy';
+  import type { Who } from './game/characters';
+  import { DUMMY_BEHAVIORS, ZOMA_BEHAVIORS } from './game/dummy';
   import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
 
@@ -14,6 +15,10 @@
     maxStock: false,
     lowHealth: false,
   });
+  let opponent = $state<Who>('zoma');
+  const partners = $derived(
+    opponent === 'zoma' ? ZOMA_BEHAVIORS : DUMMY_BEHAVIORS,
+  );
   const partnerLabels: Record<DummyBehavior, string> = {
     stand: 'Stand',
     guard: 'Guard',
@@ -26,7 +31,8 @@
   let status = $state<GameStatus>({
     ready: false,
     paused: false,
-    hp: [510, 510],
+    hp: [510, 490],
+    life: [510, 490],
     seconds: Infinity,
     hits: 0,
     damage: 0,
@@ -91,6 +97,12 @@
   function setPractice(changes: Partial<PracticeOptions>) {
     practice = { ...practice, ...changes };
     session?.scene.setPractice(practice);
+    focusArena();
+  }
+  function setOpponent(who: Who) {
+    opponent = who;
+    if (!partners.includes(practice.partner)) setPractice({ partner: 'stand' });
+    session?.scene.setOpponent(who);
     focusArena();
   }
   function pause() {
@@ -170,7 +182,7 @@
           role="meter"
           aria-label="Player health"
           aria-valuemin="0"
-          aria-valuemax="510"
+          aria-valuemax={status.life[0]}
           aria-valuenow={status.hp[0]}
         >
           {status.hp[0]}
@@ -179,7 +191,7 @@
           role="meter"
           aria-label="Opponent health"
           aria-valuemin="0"
-          aria-valuemax="510"
+          aria-valuemax={status.life[1]}
           aria-valuenow={status.hp[1]}
         >
           {status.hp[1]}
@@ -241,6 +253,18 @@
           aria-label="Practice settings"
         >
           <label
+            >Opponent
+            <select
+              value={opponent}
+              disabled={!status.ready}
+              onchange={(event) =>
+                setOpponent(event.currentTarget.value as Who)}
+            >
+              <option value="zoma">Zoma</option>
+              <option value="ryuko">Ryuko</option>
+            </select></label
+          >
+          <label
             >Partner
             <select
               value={practice.partner}
@@ -250,7 +274,7 @@
                   partner: event.currentTarget.value as DummyBehavior,
                 })}
             >
-              {#each DUMMY_BEHAVIORS as behavior (behavior)}
+              {#each partners as behavior (behavior)}
                 <option value={behavior}>{partnerLabels[behavior]}</option>
               {/each}
             </select></label
@@ -442,14 +466,15 @@
           one entered during another move comes out when that move ends.
         </p>
         <p>
-          Free practice has no timer. Below the arena, choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, jumping in, or playing as the original CPU. Max
-          stock refills your supers whenever you stand idle, and Low health
-          keeps Ryuko at 30% for her desperation moves. Vs. CPU is the original
-          game's CPU, playing Ryuko's own moves, specials and supers. Reduce
-          their health to zero, or lead on health when time runs out. Changing
-          modes starts a fresh match.
+          Free practice has no timer. Below the arena, choose the opponent, Zoma
+          or Ryuko, and how the partner behaves: standing, guarding high or low,
+          guarding in the air, attacking in range, jumping in, or playing as the
+          original CPU. Zoma so far only stands, moves and guards, so he offers
+          the first four. Max stock refills your supers whenever you stand idle,
+          and Low health keeps Ryuko at 30% for her desperation moves. Vs. CPU
+          is the original game's CPU, playing Ryuko's own moves, specials and
+          supers. Reduce their health to zero, or lead on health when time runs
+          out. Changing modes starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

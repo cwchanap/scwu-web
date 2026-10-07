@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { CHARACTERS, lifeOf } from './characters';
+import type { Who } from './characters';
 import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud, letteringSounds } from './hud';
@@ -34,6 +36,7 @@ export interface GameStatus {
   ready: boolean;
   paused: boolean;
   hp: [number, number];
+  life: [number, number];
   seconds: number;
   hits: number;
   damage: number;
@@ -47,6 +50,7 @@ export const initialStatus: GameStatus = {
   ready: false,
   paused: false,
   hp: [LIFE, LIFE],
+  life: [LIFE, LIFE],
   seconds: Infinity,
   hits: 0,
   damage: 0,
@@ -99,8 +103,23 @@ const keyMap: Record<string, Control> = {
   Digit5: 'megaBeam',
 };
 
+// Authored: free practice's opponent; Vs. CPU stays Ryuko's mirror match
+// until Zoma's moves and CPU table are in.
+const characters = (mode: Mode, opponent: Who): [Who, Who] => [
+  'ryuko',
+  mode === 'practice' ? opponent : 'ryuko',
+];
+const idleVM = (who: Who, seed?: number) =>
+  new StandingVM(CHARACTERS[who].idle, seed);
+
 export class TrainingScene extends Phaser.Scene {
-  match = new Match('practice', false, randomSeed());
+  private opponent: Who = 'zoma';
+  match = new Match(
+    'practice',
+    false,
+    randomSeed(),
+    characters('practice', this.opponent),
+  );
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
@@ -119,7 +138,7 @@ export class TrainingScene extends Phaser.Scene {
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
   private quake: Match['quake'] = { x: null, y: null };
   private frame = 0;
-  private idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
+  private idle = this.match.fighters.map((f, i) => idleVM(f.who, i));
   private ready = false;
   private error = '';
   private lastStatus = '';
@@ -140,12 +159,14 @@ export class TrainingScene extends Phaser.Scene {
 
   preload() {
     this.load.image('court', `${BASE}sport-court.png`);
-    for (const image of data.images)
-      this.load.image(`ryuko-${image.index}`, BASE + image.filename);
+    for (const [who, { images }] of Object.entries(CHARACTERS))
+      for (const image of images)
+        this.load.image(`${who}-${image.index}`, BASE + image.filename);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
-    for (const sound of data.sounds)
-      this.load.audio(`ryuko-sound-${sound.index}`, BASE + sound.filename);
+    for (const [who, { sounds }] of Object.entries(CHARACTERS))
+      for (const sound of sounds)
+        this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
     for (const sound of ui.sounds)
       this.load.audio(`kgt-sound-${sound.index}`, BASE + sound.filename);
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
@@ -261,9 +282,18 @@ export class TrainingScene extends Phaser.Scene {
     this.practice = { ...options };
     this.match.practice = { ...options };
   }
+  setOpponent(who: Who) {
+    this.opponent = who;
+    this.reset(this.match.mode);
+  }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    this.match = new Match(mode, mode === 'cpu', randomSeed());
+    this.match = new Match(
+      mode,
+      mode === 'cpu',
+      randomSeed(),
+      characters(mode, this.opponent),
+    );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.playMusic();
@@ -277,7 +307,7 @@ export class TrainingScene extends Phaser.Scene {
 
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
-    this.idle = [new StandingVM(data.idle), new StandingVM(data.idle, 1)];
+    this.idle = this.match.fighters.map((f, i) => idleVM(f.who, i));
     this.idle.forEach((vm) => vm.tick());
   }
 
@@ -321,8 +351,8 @@ export class TrainingScene extends Phaser.Scene {
 
   // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
   // each tinted image is drawn once and cached.
-  private texture(image: number, { r, g, b }: Color) {
-    const key = `ryuko-${image}`;
+  private texture(image: number, { r, g, b }: Color, who: Who) {
+    const key = `${who}-${image}`;
     if (!r && !g && !b) return key;
     const tinted = `${key}:${r},${g},${b}`;
     if (this.textures.exists(tinted)) return tinted;
@@ -358,11 +388,16 @@ export class TrainingScene extends Phaser.Scene {
 
   // Blitters 0x40c840 by op 0x23 mode: 1 averages with the screen, 2 adds,
   // 4 fades by fade/32.
-  private paint(sprite: Phaser.GameObjects.Image, pose: Pose, color: Color) {
+  private paint(
+    sprite: Phaser.GameObjects.Image,
+    pose: Pose,
+    color: Color,
+    who: Who,
+  ) {
     if (isBlank(pose)) return sprite.setVisible(false);
     return sprite
       .setVisible(true)
-      .setTexture(this.texture(pose.image, color))
+      .setTexture(this.texture(pose.image, color, who))
       .setBlendMode(
         color.mode === 2 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL,
       )
@@ -371,6 +406,7 @@ export class TrainingScene extends Phaser.Scene {
 
   private place(
     sprite: Phaser.GameObjects.Image,
+    who: Who,
     pose: Pose,
     x: number,
     y: number,
@@ -385,7 +421,7 @@ export class TrainingScene extends Phaser.Scene {
       y / ART_SCALE,
       facing === -1,
     );
-    this.paint(sprite, pose, color)
+    this.paint(sprite, pose, color, who)
       .setOrigin(0)
       .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
       .setFlip(p.flip_x, p.flip_y);
@@ -395,7 +431,9 @@ export class TrainingScene extends Phaser.Scene {
     const f = this.match.fighters[index];
     if (f.action === 'idle') {
       const frame = this.idle[index].frame!;
-      const image = data.images.find((image) => image.index === frame.image)!;
+      const image = CHARACTERS[f.who].images.find(
+        (image) => image.index === frame.image,
+      )!;
       return { ...frame, width: image.width, height: image.height };
     }
     return fighterPose(f);
@@ -419,7 +457,10 @@ export class TrainingScene extends Phaser.Scene {
           );
           if (this.match.round !== round) this.resetIdle();
           for (const { owner, index } of this.match.sounds)
-            this.play(`ryuko-sound-${index}`, owner);
+            this.play(
+              `${this.match.fighters[owner].who}-sound-${index}`,
+              owner,
+            );
           for (const index of letteringSounds(this.match))
             this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {
@@ -429,7 +470,8 @@ export class TrainingScene extends Phaser.Scene {
               this.match.fighters[i].hitStop > 0
             )
               return;
-            if (vm.ended) this.idle[i] = new StandingVM(data.idle, vm.seed);
+            if (vm.ended)
+              this.idle[i] = idleVM(this.match.fighters[i].who, vm.seed);
             this.idle[i].tick();
           });
         });
@@ -472,7 +514,7 @@ export class TrainingScene extends Phaser.Scene {
               : undefined;
         // A KO (0x40e8cd) drops the fighter to z 0x3c, behind the other
         // fighter and the objects drawn behind it.
-        this.paint(sprite, pose, this.faded(f.color, i))
+        this.paint(sprite, pose, this.faded(f.color, i), f.who)
           .setDepth(
             f.hp === 0 ? 0.9 : behind === undefined ? 2 : behind ? 1 : 3,
           )
@@ -481,8 +523,11 @@ export class TrainingScene extends Phaser.Scene {
         const { shown } = f.black;
         if (shown === 'none') this.blacks[i].setVisible(false);
         else
+          // ponytail: Ryuko's panel (image 294); a Zoma super would show his
+          // own action 40's, which comes with his supers.
           this.place(
             this.blacks[i],
+            'ryuko',
             BLACK[shown],
             327 * ART_SCALE,
             498 * ART_SCALE,
@@ -509,6 +554,7 @@ export class TrainingScene extends Phaser.Scene {
           );
           this.place(
             sprite,
+            this.match.fighters[projectile.owner].who,
             pose,
             projectile.x,
             GROUND + projectile.y,
@@ -521,11 +567,12 @@ export class TrainingScene extends Phaser.Scene {
         sprite.setVisible(!!effect);
         if (!effect) return;
         // Viewport objects (op 0x04 flag 0x40) ignore the camera.
-        const pose = animationFrame(effect.clip, effect.age);
+        const pose = animationFrame(effect.clip, effect.age, effect.who);
         this.place(
           sprite
             .setDepth(effectDepth(effect))
             .setScrollFactor(effect.screen ? 0 : 1),
+          effect.who,
           pose,
           effect.x,
           effect.screen ? effect.y : GROUND + effect.y,
@@ -546,6 +593,7 @@ export class TrainingScene extends Phaser.Scene {
           const skipped = trail.spec.count - trail.samples.length;
           return trail.samples.map((sample, i) => ({
             ...sample,
+            who: actor.who,
             depth: depth - 0.1,
             screen: object?.screen ?? false,
             color: afterimageColor(
@@ -563,6 +611,7 @@ export class TrainingScene extends Phaser.Scene {
           if (!image) return;
           this.place(
             sprite.setDepth(image.depth).setScrollFactor(image.screen ? 0 : 1),
+            image.who,
             image.pose,
             image.x,
             image.screen ? image.y : GROUND + image.y,
@@ -587,6 +636,7 @@ export class TrainingScene extends Phaser.Scene {
       ready: this.ready,
       paused: this.paused,
       hp: [a.hp, b.hp],
+      life: [lifeOf(a.who), lifeOf(b.who)],
       seconds: this.match.seconds,
       hits: a.hits,
       damage: a.damage,

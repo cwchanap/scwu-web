@@ -56,6 +56,7 @@ const object = (
   fields: Partial<Effect> = {},
 ): Effect => ({
   clip,
+  who: 'ryuko',
   x: 0,
   y: 0,
   vx: 0,
