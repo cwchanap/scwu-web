@@ -1,6 +1,6 @@
 # Ryuko regression lessons
 
-Reference snapshot: SCWU web training implementation, 2026-09-22, revised 2026-10-02 after the camera, throws, chains, damage, victim responses, effects and colour were recovered from the engine, and 2026-10-06 after the command recognizer, the movement commands and the Hit Up chase check. `README.md` holds the current numbers; where this file disagrees, the README and tests win. Re-check current source and tests before changing behavior. These are concrete examples for the checklist, not defaults to copy into another character. Original Windows-game recording parity remains unverified.
+Reference snapshot: SCWU web training implementation, 2026-09-22, revised 2026-10-02 after the camera, throws, chains, damage, victim responses, effects and colour were recovered from the engine, and 2026-10-06 after the command recognizer, the movement commands and the Hit Up chase check. `docs/evidence.md` holds the current numbers; where this file disagrees, `docs/evidence.md` and the tests win. Re-check current source and tests before changing behavior. These are concrete examples for the checklist, not defaults to copy into another character. Original Windows-game recording parity remains unverified.
 
 ## Failures and the checks they taught us
 
@@ -66,7 +66,7 @@ At this port's 10 ms simulation tick, these are the recovered successful-hit pau
 | Aerial drill                                               | 8 / 9 on hit; 8 / 3 on block                   | Actions 209–211 contact branches                            |
 | Axe object                                                 | 15 / 15 (FB → 75); 15 / 15 for airborne victim | Action 227, PC 3288; responses 50 → 110 → 75, 4 → 76        |
 
-Guard pauses and victim reactions now come from each attack's op `0x17` responses through the response table, including overheads, launches and the reactions' own op `0x01` motion (README "Victim responses"). Kick 3 uses 0 / 0 (responses 34–36 → actions 163/165/167) and aerial drill the asymmetric values above. The victim's op `0x1a` other stop (`0x4136ae`) pauses the striker's owner whether its body or an object struck, and both stops hold the stopped players' following objects (op `0x04` flag `0x20`).
+Guard pauses and victim reactions now come from each attack's op `0x17` responses through the response table, including overheads, launches and the reactions' own op `0x01` motion (`docs/evidence.md` "Victim responses"). Kick 3 uses 0 / 0 (responses 34–36 → actions 163/165/167) and aerial drill the asymmetric values above. The victim's op `0x1a` other stop (`0x4136ae`) pauses the striker's owner whether its body or an object struck, and both stops hold the stopped players' following objects (op `0x04` flag `0x20`).
 
 With every active strike contacting immediately, expected elapsed gaps are:
 
@@ -81,7 +81,7 @@ Static trace for the supplied files:
 - Reaction opcode `0x1a` adds byte 1 to self stop and byte 2 to other-player stop at `0x413637`/`0x4136ae`. The entity counter is at `+0x40`; `0x412390` skips animation advancement and `0x40f963` skips motion while it is nonzero. Opcode `0x15` is health/meter adjustment, **not hit-stop**.
 - KGT's base hit/guard pause bytes loaded at `0x43a299`/`0x43a29a` are both zero in this source. Check defaults as well as per-response additions. Aerial drill's explicit pause branches are at PCs 2989/3000, 3019–3020, 3040–3041, and 3061–3062.
 
-Regression checks now cover elapsed cadence, both fighters' frozen clocks/motion, no duplicate hits or axe release, buffering during freeze, simultaneous aerial-drill interruption in either fighter order, landing recovery, and final KO freeze. Effects are source objects running their own scripts; supers freeze objects through global 6 (README "Animations"). Original Windows playback parity remains unverified. Check current tests rather than treating a saved passing-test count as proof.
+Regression checks now cover elapsed cadence, both fighters' frozen clocks/motion, no duplicate hits or axe release, buffering during freeze, simultaneous aerial-drill interruption in either fighter order, landing recovery, and final KO freeze. Effects are source objects running their own scripts; supers freeze objects through global 6 (`docs/evidence.md` "Animations"). Original Windows playback parity remains unverified. Check current tests rather than treating a saved passing-test count as proof.
 
 ## Recovered Hit Up launch and chase
 
@@ -97,8 +97,8 @@ Keep regressions for both facings, ground versus air pauses, exact launch bounda
 
 ## Camera and directional input contracts
 
-- Camera (recovered, README "Stage/camera"): the Vs. camera object (`0x40af30`, state 3) aims 320 source pixels left of and above the fighters' midpoint and moves halfway there each tick, truncating, before the hit test and motion; the scroll clamps to 0–640 and 0–480 source pixels. The players' motion then clamps x to 50–590 source pixels of the scroll, so the fighters stay within 540 source pixels of each other. It keeps moving through KO and round endings. The earlier player-only lock was an authored rule and is gone.
-- Movement input (recovered, README "Commands"): DASH F/B (direction, neutral, direction within 13 ticks) dash on the ground and in the air; Jump 2 (neutral, then U, UF or UB within 10 ticks) double jumps. Double jump 10's window (PC 130, levels 1–254) refuses another double jump, and action 7 entered from an air attack, an air dash or a script (PC 94, 0–250) refuses both, until landing; the `doubleJumped`/`airDashed` flags stand in for those windows. The CPU's cleared history reads as neutral, so a CPU holding up in the air double jumps. Authored: a fresh up press jumps from the ground, and Shift/the Dash button write DASH F, or DASH B with back held.
+- Camera (recovered, `docs/evidence.md` "Stage/camera"): the Vs. camera object (`0x40af30`, state 3) aims 320 source pixels left of and above the fighters' midpoint and moves halfway there each tick, truncating, before the hit test and motion; the scroll clamps to 0–640 and 0–480 source pixels. The players' motion then clamps x to 50–590 source pixels of the scroll, so the fighters stay within 540 source pixels of each other. It keeps moving through KO and round endings. The earlier player-only lock was an authored rule and is gone.
+- Movement input (recovered, `docs/evidence.md` "Commands"): DASH F/B (direction, neutral, direction within 13 ticks) dash on the ground and in the air; Jump 2 (neutral, then U, UF or UB within 10 ticks) double jumps. Double jump 10's window (PC 130, levels 1–254) refuses another double jump, and action 7 entered from an air attack, an air dash or a script (PC 94, 0–250) refuses both, until landing; the `doubleJumped`/`airDashed` flags stand in for those windows. The CPU's cleared history reads as neutral, so a CPU holding up in the air double jumps. Authored: a fresh up press jumps from the ground, and Shift/the Dash button write DASH F, or DASH B with back held.
 
 Update tests that encoded superseded camera, 20-tick double-tap or single-tap air-dash behavior while preserving travel, contact, and recovery assertions. Keep an actual-input check for both keyboard and touch.
 
@@ -119,20 +119,20 @@ Regressions cover frozen motion, launch/landing boundaries, both facings, airbor
 
 ## Current training contracts worth preserving
 
-Most of these are now recovered; the README's sections hold the exact figures. Verify the underlying source before treating any remaining authored rule as original behavior.
+Most of these are now recovered; `docs/evidence.md`'s sections hold the exact figures. Verify the underlying source before treating any remaining authored rule as original behavior.
 
 | Feature             | Current regression expectation                                                                                                                                                                                                             |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Standing chains     | Recovered op `0x24` command checks: punch 1 and kick 1 chain only through their hit branches (179/187); punch 2 and kick 2 check at fixed ages with input-history windows (README "Chains"). No automatic repeat.                          |
+| Standing chains     | Recovered op `0x24` command checks: punch 1 and kick 1 chain only through their hit branches (179/187); punch 2 and kick 2 check at fixed ages with input-history windows (`docs/evidence.md` "Chains"). No automatic repeat.              |
 | Second punch        | Three contacts at action ages 18, 24, 30; damage 5 each.                                                                                                                                                                                   |
 | Aerial kick         | Three contacts at ages 15, 23, 31; damage 4 each.                                                                                                                                                                                          |
 | Third standing kick | Eight contacts at ages 15, 21, 27, 33, 39, 45, 51, 57; damage 4 each.                                                                                                                                                                      |
 | Ground drill        | Six contacts at ages 23, 29, 35, 41, 47, 53; damage 5, 5, 5, 5, 7, 8, chip-capable. The last strike uses response 18 → 80.                                                                                                                 |
 | Aerial drill        | Contact-dependent stages continue until landing. Damage 20, 5, 3, 1 by stage. Contact pauses and the two-tick moving transition are detailed above; later contacts depend on relative positions and airtime.                               |
 | Dash input          | Recovered DASH F/B and Jump 2 entries: a 13-tick double tap with neutral between, on the ground or in the air, and neutral then up for the double jump. Movement windows refuse further movement until landing; see the contracts above.   |
-| Catching attack     | Recovered: grab box at age 7 (PC 2750, kind `0xa8`), Chuck Hit 197 with response 30, three throw spins (199) with op `0x07` holds, then response 31's toss and 30 life (PCs 2769–2770). README "Throws and recovery".                      |
+| Catching attack     | Recovered: grab box at age 7 (PC 2750, kind `0xa8`), Chuck Hit 197 with response 30, three throw spins (199) with op `0x07` holds, then response 31's toss and 30 life (PCs 2769–2770). `docs/evidence.md` "Throws and recovery".          |
 | Held pair/recovery  | The victim tosses through 129–131 into knockdown 146 and get-up 145, sharing DST Hit's hold. Held and holding poses set no push box. Releasing the victim when the thrower is hit or time runs out is authored.                            |
-| Effects             | Recovered: the response table's effect action, placed at the box overlap's centre, playing its own script, op `0x20` rolls and op `0x23` colour (README "Hit effects").                                                                    |
+| Effects             | Recovered: the response table's effect action, placed at the box overlap's centre, playing its own script, op `0x20` rolls and op `0x23` colour (`docs/evidence.md` "Hit effects").                                                        |
 | KO/HUD              | KGT action 26 supplies KO display order/offsets/durations: 166 ticks, followed by an authored 100-tick hold. The source aspect ratio is 640×480, rendered at 1.5×. Ending physics/effects continue; rematch controls stay below the court. |
 
 The stage walls are the recovered 50 source pixels (75 arena) from each end, body push is the recovered `0x40fce9`, and attack reach comes from each pose's recovered attack and body boxes. Another character brings its own boxes; do not tune a margin or range merely to make a test pass.
