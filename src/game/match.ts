@@ -647,6 +647,8 @@ export interface Effect {
   objectBox: ScriptBox | null;
   responses: number[];
   connected: boolean;
+  // Op 0x1a's stop ticks (+0x40) for an object following a stopped player.
+  hitStop: number;
   color: Color;
   trail: Trail | null;
   // Op 0x02 handlers: what a hit (slot 2) or a guard (slot 3) enters.
@@ -781,6 +783,7 @@ const newEffect = (
   objectBox: null,
   responses: [],
   connected: false,
+  hitStop: 0,
   color: NORMAL_COLOR,
   trail: null,
   ...fields,
@@ -1073,11 +1076,20 @@ export class Match {
     );
   }
 
+  // Op 0x1a's stops (0x413637 self, 0x4136ae other) reach a player and
+  // every object following it (+0x28 bit 0x20000000, op 0x04 flag 0x20).
+  private pause(f: Fighter, ticks: number) {
+    f.hitStop += ticks;
+    const owner = this.fighters.indexOf(f);
+    for (const e of this.effects)
+      if (e.owner === owner && e.follow) e.hitStop += ticks;
+  }
+
   private action(f: Fighter, action: Action, restart = false) {
     if (f.action === action && !restart) return;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
     if (action === 'down')
-      this.fighters[1 - this.fighters.indexOf(f)].hitStop += 10;
+      this.pause(this.fighters[1 - this.fighters.indexOf(f)], 10);
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -1430,8 +1442,8 @@ export class Match {
         actor.responses = event.ids;
         break;
       case 'stop':
-        other.hitStop += event.other;
-        if (actor === self) self.hitStop += event.self;
+        this.pause(other, event.other);
+        if (actor === self) this.pause(self, event.self);
         break;
       case 'freeze':
         this.freeze += event.add;
@@ -1498,8 +1510,8 @@ export class Match {
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         this.action(other, reaction.action, true);
-        other.hitStop += reaction.stop;
-        self.hitStop += reaction.stop;
+        this.pause(other, reaction.stop);
+        this.pause(self, reaction.stop);
         const [victimPower, attackerPower] = reactionPower(other);
         addPower(other, victimPower);
         addPower(self, attackerPower);
@@ -1758,9 +1770,9 @@ export class Match {
         damage: boxDamage(box, body.taken, blocked),
         effect: box.damage ? responseEffectsOf(attacker.who)[response] : 0,
         hitStop: reaction.stop,
-        // Objects, like DST's missiles, pause without pausing Ryuko.
-        attackerStop:
-          source === attacker ? (reaction.attackerStop ?? reaction.stop) : 0,
+        // The reaction's other stop (0x4136ae) reaches the striker's owner
+        // whether its body or one of its objects struck.
+        attackerStop: reaction.attackerStop ?? reaction.stop,
         reaction: reaction.action as AnimatedAction,
         facing: source.facing,
         x: body.x,
@@ -2159,6 +2171,12 @@ export class Match {
     // missile's freeze hold, PC 3168). Move after the step to match.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
+      // A stopped object skips its script step (0x412390) and motion
+      // (0x40f963), but still follows its parent (0x40f992).
+      if (e.hitStop > 0) {
+        e.hitStop--;
+        continue;
+      }
       e.vx += e.ax;
       e.vy += e.gravity;
       e.x += e.vx;
@@ -2275,7 +2293,7 @@ export class Match {
     }
     move(1);
     // Applied after both move, so a double KO holds once.
-    for (const f of this.fighters) f.hitStop += this.koStop;
+    for (const f of this.fighters) this.pause(f, this.koStop);
     // 0x40f992–0x40f9d9: after its own motion, an object following its
     // parent takes the parent's position plus its offset, mirrored by the
     // parent's facing; the fighters have moved before it.
@@ -2320,8 +2338,8 @@ export class Match {
       // The reaction's op 0x1a runs once however many boxes enter it this
       // tick (DST's two missiles stop their victim once).
       if (!stopped.has(target)) {
-        f.hitStop += attackerStop;
-        target.hitStop += hitStop;
+        this.pause(f, attackerStop);
+        this.pause(target, hitStop);
         stopped.add(target);
       }
       // A chip that empties life still KOs (0x40e7c0).

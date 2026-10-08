@@ -382,8 +382,11 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(zoma.variables[0]).toBe(10);
     expect(match.effects.filter((e) => e.clip === 223)).toHaveLength(1);
     for (let t = 0; t < 400 && ryuko.hp === 510; t++) steps({});
-    // A bomb (227) falls on the second mark: response 50, 20.
+    // A bomb (227) falls on the second mark: response 50, 20. Its stop
+    // holds Zoma too (0x4136ae).
     expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 490 });
+    expect(zoma.hitStop).toBe(15);
+    while (zoma.hitStop) steps({});
     for (let k = 0; k < 4; k++) {
       steps({ dst: true });
       steps({}, 95);
@@ -548,7 +551,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
       match.step({});
       if (zoma.action === 'script') entered.add(zoma.branch);
     }
-    // FIRE, BOMB and Hit Up have keys; dragon 2 k (214, entry 8) has none.
-    expect([...entered]).toEqual(expect.arrayContaining([204, 222, 197, 214]));
+    // FIRE, BOMB and DST have keys; dragon 2 k (214, entry 8) has none.
+    expect([...entered]).toEqual(expect.arrayContaining([204, 222, 251, 214]));
   });
 });

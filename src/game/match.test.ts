@@ -93,6 +93,7 @@ const object = (
   objectBox: null,
   responses: [],
   connected: false,
+  hitStop: 0,
   color: NORMAL_COLOR,
   trail: null,
   ...fields,
@@ -307,9 +308,9 @@ describe('Hit Up launcher', () => {
     while (target.age < 20) match.step();
     expect(target).toMatchObject({ action: 'down', hp: 0 });
     const stops = player.hitStop;
-    // A DST missile (218, box y −21, PC 3164), which pauses only its victim,
-    // on KO Normal's body box (PC 619: y −100 ± 34). It sets its box as it
-    // next steps (PC 3164), before it moves.
+    // A DST missile (218, box y −21, PC 3164) on KO Normal's body box (PC
+    // 619: y −100 ± 34). It sets its box as it next steps (PC 3164), before
+    // it moves.
     match.effects.push(
       object(RYUKO.dstMissile, 0, {
         x: target.x,
@@ -319,8 +320,9 @@ describe('Hit Up launcher', () => {
     );
     match.step();
     expect(target).toMatchObject({ action: 'koAgain', age: 0, hp: 0 });
-    // Neither PC 607's ten ticks nor PC 611's hold, and no second flash.
-    expect(player.hitStop).toBe(stops);
+    // Only the missile's contact pause (twist, PC 1000: 13), neither PC
+    // 607's ten ticks nor PC 611's hold, and no second flash.
+    expect(player.hitStop).toBe(stops + 13);
     expect(match.effects.filter((e) => e.clip === '59+9')).toEqual([]);
     while (target.age < 6) match.step();
     // PC 631 launches again at raw −500/−1520 and gravity 90.
@@ -629,8 +631,9 @@ describe('Daisetsuzan Oroshi command throw', () => {
         hitStop: 13,
         hp: LIFE - 10 - 22,
       });
-      // The grab, the toss and the missile.
-      expect(attacker).toMatchObject({ age: 286, hitStop: 0, hits: 3 });
+      // The grab, the toss and the missile, whose reaction's other stop
+      // (0x4136ae) pauses Ryuko too.
+      expect(attacker).toMatchObject({ age: 286, hitStop: 13, hits: 3 });
       expect((tossX - attacker.x) * facing).toBeCloseTo(
         19 * 400 * (655 / 65536) * 1.5,
         3,
@@ -1794,10 +1797,9 @@ describe('recovered power gauge', () => {
     match.step({ axe: true });
     for (let i = 0; i < 100 && target.action === 'idle'; i++) match.step();
     // Response 50 → FB (110) adds 10 to the thrower (PC 1442), then 75 adds
-    // 5 and 3 (PC 790) and stops the victim 15 ticks (PC 791). Authored: an
-    // object's victim doesn't pause its owner.
+    // 5 and 3 (PC 790) and stops both fighters 15 ticks (PC 791, 0x4136ae).
     expect(target).toMatchObject({ action: 'hitHeavy', power: 5, hitStop: 15 });
-    expect(attacker).toMatchObject({ power: 13, hitStop: 0 });
+    expect(attacker).toMatchObject({ power: 13, hitStop: 15 });
     const thrower = new Match();
     thrower.fighters[1].x = thrower.fighters[0].x + 100;
     // The grab box at age 7, then Chuck Hit's toss at its age 65 (PC 2769).
@@ -4412,14 +4414,37 @@ describe('prototype training rules', () => {
     target.y = -80;
     target.gravity = 0;
     ticks(match, 17, { axe: true });
-    // The axe's box meets the target as it spawns; authored, its victim
-    // doesn't pause the thrower.
-    expect(f).toMatchObject({ age: 16, hits: 1, hitStop: 0 });
+    // The axe's box meets the target as it spawns, and the airborne
+    // reaction's other stop (76, 0x4136ae) pauses the thrower too.
+    expect(f).toMatchObject({ age: 16, hits: 1, hitStop: 15 });
     expect(axes(match).map((e) => e.clip)).toEqual([230]);
-    ticks(match, 15);
+    ticks(match, 30);
     expect(f).toMatchObject({ age: 31, hits: 1 });
     expect(axes(match)).toHaveLength(0);
     expect(target.hp).toBe(LIFE - 30);
+  });
+
+  it('stops the objects following a stopped fighter, not the others', () => {
+    const match = new Match();
+    const [f, target] = match.fighters;
+    target.x = f.x + 110;
+    // Getter Beam's glow (271) follows Ryuko (op 0x04 flag 0x20).
+    const glow = object(271, 0, {
+      slot: -1,
+      follow: { parent: f, x: 0, y: 0 },
+    });
+    const loose = object(271, 0, { slot: -1 });
+    match.effects.push(glow, loose);
+    match.step({ punch: true });
+    for (let i = 0; i < 30 && f.hitStop === 0; i++) match.step();
+    // Punch 1's hit (73) stops Ryuko 10 ticks, and the glow with her
+    // (0x4136ae: +0x28 bit 0x20000000).
+    expect([f.hitStop, glow.hitStop, loose.hitStop]).toEqual([10, 10, 0]);
+    const [glowAge, looseAge] = [glow.age, loose.age];
+    ticks(match, 10);
+    expect([glow.age, loose.age]).toEqual([glowAge, looseAge + 10]);
+    match.step();
+    expect(glow.age).toBe(glowAge + 1);
   });
 
   it('blocks an axe, permits jumping over it, and expires missed projectiles', () => {
@@ -4459,19 +4484,21 @@ describe('prototype training rules', () => {
     // While its axe (slot 6) lives, 226 jumps to 225 (PC 3267): one display,
     // then neutral, and the axe flies on. The command stays in its 40-tick
     // window, so the free state enters it again each tick while the axe
-    // flies and breaks (its impact, 230, keeps the slot); once that is gone,
-    // the same command throws another.
+    // flies and breaks (its impact, 230, keeps the slot). Its hit stops
+    // Ryuko too (0x4136ae); once it is gone and she moves again, the same
+    // command throws another.
     match.step({ axe: true });
     expect(named(f)).toBe('axeBusy');
     expect(axes(match)).toEqual([axe]);
-    while (axes(match).length) {
+    while (axes(match).length || f.hitStop) {
       expect(named(f)).toBe('axeBusy');
       match.step();
     }
+    match.step();
     expect(named(f)).toBe('axeThrow');
     for (
       let tick = 0;
-      tick < 1000 && (axes(match).length || f.action !== 'idle');
+      tick < 1000 && (axes(match).length || f.action !== 'idle' || f.hitStop);
       tick++
     )
       match.step();
@@ -4854,12 +4881,11 @@ describe('prototype training rules', () => {
     for (let tick = 0; tick < 100 && !match.winner; tick++) match.step();
     expect(match.winner).toBe('player');
     expect(player.action).not.toBe('win');
-    // FB's 75 stops its victim 15 ticks (authored: not the axe's thrower);
-    // KO Normal adds 10 to the thrower (PC 607), then holds both 40 at its
-    // age 5 (PC 611).
-    expect([player.hitStop, target.hitStop]).toEqual([10, 15]);
+    // FB's 75 stops both fighters 15 ticks (0x4136ae); KO Normal adds 10 to
+    // the thrower (PC 607), then holds both 40 at its age 5 (PC 611).
+    expect([player.hitStop, target.hitStop]).toEqual([25, 15]);
     ticks(match, 20);
-    expect([player.hitStop, target.hitStop]).toEqual([40, 40]);
+    expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
     // It finishes the throw before taking its result back in neutral.
     while (named(player) === 'axeThrow') {
       expect(player.age).toBeLessThan(animationDuration(RYUKO.axeThrow));
@@ -5809,13 +5835,13 @@ describe('EX mode', () => {
     expect(ball.box).toMatchObject({ damage: 30, kind: 6 });
     for (let tick = 0; tick < 100 && target.hp === LIFE; tick++) match.step();
     // Response 50 → FB (110) credits the striker 10 power (PC 1442) and
-    // enters 75; objects don't pause Ryuko.
+    // enters 75, whose stop reaches Ryuko too (0x4136ae).
     expect(target).toMatchObject({
       hp: LIFE - 30,
       action: 'hitHeavy',
       hitStop: 15,
     });
-    expect(f).toMatchObject({ power: 13, hitStop: 0 });
+    expect(f).toMatchObject({ power: 13, hitStop: 15 });
     // The hit handler (slot 2) enters 235, a blank display for ten ticks.
     expect(ball).toMatchObject({ clip: 235, age: 0, box: null });
     ticks(match, 9);
