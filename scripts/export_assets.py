@@ -588,19 +588,17 @@ def main():
     entries = tables["commands"]["entries"]
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
-    # Super timelines, their hit branches (handler slot 2) and every spawned object,
-    # plus the guard counter COUNTER HIT (174), and the super-cancel versions entered
-    # from IORI (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253),
-    # the rush air hit (122), the beam hits (83, 84), hits 75, 80, 96 and 132 for
-    # their op 0x20 rolls, air reactions whose op 0x01 commands the match plays,
-    # the lose action (59) whose records open every KO, every response's hit
-    # effect and every object the clips spawn, each with its op 0x20 branches,
-    # keyed "action+offset" when a branch enters mid-action.
+    # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
+    # match plays (the shock 88, FLY NO HIT 97, the rush air hit 122, the beam
+    # hits 83 and 84, hits 75, 80, 96 and 132 and the air reactions), the lose
+    # action (59) whose records open every KO, every response's hit effect and
+    # every object the clips spawn; her moves, and the guard reactions whose op
+    # 0x24 enters COUNTER HIT (174). Each brings what its events spawn, call
+    # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    queue = [(i, 0) for i in [88, 97, 174, 250, 251, 253, 256, 260, 263, 264,
-             265, 278, 279, 280, 286, 292, 318, 319, 122, 83, 84,
-             74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"]),
-             *moves]]
+    queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59,
+                              *filter(None, tables["response_effects"]), *moves,
+                              149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))

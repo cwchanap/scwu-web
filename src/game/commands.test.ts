@@ -101,7 +101,7 @@ describe('recovered command recognizer', () => {
 
   it('takes the first matching entry in table order', () => {
     // G BEAM LV1 (4) comes before fire (6), which its motion also contains.
-    expect(perform('d df f d df f f+P', (f) => (f.stock = 1)).action).toBe(
+    expect(named(perform('d df f d df f f+P', (f) => (f.stock = 1)))).toBe(
       'getterBeam',
     );
   });

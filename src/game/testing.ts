@@ -62,6 +62,26 @@ export const RYUKO = {
   iori3: 248,
   cpuIori: 410,
   cpuIoriRecover: 411,
+  counterHit: 174,
+  airNoSuper: 250,
+  noSuper: 251,
+  // Action 254: a super cancelling IORI spends two stocks here.
+  superCancel: 254,
+  musashi: 256,
+  musashiHit: 257,
+  airGetterBeam: 263,
+  getterBeam: 264,
+  scGetterBeam: 265,
+  evilBeam: 278,
+  scEvilBeam: 279,
+  airEvilBeam: 280,
+  blackRush: 286,
+  megaBeam: 292,
+  megaBeamHit: 294,
+  changeAttack: 319,
+  changeAttackHit: 320,
+  efs: 331,
+  efsCancel: 332,
 } as const;
 
 // What a fighter plays: a timeline's source action, or a clip action.

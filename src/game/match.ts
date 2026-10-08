@@ -9,11 +9,9 @@ import {
   heldFrame,
   hurtboxes,
   pushboxes,
-  isScripted,
   NORMAL_COLOR,
   POSE_EVENTS,
   script,
-  SCRIPTED,
 } from './animations';
 import type {
   Action,
@@ -23,7 +21,6 @@ import type {
   ObjectKey,
   Pose,
   Quake,
-  ScriptedAction,
   Shown,
   SourceEvent,
   TrailSpec,
@@ -41,7 +38,6 @@ import type { Who } from './characters';
 import {
   BACK_DASH,
   commanded,
-  CONTROLS,
   entriesOf,
   HISTORY_TICKS,
   inject,
@@ -103,64 +99,6 @@ export const HEIGHT = 720;
 export const GROUND = 636;
 // The walls with the camera at either end of the stage: 50 source pixels in.
 export const FIGHTER_MARGIN = 50 * 1.5;
-// Op 0x1e cancel windows of the actions still built by hand, read at
-// 0x41193a: from `age` (until `until`), a command whose action level (header
-// byte 2: normals 21–22, specials 31, supers 41, Mega Getter Beam 42) lies in
-// [min, max] cancels the action, always or once the action's own box has
-// connected (`contact`: the counter at player +0xdf85 that op 0x18 arms and a
-// contact raises to 2). Scripts set their own (Fighter.window).
-const cancelRange = (
-  min: number,
-  max: number,
-  contact = true,
-  age = 0,
-  until?: number,
-) => ({ min, max, contact, age, until });
-const CANCELS: Partial<Record<Action, ReturnType<typeof cancelRange>>> = {
-  counterHit: cancelRange(30, 50, true, 0, 50), // 174
-};
-// A super entered while op 0x1f player variable 6 is 100 (set during each IORI
-// stage, PCs 3606/3638/3673) takes its super-cancel path. Getter Beam and EFS
-// check it themselves (PCs 3972 → 265, 4918 → 332); the others go through
-// action 254, which needs two stocks (else NO SUPER), spends them and spawns
-// GENGAI! (253). The hidden super's entry (254 + 9) also enters NO SUPER at
-// 150 life or more.
-const SUPER_CANCELS: Partial<
-  Record<SuperControl, { action: ScriptedAction; life?: number }>
-> = {
-  musashi: { action: 'scMusashi' }, // 254 + 0 → 260
-  changeAttack: { action: 'scChangeAttack' }, // 254 + 14 → 318
-  blackRush: { action: 'blackRush', life: 150 }, // 254 + 9 → 286 + 5
-};
-// Op 0x24 in the standing and crouching guard reactions: with a stock (their
-// op 0x10 otherwise enters a twin without these checks), a fresh Hit Up
-// button press (0x2020) in the last `window` ticks enters COUNTER HIT (174).
-const guardChecks = (first: number): [age: number, window: number][] =>
-  first === 8
-    ? [
-        [0, 8],
-        [8, 10],
-        [18, 10],
-      ]
-    : [
-        [0, 10],
-        [3, 10],
-        [6, 10],
-        [9, 10],
-        [19, 13],
-      ];
-const GUARD_COUNTERS: Partial<Record<Action, [number, number][]>> = {
-  block: guardChecks(8), // 149, PCs 2016/2018/2021
-  crouchBlock: guardChecks(8), // 151, PCs 2040/2042/2045
-  blockHeavy: guardChecks(10), // 154, PCs 2073–2083
-  crouchBlockHeavy: guardChecks(10), // 156, PCs 2105–2115
-  blockStop: guardChecks(10), // 159, PCs 2146–2156
-  crouchBlockStop: guardChecks(10), // 161, PCs 2177–2187
-  blockRapid: guardChecks(10), // 163, PCs 2207–2217
-  crouchBlockRapid: guardChecks(10), // 165, PCs 2237–2247
-  timeStopGuard: guardChecks(10), // 168, PCs 2275–2283
-  crouchTimeStopGuard: guardChecks(10), // 170, PCs 2300–2308
-};
 const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
 // Opcode 1 uses 16.16 velocity scaled by floor(65536 / 100) at speed 10.
 // Convert the recovered source velocities to the web's 1.5-scale arena.
@@ -319,25 +257,6 @@ const introWalk = (who: Who) =>
   who === 'ryuko' ? INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE : 0;
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
-// Command table entries 'G BEAM LV1', 'MUSASHI', 'CGA', 'hidden sup' and 'B G';
-// only Getter Beam lists an air action (263).
-const SUPER_COMMANDS: Record<
-  SuperControl,
-  { ground: ScriptedAction; air?: ScriptedAction }
-> = {
-  getterBeam: { ground: 'getterBeam', air: 'airGetterBeam' },
-  musashi: { ground: 'musashi' },
-  changeAttack: { ground: 'changeAttack' },
-  blackRush: { ground: 'blackRush' },
-  megaBeam: { ground: 'megaBeam' },
-};
-// Source actions entered by op 0x10/0x11 branches, hit handlers and final jumps.
-const SOURCE_ACTIONS: Record<number, Action> = {
-  ...(Object.fromEntries(
-    Object.entries(SCRIPTED).map(([action, index]) => [index, action]),
-  ) as Record<number, Action>),
-  97: 'fly',
-};
 // Victim actions reached through the response table, with their op 0x1a stops
 // for the victim and, where they differ, the attacker.
 const RESPONSE_REACTIONS: Record<
@@ -497,9 +416,15 @@ const loops = (e: Effect) => script(e.clip, e.who).end === 'loop';
 // A jump target: an action, or "action+offset" entering mid-action.
 const sourceKey = (action: number, offset: number): ObjectKey =>
   offset ? `${action}+${offset}` : action;
-// The timeline a scripted fighter runs: its action's, or a branch it took.
-const timeline = (f: Fighter) =>
-  f.branch ?? SCRIPTED[f.action as ScriptedAction];
+// The timeline a scripted fighter runs.
+const timeline = (f: Fighter) => f.branch!;
+// The source action a scripted fighter plays, or null.
+const playingSource = (f: Fighter) =>
+  f.action === 'script' ? Number(String(f.branch).split('+')[0]) : null;
+// Op 0x1f player variable 0 at 10: Ryuko's EX mode, which EX Ch (204, PC
+// 2867) sets and NOR Ch (205, PC 2880) clears. Zoma's counts his bombs.
+export const exMode = (f: Fighter) =>
+  f.who === 'ryuko' && f.variables[0] === 10;
 // What a fighter shows: under 'script', its source action's timeline.
 const shown = (f: Fighter): Shown =>
   f.action === 'script' ? f.branch! : f.action;
@@ -652,9 +577,6 @@ export interface Fighter {
   trail: Trail | null;
   entered: Pose | null;
   fader: Fader | null;
-  // Op 0x1f player variable 14 (selector 0x4e): every super sets it to 100,
-  // and most other actions clear it before their first display.
-  darken: number;
   // Action 43 'Black', which the round intro spawns for each player (PCs
   // 300/325): showing nothing, its panel opaque, or its panel at 50%, for
   // `left` more ticks.
@@ -663,23 +585,19 @@ export interface Fighter {
   held: { pose: number; flags: number; x: number; y: number } | null;
   // This action's own attack or box has connected (hit or block).
   contact: boolean;
-  // Op 0x1f player variable 1: 10 after a double jump, 20 in an air dash.
-  jumpVariable: number;
   // The op 0x20 branch this reaction rolled on entry, drawn instead of its
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
   // timeline.
   branch: ObjectKey | null;
-  // Op 0x1f player variable 0 at 10: EX mode, which EX Ch (204, PC 2867)
-  // sets and NOR Ch (205, PC 2880) clears. `face` counts the cycle of the HUD
-  // face (action 70's object variable 0) from EX mode's first tick, or is −1.
-  ex: boolean;
+  // The cycle of the HUD face (action 70's object variable 0) from EX mode's
+  // first tick, or −1.
   face: number;
-  // Player variable 12: 10 from EX Fire 2 (232, PC 3364) until EX Fire (231,
-  // PC 3341) or its shot's hit (235, PC 3438) clears it. The shot reads it
-  // each display (228, PC 3321).
-  exFire: number;
-  // Op 0x1f's other player variables by number (0x4dfa75 + player): Zoma's
-  // 0 counts his bombs, ten each, and 6 marks DRAGON.
+  // Op 0x1f's player variables by number (0x4dfa75 + player). Ryuko's: 0 is
+  // EX mode (exMode), 1 is 10 after a double jump and 20 in an air dash, 6 is
+  // 100 through an IORI stage, 12 is 10 from EX Fire 2 (232, PC 3364) until
+  // EX Fire (231, PC 3341) or its shot's hit (235, PC 3438) clears it, and
+  // 14 (selector 0x4e) is 100 through a super, which darkens the stage.
+  // Zoma's 0 counts his bombs, ten each, and 6 marks DRAGON.
   variables: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
   // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
@@ -899,17 +817,13 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   trail: null,
   entered: null,
   fader: null,
-  darken: 0,
   black: { shown: 'none', left: 1 },
   held: null,
   contact: false,
-  jumpVariable: 0,
   reaction: 0,
   striker: null,
   branch: null,
-  ex: false,
   face: -1,
-  exFire: 0,
   variables: {},
   stopped: 0,
   transfer: 0,
@@ -1202,11 +1116,7 @@ export class Match {
     // Scripts own their motion: each starts still until its op 0x01 commands.
     if (action === 'script') {
       if (!flying) f.vx = f.vy = f.gravity = 0;
-    } else if (
-      isScripted(action) ||
-      action === 'superHeld' ||
-      action === 'shock'
-    ) {
+    } else if (action === 'superHeld' || action === 'shock') {
       f.vx = f.vy = 0;
       f.gravity = 0;
     } else if (f.gravity === 0) f.gravity = 0.24;
@@ -1278,7 +1188,7 @@ export class Match {
       f.airAge++;
       gravity(f);
       if (f.y === 0) {
-        f.jumpVariable = 0;
+        f.variables[1] = 0;
         this.action(f, motion.land);
       }
     }
@@ -1316,8 +1226,8 @@ export class Match {
       const holder = this.fighters[1 - index];
       if (
         (target.action === 'superHeld' &&
-          (!isScripted(holder.action) || holder.hp === 0)) ||
-        (target.action === 'shock' && holder.action !== 'megaBeamHit')
+          (holder.action !== 'script' || holder.hp === 0)) ||
+        (target.action === 'shock' && playingSource(holder) !== 294)
       )
         this.action(target, target.y < 0 ? 'airHit' : 'hit');
       if (target.action === 'superHeld' && (target.held?.flags ?? 0) & 0x10)
@@ -1325,22 +1235,12 @@ export class Match {
     });
   }
 
-  // A guard reaction's op 0x24 check at its current age (see GUARD_COUNTERS).
+  // The guard reactions run their own op 0x24 checks at their ages, once
+  // their op 0x10 has found a stock (else it enters a twin without them,
+  // 150/152): Ryuko's a fresh Hit Up (PCs 2016–2021, 2073–2083, …), Zoma's
+  // Hit Up at ages 0 and 8 and P+K (0x2090) at 18. Each enters COUNTER HIT.
   private counter(f: Fighter, history: number[]) {
-    if (!Object.hasOwn(GUARD_COUNTERS, f.action)) return false;
-    if (f.who !== 'ryuko') return this.sourceCounter(f, history);
-    const check = GUARD_COUNTERS[f.action]?.find(([age]) => age === f.age);
-    if (!check || !f.stock || !commanded(history, [0x2020], check[1]))
-      return false;
-    this.action(f, 'counterHit', true);
-    this.fireEvents(f);
-    return true;
-  }
-
-  // Zoma's guard reactions run their own op 0x24 checks, Hit Up at ages 0
-  // and 8 and P+K (0x2090) at 18, each over 10 ticks, once their op 0x10 has
-  // found a stock (else it enters a twin without them, 150/152).
-  private sourceCounter(f: Fighter, history: number[]) {
+    if (!blocks.has(f.action)) return false;
     const key = twin(f.who, REACTION_INDEX.get(f.action)!);
     const stock = script(key, f.who).events.find((e) => e.op === 'stock');
     if (stock?.op === 'stock' && f.stock <= stock.min) return false;
@@ -1352,72 +1252,9 @@ export class Match {
     return true;
   }
 
-  // Ops 0x11 (life) and 0x10 (stock) precede each super's first display. Check
-  // them in script order: a branch enters its target, a pass spends the stock.
-  private startSuper(f: Fighter, control: SuperControl, airborne: boolean) {
-    const command = SUPER_COMMANDS[control];
-    const cancel = f.variables[6] === 100 ? SUPER_CANCELS[control] : undefined;
-    if (cancel) {
-      const life = f.hp;
-      const enter =
-        f.stock >= 2 && (cancel.life === undefined || life < cancel.life);
-      if (enter) f.stock -= 2;
-      // Action 254's records clear variable 6 before each jump (PCs 3756,
-      // 3760, 3765, 3769); NO SUPER clears it itself (PC 3715).
-      if (enter) f.variables[6] = 0;
-      this.action(f, enter ? cancel.action : 'noSuper', true);
-      if (enter)
-        this.spawnObject(f, this.fighters.indexOf(f), {
-          flags: 5,
-          action: 253,
-          offset: 0,
-          x: 0,
-          y: -80,
-          slot: 0,
-          z: 0,
-        });
-      this.fireEvents(f);
-      return true;
-    }
-    let action: Action | undefined = airborne ? command.air : command.ground;
-    const entered = new Set<Action>();
-    while (action && isScripted(action) && !entered.has(action)) {
-      entered.add(action);
-      let next: Action | undefined;
-      for (const event of eventsAt(SCRIPTED[action as ScriptedAction], 0)) {
-        const life = f.hp;
-        // Op 0x1f checks (Getter Beam's variable 0 → EFS, PC 3970) jump too.
-        const target =
-          event.op === 'life'
-            ? (event.below ? life <= event.value : life >= event.value) &&
-              event.target
-            : event.op === 'stock'
-              ? f.stock <= event.min && event.target
-              : event.op === 'test' && this.passes(f, event) && event.action;
-        if (target) {
-          next = SOURCE_ACTIONS[target];
-          // The hidden super throws an axe (226) at 153 life or more (PC
-          // 4178), which plays from its own timeline.
-          if (!next) {
-            this.enterSource(f, target);
-            return true;
-          }
-          break;
-        }
-        if (event.op === 'stock') f.stock += event.add;
-      }
-      if (!next) break;
-      action = next;
-    }
-    if (!action) return false;
-    this.action(f, action, true);
-    this.fireEvents(f);
-    return true;
-  }
-
   // Runs a scripted fighter's events once per action age.
   private fireEvents(f: Fighter) {
-    if (!isScripted(f.action) || f.fired === f.age) return;
+    if (f.action !== 'script' || f.fired === f.age) return;
     f.fired = f.age;
     const owner = this.fighters.indexOf(f);
     const key = timeline(f);
@@ -1433,10 +1270,14 @@ export class Match {
       if (this.runEvent(e, e.owner, event)) return;
   }
 
-  // An action change (0x410cf0) by number: the engine states play as the
+  // An action change (0x410cf0) by number: the engine states and Ryuko's
+  // victim reactions (Musashi's finish ends in FLY NO HIT, 97) play as the
   // port's actions, and any other source action runs its timeline.
   private enterSource(f: Fighter, index: number, offset = 0) {
-    const named = offset ? undefined : NEUTRAL[f.who][index];
+    const named = offset
+      ? undefined
+      : (NEUTRAL[f.who][index] ??
+        (f.who === 'ryuko' ? RESPONSE_REACTIONS[index]?.action : undefined));
     if (named) return this.action(f, named, true);
     this.action(f, 'script', true);
     f.branch = sourceKey(index, offset);
@@ -1465,26 +1306,13 @@ export class Match {
   }
 
   // Op 0x1f's checks (0x4137a4) of player variables (selectors 0x40 up) and
-  // global 6 (the freeze): == (1), > (2) or < (3). Ryuko's 0 is EX mode, 6
-  // is 100 through an IORI stage (PCs 3606, 3633) and 12 EX Fire 2; 1 is 10
-  // after a double jump and 20 in an air dash.
+  // global 6 (the freeze): == (1), > (2) or < (3).
   private passes(
     self: Fighter,
     { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
   ) {
-    const ryuko: Record<number, number> = {
-      0x40: self.ex ? 10 : 0,
-      0x46: self.variables[6] ?? 0,
-      0x4c: self.exFire,
-    };
     const variable =
-      selector === 0x86
-        ? this.freeze
-        : selector === 0x41
-          ? self.jumpVariable
-          : self.who === 'ryuko'
-            ? ryuko[selector]
-            : (self.variables[selector & 0x3f] ?? 0);
+      selector === 0x86 ? this.freeze : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -1699,11 +1527,6 @@ export class Match {
         break;
       case 'variable':
         self.variables[event.index] = event.value;
-        if (event.index === 14) self.darken = event.value;
-        else if (event.index === 1) self.jumpVariable = event.value;
-        else if (event.index === 0 && self.who === 'ryuko')
-          self.ex = event.value === 10;
-        else if (event.index === 12) self.exFire = event.value;
         break;
       case 'add':
         self.variables[event.index] =
@@ -1712,8 +1535,7 @@ export class Match {
       // Ops 0x10 and 0x11 (0x413500, 0x413164) jump to their target on too
       // little stock, which otherwise pays the super, or past a life
       // threshold. Op 0x10 without r[5] bit 0 (0x4135eb) jumps on enough
-      // stock instead and pays nothing (EX Ch, PC 2861). Ryuko's supers
-      // resolve on entry (startSuper).
+      // stock instead and pays nothing (EX Ch, PC 2861).
       case 'stock':
         if ('clip' in actor || actor.action !== 'script') break;
         if (event.atLeast) {
@@ -1857,23 +1679,23 @@ export class Match {
 
   // A scripted fighter's own motion; false when its timeline has ended on foot.
   private moveScripted(f: Fighter) {
-    const action = f.action as ScriptedAction | 'script';
+    const branch = f.branch;
     this.fireEvents(f);
     const airborne = f.y < 0 || f.vy < 0;
     f.vx += f.ax;
     f.vy += f.gravity;
     placeX(f, f.x + f.vx);
     f.y = Math.min(0, f.y + f.vy);
-    if (f.action !== action) return true;
-    // Airborne supers end on landing: 0x411810 enters the slot-1 handler's
-    // action (Ryuko's supers land in 9), or without one ends the action.
+    if (f.action !== 'script' || f.branch !== branch) return true;
+    // An airborne move ends on landing: 0x411810 enters the slot-1 handler's
+    // action (her air beams land in Dash F lend, 15, PC 3964), or without
+    // one ends the action.
     if (airborne && f.y === 0) {
       f.vx = f.vy = 0;
-      f.jumpVariable = 0;
-      if (f.action === 'script' && !f.onLand) return false;
+      f.variables[1] = 0;
+      if (!f.onLand) return false;
       markActing(f);
-      if (f.action === 'script') this.enterKey(f, f.onLand);
-      else this.action(f, 'land');
+      this.enterKey(f, f.onLand);
       return true;
     }
     const { end, next, offset = 0 } = script(timeline(f), f.who);
@@ -1883,9 +1705,8 @@ export class Match {
       f.age < animationDuration(timeline(f), f.who)
     )
       return true;
-    if (next === 97) this.action(f, 'fly');
     // A last op 0x0a enters its target, the fall (7) among them.
-    else if (next !== null) this.enterSource(f, next, offset);
+    if (next !== null) this.enterSource(f, next, offset);
     // Running out airborne, the free state falls.
     else if (f.y < 0) {
       this.action(f, 'jump');
@@ -1988,9 +1809,7 @@ export class Match {
         f.objectBox,
         () => {
           f.connected = true;
-          if (!f.onHit) return;
-          this.action(f, SOURCE_ACTIONS[f.onHit as number], true);
-          this.fireEvents(f);
+          if (f.onHit) this.enterKey(f, f.onHit);
         },
       ]);
     });
@@ -2063,52 +1882,19 @@ export class Match {
       f.who,
     );
     if (!found) return false;
-    const { stance } = found;
-    // Ryuko's supers still built by hand, until they play from their timelines.
-    const [control] = (f.who === 'ryuko' && CONTROLS[found.entry]) || [];
-    switch (control) {
-      case 'getterBeam':
-      case 'musashi':
-      case 'changeAttack':
-      case 'blackRush':
-      case 'megaBeam':
-        return (
-          ok(control === 'megaBeam' ? 42 : 41) &&
-          this.startSuper(f, control, stance === 'air')
-        );
-    }
     // Each entry enters its stance's action, which plays from its own
     // timeline; a window passes it by that action's level.
-    const index = entriesOf(f.who)[found.entry - 1][stance];
+    const index = entriesOf(f.who)[found.entry - 1][found.stance];
     if (!ok(LEVELS[f.who][index], index)) return false;
     this.enterSource(f, index);
     return true;
   }
 
-  // Op 0x1e windows, read on every tick, contact stops included: the hand-built
-  // actions' (CANCELS), or the one a script or clip set.
+  // Op 0x1e windows, read on every tick, contact stops included. Scripts and
+  // clips set the window themselves, which 0x41193a reads: mode 1 once the
+  // move's box has connected, 2 always; type 0 passes a command whose
+  // action's level lies in [min, max], type 1 only the action it names.
   private cancel(f: Fighter, other: Fighter, history: number[]) {
-    const range = f.who === 'ryuko' ? CANCELS[f.action] : undefined;
-    if (!range) return this.windowCancel(f, other, history);
-    if (
-      f.age < range.age ||
-      f.age >= (range.until ?? Infinity) ||
-      (range.contact && !f.contact)
-    )
-      return false;
-    return this.command(
-      f,
-      other,
-      history,
-      (level) => level >= range.min && level <= range.max,
-    );
-  }
-
-  // Scripts and clips set the window themselves (op 0x1e), which 0x41193a reads:
-  // mode 1 once the move's box has connected, 2 always; type 0 passes a
-  // command whose action's level lies in [min, max], type 1 only the action
-  // it names.
-  private windowCancel(f: Fighter, other: Fighter, history: number[]) {
     const window = f.window;
     if (!window || !(window.mode === 2 || (window.mode === 1 && f.contact)))
       return false;
@@ -2129,7 +1915,7 @@ export class Match {
     if (f.hitStop === 0) f.age++;
     if (this.cancel(f, other, history)) {
       // The motion step still moves a script it enters this tick (0x40f910).
-      if (f.hitStop === 0 && isScripted(f.action)) this.moveScripted(f);
+      if (f.hitStop === 0 && f.action === 'script') this.moveScripted(f);
       return;
     }
     if (f.hitStop > 0) {
@@ -2139,7 +1925,7 @@ export class Match {
     if (f.action === 'superHeld' || f.action === 'shock') return;
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
-    if (isScripted(f.action) && this.moveScripted(f)) return;
+    if (f.action === 'script' && this.moveScripted(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
     // Commands before a reaction's first display apply on its first moving tick.
@@ -2152,7 +1938,7 @@ export class Match {
       f.airAge++;
       gravity(f);
       if (f.y === 0) {
-        f.jumpVariable = 0;
+        f.variables[1] = 0;
         // 0x411810: landing without a slot-1 handler ends the action, and the
         // free state reads commands on the same tick. The air reactions have
         // none.
@@ -2290,7 +2076,7 @@ export class Match {
           : [];
     const events = [...entry, ...(pose.events ?? [])];
     f.entered = pose;
-    if (isScripted(f.action)) return;
+    if (f.action === 'script') return;
     for (const event of events) this.runEvent(f, index, event);
   }
 
@@ -2317,17 +2103,17 @@ export class Match {
     }
     // The HUD face (action 70, bucket 20) also runs first: in EX mode it
     // counts its cycle from the tick after the variable is set.
-    for (const f of this.fighters) f.face = f.ex ? f.face + 1 : -1;
+    for (const f of this.fighters) f.face = exMode(f) ? f.face + 1 : -1;
     // Action 43 runs in bucket 15, before the fighters' scripts (0x50): while
     // variable 14 is 100 it shows its panel one tick opaque (PC 431), then
     // five at 50% (PC 435), checking again after each (PCs 428, 433).
-    for (const { black, darken } of this.fighters) {
+    for (const { black, variables } of this.fighters) {
       if (black.left > 1) black.left--;
       else if (black.shown === 'opaque')
         Object.assign(black, { shown: 'half', left: 5 });
       else
         Object.assign(black, {
-          shown: darken === 100 ? 'opaque' : 'none',
+          shown: variables[14] === 100 ? 'opaque' : 'none',
           left: 1,
         });
     }
@@ -2421,7 +2207,7 @@ export class Match {
         // Zoma's intro has no such check.
         const ryuko = f.who === 'ryuko';
         if (ryuko && f.age === INTRO_EX_TICK && [player, opponent][i]?.crouch)
-          f.ex = true;
+          f.variables[0] = 10;
         if (ryuko && f.age <= INTRO_WALK_TICKS)
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
         if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
@@ -2504,7 +2290,7 @@ export class Match {
     // Collect contacts before applying them so same-tick attacks can trade.
     const contacts = [
       ...this.fighters.flatMap((f, i) =>
-        !frozen[i] && isScripted(f.action) ? this.boxContact(f, i) : [],
+        !frozen[i] && f.action === 'script' ? this.boxContact(f, i) : [],
       ),
       ...this.effects.flatMap((e) => this.boxContact(e, e.owner)),
     ];
@@ -2581,18 +2367,13 @@ export class Match {
     }
     // Run contact branches after all hits: an interrupted aerial drill must not
     // apply its own stop or restart, regardless of fighter update order.
-    for (const { f, target, blocked, source } of contacts) {
+    for (const { f, blocked, source } of contacts) {
       if ('clip' in source) this.handle(source, blocked);
       // Op 0x02 slots 2 and 3: a script's own box enters its hit or guard
       // handler's action.
       if (source === f && f.action === 'script') {
         const handler = blocked ? f.onGuard : f.onHit;
         if (handler) this.enterKey(f, handler);
-      }
-      // Op 0x02 slot 2: the super's own box enters its hit branch.
-      else if (source === f && f.onHit && !blocked && target.hp > 0) {
-        this.action(f, SOURCE_ACTIONS[f.onHit as number], true);
-        this.fireEvents(f);
       }
     }
     for (const fire of objectHits) fire();

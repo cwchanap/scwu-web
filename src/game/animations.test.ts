@@ -218,7 +218,7 @@ describe('selected core animation assets', () => {
     // Action 264: 24, 304, 305, 306, twenty calls of 266, then 306, 24, 31.
     expect(
       [0, 30, 75, 80, 95, 350, 365].map(
-        (age) => animationFrame('getterBeam', age).image,
+        (age) => animationFrame(264, age).image,
       ),
     ).toEqual([24, 304, 305, 306, 306, 24, 31]);
     expect(eventsAt(264, 0)).toEqual(
@@ -258,7 +258,7 @@ describe('selected core animation assets', () => {
     ).toHaveLength(20);
     // Action 257 jumps to FLY NO HIT (97), which loops 98 until landing.
     expect(script(257)).toMatchObject({ end: 'jump', next: 97 });
-    expect(animationDuration('musashiHit')).toBe(578);
+    expect(animationDuration(257)).toBe(578);
     expect(script(97)).toMatchObject({ end: 'loop', loop: 3 });
     expect(animationFrame('fly', 6).image).toBe(102);
     expect(animationFrame('fly', 22)).toEqual(animationFrame('fly', 6));

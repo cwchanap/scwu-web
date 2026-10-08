@@ -198,7 +198,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     steps({ jump: true });
     expect(zoma).toMatchObject({ action: 'script', branch: 11 });
     steps({}, 3);
-    expect(zoma.jumpVariable).toBe(10);
+    expect(zoma.variables[1]).toBe(10);
     steps({ punch: true });
     // JUMP 2 (entry 12) still matches its own neutral-then-up and comes
     // first: its level 255 is refused (11's window passes 1–254, PC 131),
@@ -411,7 +411,11 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
       for (const input of [{ crouch: true }, { right: true }]) steps(input, 2);
     steps({ punch: true });
     // Op 0x10 at PC (239) takes the stock; variable 14 darkens the stage.
-    expect(zoma).toMatchObject({ branch: 239, stock: 0, darken: 100 });
+    expect(zoma).toMatchObject({
+      branch: 239,
+      stock: 0,
+      variables: expect.objectContaining({ 14: 100 }),
+    });
     expect(match.freeze).toBeGreaterThan(0);
     steps({});
     expect(zoma.black.shown).toBe('opaque');
@@ -513,7 +517,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect([ryuko.action, zoma.action]).toEqual(['idle', 'intro']);
     expect([ryuko.x, zoma.x]).toEqual([780, 1140]);
     match.step({}, { crouch: true });
-    expect(zoma).toMatchObject({ action: 'idle', x: 1140, ex: false });
+    expect(zoma).toMatchObject({ action: 'idle', x: 1140, variables: {} });
   });
 
   it("enters a command the CPU writes, with its step's direction (0x411644)", () => {

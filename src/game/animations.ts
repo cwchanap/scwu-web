@@ -413,30 +413,6 @@ export const animations = {
     1,
   ]),
   draw: clip([...clips.winStand, ...clips.draw]),
-  // Supers and their hit branches, played from the flattened source timelines.
-  noSuper: scriptClip(251),
-  airNoSuper: scriptClip(250),
-  getterBeam: scriptClip(264),
-  airGetterBeam: scriptClip(263),
-  evilBeam: scriptClip(278),
-  airEvilBeam: scriptClip(280),
-  musashi: scriptClip(256),
-  musashiHit: scriptClip(257),
-  blackRush: scriptClip(286),
-  megaBeam: scriptClip(292),
-  megaBeamHit: scriptClip(294),
-  changeAttack: scriptClip(319),
-  changeAttackHit: scriptClip(320),
-  // A guard reaction's op 0x24 enters COUNTER HIT (174), spending a stock.
-  counterHit: scriptClip(174),
-  // Super-cancel versions, entered when a super cancels IORI.
-  scMusashi: scriptClip(260),
-  scGetterBeam: scriptClip(265),
-  scEvilBeam: scriptClip(279),
-  scChangeAttack: scriptClip(318),
-  // EX mode's Getter Beam: EFS (331) and its IORI cancel version (332).
-  efs: scriptClip(331),
-  efsCancel: scriptClip(332),
   // Responses 43 (action 97, looping 98 until landing) and 33 (88, looping 90).
   fly: scriptClip(97),
   shock: scriptClip(88),
@@ -447,39 +423,10 @@ export const animations = {
 };
 export type AnimatedAction = keyof typeof animations;
 // 'script' runs the source action in the fighter's `branch` from its own
-// timeline: Zoma's moves, entered by number.
+// timeline: every move, entered by number.
 export type Action = 'idle' | 'script' | AnimatedAction;
 // What a fighter shows: an action's clip, or a source action's timeline.
 export type Shown = Exclude<Action, 'script'> | ObjectKey;
-// Actions whose events the match runs, by source action.
-export const SCRIPTED = {
-  noSuper: 251,
-  airNoSuper: 250,
-  getterBeam: 264,
-  airGetterBeam: 263,
-  evilBeam: 278,
-  airEvilBeam: 280,
-  musashi: 256,
-  musashiHit: 257,
-  blackRush: 286,
-  megaBeam: 292,
-  megaBeamHit: 294,
-  changeAttack: 319,
-  changeAttackHit: 320,
-  counterHit: 174,
-  scMusashi: 260,
-  scGetterBeam: 265,
-  scEvilBeam: 279,
-  scChangeAttack: 318,
-  efs: 331,
-  efsCancel: 332,
-} satisfies Partial<Record<Action, number>>;
-export type ScriptedAction = keyof typeof SCRIPTED;
-export const isScripted = (
-  action: Action,
-): action is ScriptedAction | 'script' =>
-  action === 'script' || Object.hasOwn(SCRIPTED, action);
-
 // A display of 0 or 1000-odd ticks waits for gameplay (landing or a jump
 // back to itself): play it as one held tick.
 const waits = (frames: Pose[]) =>
