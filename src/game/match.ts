@@ -2332,12 +2332,15 @@ export class Match {
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = source === f;
       if (body) f.contact = true;
-      addPower(f, bonus);
       const wasOut = target.hp === 0;
       f.damage += loseLife(target, strength);
+      // A loss that empties life replaces the victim's next action, the
+      // reaction (+0x38, 0x40f541), with the lose action (0x40e84b), so the
+      // reaction's records never run: no op 0x15 power, no op 0x1a stops.
+      if (target.hp > 0) addPower(f, bonus);
       // The reaction's op 0x1a runs once however many boxes enter it this
       // tick (DST's two missiles stop their victim once).
-      if (!stopped.has(target)) {
+      if (!stopped.has(target) && target.hp > 0) {
         this.pause(f, attackerStop);
         this.pause(target, hitStop);
         stopped.add(target);

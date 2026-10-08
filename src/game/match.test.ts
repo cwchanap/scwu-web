@@ -320,9 +320,10 @@ describe('Hit Up launcher', () => {
     );
     match.step();
     expect(target).toMatchObject({ action: 'koAgain', age: 0, hp: 0 });
-    // Only the missile's contact pause (twist, PC 1000: 13), neither PC
-    // 607's ten ticks nor PC 611's hold, and no second flash.
-    expect(player.hitStop).toBe(stops + 13);
+    // No stop: the lose action replaces the missile's reaction (0x40e84b),
+    // and 61 has neither PC 607's ten ticks nor PC 611's hold. No second
+    // flash either.
+    expect(player.hitStop).toBe(stops);
     expect(match.effects.filter((e) => e.clip === '59+9')).toEqual([]);
     while (target.age < 6) match.step();
     // PC 631 launches again at raw −500/−1520 and gravity 90.
@@ -4811,9 +4812,10 @@ describe('prototype training rules', () => {
         vx: 0,
         vy: 0,
       });
-      expect([player.hitStop, target.hitStop]).toEqual([20, 10]);
-      ticks(match, 10);
-      expect(target.age).toBe(0);
+      // The lose action replaces the reaction (0x40e84b), so the hit stops
+      // no one; KO Normal adds 10 to the striker (PC 607), then holds both
+      // 40 at its age 5 (PC 611).
+      expect([player.hitStop, target.hitStop]).toEqual([10, 0]);
       ticks(match, 5);
       expect(target.age).toBe(5);
       expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
@@ -4862,7 +4864,7 @@ describe('prototype training rules', () => {
     target.hp = 1;
     match.step();
     const height = target.y;
-    ticks(match, 15 + 5 + 40 + 8);
+    ticks(match, 5 + 40 + 8);
     expect(target).toMatchObject({ action: 'down', age: 13, y: height, vy: 0 });
     ticks(match, 26);
     expect(target.action).toBe('down');
@@ -4881,10 +4883,12 @@ describe('prototype training rules', () => {
     for (let tick = 0; tick < 100 && !match.winner; tick++) match.step();
     expect(match.winner).toBe('player');
     expect(player.action).not.toBe('win');
-    // FB's 75 stops both fighters 15 ticks (0x4136ae); KO Normal adds 10 to
+    // The lose action replaces FB's reaction (0x40e84b), so it neither
+    // credits the thrower (PC 1442) nor stops anyone; KO Normal adds 10 to
     // the thrower (PC 607), then holds both 40 at its age 5 (PC 611).
-    expect([player.hitStop, target.hitStop]).toEqual([25, 15]);
-    ticks(match, 20);
+    expect(player.power).toBe(0);
+    expect([player.hitStop, target.hitStop]).toEqual([10, 0]);
+    ticks(match, 5);
     expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
     // It finishes the throw before taking its result back in neutral.
     while (named(player) === 'axeThrow') {
@@ -4903,7 +4907,7 @@ describe('prototype training rules', () => {
     a.hp = b.hp = 7;
     ticks(match, 8, { punch: true }, { punch: true });
     expect(match.winner).toBe('draw');
-    ticks(match, 35);
+    ticks(match, 15);
     expect(match.fighters.map((f) => [f.age, f.hitStop])).toEqual([
       [5, 80],
       [5, 80],
@@ -4948,15 +4952,16 @@ describe('prototype training rules', () => {
     expect(match.fighters[1].action).toBe('down');
     const end = match.ticks;
     const age = match.fighters[1].age;
+    // PC 611 holds KO Normal at age 5 for 40 ticks.
     ticks(match, 10, { kick: true });
-    expect(match.fighters[1].age).toBe(age);
-    ticks(match, 100, { kick: true });
+    expect(match.fighters[1].age).toBe(age + 5);
+    ticks(match, 90, { kick: true });
     expect(match.fighters[0].action).toBe('win');
     expect(match.ticks).toBe(end);
     expect(match.fighters[1].age).toBe(age + 60); // Includes the KO's 40-tick hold.
     expect(match.fighters[1].hp).toBe(0);
     expect(match.resultReady).toBe(false);
-    ticks(match, ROUND_END_TICKS - 110);
+    ticks(match, ROUND_END_TICKS - 100);
     expect(match.resultReady).toBe(true);
     expect(match.fighters[1].y).toBe(0);
     const finalAge = match.fighters[1].age;
