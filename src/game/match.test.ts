@@ -2,8 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   addPower,
   afterimageColor,
-  AXE_RELEASE_TICK,
-  THROW_TOSS_TICK,
   fighterPose,
   FIGHTER_MARGIN,
   FixedClock,
@@ -27,7 +25,17 @@ import {
   RESPONSE_EFFECTS,
 } from './animations';
 import { rand } from './standing';
-import { enter, named, playing, pose, RYUKO, strike } from './testing';
+import {
+  base,
+  enter,
+  named,
+  objects,
+  playing,
+  pose,
+  RYUKO,
+  spawn,
+  strike,
+} from './testing';
 
 function ticks(
   match: Match,
@@ -45,6 +53,16 @@ function untilResult(match: Match) {
   expect(match.resultReady).toBe(true);
 }
 
+// Air Drill's contact branches: each spin's hit and guard handlers (209 +
+// 12/23, 209 + 42/43, 210 and 211 + 12/13), which shake on image 136.
+const DRILL_CONTACT = /^(209\+(12|23|42|43)|21[01]\+1[23])$/;
+// A side's axes (227), flying or breaking into their impact (230).
+const axes = (match: Match, owner?: number) =>
+  match.effects.filter(
+    (e) =>
+      [RYUKO.axe, RYUKO.axeHit].includes(base(e.clip) as 227 | 230) &&
+      (owner === undefined || e.owner === owner),
+  );
 // The response hit effects 0x40f567 spawns at contact.
 const HIT_EFFECTS = new Set(RESPONSE_EFFECTS.filter(Boolean));
 const hitEffects = (match: Match) =>
@@ -288,21 +306,16 @@ describe('Hit Up launcher', () => {
     while (target.age < 20) match.step();
     expect(target).toMatchObject({ action: 'down', hp: 0 });
     const stops = player.hitStop;
-    // A DST missile (box y −21, PC 3164), which pauses only its victim, on
-    // KO Normal's body box (PC 619: y −100 ± 34).
-    match.projectiles = [
-      {
-        owner: 0,
-        kind: 'missile',
+    // A DST missile (218, box y −21, PC 3164), which pauses only its victim,
+    // on KO Normal's body box (PC 619: y −100 ± 34). It sets its box as it
+    // next steps (PC 3164), before it moves.
+    match.effects.push(
+      object(RYUKO.dstMissile, 0, {
         x: target.x,
         y: target.y + (21 - 100) * 1.5,
-        vx: 0,
-        vy: 0,
-        facing: 1,
-        age: 0,
-        hit: false,
-      },
-    ];
+        slot: -1,
+      }),
+    );
     match.step();
     expect(target).toMatchObject({ action: 'koAgain', age: 0, hp: 0 });
     // Neither PC 607's ten ticks nor PC 611's hold, and no second flash.
@@ -561,26 +574,34 @@ describe('Daisetsuzan Oroshi command throw', () => {
       attacker.facing = facing;
       target.facing = facing === 1 ? -1 : 1;
       ticks(match, 4, { dst: true });
-      expect(attacker).toMatchObject({ action: 'dstFar', age: 3 });
+      expect({ ...attacker, action: named(attacker) }).toMatchObject({
+        action: 'dstFar',
+        age: 3,
+      });
       match.step();
-      expect(attacker).toMatchObject({ action: 'dstHit', age: 0 });
+      expect({ ...attacker, action: named(attacker) }).toMatchObject({
+        action: 'dstHit',
+        age: 0,
+      });
       expect(target).toMatchObject({
-        action: 'dstHeld',
+        action: 'superHeld',
         x: attacker.x + facing * 90,
       });
       const offsets = new Set<number>();
       for (let tick = 0; tick < 185; tick++) {
         match.step();
-        if (target.action === 'dstHeld')
+        if (target.action === 'superHeld')
           offsets.add(Math.round((target.x - attacker.x) * facing));
       }
       // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
       expect([...offsets]).toEqual([90, -15, -90, 0]);
       expect(attacker.age).toBe(185);
+      // PC 3111 places the victim at (14, −96) and enters 129, whose script
+      // runs after Ryuko's this tick: it launches at once at −200/−3000.
       expect(target).toMatchObject({
         action: 'dstToss',
-        x: attacker.x + facing * 21,
-        y: -144,
+        x: attacker.x + facing * (21 + 200 * (655 / 65536) * 1.5),
+        y: -144 - 3000 * (655 / 65536) * 1.5 + 90 * (393 / 65536) * 1.5,
         facing: -facing,
         // PC 3112 (op 0x15).
         hp: LIFE - 10,
@@ -588,26 +609,25 @@ describe('Daisetsuzan Oroshi command throw', () => {
       const tossX = attacker.x;
       ticks(match, 83);
       expect(attacker.age).toBe(268);
-      expect(match.projectiles.map((p) => p.kind)).toEqual([
-        'missile',
-        'missile',
-      ]);
+      expect(objects(match, RYUKO.dstMissile)).toHaveLength(2);
       expect(match.effects.map((e) => e.clip)).toEqual(
         expect.arrayContaining([385, 219, 396]),
       );
-      ticks(match, 18);
+      ticks(match, 17);
       expect(target.action).toBe('dstToss');
       match.step();
-      // Both missiles connect 19 ticks after launch, as the source geometry does.
-      // Each missile's box (PC 3164) deals 22.
+      // The lower missile meets the falling victim 18 ticks after launch;
+      // the other, 3 pixels lower, passes 2 under it. Its box (PC 3164)
+      // deals 22.
       expect(target).toMatchObject({
         action: 'twist',
         hitStop: 13,
-        hp: LIFE - 10 - 2 * 22,
+        hp: LIFE - 10 - 22,
       });
-      expect(attacker).toMatchObject({ age: 287, hitStop: 0, hits: 3 });
+      // The grab, the toss and the missile.
+      expect(attacker).toMatchObject({ age: 286, hitStop: 0, hits: 3 });
       expect((tossX - attacker.x) * facing).toBeCloseTo(
-        20 * 400 * (655 / 65536) * 1.5,
+        19 * 400 * (655 / 65536) * 1.5,
         3,
       );
       const seen = new Set<string>();
@@ -619,7 +639,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
         new Set(['twist', 'twistBounce', 'knockdown', 'getUp', 'idle']),
       );
       expect(attacker.action).toBe('idle');
-      expect(match.projectiles).toEqual([]);
+      expect(objects(match, RYUKO.dstMissile)).toEqual([]);
     },
   );
 
@@ -629,7 +649,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
       const far = new Match();
       far.fighters[0].hp = hp;
       far.step({ dst: true });
-      expect(far.fighters[0].action).toBe(hp > 153 ? 'dstFar' : 'evilDstFar');
+      expect(named(far.fighters[0])).toBe(hp > 153 ? 'dstFar' : 'evilDstFar');
     }
     const match = new Match();
     const [attacker, target] = match.fighters;
@@ -638,10 +658,17 @@ describe('Daisetsuzan Oroshi command throw', () => {
     attacker.hp = 153;
     ticks(match, 4, { dst: true });
     // PC 3082 (op 0x11) enters action 221 at 153 of 510 life or less.
-    expect(attacker).toMatchObject({ action: 'evilDst', age: 3, power: 8 });
+    expect({ ...attacker, action: named(attacker) }).toMatchObject({
+      action: 'evilDst',
+      age: 3,
+      power: 8,
+    });
     match.step();
     // Hit branch 222 applies response 30 at 60 source pixels.
-    expect(attacker).toMatchObject({ action: 'evilDstHit', age: 0 });
+    expect({ ...attacker, action: named(attacker) }).toMatchObject({
+      action: 'evilDstHit',
+      age: 0,
+    });
     expect(target).toMatchObject({ action: 'superHeld', x: attacker.x + 90 });
     const poses = new Set<number>();
     const objects = new Set<unknown>();
@@ -655,15 +682,37 @@ describe('Daisetsuzan Oroshi command throw', () => {
     // and takes no life.
     expect([...poses]).toEqual([0, 1, 8, 12, 6]);
     expect([...objects]).toEqual(expect.arrayContaining([340, 400]));
-    expect(attacker).toMatchObject({ action: 'dstHit', age: 0, power: 33 });
+    // PC 3233 jumps into DST Hit at PC 3104, which re-applies response 30.
+    expect({ ...attacker, action: named(attacker) }).toMatchObject({
+      action: 'evilDstHit',
+      age: 165,
+      power: 33,
+    });
     expect(target).toMatchObject({
-      action: 'dstHeld',
+      action: 'superHeld',
       x: attacker.x + 90,
       y: 0,
       hp: LIFE,
     });
     ticks(match, 185);
     expect(target).toMatchObject({ action: 'dstToss', hp: LIFE - 10 });
+  });
+
+  it("keeps DST FAR's grab box open through its recovery", () => {
+    // 220 sets its box at age 4 (PC 3189) and, unlike 214, 221 and 224,
+    // never clears it, so it grabs whoever steps in until it ends at 58.
+    for (const age of [10, 56, 57]) {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      f.x = 600;
+      target.x = 900;
+      match.step({ dst: true });
+      while (f.age < age) match.step();
+      expect(named(f)).toBe('dstFar');
+      target.x = f.x + 120;
+      match.step();
+      expect(target.action).toBe(age < 57 ? 'superHeld' : 'idle');
+    }
   });
 
   it('whiffs outside its range or against an airborne target with a long recovery', () => {
@@ -673,8 +722,8 @@ describe('Daisetsuzan Oroshi command throw', () => {
     // Just past DST FAR's reach.
     target.x = 600 + 170;
     match.step({ dst: true });
-    ticks(match, animationDuration('dstFar') - 1);
-    expect(attacker.action).toBe('dstFar');
+    ticks(match, animationDuration(RYUKO.dstFar) - 1);
+    expect(named(attacker)).toBe('dstFar');
     match.step();
     expect(attacker.action).toBe('idle');
     expect(target.hp).toBe(LIFE);
@@ -682,8 +731,8 @@ describe('Daisetsuzan Oroshi command throw', () => {
     ticks(match, 10, {}, { jump: true });
     expect(target.y).toBeLessThan(0);
     ticks(match, 10, { dst: true });
-    expect(attacker.action).toBe('dst');
-    expect(target.action).not.toBe('dstHeld');
+    expect(named(attacker)).toBe('dst');
+    expect(target.action).not.toBe('superHeld');
   });
 
   it('protects the held victim and keeps the hold through a time-out', () => {
@@ -693,29 +742,20 @@ describe('Daisetsuzan Oroshi command throw', () => {
     target.x = 700;
     match.ticks = 5990;
     ticks(match, 5, { dst: true }, {});
-    expect(target.action).toBe('dstHeld');
-    match.projectiles.push({
-      owner: 0,
-      kind: 'axe',
-      x: target.x,
-      y: -125,
-      vx: 0,
-      vy: 0,
-      facing: 1,
-      age: 0,
-      hit: false,
-    });
+    expect(target.action).toBe('superHeld');
+    // An axe (227) whose box covers the held victim, which has no body box.
+    spawn(match, 0, RYUKO.axe, { x: target.x - 63 * 1.5, y: -3 * 1.5 });
     match.step({}, {});
-    expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
+    expect(target).toMatchObject({ action: 'superHeld', hp: LIFE });
     ticks(match, 10, {}, {});
     expect(match.winner).toBe('draw');
     // The round phase stays 1 (0x408f38), so the throw runs on: the toss and
     // the missiles still take life after the round is decided.
-    expect(target.action).toBe('dstHeld');
-    while (target.action === 'dstHeld') match.step({}, {});
+    expect(target.action).toBe('superHeld');
+    while (target.action === 'superHeld') match.step({}, {});
     expect(target).toMatchObject({ action: 'dstToss', hp: LIFE - 10 });
     while (target.action === 'dstToss') match.step({}, {});
-    expect(target).toMatchObject({ action: 'twist', hp: LIFE - 10 - 2 * 22 });
+    expect(target).toMatchObject({ action: 'twist', hp: LIFE - 10 - 22 });
     untilResult(match);
     expect(match.fighters.map((f) => f.action)).toEqual(['draw', 'draw']);
   });
@@ -735,10 +775,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
     // DST Hit runs on and fires its missiles over the lying victim.
     while (attacker.age < 268) match.step();
     expect(target.action).toBe('koLand');
-    expect(match.projectiles.map((p) => p.kind)).toEqual([
-      'missile',
-      'missile',
-    ]);
+    expect(objects(match, RYUKO.dstMissile)).toHaveLength(2);
     untilResult(match);
     expect(attacker.action).toBe('win');
     expect(target.action).toBe('koLand');
@@ -994,7 +1031,7 @@ describe('practice partner', () => {
     match.step();
     expect(ryuko.hp).toBe(153);
     match.step({ dst: true });
-    expect(ryuko.action).toBe('evilDst');
+    expect(named(ryuko)).toBe('evilDst');
   });
 });
 
@@ -1441,10 +1478,12 @@ describe('recovered screen shake (op 0x0e)', () => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.y = -100;
-      f.action = 'airDrillSpin';
+      // Air Drill (208) opens its first spin's box at age 22.
+      enter(match, f, RYUKO.airDrill, 22);
       target.x = f.x + 150;
       match.step({}, { guard });
-      expect(f.action).toBe('airDrillContact');
+      // The hit and guard handlers, 209 + 12 and 209 + 23 (PCs 2979–2980).
+      expect(playing(f)).toBe(guard ? '209+23' : '209+12');
       // PCs 2991 (hit) and 3002 (guard) shake alike.
       expect(match.quake).toEqual({
         x: { type: 4, amplitude: 4, frames: 4 },
@@ -1459,7 +1498,7 @@ describe('recovered screen shake (op 0x0e)', () => {
     target.x = f.x + 120;
     match.step({ dst: true });
     const seen = new Set();
-    while (f.action === 'dst' || f.action === 'dstHit') {
+    while (['dst', 'dstHit'].includes(named(f))) {
       match.step();
       if (match.quake.x) seen.add(match.quake.x);
     }
@@ -1498,7 +1537,10 @@ describe('recovered cancels', () => {
     while (playing(f) === RYUKO.punch) match.step();
     // 179 accepts them always; the drill waits out the contact stop.
     match.step({ drill: true });
-    expect(f).toMatchObject({ action: 'drill', age: 0 });
+    expect({ ...f, action: named(f) }).toMatchObject({
+      action: 'drill',
+      age: 0,
+    });
     expect(f.hitStop).toBeGreaterThan(0);
     const beam = new Match();
     beam.fighters[1].x = beam.fighters[0].x + 130;
@@ -1516,7 +1558,10 @@ describe('recovered cancels', () => {
     // The press stays within the drill's 40-tick window, so the free state
     // enters it once the punch ends.
     whiff.step();
-    expect(whiff.fighters[0]).toMatchObject({ action: 'drill', age: 0 });
+    expect({
+      ...whiff.fighters[0],
+      action: named(whiff.fighters[0]),
+    }).toMatchObject({ action: 'drill', age: 0 });
   });
 
   it.each([
@@ -1556,7 +1601,7 @@ describe('recovered cancels', () => {
       match.step({ iori: true });
       while (!f.contact) match.step();
       match.step({ [control]: true });
-      expect(f.action).toBe('iori');
+      expect(named(f)).toBe('iori');
     }
     const whiff = new Match();
     whiff.fighters[1].x = whiff.fighters[0].x + 500;
@@ -1564,7 +1609,10 @@ describe('recovered cancels', () => {
     whiff.step({ iori: true });
     ticks(whiff, 30);
     whiff.step({ musashi: true });
-    expect(whiff.fighters[0]).toMatchObject({ action: 'iori', stock: 2 });
+    expect({
+      ...whiff.fighters[0],
+      action: named(whiff.fighters[0]),
+    }).toMatchObject({ action: 'iori', stock: 2 });
   });
 
   it('cancels a connected air attack into the air kick or a double jump', () => {
@@ -1619,7 +1667,7 @@ describe('recovered cancels', () => {
     match.step();
     expect(playing(f)).toBe(RYUKO.airDash);
     match.step();
-    expect(f.action).toBe('airDrill');
+    expect(named(f)).toBe('airDrill');
     const punched = new Match();
     const p = punched.fighters[0];
     punched.step({ jump: true });
@@ -1728,12 +1776,14 @@ describe('recovered power gauge', () => {
     match.step({ axe: true });
     for (let i = 0; i < 100 && target.action === 'idle'; i++) match.step();
     // Response 50 → FB (110) adds 10 to the thrower (PC 1442), then 75 adds
-    // 5 and 3 (PC 790), and both stop 15 ticks (PC 791).
+    // 5 and 3 (PC 790) and stops the victim 15 ticks (PC 791). Authored: an
+    // object's victim doesn't pause its owner.
     expect(target).toMatchObject({ action: 'hitHeavy', power: 5, hitStop: 15 });
-    expect(attacker).toMatchObject({ power: 13, hitStop: 15 });
+    expect(attacker).toMatchObject({ power: 13, hitStop: 0 });
     const thrower = new Match();
     thrower.fighters[1].x = thrower.fighters[0].x + 100;
-    ticks(thrower, 8 + THROW_TOSS_TICK, { throw: true });
+    // The grab box at age 7, then Chuck Hit's toss at its age 65 (PC 2769).
+    ticks(thrower, 8 + 65, { throw: true });
     expect(thrower.fighters[1].action).toBe('dstToss');
     // PC 2770 credits 5 to both; the toss (129) credits none.
     expect(thrower.fighters[0].power).toBe(5);
@@ -1975,7 +2025,10 @@ describe('recovered supers', () => {
     const axe = superMatch(250);
     axe.match.step({ blackRush: true });
     // Action 286 jumps to the axe throw (226) at 153 of 510 life or more.
-    expect(axe.ryuko).toMatchObject({ action: 'axeThrow', stock: 3 });
+    expect({ ...axe.ryuko, action: named(axe.ryuko) }).toMatchObject({
+      action: 'axeThrow',
+      stock: 3,
+    });
     const { match, ryuko, target } = superMatch(200);
     ryuko.hp = 147;
     match.step({ blackRush: true });
@@ -2083,8 +2136,8 @@ describe('IORI chain', () => {
   // The F key writes IORI's ↓← and P; each stage's op 0x24 reads them at age
   // 29 or 31 (PCs 3625, 3661). Press one tick before.
   const followUp = (f: Fighter) =>
-    (f.action === 'iori' && f.age === 28) ||
-    (f.action === 'iori2' && f.age === 30);
+    (named(f) === 'iori' && f.age === 28) ||
+    (named(f) === 'iori2' && f.age === 30);
   it.each([1, -1] as const)(
     'plays all three strikes and the knockdown facing %i',
     (facing) => {
@@ -2102,7 +2155,7 @@ describe('IORI chain', () => {
             },
             { guard: blocked },
           );
-          actions.add(f.action);
+          actions.add(named(f));
           if (hitEffects(match).some((e) => e.age === 0))
             contacts.push(match.ticks);
         }
@@ -2129,17 +2182,17 @@ describe('IORI chain', () => {
       target.x = f.x + facing * 800;
       const start = f.x;
       const stages: number[] = [];
-      let previous = f.action;
+      let previous = named(f);
       for (let tick = 0; tick < 140; tick++) {
         match.step({
           iori: tick === 0 || followUp(f),
         });
         if (
-          f.action !== previous &&
-          ['iori2', 'iori3', 'idle'].includes(f.action)
+          named(f) !== previous &&
+          ['iori2', 'iori3', 'idle'].includes(named(f))
         )
           stages.push((f.x - start) * facing);
-        previous = f.action;
+        previous = named(f);
       }
       expect(stages[0]).toBeCloseTo(95.947266, 5);
       expect(stages[1] - stages[0]).toBeCloseTo(157.413483, 5);
@@ -2159,7 +2212,11 @@ describe('IORI chain', () => {
       const [f, target] = match.fighters;
       f.x = 440;
       ticks(match, 22, { iori: true });
-      expect(f).toMatchObject({ action: 'iori', age: 21, hitStop: 15 });
+      expect({ ...f, action: named(f) }).toMatchObject({
+        action: 'iori',
+        age: 21,
+        hitStop: 15,
+      });
       const positions = [f.x, target.x];
       ticks(match, early ? 1 : 11);
       match.step({ iori: true });
@@ -2167,9 +2224,12 @@ describe('IORI chain', () => {
       expect(f).toMatchObject({ age: 21, hitStop: 0 });
       expect([f.x, target.x]).toEqual(positions);
       ticks(match, 7);
-      expect(f).toMatchObject({ action: 'iori', age: 28 });
+      expect({ ...f, action: named(f) }).toMatchObject({
+        action: 'iori',
+        age: 28,
+      });
       match.step();
-      expect(f).toMatchObject(
+      expect({ ...f, action: named(f) }).toMatchObject(
         early ? { action: 'iori', age: 29 } : { action: 'iori2', age: 0 },
       );
     }
@@ -2180,12 +2240,18 @@ describe('IORI chain', () => {
       const match = new Match();
       match.fighters[1].x = 1700;
       ticks(match, 58, { iori: true });
-      expect(match.fighters[0]).toMatchObject({ action: 'iori', age: 57 });
+      expect({
+        ...match.fighters[0],
+        action: named(match.fighters[0]),
+      }).toMatchObject({ action: 'iori', age: 57 });
       if (late) {
         match.step();
         // The finite recovery has ended: this is a new stage one, not stage two.
         match.step({ iori: true });
-        expect(match.fighters[0]).toMatchObject({ action: 'iori', age: 0 });
+        expect({
+          ...match.fighters[0],
+          action: named(match.fighters[0]),
+        }).toMatchObject({ action: 'iori', age: 0 });
       } else {
         ticks(match, 100, { iori: true });
         expect(match.fighters[0].action).toBe('idle');
@@ -2199,12 +2265,18 @@ describe('IORI chain', () => {
       late.step({ iori: true });
       ticks(late, age - 1);
       late.step({ iori: true });
-      expect(late.fighters[0]).toMatchObject(
+      expect({
+        ...late.fighters[0],
+        action: named(late.fighters[0]),
+      }).toMatchObject(
         age === 54 ? { action: 'iori2', age: 0 } : { action: 'iori', age },
       );
       if (age === 55) {
         ticks(late, 4);
-        expect(late.fighters[0]).toMatchObject({ action: 'iori', age: 0 });
+        expect({
+          ...late.fighters[0],
+          action: named(late.fighters[0]),
+        }).toMatchObject({ action: 'iori', age: 0 });
       }
     }
   });
@@ -2214,7 +2286,8 @@ describe('IORI chain', () => {
     (facing) => {
       const match = new Match();
       const [f, target] = match.fighters;
-      Object.assign(f, { x: 960, facing, action: 'iori2', age: 22 });
+      Object.assign(f, { x: 960, facing });
+      enter(match, f, RYUKO.iori2, 22);
       target.x = f.x + facing * 200;
       match.step();
       expect(target).toMatchObject({ action: 'hitPull', hitStop: 15 });
@@ -2229,7 +2302,8 @@ describe('IORI chain', () => {
   it('slams an airborne finisher into a bounce, floor recovery, and get-up', () => {
     const match = new Match();
     const [f, target] = match.fighters;
-    Object.assign(f, { x: 530, action: 'iori3', age: 20 });
+    f.x = 530;
+    enter(match, f, RYUKO.iori3, 20);
     Object.assign(target, {
       action: 'jump',
       y: -80,
@@ -2289,7 +2363,8 @@ describe('IORI chain', () => {
     match.step({ iori: true });
     expect(playing(match.fighters[0])).toBe(RYUKO.airPunch);
     const ko = new Match();
-    Object.assign(ko.fighters[0], { x: 530, action: 'iori3', age: 20 });
+    ko.fighters[0].x = 530;
+    enter(ko, ko.fighters[0], RYUKO.iori3, 20);
     // 60% of IORI 3's 20 at desperation life.
     ko.fighters[1].hp = 12;
     ko.step();
@@ -2318,7 +2393,8 @@ describe('IORI chain', () => {
 
   it('finishes the airborne slam and bounce recovery after timeout', () => {
     const match = new Match('cpu');
-    Object.assign(match.fighters[0], { x: 530, action: 'iori3', age: 20 });
+    match.fighters[0].x = 530;
+    enter(match, match.fighters[0], RYUKO.iori3, 20);
     Object.assign(match.fighters[1], {
       action: 'jump',
       y: -80,
@@ -2349,39 +2425,45 @@ describe('prototype training rules', () => {
       target.facing = facing === 1 ? -1 : 1;
       ticks(match, 8, { throw: true });
       // PC 2765: response 30 holds the victim 60 source pixels ahead.
-      expect(attacker).toMatchObject({ action: 'throw', age: 0 });
+      expect({ ...attacker, action: named(attacker) }).toMatchObject({
+        action: 'throw',
+        age: 0,
+      });
       expect(target).toMatchObject({
-        action: 'dstHeld',
+        action: 'superHeld',
         x: attacker.x + facing * 90,
         y: 0,
       });
       const poses = new Set<number>();
       const offsets = new Set<number>();
-      for (let tick = 1; tick < THROW_TOSS_TICK; tick++) {
+      // Chuck Hit tosses at its age 65 (PC 2769).
+      for (let tick = 1; tick < 65; tick++) {
         match.step({ punch: true, jump: true }, { jump: true, dash: true });
-        expect(attacker.action).toBe('throw');
-        expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
-        poses.add(animationFrame('throw', attacker.age).image);
+        expect(named(attacker)).toBe('throw');
+        expect(target).toMatchObject({ action: 'superHeld', hp: LIFE });
+        poses.add(animationFrame(RYUKO.throw, attacker.age).image);
         offsets.add(Math.round((target.x - attacker.x) * facing));
       }
       expect(poses).toEqual(new Set([106, 107, 108, 110]));
       // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
       expect([...offsets]).toEqual([90, -15, -90, 0]);
       match.step();
-      // PC 2769: response 31 at (14, −96) enters action 129; PC 2770 deals 30.
+      // PC 2769: response 31 at (14, −96) enters action 129, which launches
+      // as it runs after Ryuko's script; PC 2770 deals 30.
       expect(target).toMatchObject({
         action: 'dstToss',
-        x: attacker.x + facing * 21,
-        y: -144,
+        x: attacker.x + facing * (21 + 200 * (655 / 65536) * 1.5),
+        y: -144 - 3000 * (655 / 65536) * 1.5 + 90 * (393 / 65536) * 1.5,
         facing: -facing,
         hp: LIFE - 30,
       });
-      expect(attacker).toMatchObject({
+      // The grab and the toss.
+      expect({ ...attacker, action: named(attacker) }).toMatchObject({
         action: 'throw',
-        age: THROW_TOSS_TICK,
-        hits: 1,
+        age: 65,
+        hits: 2,
       });
-      expect(animationFrame('throw', attacker.age).image).toBe(111);
+      expect(animationFrame(RYUKO.throw, attacker.age).image).toBe(111);
     },
   );
 
@@ -2420,7 +2502,7 @@ describe('prototype training rules', () => {
       }
       expect(seen).toEqual(
         new Set([
-          'dstHeld',
+          'superHeld',
           'dstToss',
           'tossBounce',
           'knockdown',
@@ -2459,13 +2541,13 @@ describe('prototype training rules', () => {
       attacker.x = facing === 1 ? 550 : 660;
       target.x = facing === 1 ? 660 : 550;
       ticks(match, 8, { throw: true }, { guard: true });
-      expect(attacker.action).toBe('throw');
-      expect(target.action).toBe('dstHeld');
-      ticks(match, THROW_TOSS_TICK - 1, {}, { punch: true, jump: true });
-      expect(target).toMatchObject({ action: 'dstHeld', hp: LIFE });
+      expect(named(attacker)).toBe('throw');
+      expect(target.action).toBe('superHeld');
+      ticks(match, 65 - 1, {}, { punch: true, jump: true });
+      expect(target).toMatchObject({ action: 'superHeld', hp: LIFE });
       match.step();
       expect(target).toMatchObject({ action: 'dstToss', hp: LIFE - 30 });
-      expect(attacker.hits).toBe(1);
+      expect(attacker.hits).toBe(2);
       // Op 0x14 applies response 31 without the hit test; its effect word is 0.
       expect(hitEffects(match)).toHaveLength(0);
       // Action 129 flies at raw −200/−3000, gravity 90; landing bounces
@@ -2485,7 +2567,7 @@ describe('prototype training rules', () => {
       match.step({}, { punch: true });
       expect(playing(target)).toBe(RYUKO.punch);
       expect(target.hp).toBe(LIFE - 30);
-      expect(attacker.hits).toBe(1);
+      expect(attacker.hits).toBe(2);
     },
   );
 
@@ -2495,7 +2577,7 @@ describe('prototype training rules', () => {
       if (airborne) match.fighters[0].x = 550;
       ticks(match, 15, {}, { jump: airborne });
       ticks(match, 8, { throw: true });
-      expect(match.fighters[0].action).toBe('grab');
+      expect(named(match.fighters[0])).toBe('grab');
       ticks(match, 150, { throw: true });
       expect(match.fighters[0].action).toBe('idle');
       expect(match.fighters[1].hp).toBe(LIFE);
@@ -2524,7 +2606,7 @@ describe('prototype training rules', () => {
         ticks(match, startup + 1, {
           [move === 'grab' ? 'throw' : 'dst']: true,
         });
-        expect(target.action).toBe(gap === reached ? 'dstHeld' : 'idle');
+        expect(target.action).toBe(gap === reached ? 'superHeld' : 'idle');
       }
     },
   );
@@ -2552,7 +2634,7 @@ describe('prototype training rules', () => {
       pose(match, target, state, 0);
       target.reaction = bits;
       match.step();
-      expect(target.action).toBe(grabbed ? 'dstHeld' : state);
+      expect(target.action).toBe(grabbed ? 'superHeld' : state);
     },
   );
 
@@ -2563,10 +2645,10 @@ describe('prototype training rules', () => {
       // A punch pressed a tick earlier lands before the grab's own tick.
       if (attack === 'punch') match.step({}, { punch: true });
       ticks(match, 8, { throw: true }, { [attack]: true });
-      expect(match.fighters[0].action).toBe(
+      expect(named(match.fighters[0])).toBe(
         attack === 'punch' ? 'hit' : 'grab',
       );
-      expect(match.fighters[1].action).not.toBe('dstHeld');
+      expect(match.fighters[1].action).not.toBe('superHeld');
       expect(match.fighters[1].hp).toBe(LIFE);
     }
     // Action 196's grab tick (PC 2748) keeps only a kind-1 body box, so a
@@ -2574,7 +2656,7 @@ describe('prototype training rules', () => {
     const match = new Match();
     match.fighters[0].x = 550;
     ticks(match, 8, { throw: true }, { punch: true });
-    expect(match.fighters[1].action).toBe('dstHeld');
+    expect(match.fighters[1].action).toBe('superHeld');
   });
 
   it.each([0, 20, 64])(
@@ -2585,21 +2667,15 @@ describe('prototype training rules', () => {
       const [attacker, target] = match.fighters;
       attacker.x = 550;
       ticks(match, 8 + age, { throw: true });
-      match.projectiles.push({
-        owner: 1,
-        kind: 'axe',
-        vx: 0,
-        vy: 0,
-        x: attacker.x + 50,
-        y: -153,
-        facing: -1,
-        age: 0,
-        hit: false,
-      });
+      // The other side's axe (227), its box over Ryuko.
+      spawn(match, 1, RYUKO.axe, { x: attacker.x + 50, y: -153, facing: -1 });
       match.step();
-      expect(attacker).toMatchObject({ action: 'throw', hp: LIFE });
-      expect(target.action).toBe(age === 64 ? 'dstToss' : 'dstHeld');
-      expect(match.projectiles).toMatchObject([{ hit: false }]);
+      expect({ ...attacker, action: named(attacker) }).toMatchObject({
+        action: 'throw',
+        hp: LIFE,
+      });
+      expect(target.action).toBe(age === 64 ? 'dstToss' : 'superHeld');
+      expect(objects(match, RYUKO.axe)).toHaveLength(1);
     },
   );
 
@@ -2609,9 +2685,9 @@ describe('prototype training rules', () => {
     attacker.x = 550;
     // 60% of the throw's 30 at desperation life.
     target.hp = 18;
-    ticks(match, 8 + THROW_TOSS_TICK, { throw: true });
+    ticks(match, 8 + 65, { throw: true });
     expect(match.winner).toBe('player');
-    expect(attacker.action).toBe('throw');
+    expect(named(attacker)).toBe('throw');
     // The toss's op 0x15 (PC 2770) KOs the victim where it was tossed.
     expect(target).toMatchObject({ action: 'down', hp: 0, y: -144 });
     untilResult(match);
@@ -2623,7 +2699,7 @@ describe('prototype training rules', () => {
     const match = new Match();
     const [attacker, target] = match.fighters;
     attacker.x = 550;
-    ticks(match, 8 + THROW_TOSS_TICK, { throw: true });
+    ticks(match, 8 + 65, { throw: true });
     for (let tick = 0; tick < 200 && target.action !== 'knockdown'; tick++)
       match.step();
     expect(target.action).toBe('knockdown');
@@ -2632,24 +2708,16 @@ describe('prototype training rules', () => {
     for (let tick = 0; tick < protectedTicks; tick++) {
       // Keep attacks in range while the victim lies down and gets up.
       attacker.x = target.x - 100;
-      match.projectiles = [
-        {
-          owner: 0,
-          kind: 'axe',
-          vx: 7,
-          vy: 0,
-          x: target.x,
-          y: target.y - 125,
-          facing: 1,
-          age: 0,
-          hit: false,
-        },
-      ];
+      // A fresh axe (227) each tick, its box over the victim.
+      match.effects = match.effects.filter(
+        (e) => objects(match, RYUKO.axe).indexOf(e) < 0,
+      );
+      spawn(match, 0, RYUKO.axe, { x: target.x - 80, y: target.y - 125 });
       match.step({ punch: tick % 2 === 0 });
       expect(target.hp).toBe(LIFE - 30);
     }
     expect(target.action).toBe('getUp');
-    match.projectiles = [];
+    match.effects = [];
     // Out of reach of the attacker's latest punch.
     attacker.x = target.x - 400;
     match.step();
@@ -2685,13 +2753,13 @@ describe('prototype training rules', () => {
       attacker.facing = facing;
       target.facing = facing === 1 ? -1 : 1;
       ticks(match, 8, { throw: true });
-      expect(target.action).toBe('dstHeld');
+      expect(target.action).toBe('superHeld');
       expect(target.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
       expect(target.x).toBeLessThanOrEqual(WIDTH - FIGHTER_MARGIN);
       match.ticks = 5999;
       match.step({}, {});
       expect(match.winner).toBe('draw');
-      expect(target.action).toBe('dstHeld');
+      expect(target.action).toBe('superHeld');
       untilResult(match);
       expect(target).toMatchObject({ action: 'draw', y: 0, hp: LIFE - 30 });
     }
@@ -3686,8 +3754,8 @@ describe('prototype training rules', () => {
     (guarded) => {
       const match = new Match();
       const [f, target] = match.fighters;
-      f.action = 'airDrillSpin';
       f.y = -100;
+      enter(match, f, RYUKO.airDrill, 22);
       target.x = f.x + 150;
       match.step({}, { guard: guarded });
       const contact = { x: f.x, y: f.y, age: f.age };
@@ -3871,12 +3939,11 @@ describe('prototype training rules', () => {
         f.x = facing === 1 ? 300 : 660;
         f.facing = facing;
         target.x = WIDTH - f.x;
-        f.action = 'drill';
-        f.age = age - 1;
+        enter(match, f, RYUKO.drill, age - 1);
         const start = f.x;
         match.step({ left: facing === 1, right: facing === -1 }, {});
         expect((f.x - start) * facing).toBeCloseTo(displacement, 5);
-        expect(f.action).toBe('drill');
+        expect(named(f)).toBe('drill');
       }
     },
   );
@@ -3898,12 +3965,13 @@ describe('prototype training rules', () => {
       match.step();
       expect((f.x - startX) * facing).toBeCloseTo(11.993408, 5);
       expect(f.y - startY).toBeCloseTo(14.99176, 5);
-      expect(f.action).toBe('airDrillSpin');
+      // PC 2971 jumps into spin 209, which the timeline continues.
+      expect([named(f), f.age]).toEqual(['airDrill', 22]);
       ticks(match, 12);
       expect((f.x - startX) * facing).toBeCloseTo(155.914307, 5);
       expect(f.y).toBeLessThan(0);
       match.step();
-      expect(f.action).toBe('drillLand');
+      expect(named(f)).toBe('drillLand');
       expect([f.y, f.vy]).toEqual([0, 0]);
       const landedX = f.x;
       ticks(match, 23);
@@ -3919,10 +3987,11 @@ describe('prototype training rules', () => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.y = -100;
-      f.action = 'airDrillSpin';
+      enter(match, f, RYUKO.airDrill, 22);
       target.x = f.x + 150;
       match.step({}, { guard: guarded });
-      expect(f.action).toBe('airDrillContact');
+      // Spin 209's hit and guard handlers (PCs 2979–2980).
+      expect(playing(f)).toBe(guarded ? '209+23' : '209+12');
       const contact = { x: f.x, y: f.y };
       ticks(match, 8, {}, { guard: guarded });
       expect({ x: f.x, y: f.y }).toEqual(contact);
@@ -3932,12 +4001,14 @@ describe('prototype training rules', () => {
       const transitionY = f.y;
       match.step({}, { guard: guarded });
       expect(f.y - transitionY).toBeCloseTo(22.48764, 5);
-      // Response 56 → action 135 slams a grounded victim into the floor
-      // bounce (124) before the spin returns; guard 163 is struck again.
-      expect(f.action).toBe(guarded ? 'airDrillContact' : 'airDrillSpin');
-      expect(target.action).toBe(guarded ? 'blockRapid' : 'slamBounce');
-      // Stage 1's 20, or 20% chips of it and stage 2's 5 (kind 6).
-      expect(target.hp).toBe(LIFE - (guarded ? 4 + 1 : 20));
+      // PC 2997's op 0x14 lifts the hit victim to (100, −20), into action
+      // 135 again, and guard 163 slides back; stage 2's box meets either at
+      // once: its hit handler is 209 + 42, its guard handler 209 + 43 (PCs
+      // 3008–3009).
+      expect(playing(f)).toBe(guarded ? '209+43' : '209+42');
+      expect(target.action).toBe(guarded ? 'blockRapid' : 'drillDown');
+      // Stage 1's 20 and stage 2's 5 (kind 6), or 20% chips of them.
+      expect(target.hp).toBe(LIFE - (guarded ? 4 + 1 : 20 + 5));
     },
   );
 
@@ -3950,8 +4021,9 @@ describe('prototype training rules', () => {
         target.x = facing === 1 ? STAGE_WIDTH - FIGHTER_MARGIN : FIGHTER_MARGIN;
         f.x = target.x - facing * 100;
         f.facing = facing;
-        f.action = airborne ? 'airDrillSpin' : 'drill';
         if (airborne) f.y = -80;
+        if (airborne) enter(match, f, RYUKO.airDrill, 22);
+        else enter(match, f, RYUKO.drill);
         for (let tick = 0; tick < 210; tick++) {
           match.step({}, { guard: true });
           expect(f.x).toBeGreaterThanOrEqual(FIGHTER_MARGIN);
@@ -3969,16 +4041,16 @@ describe('prototype training rules', () => {
     },
   );
 
-  it.each(['drill', 'airDrillSpin'] as const)(
+  it.each(['drill', 'airDrill'] as const)(
     'stops %s travel when interrupted',
     (action) => {
       const match = new Match();
       const [f, target] = match.fighters;
       f.x = 900;
       target.x = f.x + 150;
-      f.action = action;
-      f.age = action === 'drill' ? 10 : 0;
-      if (action === 'airDrillSpin') f.y = -40;
+      if (action === 'airDrill') f.y = -40;
+      // The ground drill before its lunge, or the air drill's first spin.
+      enter(match, f, RYUKO[action], action === 'drill' ? 10 : 22);
       strike(match, target, RYUKO.punch);
       match.step({}, {});
       // The drilling pose's body box takes 120% of the punch's 10.
@@ -4008,7 +4080,7 @@ describe('prototype training rules', () => {
           f.facing = facing;
           target.x = f.x + facing * 100;
           f.y = target.y = height;
-          f.action = 'airDrillSpin';
+          enter(match, f, RYUKO.airDrill, 22);
           const damage: number[] = [];
           const contacts: number[] = [];
           for (let tick = 0; tick < 120; tick++) {
@@ -4019,8 +4091,8 @@ describe('prototype training rules', () => {
               contacts.push(tick + 1);
               damage.push(hp - target.hp);
               expect(impact.clip === 370).toBe(guarded);
-              expect(f.action).toBe('airDrillContact');
-              expect(animationFrame('airDrillContact', f.age).image).toBe(136);
+              expect(String(f.branch)).toMatch(DRILL_CONTACT);
+              expect(fighterPose(f).image).toBe(136);
             }
           }
           // Response 56 → action 135 drives a hit victim down, but its nine
@@ -4056,19 +4128,22 @@ describe('prototype training rules', () => {
     const match = new Match();
     const [f, target] = match.fighters;
     f.y = -300;
-    f.action = 'airDrillSpin';
-    f.airDrillStage = 3;
     target.x = f.x + 600;
-    ticks(match, animationDuration('airDrillSpin') - 1);
-    expect(f.airDrillStage).toBe(3);
+    // Stage 2's hit branch (210 + 12): eight stop ticks and a two-tick
+    // display, then 211's spin (box 1) for six; without contact, PC 3060
+    // jumps back to 210 (box 3).
+    enter(match, f, RYUKO.airDrillSpin2, 0, 12);
+    ticks(match, 8 + 2);
+    expect(f.box?.damage).toBe(1);
+    ticks(match, 5);
+    expect(f.box?.damage).toBe(1);
     match.step();
-    expect(f.airDrillStage).toBe(2);
-    // 210's box deals 3 again, rather than 211's 1.
+    expect(f.box?.damage).toBe(3);
     target.x = f.x + 130;
     target.y = f.y;
     match.step();
     expect(target.hp).toBe(LIFE - 3);
-    expect(f.airDrillStage).toBe(3);
+    expect(playing(f)).toBe('210+12');
   });
 
   it('holds aerial drill startup, keeps missed spins armed, and recovers only on landing', () => {
@@ -4080,16 +4155,16 @@ describe('prototype training rules', () => {
     const height = f.y;
     ticks(match, 21, { punch: true });
     expect(f.y).toBe(height);
-    expect(f.action).toBe('airDrill');
+    expect(named(f)).toBe('airDrill');
     ticks(match, 7);
-    expect(f.action).toBe('airDrillSpin');
+    expect([named(f), f.age]).toEqual(['airDrill', 28]);
     expect(f.hits).toBe(0);
     target.x = f.x + 130;
     match.step();
     expect(target.hp).toBe(LIFE - 20);
-    expect(f.action).toBe('airDrillContact');
+    expect(playing(f)).toBe('209+12');
     for (let i = 0; i < 100 && f.y < 0; i++) match.step();
-    expect(f.action).toBe('drillLand');
+    expect(named(f)).toBe('drillLand');
     ticks(match, 23);
     expect(f.action).toBe('idle');
   });
@@ -4103,13 +4178,12 @@ describe('prototype training rules', () => {
       f.x = index === 0 ? 420 : 540;
       target.x = f.x + f.facing * 100;
       f.y = target.y = -80;
-      f.action = 'airDrillSpin';
+      enter(match, f, RYUKO.airDrill, 22);
       strike(match, target, RYUKO.airPunch);
       match.step({}, {});
       // Both attacking poses take 120%: the air punch's 15 and the spin's 20.
       expect([f.hp, target.hp]).toEqual([LIFE - 18, LIFE - 24]);
       expect(f.action).toBe('airHitHeavy');
-      expect(f.airDrillStage).toBe(0);
       expect([f.hitStop, target.hitStop]).toEqual([15, 15]);
       ticks(match, 100);
       expect([f.hits, target.hits]).toEqual([1, 1]);
@@ -4124,7 +4198,7 @@ describe('prototype training rules', () => {
     ['airKick', 1],
     ['kick3', 5],
     ['drill', 5],
-    ['airDrillSpin', 2],
+    ['airDrill', 2],
   ] as const)(
     'keeps striking with %s after a lethal first strike: %i hits',
     (action, hits) => {
@@ -4137,7 +4211,8 @@ describe('prototype training rules', () => {
         f.y = target.y = -80;
         f.vy = target.vy = -8;
       }
-      pose(match, f, action, 0);
+      // The air drill from its first spin's box.
+      pose(match, f, action, action === 'airDrill' ? 22 : 0);
       const seen = new Set<string>();
       for (let tick = 0; tick < 1000 && !match.resultReady; tick++) {
         match.step();
@@ -4148,7 +4223,6 @@ describe('prototype training rules', () => {
       expect(seen.has('koAgain')).toBe(hits > 1);
       expect(target).toMatchObject({ action: 'koLand', hp: 0 });
       expect(f.action).toBe('win');
-      expect(f.airDrillStage).toBe(0);
     },
   );
 
@@ -4166,14 +4240,14 @@ describe('prototype training rules', () => {
     match.step({ jump: true });
     ticks(match, 40);
     match.step({ drill: true });
-    expect(match.fighters[0].action).toBe('airDrill');
-    for (let i = 0; i < 100 && match.fighters[0].action !== 'drillLand'; i++)
+    expect(named(match.fighters[0])).toBe('airDrill');
+    for (let i = 0; i < 100 && named(match.fighters[0]) !== 'drillLand'; i++)
       match.step();
-    expect(match.fighters[0].action).toBe('drillLand');
-    // The drill crossed over, so action 23 plays before standing again.
-    ticks(match, animationDuration('drillLand'));
-    expect(match.fighters[0]).toMatchObject({ action: 'turn', facing: -1 });
-    ticks(match, animationDuration('turn'));
+    expect(named(match.fighters[0])).toBe('drillLand');
+    // Spin 209's landing handler (PC 2978) plays Drill Lend (212).
+    ticks(match, animationDuration(RYUKO.drillLand) - 1);
+    expect(named(match.fighters[0])).toBe('drillLand');
+    match.step();
     expect(match.fighters[0].action).toBe('idle');
   });
 
@@ -4195,7 +4269,7 @@ describe('prototype training rules', () => {
           const impact = hitEffects(match).find((e) => e.age === 0);
           if (impact) {
             contacts.push(f.age);
-            expect(animationFrame('drill', f.age).image).toBe(121);
+            expect(animationFrame(RYUKO.drill, f.age).image).toBe(121);
             expect(impact.clip === 370).toBe(guarded);
             // From age 13 the drill's forward push box, (44, −74) ±(38, 86),
             // shoves the target ahead of the lunge: 34.5 before the first
@@ -4235,7 +4309,8 @@ describe('prototype training rules', () => {
       // slides it back (163).
       for (const [distance, guarded, hp, hits, shift] of [
         [228, false, LIFE, 0, 0],
-        [180, false, LIFE - 20, 1, 239.868],
+        // PC 2997's op 0x14 re-applies response 56 at (100, −20).
+        [180, false, LIFE - 20, 1, 233.855],
         [180, true, LIFE - 4, 0, 204.266],
       ] as const) {
         const match = new Match();
@@ -4249,8 +4324,8 @@ describe('prototype training rules', () => {
         for (let tick = 0; tick < 100; tick++) {
           match.step({}, { guard: guarded });
           if (hitEffects(match).some((e) => e.age === 0)) {
-            expect(f.action).toBe('airDrillContact');
-            expect(animationFrame('airDrillContact', f.age).image).toBe(136);
+            expect(String(f.branch)).toMatch(DRILL_CONTACT);
+            expect(fighterPose(f).image).toBe(136);
             expect(hitEffects(match)[0].clip === 370).toBe(guarded);
           }
         }
@@ -4267,42 +4342,38 @@ describe('prototype training rules', () => {
       const match = new Match();
       if (facing === -1) match.fighters.reverse();
       const thrower = match.fighters[0];
-      ticks(match, AXE_RELEASE_TICK, { axe: true });
-      expect(match.projectiles).toHaveLength(0);
+      ticks(match, 16, { axe: true });
+      expect(axes(match)).toHaveLength(0);
       match.step({ axe: true });
-      // PC 3279 spawns action 227 at (−6, −102); PC 3293 moves it at raw 900.
-      expect(match.projectiles).toMatchObject([
-        { age: 0, facing, hit: false, x: thrower.x - facing * 9, y: -153 },
+      // At age 16 PC 3279 spawns action 227 at (−6, −102) in slot 6; PC 3293
+      // moves it at raw 900.
+      expect(axes(match)).toMatchObject([
+        { clip: 227, age: 0, facing, slot: 6, x: thrower.x - facing * 9 },
       ]);
-      expect(match.projectiles[0].vx).toBeCloseTo(facing * 13.493, 3);
+      expect(axes(match)[0].y).toBe(-153);
+      expect(axes(match)[0].vx).toBeCloseTo(facing * 13.493, 3);
       expect(match.fighters[1].hp).toBe(LIFE);
       ticks(match, 100, { axe: true });
       expect(match.fighters[1].hp).toBe(LIFE - 30);
       expect(match.fighters[0].hits).toBe(1);
-      expect(match.projectiles).toHaveLength(0);
+      expect(axes(match)).toHaveLength(0);
     }
   });
 
-  it('does not release another axe while frozen on its release pose', () => {
+  it('releases one axe, which strikes on its release tick', () => {
     const match = new Match();
     const [f, target] = match.fighters;
     target.x = f.x + 140;
     target.y = -80;
     target.gravity = 0;
     ticks(match, 17, { axe: true });
-    expect(f.age).toBe(16);
-    expect(f.hits).toBe(1);
-    expect(f.hitStop).toBe(15);
-    for (let tick = 0; tick < 15; tick++) {
-      match.step();
-      expect(f.age).toBe(16);
-      expect(match.projectiles.every((projectile) => projectile.hit)).toBe(
-        true,
-      );
-      expect(f.hits).toBe(1);
-    }
-    match.step();
-    expect(f.age).toBe(17);
+    // The axe's box meets the target as it spawns; authored, its victim
+    // doesn't pause the thrower.
+    expect(f).toMatchObject({ age: 16, hits: 1, hitStop: 0 });
+    expect(axes(match).map((e) => e.clip)).toEqual([230]);
+    ticks(match, 15);
+    expect(f).toMatchObject({ age: 31, hits: 1 });
+    expect(axes(match)).toHaveLength(0);
     expect(target.hp).toBe(LIFE - 30);
   });
 
@@ -4315,7 +4386,7 @@ describe('prototype training rules', () => {
     ticks(airborne, 57, { axe: true }, { jump: true });
     expect(airborne.fighters[1].hp).toBe(LIFE);
     ticks(airborne, 180);
-    expect(airborne.projectiles).toHaveLength(0);
+    expect(axes(airborne)).toHaveLength(0);
   });
 
   it('hits through the body box, 120% against an attacking pose', () => {
@@ -4337,86 +4408,78 @@ describe('prototype training rules', () => {
     f.x = FIGHTER_MARGIN;
     match.fighters[1].x = STAGE_WIDTH - FIGHTER_MARGIN;
     match.step({ axe: true });
-    ticks(match, animationDuration('axeThrow'));
-    const [axe] = match.projectiles;
-    expect(axe).toMatchObject({ hit: false });
+    ticks(match, animationDuration(RYUKO.axeThrow));
+    const [axe] = axes(match);
+    expect(axe.clip).toBe(227);
     // While its axe (slot 6) lives, 226 jumps to 225 (PC 3267): one display,
     // then neutral, and the axe flies on. The command stays in its 40-tick
-    // window, so the free state enters it again until the axe's hit stops
-    // the thrower; once that axe is gone, it throws another.
+    // window, so the free state enters it again each tick while the axe
+    // flies and breaks (its impact, 230, keeps the slot); once that is gone,
+    // the same command throws another.
     match.step({ axe: true });
-    expect(f.action).toBe('axeBusy');
-    expect(match.projectiles).toEqual([axe]);
-    for (let tick = 1; tick < 22; tick++) {
+    expect(named(f)).toBe('axeBusy');
+    expect(axes(match)).toEqual([axe]);
+    while (axes(match).length) {
+      expect(named(f)).toBe('axeBusy');
       match.step();
-      expect(f.action).toBe('axeBusy');
-      expect(match.projectiles.length).toBeLessThanOrEqual(1);
     }
-    match.step();
-    expect(f.action).toBe('axeThrow');
-    // The hit stops the thrower too, which reads no command meanwhile.
+    expect(named(f)).toBe('axeThrow');
     for (
       let tick = 0;
-      tick < 1000 &&
-      (match.projectiles.length || f.hitStop || f.action !== 'idle');
+      tick < 1000 && (axes(match).length || f.action !== 'idle');
       tick++
     )
       match.step();
-    expect(match.projectiles).toEqual([]);
     match.step({ axe: true });
-    expect(f.action).toBe('axeThrow');
-    ticks(match, AXE_RELEASE_TICK);
-    expect(match.projectiles).toMatchObject([{ age: 0 }]);
+    expect(named(f)).toBe('axeThrow');
+    ticks(match, 16);
+    expect(axes(match)).toMatchObject([{ age: 0 }]);
     const interrupted = new Match();
     interrupted.fighters[0].x = 530;
     ticks(interrupted, 8, { axe: true }, { punch: true });
     expect(interrupted.fighters[0].action).toBe('hit');
     ticks(interrupted, 60, { axe: true });
-    expect(interrupted.projectiles).toHaveLength(0);
+    expect(axes(interrupted)).toHaveLength(0);
   });
 
   it('breaks opposing axes where their object boxes meet', () => {
     const match = new Match();
-    ticks(match, AXE_RELEASE_TICK + 1, { axe: true }, { axe: true });
-    expect(match.projectiles.map((p) => p.x)).toEqual([291, 669]);
+    ticks(match, 17, { axe: true }, { axe: true });
+    expect(axes(match).map((e) => e.x)).toEqual([291, 669]);
     ticks(match, 2);
-    expect(match.projectiles.map((p) => p.hit)).toEqual([false, false]);
+    expect(axes(match).map((e) => e.clip)).toEqual([227, 227]);
     // Each slot-1 box (±39) reaches the other's slot-0 body (±34), both 63
-    // ahead, under 109.5 arena pixels apart.
+    // ahead, under 109.5 arena pixels apart: both break into 230.
     match.step();
-    expect(match.projectiles).toMatchObject([
-      { hit: true, age: 0 },
-      { hit: true, age: 0 },
+    expect(axes(match)).toMatchObject([
+      { clip: 230, age: 0 },
+      { clip: 230, age: 0 },
     ]);
     expect(match.fighters.map((f) => f.hitStop)).toEqual([0, 0]);
     expect(hitEffects(match)).toEqual([]);
     ticks(match, 100);
     expect(match.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
-    expect(match.projectiles).toHaveLength(0);
+    expect(axes(match)).toHaveLength(0);
   });
 
   describe('the y + 2000 object layer', () => {
-    const axe = (owner: number, x: number) => ({
-      owner,
-      kind: 'axe' as const,
-      x,
-      y: -153,
-      vx: 0,
-      vy: 0,
-      facing: (owner === 0 ? 1 : -1) as 1 | -1,
-      age: 1,
-      hit: false,
-    });
+    // A side's axe (227) flying at a height of −153, its first records run.
+    const axe = (match: Match, owner: number, x: number) =>
+      spawn(match, owner, RYUKO.axe, {
+        x,
+        y: -153,
+        facing: owner === 0 ? 1 : -1,
+      });
 
     it("breaks the other side's axes on B G's stage-wide bodies (303)", () => {
       const match = new Match();
-      match.projectiles = [axe(0, 1100), axe(1, 1700)];
       match.effects = [object(303, 1, { x: 1500 })];
+      const flying = [axe(match, 0, 1100), axe(match, 1, 1700)];
       match.step();
       // Its bodies (0, 1995) ±(10000, 182) meet the axe's box 2000 down.
-      expect(match.projectiles.map((p) => [p.hit, p.age])).toEqual([
-        [true, 0],
-        [false, 2],
+      expect(flying.map((e) => [e.clip, e.age])).toEqual([
+        [230, 0],
+        [227, 1],
       ]);
     });
 
@@ -4425,15 +4488,15 @@ describe('prototype training rules', () => {
       // A downed Ryuko's body box lies below the floor, so only the axe meets
       // the beam.
       match.fighters[0].action = 'knockdown';
-      match.projectiles = [axe(0, 1100)];
       // Object 269 (calling 270) sets its boxes as it starts; slot 1's
       // (644, 1995) ±(644, 72) reaches the axe's body.
       const beam = object(269, 1, { x: 1500, facing: -1, age: -1 });
       match.effects = [beam];
+      const flying = axe(match, 0, 1100);
       match.step();
       expect(beam.objectBox).toMatchObject({ y: 1995, w: 644 });
       expect(beam.connected).toBe(true);
-      expect(match.projectiles[0].hit).toBe(false);
+      expect(flying.clip).toBe(227);
     });
 
     it('re-arms an object at each display holding a box of kind bit 1 (0x41257d)', () => {
@@ -4466,10 +4529,10 @@ describe('prototype training rules', () => {
       Object.assign(bg, { action: 'megaBeam', age: 89, fired: 89 });
       // At age 90 action 292 sets its slot-1 box (59, 1908) ±(40, 89) and
       // hit handler 294 (PC 4311).
-      match.projectiles = [axe(0, 470)];
+      const flying = axe(match, 0, 470);
       match.step();
       expect(bg.action).toBe('megaBeamHit');
-      expect(match.projectiles[0].hit).toBe(false);
+      expect(flying.clip).toBe(227);
     });
 
     it('cannot be guarded with a box of kind 0x40 (0x40f469)', () => {
@@ -4500,9 +4563,9 @@ describe('prototype training rules', () => {
     match.fighters[1].hp = 16;
     for (let i = 0; i < 100 && !match.winner; i++) match.step({ axe: true });
     expect(match.winner).toBe('player');
-    expect(match.projectiles).toMatchObject([{ kind: 'axe', hit: true }]);
-    ticks(match, animationDuration('axeHit'));
-    expect(match.projectiles).toEqual([]);
+    expect(axes(match).map((e) => e.clip)).toEqual([230]);
+    ticks(match, animationDuration(RYUKO.axeHit));
+    expect(axes(match)).toEqual([]);
   });
 
   it('holds an axe through the Getter Beam freeze, which op 0x1f adds to global 6', () => {
@@ -4510,99 +4573,76 @@ describe('prototype training rules', () => {
     const [ryuko, target] = match.fighters;
     target.x = 1700;
     target.stock = 1;
-    ticks(match, AXE_RELEASE_TICK + 4, { axe: true });
-    const [axe] = match.projectiles;
+    ticks(match, 20, { axe: true });
+    const [axe] = axes(match);
     match.step({}, { getterBeam: true });
     // Action 264 adds 10, then 65 at age 5, with its op 0x1a stops; KGT 58
     // counts it down after the fighters and the axe have read it.
     expect([match.freeze, ryuko.hitStop]).toEqual([9, 10]);
-    match.step();
+    ticks(match, 2);
+    // The axe checks after each 3-tick display (PCs 3297–3318): from age 6
+    // it replays its second display (227 + 16) without box or motion until
+    // a check finds the freeze over, 75 ticks later.
+    expect(axe).toMatchObject({ clip: '227+16', box: null });
     const x = axe.x;
     ticks(match, 75);
-    // The axe checks after each 3-tick display: from its next one (age 6)
-    // through the first after the freeze, 75 ticks.
     expect(match.freeze).toBe(0);
-    expect(axe).toMatchObject({ x, held: true });
+    expect(axe.x).toBe(x);
     match.step();
-    expect(axe.held).toBe(false);
     expect(axe.x).toBeCloseTo(x + 13.493, 3);
   });
 
   it('holds a flying axe without its box while global 6 is positive, and a missile once at 1', () => {
     const match = new Match();
     const target = match.fighters[1];
-    match.projectiles = [
-      {
-        owner: 0,
-        kind: 'axe',
-        x: 560,
-        y: -153,
-        vx: 0,
-        vy: 0,
-        facing: 1,
-        age: 2,
-        hit: false,
-      },
-    ];
+    // An axe (227) at rest at its age 2, its box over the target.
+    const axe = spawn(match, 0, RYUKO.axe, { x: 560, y: -153 });
+    Object.assign(axe, { age: 2, vx: 0 });
     // Scripts read global 6 before KGT 58 counts it down: 3, then 0 at the
     // axe's next 3-tick display.
     match.freeze = 3;
     for (let tick = 0; tick < 3; tick++) {
       match.step();
-      expect(match.projectiles[0]).toMatchObject({ held: true, hit: false });
+      expect(axe).toMatchObject({ clip: '227+9', box: null });
     }
     expect(target.hp).toBe(LIFE);
     match.step();
     expect(target.hp).toBe(LIFE - 30);
-    const missile = {
-      owner: 0,
-      kind: 'missile' as const,
-      x: 1000,
-      y: -600,
-      vx: 10,
-      vy: -10,
-      facing: 1 as const,
-      age: 0,
-      hit: false,
-    };
-    match.projectiles = [missile];
+    // A missile (218) replays its display while global 6 is exactly 1 (PC
+    // 3168). ponytail: objects move before their script step, so it moves
+    // once more before the hold, where the source's motion pass (0x40f910)
+    // follows the scripts.
+    const missile = spawn(match, 0, RYUKO.dstMissile, { x: 1000, y: -600 });
+    const v = 1000 * (655 / 65536) * 1.5;
     match.freeze = 2;
     const xs = [];
-    for (let tick = 0; tick < 3; tick++) {
+    for (let tick = 0; tick < 4; tick++) {
       match.step();
-      xs.push(missile.x);
+      xs.push(missile.x - 1000);
     }
-    expect(xs).toEqual([1010, 1010, 1020]);
+    expect(xs.map((x) => x / v)).toEqual([1, 2, 2, 3]);
   });
 
-  it('deletes projectiles 50 source pixels outside the world (0x4124c9)', () => {
+  it('deletes a missile 50 source pixels outside the world (0x4124c9)', () => {
     const match = new Match();
-    const missile = (x: number, y: number, vx: number, vy: number) => ({
-      owner: 0,
-      kind: 'missile' as const,
-      x,
-      y,
-      vx,
-      vy,
-      facing: 1 as const,
-      age: 0,
-      hit: false,
-    });
-    match.projectiles = [
+    // Missiles (218) moving before their script sets their own motion: each
+    // pair ends on a bound and just past it.
+    const missile = (x: number, y: number, vx: number, vy: number) =>
+      object(RYUKO.dstMissile, 0, { x, y, vx, vy, slot: -1 });
+    match.effects = [
       missile(1985, -300, 10, 0),
+      missile(1985, -300, 11, 0),
       missile(-65, -300, -10, 0),
+      missile(-65, -300, -11, 0),
       missile(900, -1445, 0, -10),
-      missile(900, 125, 0, 10),
+      missile(900, -1445, 0, -11),
     ];
     match.step();
-    expect(match.projectiles.map((p) => [p.x, p.y])).toEqual([
+    expect(objects(match, RYUKO.dstMissile).map((e) => [e.x, e.y])).toEqual([
       [1995, -300],
       [-75, -300],
       [900, -1455],
-      [900, 135],
     ]);
-    match.step();
-    expect(match.projectiles).toEqual([]);
   });
 
   it('uses a backward walk when moving away from the opponent', () => {
@@ -4765,14 +4805,15 @@ describe('prototype training rules', () => {
     for (let tick = 0; tick < 100 && !match.winner; tick++) match.step();
     expect(match.winner).toBe('player');
     expect(player.action).not.toBe('win');
-    // FB's 75 stops both 15 ticks; KO Normal adds 10 to the thrower (PC 607),
-    // then holds both 40 at its age 5 (PC 611).
-    expect([player.hitStop, target.hitStop]).toEqual([25, 15]);
+    // FB's 75 stops its victim 15 ticks (authored: not the axe's thrower);
+    // KO Normal adds 10 to the thrower (PC 607), then holds both 40 at its
+    // age 5 (PC 611).
+    expect([player.hitStop, target.hitStop]).toEqual([10, 15]);
     ticks(match, 20);
-    expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
+    expect([player.hitStop, target.hitStop]).toEqual([40, 40]);
     // It finishes the throw before taking its result back in neutral.
-    while (player.action === 'axeThrow') {
-      expect(player.age).toBeLessThan(animationDuration('axeThrow'));
+    while (named(player) === 'axeThrow') {
+      expect(player.age).toBeLessThan(animationDuration(RYUKO.axeThrow));
       match.step();
     }
     expect(player).toMatchObject({ action: 'win', age: 0 });
@@ -5263,14 +5304,20 @@ describe('CPU IORI', () => {
     const [ryuko, cpu] = match.fighters;
     cpu.x = ryuko.x + 1000; // out of reach: timing only
     match.step({}, { cpuIori: true });
-    expect(cpu).toMatchObject({ action: 'cpuIori', age: 0 });
+    expect({ ...cpu, action: named(cpu) }).toMatchObject({
+      action: 'cpuIori',
+      age: 0,
+    });
     // 410's displays (5 + 8 + 8 + 8 + 3) and 411's (3 + 5 + 5 + 10 + 8 + 3).
-    expect(animationDuration('cpuIori')).toBe(66);
+    expect(animationDuration(RYUKO.cpuIori)).toBe(66);
     ticks(match, 65);
-    expect(cpu.action).toBe('cpuIori');
+    expect(named(cpu)).toBe('cpuIori');
     expect(cpu.x).toBeLessThan(ryuko.x + 1000);
     match.step({}, {});
-    expect(cpu).toMatchObject({ action: 'iori3', age: 0 });
+    expect({ ...cpu, action: named(cpu) }).toMatchObject({
+      action: 'iori3',
+      age: 0,
+    });
   });
 
   it('recovers one time in six instead (op 0x20 at PC 5887)', () => {
@@ -5286,19 +5333,19 @@ describe('CPU IORI', () => {
       cpu.x = ryuko.x + 1000;
       match.step({}, { cpuIori: true });
       ticks(match, 66);
-      expect(cpu).toMatchObject({
+      expect({ ...cpu, action: named(cpu) }).toMatchObject({
         action: recover ? 'cpuIoriRecover' : 'iori3',
         age: 0,
       });
     }
     // Images 441, 321 and 31 for five ticks each, then idle.
-    expect(animationDuration('cpuIoriRecover')).toBe(15);
+    expect(animationDuration('411+31')).toBe(15);
     const match = new Match('cpu', false, seedFor(true));
     const cpu = match.fighters[1];
     cpu.x = match.fighters[0].x + 1000;
     match.step({}, { cpuIori: true });
     ticks(match, 66 + 14);
-    expect(cpu.action).toBe('cpuIoriRecover');
+    expect(named(cpu)).toBe('cpuIoriRecover');
     match.step({}, {});
     expect(cpu.action).toBe('idle');
   });
@@ -5643,25 +5690,37 @@ describe('EX mode', () => {
   it('switches with EX Ch and NOR Ch for 50 power, or enters NO SUPER without it', () => {
     const broke = new Match();
     broke.step({ ex: true });
-    // PCs 2858–2863: under 50 power in all, NO SUPER (251).
-    expect(broke.fighters[0]).toMatchObject({ action: 'noSuper', ex: false });
+    // PCs 2858–2863: under 50 power in all, its branch (204 + 3) gives the
+    // 50 back and jumps into NO SUPER (251).
+    expect({
+      ...broke.fighters[0],
+      branch: playing(broke.fighters[0]),
+    }).toMatchObject({
+      branch: '204+3',
+      power: 0,
+      ex: false,
+    });
     const match = new Match();
     const [f] = match.fighters;
     f.power = 60;
     match.step({ ex: true });
     // EX Ch (204) spends 50, sets variable 0 (PC 2867) and spawns EX Obj 375.
-    expect(f).toMatchObject({ action: 'exChange', power: 10, ex: true });
+    expect({ ...f, action: named(f) }).toMatchObject({
+      action: 'exChange',
+      power: 10,
+      ex: true,
+    });
     expect(match.effects.map((e) => e.clip)).toEqual([375]);
     expect(f.face).toBe(-1);
     match.step();
     // The HUD face (action 70) counts its cycle from the next tick.
     expect(f.face).toBe(0);
-    ticks(match, animationDuration('exChange'));
+    ticks(match, animationDuration(RYUKO.exChange));
     expect(f).toMatchObject({ action: 'idle', ex: true });
     Object.assign(f, { stock: 1, power: 0 });
     match.step({ ex: true });
     // In EX mode PC 2866 enters NOR Ch (205), which clears it (PC 2880).
-    expect(f).toMatchObject({
+    expect({ ...f, action: named(f) }).toMatchObject({
       action: 'norChange',
       stock: 0,
       power: 50,
@@ -5687,7 +5746,7 @@ describe('EX mode', () => {
   it('fires a tapped EX Fire (231): a 30-damage shot at raw 800 through FB', () => {
     const { match, f, target } = exMatch();
     match.step({ axe: true });
-    expect(f.action).toBe('exFire');
+    expect(named(f)).toBe('exFire');
     // Holding back doesn't charge: condition 4 is forward.
     ticks(match, 17, { left: true });
     expect(shot(match)).toBeUndefined();
@@ -5800,11 +5859,11 @@ describe('EX mode', () => {
     const { match, f } = exMatch();
     match.fighters[1].x = f.x + 1200;
     match.step({ axe: true });
-    ticks(match, animationDuration('exFire'));
+    ticks(match, animationDuration(RYUKO.exFire));
     expect(f.action).toBe('idle');
     match.step({ axe: true });
     // 231's PC 3340 jumps to 225 while slot 6 lives.
-    expect(f.action).toBe('axeBusy');
+    expect(named(f)).toBe('axeBusy');
     expect(shot(match)).toMatchObject({ clip: 233 });
     const versus = new Match();
     versus.fighters[0].ex = true;
@@ -5814,7 +5873,7 @@ describe('EX mode', () => {
     // The shot's slot-1 box and the axe's (y + 2000) each reach the other's
     // body: both break, without damage.
     expect(shot(versus)).toMatchObject({ clip: 235, age: 0 });
-    expect(versus.projectiles).toMatchObject([{ hit: true, age: 0 }]);
+    expect(axes(versus, 1)).toMatchObject([{ clip: 230, age: 0 }]);
     expect(versus.fighters.map((f) => f.hp)).toEqual([LIFE, LIFE]);
   });
 
@@ -5916,8 +5975,8 @@ describe('sound cues (op 0x03)', () => {
 
   it("plays the axe's impact (230, PC 3334) as it breaks", () => {
     const match = new Match();
-    ticks(match, AXE_RELEASE_TICK + 4, { axe: true }, { axe: true });
-    expect(match.projectiles.map((p) => p.hit)).toEqual([true, true]);
+    ticks(match, 20, { axe: true }, { axe: true });
+    expect(axes(match).map((e) => e.clip)).toEqual([230, 230]);
     expect(match.sounds).toEqual([
       { owner: 0, index: 34 },
       { owner: 1, index: 34 },

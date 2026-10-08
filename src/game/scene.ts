@@ -5,13 +5,7 @@ import data from './generated/assets.json';
 import ui from './generated/ui.json';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
-import {
-  animationFrame,
-  BLACK,
-  dstHold,
-  isBlank,
-  NORMAL_COLOR,
-} from './animations';
+import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
 import {
   afterimageColor,
@@ -123,7 +117,6 @@ export class TrainingScene extends Phaser.Scene {
   private sprites: Phaser.GameObjects.Image[] = [];
   private shadows: Phaser.GameObjects.Ellipse[] = [];
   private blacks: Phaser.GameObjects.Image[] = [];
-  private projectileSprites: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
   private trailSprites: Phaser.GameObjects.Image[] = [];
   // Op 0x0e's shake, stepped once per drawn frame like the source's draw
@@ -501,12 +494,11 @@ export class TrainingScene extends Phaser.Scene {
           (GROUND + f.y) / ART_SCALE,
           (pose.held ? holder : f).facing === -1,
         );
+        // Op 0x07 flag bit 0 draws the held victim behind its holder.
         const behind =
-          f.action === 'dstHeld'
-            ? dstHold(holder.age)?.behind
-            : f.action === 'superHeld'
-              ? ((f.held?.flags ?? 0) & 1) !== 0
-              : undefined;
+          f.action === 'superHeld'
+            ? ((f.held?.flags ?? 0) & 1) !== 0
+            : undefined;
         // A KO (0x40e8cd) drops the fighter to z 0x3c, behind the other
         // fighter and the objects drawn behind it.
         this.paint(sprite, pose, this.faded(f.color, i), f.who)
@@ -531,30 +523,7 @@ export class TrainingScene extends Phaser.Scene {
           .setPosition(f.x, GROUND - 1)
           .setAlpha(Math.max(0.1, 0.3 + f.y / 1000));
       });
-      const { projectiles, effects } = this.match;
-      this.pool(this.projectileSprites, projectiles.length).forEach(
-        (sprite, index) => {
-          const projectile = projectiles[index];
-          sprite.setVisible(!!projectile);
-          if (!projectile) return;
-          const pose = animationFrame(
-            projectile.kind === 'missile'
-              ? 'dstMissile'
-              : projectile.hit
-                ? 'axeHit'
-                : 'axeFlight',
-            projectile.age,
-          );
-          this.place(
-            sprite,
-            this.match.fighters[projectile.owner].who,
-            pose,
-            projectile.x,
-            GROUND + projectile.y,
-            projectile.facing,
-          );
-        },
-      );
+      const { effects } = this.match;
       this.pool(this.effectSprites, effects.length).forEach((sprite, index) => {
         const effect = effects[index];
         sprite.setVisible(!!effect);

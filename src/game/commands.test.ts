@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { commanded, ENTRIES, NEAR } from './commands';
 import { LIFE, Match } from './match';
 import type { Fighter, Input } from './match';
-import { playing, RYUKO } from './testing';
+import { named, playing, RYUKO } from './testing';
 
 // Motions for player 1 on the left, facing right: f is right, b is left.
 const KEYS: Record<string, Input> = {
@@ -75,7 +75,7 @@ describe('recovered command recognizer', () => {
     const f = perform(motion, (f) =>
       Object.assign(f, { stock: 3, power: 50, hp }),
     );
-    expect(f.action).toBe(action);
+    expect(named(f)).toBe(action);
   });
 
   it("reads back and forward from the opponent's side", () => {
@@ -89,7 +89,7 @@ describe('recovered command recognizer', () => {
       { left: true, punch: true },
     ])
       ticks2(match, input);
-    expect(f.action).toBe('axeThrow');
+    expect(named(f)).toBe('axeThrow');
   });
 
   it('needs each exact direction before the button, else falls back to P', () => {

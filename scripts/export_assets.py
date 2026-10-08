@@ -50,8 +50,10 @@ def decode_event(record):
                     y=s16(record, 10), slot=record[12], z=record[13], busy=u16(record, 5), busyOffset=record[7])
     if op == 0x07:  # place the held opponent in a pose from the held-pose table
         return dict(op="hold", flags=record[1], pose=u16(record, 2), x=s16(record, 4), y=s16(record, 6))
-    if op == 0x10:  # stock check (0x413500): stock <= min jumps to target + r[4] (NO SUPER); otherwise stock += add
-        return dict(op="stock", target=u16(record, 2), offset=record[4], min=record[6], add=s16(record, 7))
+    if op == 0x10:  # stock check (0x413500): with r[5] bit 0, stock <= min jumps to target + r[4] (NO SUPER) and
+        # otherwise stock += add; without it (0x4135eb), stock >= min jumps (`atLeast`)
+        return dict(op="stock", target=u16(record, 2), offset=record[4], min=record[6], add=s16(record, 7),
+                    atLeast=not record[5] & 1)
     if op == 0x11:  # life check (0x413164): bit 0 of r[5] jumps at or below the value, otherwise at or above
         return dict(op="life", target=u16(record, 2), offset=record[4], below=bool(record[5] & 1),
                     value=u16(record, 6))
@@ -557,7 +559,7 @@ def main():
         "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24,
     }
     # Pose clips for what the match draws from clips: neutral, victim and
-    # result actions, and the moves it still builds by hand.
+    # result actions.
     actions = {
         **neutral,
         "intro": 33,
@@ -566,15 +568,6 @@ def main():
         "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76, "jumpHit": 77, "drillDown": 135,
         "blockRapid": 163, "crouchBlockRapid": 165, "airBlockRapid": 167,
         "timeStopGuard": 168, "crouchTimeStopGuard": 170, "airTimeStopGuard": 172,
-        "drill": 207, "airDrill": 208, "airDrillSpin": 209, "drillLand": 212,
-        "axeBusy": 225, "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
-        "grab": 196, "throw": 197, "throwSpin": 199,
-        "iori": 246, "iori2": 247, "iori3": 248,
-        "exChange": 204, "norChange": 205,
-        # CPU IORI's recovery: op 0x20 at PC 5887 jumps to action 411 + 31.
-        "cpuIoriRecover": (411, 31),
-        "dst": 214, "dstHit": 215, "dstSpin": 217, "dstMissile": 218,
-        "evilDst": 221, "dstFar": 220, "evilDstFar": 224,
         "dstToss": 129, "dstTossSpin": 130, "dstTossSpin2": 131,
         "twist": 85, "twisting": 86, "twisting2": 87,
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
@@ -596,19 +589,16 @@ def main():
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # Super timelines, their hit branches (handler slot 2) and every spawned object,
-    # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
-    # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
-    # (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253), EX Fire
-    # (231) and every charge and freeze branch its checks take, and CPU
-    # IORI (410, which jumps through 411 into iori3), the rush air hit (122), the
-    # beam hits (83, 84), hits 75, 80, 96 and 132 for their op 0x20 rolls, air reactions
-    # whose op 0x01 commands the match plays, the lose action (59) whose records
-    # open every KO, every response's hit effect and every object the clips
-    # spawn, each with its op 0x20 branches, keyed
-    # "action+offset" when a branch enters mid-action.
+    # plus the guard counter COUNTER HIT (174), and the super-cancel versions entered
+    # from IORI (260, 265, 279, 318) with the GENGAI! lettering of action 254 (253),
+    # the rush air hit (122), the beam hits (83, 84), hits 75, 80, 96 and 132 for
+    # their op 0x20 rolls, air reactions whose op 0x01 commands the match plays,
+    # the lose action (59) whose records open every KO, every response's hit
+    # effect and every object the clips spawn, each with its op 0x20 branches,
+    # keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    queue = [(i, 0) for i in [88, 97, 174, 222, 231, 250, 251, 253, 256, 260, 263, 264,
-             265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
+    queue = [(i, 0) for i in [88, 97, 174, 250, 251, 253, 256, 260, 263, 264,
+             265, 278, 279, 280, 286, 292, 318, 319, 122, 83, 84,
              74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"]),
              *moves]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)

@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { fighterPose, Match } from './match';
 import type { Input } from './match';
 import type { DummyBehavior } from './dummy';
-import { RYUKO, strike } from './testing';
+import { enter, RYUKO, strike } from './testing';
 
 const ZOMA_IMAGES = new Set(CHARACTERS.zoma.images.map(({ index }) => index));
 
@@ -110,12 +110,11 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
 
   it("is held in his own pose table's poses through Ryuko's throw", () => {
     const { match, ryuko, zoma } = versus(80);
-    ryuko.action = 'grab';
-    ryuko.age = 6;
+    enter(match, ryuko, RYUKO.grab, 6);
     match.step();
-    expect(zoma.action).toBe('dstHeld');
+    expect(zoma.action).toBe('superHeld');
     const poses = new Set<number>();
-    for (let t = 0; t < 120 && zoma.action === 'dstHeld'; t++) {
+    for (let t = 0; t < 120 && zoma.action === 'superHeld'; t++) {
       match.step();
       const pose = fighterPose(zoma);
       if (pose.held) poses.add(pose.image);

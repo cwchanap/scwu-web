@@ -90,56 +90,6 @@ function clip(
   return { frames, ticks, loopStart };
 }
 
-// Action 197 calls the throw spin (199) three times (PC 2767), then tosses.
-const throwSpins = Array.from({ length: 3 }, () => clips.throwSpin).flat();
-export const THROW_TOSS_TICK =
-  clips.throw[0].duration +
-  throwSpins.reduce((total, frame) => total + frame.duration, 0);
-// Action 215 plays the same three spins, then 217 ten times.
-const dstSpins = [
-  ...throwSpins,
-  ...Array.from({ length: 10 }, () => clips.dstSpin).flat(),
-];
-export const DST_TOSS_TICK =
-  clips.dstHit[0].duration +
-  dstSpins.reduce((total, frame) => total + frame.duration, 0);
-// Actions 199/217 run op 0x07 before each spin display: the held offset in
-// source pixels, bit 2 (face the holder's way, mirrored image) and bit 0
-// (drawn behind the holder). Response 30 (op 0x14) first places the victim 60
-// ahead. The throw (197) opens with the same five ticks, so it shares these
-// holds. `place` is true when an op places the victim this tick: op 0x14 at
-// age 0, op 0x07 as its display starts, and every tick through 217, whose bit
-// 4 (0x10) has the holder's motion step re-place it (0x40fa29).
-const DST_HOLDS = [
-  { x: 60, same: true, behind: true },
-  { x: -10, same: true, behind: true },
-  { x: -60, same: false, behind: true },
-  { x: 0, same: false, behind: false },
-];
-export function dstHold(age: number) {
-  const first = clips.dstHit[0].duration;
-  if (age < first) return { x: 60, same: false, behind: false, place: !age };
-  let time = age - first;
-  for (const [index, frame] of dstSpins.entries()) {
-    if (time < frame.duration)
-      return {
-        ...DST_HOLDS[index % DST_HOLDS.length],
-        place: !time || index >= throwSpins.length,
-      };
-    time -= frame.duration;
-  }
-  return null;
-}
-// The victim's poses (its grabbed pose and held table) to Ryuko's timing.
-const dstHeld = (grabbed: Pose[], who: Who) => [
-  { ...grabbed[0], duration: clips.dstHit[0].duration },
-  // Op 0x07 selects held pose 1 from the victim's table and adds the bit 2 flip.
-  ...dstSpins.map((frame, index) => ({
-    ...heldFrame(1, DST_HOLDS[index % DST_HOLDS.length].same ? 4 : 0, who),
-    duration: frame.duration,
-  })),
-];
-
 // Super timelines flattened by scripts/export_assets.py: displays with op 0x09
 // calls inlined and op 0x0a jumps followed, plus the gameplay opcodes at their
 // action ages. The match plays their events; conditions are checked at entry.
@@ -203,7 +153,15 @@ export type SourceEvent =
       busyOffset: number;
     }
   | { op: 'hold'; flags: number; pose: number; x: number; y: number }
-  | { op: 'stock'; target: number; offset: number; min: number; add: number }
+  // Op 0x10: stock <= min jumps, else stock += add; `atLeast`, stock >= min.
+  | {
+      op: 'stock';
+      target: number;
+      offset: number;
+      min: number;
+      add: number;
+      atLeast: boolean;
+    }
   | {
       op: 'life';
       target: number;
@@ -382,12 +340,6 @@ export const animations = {
   crouchTurn: clip(clips.crouchTurn),
   // Action 32 jumps to action 33 at PC 333, after its blank repositioning displays.
   intro: clip(clips.intro.slice(2)),
-  // Actions 204/205 (EX Ch, NOR Ch): four flashing displays of image 366.
-  exChange: clip(clips.exChange),
-  norChange: clip(clips.norChange),
-  iori: clip(clips.iori),
-  iori2: clip(clips.iori2),
-  iori3: clip(clips.iori3),
   hitPull: clip(clips.hitPull),
   // Response 5/6 (air punch and kick against a grounded opponent) → action 77.
   jumpHit: clip(clips.jumpHit),
@@ -410,27 +362,6 @@ export const animations = {
   // op 0x20 reorders their shaking (+17, +18).
   stun: scriptClip(108),
   airStun: scriptClip(109),
-  drill: clip(clips.drill),
-  airDrill: clip(clips.airDrill.slice(0, 3)),
-  // Actions 209–211 loop these poses until contact or landing.
-  airDrillSpin: clip(clips.airDrillSpin.slice(0, 2), true),
-  // Actions 209–211: eight ticks of hit-stop, then this two-tick transition.
-  // Every contact branch shakes alike before its display (PCs 2991, 3002,
-  // 3022, 3043, 3064).
-  airDrillContact: clip(
-    [{ ...clips.airDrillSpin[0], events: clips.airDrillSpin[2].events }],
-    false,
-    [2],
-  ),
-  drillLand: clip(clips.drillLand),
-  dst: clip(clips.dst),
-  // Action 221 repeats DST's grab and 58-tick miss with its own images.
-  evilDst: clip(clips.evilDst),
-  // DST FAR (220) and EVIL DST FAR (224) repeat 214 and 221 with a shorter box.
-  dstFar: clip(clips.dstFar),
-  evilDstFar: clip(clips.evilDstFar),
-  dstHit: clip([clips.dstHit[0], ...dstSpins, ...clips.dstHit.slice(1)]),
-  dstHeld: clip(dstHeld(clips.grabbed, 'ryuko')),
   // Response 31 enters action 129, which jumps to the spinning loop 130; its
   // landing branch bounces through PC 1752 into the slower loop 131.
   dstToss: clip([clips.dstToss[0], ...clips.dstTossSpin], 1),
@@ -438,16 +369,6 @@ export const animations = {
   // Missile response 32 enters action 85, then 86; landing bounces into 87.
   twist: clip([clips.twist[0], ...clips.twisting], 1),
   twistBounce: clip([clips.twist[1], ...clips.twisting2], 1),
-  dstMissile: clip(clips.dstMissile, true),
-  // Action 225, which 226 jumps to while its axe flies (PC 3267): one
-  // display, then neutral.
-  axeBusy: clip(clips.axeBusy),
-  axeThrow: clip(clips.axeThrow),
-  axeFlight: clip(clips.axeFlight, true),
-  axeHit: clip(clips.axeHit),
-  grab: clip(clips.grab),
-  // Its victim plays dstHeld until the toss: the same response 30 and spins.
-  throw: clip([clips.throw[0], ...throwSpins, ...clips.throw.slice(1)]),
   knockdown: clip(clips.knockdown),
   getUp: clip(clips.getUp),
   guard: clip(clips.guard.slice(0, 1)),
@@ -506,16 +427,8 @@ export const animations = {
   megaBeamHit: scriptClip(294),
   changeAttack: scriptClip(319),
   changeAttackHit: scriptClip(320),
-  // EVIL DST's hit branch (222) strikes the held opponent five times, then
-  // jumps into DST Hit (215) at PC 3104.
-  evilDstHit: scriptClip(222),
   // A guard reaction's op 0x24 enters COUNTER HIT (174), spending a stock.
   counterHit: scriptClip(174),
-  // EX mode's axe throw: action 231, with its charge branches (237, 238).
-  exFire: scriptClip(231),
-  // Command 22 (CPU IORI): action 410 jumps to 411, which jumps to iori3 (248).
-  cpuIori: scriptClip(410),
-  cpuIoriRecover: clip(clips.cpuIoriRecover),
   // Super-cancel versions, entered when a super cancels IORI.
   scMusashi: scriptClip(260),
   scGetterBeam: scriptClip(265),
@@ -553,10 +466,7 @@ export const SCRIPTED = {
   megaBeamHit: 294,
   changeAttack: 319,
   changeAttackHit: 320,
-  evilDstHit: 222,
   counterHit: 174,
-  exFire: 231,
-  cpuIori: 410,
   scMusashi: 260,
   scGetterBeam: 265,
   scEvilBeam: 279,
@@ -633,7 +543,6 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
   tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
   twist: clip([z.twist[0], ...z.twisting], 1),
   twistBounce: clip([z.twist[1], ...z.twisting2], 1),
-  dstHeld: clip(dstHeld(z.grabbed, 'zoma')),
   superHeld: clip(z.grabbed.slice(0, 1)),
   knockdown: clip(z.knockdown),
   getUp: clip(z.getUp),

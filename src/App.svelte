@@ -420,8 +420,9 @@
         </p>
         <p>
           Press <kbd>U</kbd> for a six-hit Drill Punch on the ground, or an
-          aerial drill while jumping. Aerial drill follows each hit or block
-          with a weaker strike while you stay in range. Landing ends it with its
+          aerial drill while jumping. Aerial drill's first hit lifts the
+          opponent in front of the drill, and each hit or block is followed by a
+          weaker strike while they stay in range. Landing ends it with its
           recovery pose. Press <kbd>I</kbd> on the ground to throw a spinning axe.
           Only one axe per fighter can be out at a time: pressing it again while your
           axe flies only makes Ryuko stand. These basic specials do not spend super
@@ -457,9 +458,10 @@
         <p>
           Press <kbd>G</kbd> or Daisetsuzan for Ryuko's command throw. Ryuko transforms,
           spins the opponent overhead, hurls them into the sky, then fires two missiles
-          that can catch them as they fall. A miss leaves a long recovery. At 30%
-          health or less it becomes EVIL DST, striking the held opponent five times
-          first.
+          that can catch them as they fall. A miss leaves a long recovery; started
+          from farther away, its shorter grab stays open through that recovery. At
+          30% health or less it becomes EVIL DST, striking the held opponent five
+          times first.
         </p>
         <p>
           Landing hits, blocking, and taking damage fill the power gauge at the
