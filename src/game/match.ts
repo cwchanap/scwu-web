@@ -196,10 +196,9 @@ const launchMotion: Partial<
 // stocks, none at the start. Routine 0x40e6f0 carries and borrows between them.
 export const POWER_PER_STOCK = 100;
 export const MAX_STOCK = 3;
-// The same block's 510 life. Its 30% (153) selects desperation branches and,
-// in 0x40e7c0, shrinks every loss to 60%.
+// The same block's 510 life. Its 30% (153, desperationOf) selects desperation
+// branches and, in 0x40e7c0, shrinks every loss to 60%.
 export const LIFE = 510;
-export const DESPERATION_HP = 153;
 // Vs. single play's rounds to win (0x470048, 0x4087da): GAME.INI's
 // Editor.TestPlay.VSSinglePlay, 3 (0x414afc).
 export const ROUNDS_TO_WIN = 3;

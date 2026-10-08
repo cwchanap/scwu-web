@@ -54,19 +54,19 @@ The earlier implementation advanced attack and movement clocks through impacts. 
 
 At this port's 10 ms simulation tick, these are the recovered successful-hit pauses used by the current Ryuko training implementation:
 
-| Attack                                                     | Attacker / defender pause in ticks             | Source selection                                            |
-| ---------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------- |
-| Punch 1 / Kick 1                                           | 10 / 10                                        | Responses 1–2 → actions 73–74                               |
-| Punch 2                                                    | 10 / 10 for hits 1–2; 15 / 15 for hit 3        | Action 180, PCs 2400/2413; responses 8–11                   |
-| Punch 3 / Kick 2 / crouching punch / aerial punch and kick | 15 / 15                                        | Strong/launch responses in actions 181/188/185/182/191      |
-| Hit Up                                                     | Ground 33 / 10; air 13 / 13                    | Action 200; response 19 → 81, air response 17 → 80          |
-| Crouching kick                                             | 13 / 13                                        | Response 7 → action 79                                      |
-| Ground Drill Punch                                         | 15 / 15 for hits 1–5; 13 / 13 for hit 6        | Action 207, PCs 2920/2941; responses 10–11 → 75–76, 18 → 80 |
-| Kick 3                                                     | 0 / 0                                          | Action 190, PC 2631; responses 20–21 → 83–84                |
-| Aerial drill                                               | 8 / 9 on hit; 8 / 3 on block                   | Actions 209–211 contact branches                            |
-| Axe projectile                                             | 15 / 15 (FB → 75); 15 / 15 for airborne victim | Action 227, PC 3288; responses 50 → 110 → 75, 4 → 76        |
+| Attack                                                     | Attacker / defender pause in ticks           | Source selection                                            |
+| ---------------------------------------------------------- | -------------------------------------------- | ----------------------------------------------------------- |
+| Punch 1 / Kick 1                                           | 10 / 10                                      | Responses 1–2 → actions 73–74                               |
+| Punch 2                                                    | 10 / 10 for hits 1–2; 15 / 15 for hit 3      | Action 180, PCs 2400/2413; responses 8–11                   |
+| Punch 3 / Kick 2 / crouching punch / aerial punch and kick | 15 / 15                                      | Strong/launch responses in actions 181/188/185/182/191      |
+| Hit Up                                                     | Ground 33 / 10; air 13 / 13                  | Action 200; response 19 → 81, air response 17 → 80          |
+| Crouching kick                                             | 13 / 13                                      | Response 7 → action 79                                      |
+| Ground Drill Punch                                         | 15 / 15 for hits 1–5; 13 / 13 for hit 6      | Action 207, PCs 2920/2941; responses 10–11 → 75–76, 18 → 80 |
+| Kick 3                                                     | 0 / 0                                        | Action 190, PC 2631; responses 20–21 → 83–84                |
+| Aerial drill                                               | 8 / 9 on hit; 8 / 3 on block                 | Actions 209–211 contact branches                            |
+| Axe object                                                 | 0 / 15 (FB → 75); 0 / 15 for airborne victim | Action 227, PC 3288; responses 50 → 110 → 75, 4 → 76        |
 
-Guard pauses and victim reactions now come from each attack's op `0x17` responses through the response table, including overheads, launches and the reactions' own op `0x01` motion (README "Victim responses"). Kick 3 uses 0 / 0 (responses 34–36 → actions 163/165/167) and aerial drill the asymmetric values above.
+Guard pauses and victim reactions now come from each attack's op `0x17` responses through the response table, including overheads, launches and the reactions' own op `0x01` motion (README "Victim responses"). Kick 3 uses 0 / 0 (responses 34–36 → actions 163/165/167) and aerial drill the asymmetric values above. The victim's op `0x1a` other stop (`0x4136ae`) would also pause Ryuko for the axe; the port pauses only an object's victim, an authored rule (README evidence).
 
 With every active strike contacting immediately, expected elapsed gaps are:
 

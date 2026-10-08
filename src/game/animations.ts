@@ -90,9 +90,9 @@ function clip(
   return { frames, ticks, loopStart };
 }
 
-// Super timelines flattened by scripts/export_assets.py: displays with op 0x09
+// Source timelines flattened by scripts/export_assets.py: displays with op 0x09
 // calls inlined and op 0x0a jumps followed, plus the gameplay opcodes at their
-// action ages. The match plays their events; conditions are checked at entry.
+// action ages. The match plays every move and object from them.
 export type ScriptEvent = { t: number } & SourceEvent;
 export const POSE_EVENTS = [
   'sound',
@@ -324,7 +324,7 @@ export const INTRO_EX_TICK = clips.intro
   .filter((frame) => frame.pc < 348)
   .reduce((total, frame) => total + frame.duration, 0);
 
-// These are authored visual timelines, not execution of non-idle action bytecode.
+// Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
   walk: clip(clips.walk, true),
