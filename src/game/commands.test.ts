@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { commanded, ENTRIES, NEAR } from './commands';
 import { LIFE, Match } from './match';
 import type { Fighter, Input } from './match';
+import { playing, RYUKO } from './testing';
 
 // Motions for player 1 on the left, facing right: f is right, b is left.
 const KEYS: Record<string, Input> = {
@@ -93,9 +94,9 @@ describe('recovered command recognizer', () => {
 
   it('needs each exact direction before the button, else falls back to P', () => {
     // ↘ is not →, so P alone matches, crouching while down is held.
-    expect(perform('d df df+P').action).toBe('crouchPunch');
+    expect(playing(perform('d df df+P'))).toBe(RYUKO.crouchPunch);
     // P's own tick doesn't count as the → before it.
-    expect(perform('d df f+P').action).toBe('punch');
+    expect(playing(perform('d df f+P'))).toBe(RYUKO.punch);
   });
 
   it('takes the first matching entry in table order', () => {
@@ -128,10 +129,10 @@ describe('recovered command recognizer', () => {
     const held = new Match();
     for (let t = 0; t < 30; t++) held.step({ jump: true });
     expect(held.fighters[0]).toMatchObject({ action: 'jump', vx: 0 });
-    for (const [input, vx] of [
-      [{ jump: true }, 0],
-      [{ jump: true, right: true }, 1],
-      [{ jump: true, left: true }, -1],
+    for (const [input, action, vx] of [
+      [{ jump: true }, RYUKO.doubleJump, 0],
+      [{ jump: true, right: true }, RYUKO.doubleJumpF, 1],
+      [{ jump: true, left: true }, RYUKO.doubleJumpB, -1],
     ] as const) {
       const match = new Match();
       const f = match.fighters[0];
@@ -139,7 +140,9 @@ describe('recovered command recognizer', () => {
       ticks2(match, { jump: true });
       for (let t = 0; t < 12; t++) match.step({});
       match.step(input);
-      expect(f.action).toBe('doubleJump');
+      expect(playing(f)).toBe(action);
+      // Each hovers three ticks before its op 0x01 (PCs 129, 144, 159).
+      for (let t = 0; t < 3; t++) match.step({});
       expect(Math.sign(f.vx)).toBe(vx);
     }
   });
@@ -154,23 +157,25 @@ describe('recovered command recognizer', () => {
       target.x = f.x + 110;
       match.step({ punch: true });
       for (let t = 0; t < 30 && f.hitStop === 0; t++) match.step();
-      expect(f.action).toBe('punchHit');
+      expect(playing(f)).toBe(RYUKO.punchHit);
       for (const input of [KEYS[direction], {}, KEYS[direction]])
         match.step(input);
-      expect(f.action === 'dash' || f.action === 'backdash').toBe(dashed);
+      expect([RYUKO.dash, RYUKO.backdash].includes(playing(f) as 13 | 14)).toBe(
+        dashed,
+      );
     }
   });
 
   it('reads no air command within 50 source pixels of the floor on the way down', () => {
     for (const [y, action] of [
       [-75, 'jump'],
-      [-76, 'airPunch'],
+      [-76, RYUKO.airPunch],
     ] as const) {
       const match = new Match();
       const [f] = match.fighters;
       Object.assign(f, { action: 'jump', y, vy: 1, gravity: 0 });
       match.step({ punch: true });
-      expect(f.action).toBe(action);
+      expect(playing(f)).toBe(action);
     }
   });
 });

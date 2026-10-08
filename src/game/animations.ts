@@ -274,7 +274,9 @@ export interface Script {
   // The first event of a loop's target record.
   loopEvent?: number;
   end: 'end' | 'hold' | 'loop' | 'jump';
+  // A final op 0x0a's target and its record offset.
   next: number | null;
+  offset?: number;
 }
 const scripts = {
   ryuko: data.scripts,
@@ -371,11 +373,6 @@ export const animations = {
   backwalk: clip(clips.backwalk, true),
   takeoff: clip(clips.jump.slice(0, 1)),
   jump: clip(clips.jump.slice(1), false, [13, 5, 15, 1]),
-  doubleJump: clip(clips.doubleJump, false, [3, 5, 27]),
-  dash: clip(clips.dash, false, [5, 5, 5, 8]),
-  backdash: clip(clips.backdash, false, [10, 5, 5, 15, 8]),
-  airDash: clip(clips.airDash),
-  airBackdash: clip(clips.airBackdash),
   land: clip(clips.land),
   crouchEnter: clip(clips.crouchEnter),
   crouch: clip(clips.crouch, true),
@@ -385,18 +382,6 @@ export const animations = {
   crouchTurn: clip(clips.crouchTurn),
   // Action 32 jumps to action 33 at PC 333, after its blank repositioning displays.
   intro: clip(clips.intro.slice(2)),
-  punch: clip(clips.punch),
-  kick: clip(clips.kick, false, [5, 5, 7, 10, 11]),
-  // Punch 1 and kick 1 enter 179/187 on contact (op 0x02 slots 2 and 3).
-  punchHit: clip(clips.punchHit),
-  kickHit: clip(clips.kickHit),
-  punch2: clip(clips.punch2),
-  // Action 181's two hop poses last until each landing: 12 and 8 ticks.
-  punch3: clip(clips.punch3, false, [12, 2, 8, 6, 8, 5, 15, 8]),
-  kick2: clip(clips.kick2),
-  hitUp: clip(clips.hitUp),
-  hitUpRecover: clip(clips.hitUpRecover),
-  hitUpJump: clip(clips.hitUpJump, false, [8, 13, 5, 15, 1]),
   // Actions 204/205 (EX Ch, NOR Ch): four flashing displays of image 366.
   exChange: clip(clips.exChange),
   norChange: clip(clips.norChange),
@@ -425,11 +410,6 @@ export const animations = {
   // op 0x20 reorders their shaking (+17, +18).
   stun: scriptClip(108),
   airStun: scriptClip(109),
-  kick3: clip([
-    ...clips.kick3.slice(0, 3),
-    ...Array.from({ length: 8 }, () => clips.kick3Repeat).flat(),
-    ...clips.kick3.slice(3),
-  ]),
   drill: clip(clips.drill),
   airDrill: clip(clips.airDrill.slice(0, 3)),
   // Actions 209–211 loop these poses until contact or landing.
@@ -470,10 +450,6 @@ export const animations = {
   throw: clip([clips.throw[0], ...throwSpins, ...clips.throw.slice(1)]),
   knockdown: clip(clips.knockdown),
   getUp: clip(clips.getUp),
-  crouchPunch: clip(clips.crouchPunch),
-  crouchKick: clip(clips.crouchKick),
-  airPunch: clip(clips.airPunch),
-  airKick: clip(clips.airKick),
   guard: clip(clips.guard.slice(0, 1)),
   crouchGuard: clip(clips.crouchGuard.slice(0, 1)),
   airGuard: clip(clips.airGuard.slice(0, 1)),

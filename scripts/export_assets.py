@@ -343,6 +343,9 @@ def flatten_queue(p, c, queue, played, image_ids):
             continue
         script = scripts[key] = flatten(p, c, index, played, offset)
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
+        # A timeline's last jump enters its target, unless played as a clip.
+        if script["end"] == "jump" and script["next"] not in played:
+            queue.append((script["next"], script["offset"]))
         for event in script["events"]:
             if event["op"] == "spawn" and event["action"]:
                 queue.append((event["action"], event["offset"]))
@@ -547,26 +550,25 @@ def main():
     p = Program(c)
     for folder in (PUBLIC / "ryuko", GENERATED, FIXTURES):
         folder.mkdir(parents=True, exist_ok=True)
-    # Authored pose clips are not a reconstruction of these actions' bytecode.
-    actions = {
+    # The engine's own states, from her default-action table (+0x757a), and
+    # the jumps' landing handler (slot 1 → 9, PC 43).
+    neutral = {
         "idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,
-        "doubleJump": 10, "dash": 13, "backdash": 14,
-        "airDash": 16, "airBackdash": 17,
         "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24,
+    }
+    # Pose clips for what the match draws from clips: neutral, victim and
+    # result actions, and the moves it still builds by hand.
+    actions = {
+        **neutral,
         "intro": 33,
         "guard": 149, "crouchGuard": 151, "airGuard": 153,
         "blockHeavy": 154, "crouchBlockHeavy": 156, "airBlockHeavy": 158,
         "hit": 73, "airHit": 74, "hitHeavy": 75, "airHitHeavy": 76, "jumpHit": 77, "drillDown": 135,
         "blockRapid": 163, "crouchBlockRapid": 165, "airBlockRapid": 167,
         "timeStopGuard": 168, "crouchTimeStopGuard": 170, "airTimeStopGuard": 172,
-        "punch": 178, "kick": 186, "crouchPunch": 185, "crouchKick": 194,
-        "airPunch": 182, "airKick": 191,
-        "punch2": 180, "punch3": 181, "kick2": 188, "kick3": 189, "kick3Repeat": 190,
-        "punchHit": 179, "kickHit": 187,
         "drill": 207, "airDrill": 208, "airDrillSpin": 209, "drillLand": 212,
         "axeBusy": 225, "axeThrow": 226, "axeFlight": 227, "axeHit": 230,
         "grab": 196, "throw": 197, "throwSpin": 199,
-        "hitUp": 200, "hitUpRecover": 201, "hitUpJump": 202,
         "iori": 246, "iori2": 247, "iori3": 248,
         "exChange": 204, "norChange": 205,
         # CPU IORI's recovery: op 0x20 at PC 5887 jumps to action 411 + 31.
@@ -588,6 +590,11 @@ def main():
     image_ids = {419, 464, 2000, 2001, 2002}
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
+    # Her moves play from their timelines, as Zoma's do: the actions of her
+    # command entries, each with its level (header r[2]).
+    entries = tables["commands"]["entries"]
+    moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
+    levels = {i: p.records[p.action(i).start][2] for i in moves}
     # Super timelines, their hit branches (handler slot 2) and every spawned object,
     # plus EVIL DST's hit branch (222), which jumps into DST Hit (215), the guard
     # counter COUNTER HIT (174), and the super-cancel versions entered from IORI
@@ -602,7 +609,8 @@ def main():
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 174, 222, 231, 250, 251, 253, 256, 260, 263, 264,
              265, 278, 279, 280, 286, 292, 318, 319, 410, 122, 83, 84,
-             74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"])]]
+             74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59, *filter(None, tables["response_effects"]),
+             *moves]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))
@@ -617,7 +625,7 @@ def main():
     music = export_sounds(stage, "stage", [2])[0]
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, music=music, clips=clips,
-        **tables, scripts=scripts, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
+        **tables, scripts=scripts, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     zoma = export_zoma(p)
     export_ui()
     # Python is an independent oracle. Keep fixtures out of the browser bundle.

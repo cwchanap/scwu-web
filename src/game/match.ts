@@ -131,35 +131,10 @@ const strikes = (
     to: first.to + k * interval,
     box: { ...first.box, damage },
   }));
-export const ATTACKS = {
-  punch: { strikes: [strike(7, 12, 74, -114, 63, 27, 10, 3)] }, // PC 2367
-  kick: { strikes: [strike(7, 12, 92, -91, 60, 31, 8, 3)] }, // PC 2559
-  crouchPunch: { strikes: [strike(14, 24, 96, -89, 60, 24, 30, 1)] }, // PC 2541
-  crouchKick: { strikes: [strike(18, 28, 99, -70, 70, 53, 30, 1)] }, // PC 2732
-  airPunch: { strikes: [strike(18, 33, 25, -43, 54, 38, 15, 1)] }, // PC 2477
-  // PCs 2649/2653/2657.
-  airKick: {
-    strikes: strikes(8, strike(15, 19, 10, -51, 53, 27, 4, 3), [4, 4, 4]),
-  },
-  // PCs 2401/2407/2414.
-  punch2: {
-    strikes: strikes(6, strike(18, 21, 69, -118, 61, 32, 5, 3), [5, 5, 5]),
-  },
-  // PC 2454, after the two landing-timed hops (12 + 2 + 8) and PCs 2446/2450.
-  punch3: { strikes: [strike(36, 41, 66, -102, 82, 83, 35, 0)] },
-  kick2: { strikes: [strike(16, 26, 60, -118, 53, 68, 20, 3)] }, // PC 2595
-  hitUp: { strikes: [strike(15, 25, 33, -152, 40, 45, 15, 1)] }, // PC 2824
+const ATTACKS = {
   iori: { strikes: [strike(21, 29, 80, -98, 53, 29, 15, 7)] }, // PC 3620
   iori2: { strikes: [strike(23, 31, 103, -104, 61, 29, 18, 7)] }, // PC 3656
   iori3: { strikes: [strike(21, 26, 79, -121, 58, 59, 20, 7)] }, // PC 3690
-  // PC 2619 calls action 190 eight times: its beam box (PC 2632) for 3 of 6 ticks.
-  kick3: {
-    strikes: strikes(
-      6,
-      strike(15, 18, 169, -115, 163, 25, 4, 2),
-      [4, 4, 4, 4, 4, 4, 4, 4],
-    ),
-  },
   // PCs 2921–2942.
   drill: {
     strikes: strikes(
@@ -177,24 +152,12 @@ export const ATTACKS = {
 // Ryuko's op 0x17 selects the victim response by stance: standing, crouching,
 // airborne, then the same three while guarding. Each response names a victim
 // action (RESPONSE_REACTIONS), whose op 0x1a pauses both fighters. These are
-// contact pauses, not active-frame gaps; SCWU.KGT's base pause is zero. Punch 2
-// and the drill switch sets before their last strike (`last`).
+// contact pauses, not active-frame gaps; SCWU.KGT's base pause is zero. The
+// drill switches sets before its last strike (`last`).
 const ATTACK_RESPONSES: Record<
   keyof typeof ATTACKS,
   { ids: number[]; last?: number[] }
 > = {
-  punch: { ids: [1, 1, 2, 22, 23, 2] }, // PC 2366
-  kick: { ids: [1, 1, 2, 22, 23, 2] }, // PC 2558
-  crouchPunch: { ids: [3, 3, 4, 25, 26, 4] }, // PC 2540
-  crouchKick: { ids: [7, 7, 7, 25, 26, 7] }, // PC 2731
-  // Air attacks hit a crouching guard (response 5/6) and push a standing one.
-  airPunch: { ids: [5, 5, 4, 28, 5, 27] }, // PC 2476
-  airKick: { ids: [6, 6, 11, 28, 6, 27] }, // PC 2648
-  punch2: { ids: [8, 8, 9, 22, 23, 9], last: [10, 10, 11, 22, 23, 11] }, // PCs 2400/2413
-  punch3: { ids: [77, 77, 77, 25, 77, 27] }, // PC 2453
-  kick2: { ids: [3, 3, 4, 25, 26, 4] }, // PC 2594
-  kick3: { ids: [20, 20, 21, 34, 35, 36] }, // PC 2631 (action 190)
-  hitUp: { ids: [19, 19, 17, 25, 26, 17] }, // PC 2823
   iori: { ids: [3, 3, 4, 28, 29, 27] }, // PC 3619
   iori2: { ids: [71, 71, 4, 28, 29, 27] }, // PC 3655
   iori3: { ids: [18, 18, 77, 25, 26, 27] }, // PC 3689
@@ -204,11 +167,7 @@ const ATTACK_RESPONSES: Record<
   airDrillSpin: { ids: [56, 56, 56, 34, 35, 80] }, // PCs 2984/3014
 };
 // Op 0x24 (handler 0x413a50) at these action ages runs the command check at
-// 0x410a50 over the last `window` ticks of input, trying each command in
-// turn; a match enters its action. The chains look for a neutral tick, then a
-// fresh P (checked first) or K.
-const P_CHAIN = [0x3001, 0x2080];
-const K_CHAIN = [0x3001, 0x2010];
+// 0x410a50 over the last `window` ticks of input; a match enters its action.
 // IORI's stages look for ↓← and P: any down, anything, any back, then P.
 const IORI_STEPS = [0x300d, 0x3000, 0x300a, 0x2080];
 const CHAINS: Partial<
@@ -220,39 +179,6 @@ const CHAINS: Partial<
     }
   >
 > = {
-  punchHit: {
-    checks: [[8, 20]],
-    next: [
-      [P_CHAIN, 'punch2'],
-      [K_CHAIN, 'kick2'],
-    ],
-  }, // PCs 2380–2381
-  kickHit: {
-    checks: [[8, 25]],
-    next: [
-      [P_CHAIN, 'punch2'],
-      [K_CHAIN, 'kick2'],
-    ],
-  }, // PCs 2572–2573
-  // PCs 2403–2404, 2409–2410 and 2416–2417, after each strike.
-  punch2: {
-    checks: [
-      [21, 10],
-      [27, 10],
-      [33, 30],
-    ],
-    next: [
-      [P_CHAIN, 'punch3'],
-      [K_CHAIN, 'kick3'],
-    ],
-  },
-  kick2: {
-    checks: [[26, 30]],
-    next: [
-      [P_CHAIN, 'punch3'],
-      [K_CHAIN, 'kick3'],
-    ],
-  }, // PCs 2597–2598
   // PCs 3625/3628/3630 and 3661/3663/3665, after each stage's strike.
   iori: {
     checks: [
@@ -270,18 +196,13 @@ const CHAINS: Partial<
     ],
     next: [[IORI_STEPS, 'iori3']],
   },
-  // PC 2837, after 201's first five-tick display: any up in the last 20
-  // ticks, held or not, chases into 202.
-  hitUpRecover: {
-    checks: [[5, 20]],
-    next: [[[0x200b], 'hitUpJump']],
-  },
 };
-// Op 0x1e cancel windows, read at 0x41193a: from `age` (until `until`), a
-// command whose action level (header byte 2: normals 21–22, specials 31,
-// supers 41, Mega Getter Beam 42, double jump 255) lies in [min, max] cancels
-// the action, always or once the action's own box has connected (`contact`:
-// the counter at player +0xdf85 that op 0x18 arms and a contact raises to 2).
+// Op 0x1e cancel windows of the actions still built by hand, read at
+// 0x41193a: from `age` (until `until`), a command whose action level (header
+// byte 2: normals 21–22, specials 31, supers 41, Mega Getter Beam 42) lies in
+// [min, max] cancels the action, always or once the action's own box has
+// connected (`contact`: the counter at player +0xdf85 that op 0x18 arms and a
+// contact raises to 2). Scripts set their own (Fighter.window).
 const cancelRange = (
   min: number,
   max: number,
@@ -290,25 +211,11 @@ const cancelRange = (
   until?: number,
 ) => ({ min, max, contact, age, until });
 const CANCELS: Partial<Record<Action, ReturnType<typeof cancelRange>>> = {
-  punch: cancelRange(30, 50), // 178
-  kick: cancelRange(30, 50), // 186
-  crouchPunch: cancelRange(30, 50), // 185
-  crouchKick: cancelRange(30, 50), // 194
-  punch2: cancelRange(30, 50), // 180
-  kick2: cancelRange(30, 50), // 188
-  punchHit: cancelRange(30, 50, false), // 179
-  kickHit: cancelRange(30, 50, false), // 187
-  airPunch: cancelRange(22, 255), // 182
-  airKick: cancelRange(30, 255), // 191
   // IORI's stages accept supers (41) but not specials or the Mega Getter Beam.
   iori: cancelRange(32, 41), // 246
   iori2: cancelRange(32, 41), // 247
   iori3: cancelRange(32, 41), // 248
-  airDash: cancelRange(20, 50, false, 3), // 16
-  airBackdash: cancelRange(20, 50, false, 3), // 17
   counterHit: cancelRange(30, 50, true, 0, 50), // 174
-  // Standing up from a crouch (20, PC 246) accepts levels 0–50 always.
-  stand: cancelRange(0, 50, false),
 };
 const IORI = new Set<Action>(['iori', 'iori2', 'iori3']);
 // A super entered while op 0x1f player variable 6 is 100 (set during each IORI
@@ -354,7 +261,6 @@ const GUARD_COUNTERS: Partial<Record<Action, [number, number][]>> = {
   crouchTimeStopGuard: guardChecks(10), // 170, PCs 2300–2308
 };
 const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
-const dashes = new Set<Action>(['dash', 'backdash', 'airDash', 'airBackdash']);
 const aerialDrills = new Set<Action>([
   'airDrill',
   'airDrillSpin',
@@ -470,15 +376,6 @@ export const DESPERATION_HP = 153;
 export const ROUNDS_TO_WIN = 3;
 // Opcode 0x15 self power in each attack's script, credited when it starts.
 const ATTACK_POWER: Partial<Record<Action, number>> = {
-  punch2: 3,
-  punch3: 23,
-  airPunch: 5,
-  crouchPunch: 5,
-  kick2: 3,
-  kick3: 16,
-  airKick: 5,
-  crouchKick: 5,
-  hitUp: 5,
   drill: 8,
   airDrill: 8,
   iori: 8,
@@ -782,10 +679,16 @@ const timeline = (f: Fighter) =>
 // What a fighter shows: under 'script', its source action's timeline.
 const shown = (f: Fighter): Shown =>
   f.action === 'script' ? f.branch! : f.action;
-// Zoma's engine states by number (export_zoma's `neutral`), which a handler
-// enters as the port's actions, and his moves' levels (header r[2]).
-const ZOMA_NEUTRAL = CHARACTERS.zoma.neutral as Record<string, Action>;
-const ZOMA_LEVELS = CHARACTERS.zoma.levels as Record<string, number>;
+// Each player's engine states by number (the export's `neutral`), which a
+// handler enters as the port's actions, and their moves' levels (header r[2]).
+const NEUTRAL = {
+  ryuko: CHARACTERS.ryuko.neutral,
+  zoma: CHARACTERS.zoma.neutral,
+} as Record<Who, Record<string, Action>>;
+const LEVELS = {
+  ryuko: CHARACTERS.ryuko.levels,
+  zoma: CHARACTERS.zoma.levels,
+} as Record<Who, Record<string, number>>;
 // Each victim action's source number (Ryuko's), for the guard reactions.
 const REACTION_INDEX = new Map(
   Object.entries(RESPONSE_REACTIONS).map(([index, { action }]) => [
@@ -827,14 +730,15 @@ function skips(box: ScriptBox, target: Fighter) {
   const bits = target.reaction & 0xc;
   return (box.kind & 8 && bits === 0xc) || (box.kind & 0x80 && bits === 8);
 }
-// The farthest centre distance at which an attack's first box meets an idle
-// victim facing it (for the authored practice partners).
-export function reach(action: keyof typeof ATTACKS) {
-  const { box } = ATTACKS[action].strikes[0];
-  const [body] = hurtboxes('idle', 0);
-  return (box.x + box.w + body.w + body.x) * 1.5;
+// For the authored practice partners: when a move's first box opens, and the
+// farthest centre distance at which it meets an idle `victim` facing it.
+export function firstStrike(who: Who, index: number, victim: Who) {
+  const box = script(index, who).events.find((e) => e.op === 'box' && e.w);
+  if (box?.op !== 'box') throw new Error(`Source action ${index} has no box`);
+  const [body] = hurtboxes('idle', 0, victim);
+  return { from: box.t, reach: (box.x + box.w + body.w + body.x) * 1.5 };
 }
-export function isAttack(action: Action): action is keyof typeof ATTACKS {
+function isAttack(action: Action): action is keyof typeof ATTACKS {
   return Object.hasOwn(ATTACKS, action);
 }
 const blocks = new Set<Action>([
@@ -904,8 +808,6 @@ export interface Fighter {
   airDrillStage: number;
   hits: number;
   damage: number;
-  doubleJumped: boolean;
-  airDashed: boolean;
   power: number;
   stock: number;
   // Scripted (super) state: the last age whose events ran, op 0x01 horizontal
@@ -917,10 +819,10 @@ export interface Fighter {
   // Op 0x18 slot 1: the box repeated 2000 pixels down, for objects' bodies.
   objectBox: ScriptBox | null;
   responses: number[];
-  onHit: number;
-  // Op 0x02 slots 3 (guard) and 1 (landing), which Zoma's moves take.
-  onGuard: number;
-  onLand: number;
+  onHit: ObjectKey;
+  // Op 0x02 slots 3 (guard) and 1 (landing): each a jump target, 0 for none.
+  onGuard: ObjectKey;
+  onLand: ObjectKey;
   // Op 0x1e's cancel window (+0xdf91): action changes keep it, and the
   // return to neutral clears it (0x411b0c). Zoma's moves read it.
   window: Window | null;
@@ -1176,8 +1078,6 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   airDrillStage: 0,
   hits: 0,
   damage: 0,
-  doubleJumped: false,
-  airDashed: false,
   power: 0,
   stock: 0,
   fired: -1,
@@ -1253,28 +1153,11 @@ function motion(
   if (!(event.flags & 16))
     actor.gravity = set(actor.gravity, event.ay * SOURCE_ACCELERATION_SCALE);
 }
-// Op 0x01 velocity and gravity from a script, in raw source units.
-function scriptMotion(f: Fighter, vx: number, vy: number, gravity: number) {
-  f.vx = f.facing * vx * SOURCE_VELOCITY_SCALE;
-  f.vy = vy * SOURCE_VELOCITY_SCALE;
-  f.gravity = gravity * SOURCE_ACCELERATION_SCALE;
-}
-function launchJump(f: Fighter, double = false) {
-  // Actions 4–6 and 10–12 choose neutral or directional velocity at takeoff.
-  const speed = double ? (f.vx === 0 ? 1300 : 1200) : f.vx === 0 ? 1450 : 1400;
-  f.vy = -speed * SOURCE_VELOCITY_SCALE;
+function launchJump(f: Fighter) {
+  // Actions 4–6 choose neutral or directional velocity at takeoff.
+  f.vy = -(f.vx === 0 ? 1450 : 1400) * SOURCE_VELOCITY_SCALE;
   f.gravity = JUMP_GRAVITY;
   f.airAge = 0;
-}
-
-function launchHitUpJump(f: Fighter) {
-  // Action 202 prepares for eight ticks, then follows the launched opponent.
-  if (f.action === 'hitUpJump' && f.age === 8) {
-    f.vx = f.facing * 320 * SOURCE_VELOCITY_SCALE;
-    f.vy = -1530 * SOURCE_VELOCITY_SCALE;
-    f.gravity = 42 * SOURCE_ACCELERATION_SCALE;
-    f.airAge = 0;
-  }
 }
 
 export function addPower(f: Fighter, amount: number) {
@@ -1488,12 +1371,6 @@ export class Match {
     if (action === 'down')
       this.fighters[1 - this.fighters.indexOf(f)].hitStop += 10;
     addPower(f, ATTACK_POWER[action] ?? 0);
-    // Variable 1: set by actions 10–12 and 16–17 (PCs 119/199/217); an air
-    // dash's end (op 0x0a into action 7 + 0) clears it.
-    if (action === 'doubleJump') f.jumpVariable = 10;
-    else if (action === 'airDash' || action === 'airBackdash')
-      f.jumpVariable = 20;
-    else if (action === 'jump' && dashes.has(f.action)) f.jumpVariable = 0;
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -1540,24 +1417,10 @@ export class Match {
       f.vx = f.vy = 0;
       f.gravity = 0;
     } else if (f.gravity === 0) f.gravity = 0.24;
-    if (
-      action === 'dash' ||
-      action === 'backdash' ||
-      aerialDrills.has(action) ||
-      action === 'down' ||
-      action === 'koAgain'
-    ) {
+    if (aerialDrills.has(action) || action === 'down' || action === 'koAgain') {
       f.vx = 0;
       f.gravity = 0.24;
     }
-    // 183/192 (entered in an air dash) fall at acceleration 45 (PCs 2489/2668).
-    if (
-      (action === 'airPunch' || action === 'airKick') &&
-      f.jumpVariable === 20
-    )
-      f.gravity = 45 * SOURCE_ACCELERATION_SCALE;
-    // Action 181 hops at once (PC 2434); its landing handler ends the pose.
-    if (action === 'punch3') scriptMotion(f, 300, -400, 110);
   }
 
   // The action of a standing fighter's round result (+0xe007): 1 win (57),
@@ -1622,7 +1485,6 @@ export class Match {
       f.airAge++;
       gravity(f);
       if (f.y === 0) {
-        f.doubleJumped = f.airDashed = false;
         f.jumpVariable = 0;
         this.action(f, motion.land);
       }
@@ -1837,14 +1699,20 @@ export class Match {
       if (this.runEvent(e, e.owner, event)) return;
   }
 
-  // An action change (0x410cf0) by number, for Zoma: his engine states play
-  // as the port's actions, and any other source action runs its timeline.
+  // An action change (0x410cf0) by number: the engine states play as the
+  // port's actions, and any other source action runs its timeline.
   private enterSource(f: Fighter, index: number, offset = 0) {
-    const named = offset ? undefined : ZOMA_NEUTRAL[index];
+    const named = offset ? undefined : NEUTRAL[f.who][index];
     if (named) return this.action(f, named, true);
     this.action(f, 'script', true);
     f.branch = sourceKey(index, offset);
     this.fireEvents(f);
+  }
+
+  // A handler's target, "action+offset" entering mid-action.
+  private enterKey(f: Fighter, key: ObjectKey) {
+    const [index, offset = 0] = String(key).split('+').map(Number);
+    this.enterSource(f, index, offset);
   }
 
   // A jump to another timeline (ops 0x16, 0x1f, 0x20 and 0x24) runs its
@@ -2009,9 +1877,10 @@ export class Match {
         break;
       case 'handler':
         if (!('clip' in actor)) {
-          if (event.slot === 1) actor.onLand = event.action;
-          else if (event.slot === 2) actor.onHit = event.action;
-          else if (event.slot === 3) actor.onGuard = event.action;
+          const key = event.action && sourceKey(event.action, event.offset);
+          if (event.slot === 1) actor.onLand = key;
+          else if (event.slot === 2) actor.onHit = key;
+          else if (event.slot === 3) actor.onGuard = key;
         } else if (event.slot >= 1 && event.slot <= 3)
           actor[(['onLand', 'onHit', 'onGuard'] as const)[event.slot - 1]] =
             sourceKey(event.action, event.offset);
@@ -2271,15 +2140,14 @@ export class Match {
     // action (Ryuko's supers land in 9), or without one ends the action.
     if (airborne && f.y === 0) {
       f.vx = f.vy = 0;
-      f.doubleJumped = f.airDashed = false;
       f.jumpVariable = 0;
       if (f.action === 'script' && !f.onLand) return false;
       markActing(f);
-      if (f.action === 'script') this.enterSource(f, f.onLand);
+      if (f.action === 'script') this.enterKey(f, f.onLand);
       else this.action(f, 'land');
       return true;
     }
-    const { end, next } = script(timeline(f), f.who);
+    const { end, next, offset = 0 } = script(timeline(f), f.who);
     if (
       end === 'hold' ||
       end === 'loop' ||
@@ -2296,9 +2164,11 @@ export class Match {
       const target = this.fighters[1 - this.fighters.indexOf(f)];
       this.action(f, 'dstHit');
       if (target.action === 'superHeld') this.action(target, 'dstHeld');
-    } else if (f.y < 0) {
-      // Op 0x0a into action 7: the ordinary fall, levels 0–250 (PC 94).
-      f.doubleJumped = f.airDashed = true;
+    }
+    // A last op 0x0a enters its target, the fall (7) among them.
+    else if (next !== null) this.enterSource(f, next, offset);
+    // Running out airborne, the free state falls.
+    else if (f.y < 0) {
       this.action(f, 'jump');
       f.gravity = JUMP_GRAVITY;
     } else {
@@ -2413,7 +2283,7 @@ export class Match {
         () => {
           f.connected = true;
           if (!f.onHit) return;
-          this.action(f, SOURCE_ACTIONS[f.onHit], true);
+          this.action(f, SOURCE_ACTIONS[f.onHit as number], true);
           this.fireEvents(f);
         },
       ]);
@@ -2467,14 +2337,6 @@ export class Match {
     return target.action.startsWith('crouch') || Boolean(input.crouch);
   }
 
-  private doubleJump(f: Fighter, direction: number) {
-    f.doubleJumped = true;
-    f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
-    f.vy = 0;
-    f.airAge = 0;
-    this.action(f, 'doubleJump');
-  }
-
   // Command entry (0x411a01, and 0x41195a in a cancel window): the scan picks
   // the command (see commands.ts), and a cancel window passes only the levels
   // it accepts (header byte 2); a refused command enters nothing.
@@ -2496,57 +2358,14 @@ export class Match {
     );
     if (!found) return false;
     const { stance } = found;
-    // Zoma's entries enter their stance's action, which plays from its own
-    // timeline; a window passes it by that action's level.
-    if (f.who !== 'ryuko') {
-      const index = entriesOf(f.who)[found.entry - 1][stance];
-      if (!ok(ZOMA_LEVELS[index], index)) return false;
-      this.enterSource(f, index);
-      return true;
-    }
     const air = stance === 'air';
     const start = (action: Action) => {
       this.action(f, action, true);
       return true;
     };
-    const [control, direction] = CONTROLS[found.entry];
+    // Ryuko's moves still built by hand, until they play from their timelines.
+    const [control] = (f.who === 'ryuko' && CONTROLS[found.entry]) || [];
     switch (control) {
-      // Jump 2 (entries 10–12) enters double jump 10, 11 or 12, level 255
-      // (their op 0x00 headers). The flag stands in for the windows that
-      // refuse it until landing: 10's own (PC 130, 1–254) and action 7's.
-      case 'jump': {
-        if (!ok(255) || f.doubleJumped) return false;
-        const toward = other.x >= f.x ? 1 : -1;
-        this.doubleJump(
-          f,
-          direction === 'F' ? toward : direction === 'B' ? -toward : 0,
-        );
-        return true;
-      }
-      // DASH F and B (13, 14): ground dashes 13 (level 30) and 14 (level 0),
-      // air dashes 16 and 17 (level 254).
-      case 'dash': {
-        const back = direction === 'B';
-        if (!air) return ok(back ? 0 : 30) && start(back ? 'backdash' : 'dash');
-        if (!ok(254) || f.airDashed) return false;
-        // An air dash ends in action 7 (PC 215), whose window (PC 94, levels
-        // 0–250) takes neither a double jump nor another air dash.
-        f.doubleJumped = f.airDashed = true;
-        return start(back ? 'airBackdash' : 'airDash');
-      }
-      case 'punch':
-        return (
-          ok(21) &&
-          start(
-            air ? 'airPunch' : stance === 'crouch' ? 'crouchPunch' : 'punch',
-          )
-        );
-      case 'kick':
-        return air
-          ? ok(22) && start('airKick')
-          : ok(21) && start(stance === 'crouch' ? 'crouchKick' : 'kick');
-      case 'hitUp':
-        return ok(21) && start('hitUp');
       case 'throw':
         return ok(21) && start('grab');
       case 'drill':
@@ -2584,35 +2403,44 @@ export class Match {
         }
         addPower(f, -50);
         return start(f.ex ? 'norChange' : 'exChange');
-      default:
+      case 'getterBeam':
+      case 'musashi':
+      case 'changeAttack':
+      case 'blackRush':
+      case 'megaBeam':
         return (
           ok(control === 'megaBeam' ? 42 : 41) &&
-          this.startSuper(f, control as SuperControl, air)
+          this.startSuper(f, control, air)
         );
     }
+    // Each entry enters its stance's action, which plays from its own
+    // timeline; a window passes it by that action's level.
+    const index = entriesOf(f.who)[found.entry - 1][stance];
+    if (!ok(LEVELS[f.who][index], index)) return false;
+    this.enterSource(f, index);
+    return true;
   }
 
-  // Op 0x1e windows (CANCELS), read on every tick, contact stops included.
+  // Op 0x1e windows, read on every tick, contact stops included: the hand-built
+  // actions' (CANCELS), or the one a script or clip set.
   private cancel(f: Fighter, other: Fighter, history: number[]) {
-    if (f.who !== 'ryuko') return this.windowCancel(f, other, history);
-    const range = CANCELS[f.action];
+    const range = f.who === 'ryuko' ? CANCELS[f.action] : undefined;
+    if (!range) return this.windowCancel(f, other, history);
     if (
-      !range ||
       f.age < range.age ||
       f.age >= (range.until ?? Infinity) ||
       (range.contact && !f.contact)
     )
       return false;
-    // 183/184 and 192/193 cap their range at 50: no double jump cancel.
-    const max =
-      f.jumpVariable && (f.action === 'airPunch' || f.action === 'airKick')
-        ? 50
-        : range.max;
-    const ok = (level: number) => level >= range.min && level <= max;
-    return this.command(f, other, history, ok);
+    return this.command(
+      f,
+      other,
+      history,
+      (level) => level >= range.min && level <= range.max,
+    );
   }
 
-  // Zoma's moves set the window themselves (op 0x1e), which 0x41193a reads:
+  // Scripts and clips set the window themselves (op 0x1e), which 0x41193a reads:
   // mode 1 once the move's box has connected, 2 always; type 0 passes a
   // command whose action's level lies in [min, max], type 1 only the action
   // it names.
@@ -2635,7 +2463,11 @@ export class Match {
     history: number[],
   ) {
     if (f.hitStop === 0) f.age++;
-    if (this.cancel(f, other, history)) return;
+    if (this.cancel(f, other, history)) {
+      // The motion step still moves a script it enters this tick (0x40f910).
+      if (f.hitStop === 0 && isScripted(f.action)) this.moveScripted(f);
+      return;
+    }
     if (f.hitStop > 0) {
       f.hitStop--;
       return;
@@ -2662,8 +2494,6 @@ export class Match {
     if (isScripted(f.action) && this.moveScripted(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
-    launchHitUpJump(f);
-    if (f.action === 'hitUpJump' && f.age < 8) return;
     // Commands before a reaction's first display apply on its first moving tick.
     const reaction = AIR_REACTIONS[f.action];
     if (reaction)
@@ -2687,31 +2517,13 @@ export class Match {
           f.y = Math.min(0, f.y + f.vy);
           if (f.y === 0) f.vy = 0;
         }
-      } else if (f.action === 'doubleJump' && f.age <= 3) {
-        if (f.age === 3) launchJump(f, true);
-      } else if (f.action === 'airDash' || f.action === 'airBackdash') {
-        const backwards = f.action === 'airBackdash';
-        // Actions 16/17 keep incoming motion until PCs 205/223 at age 3.
-        // PCs 211/227 restore gravity after 30/20 level ticks; flag 0x02
-        // retains horizontal velocity through recovery and action 7's fall.
-        if (f.age === 3) {
-          f.vx = f.facing * (backwards ? -800 : 800) * SOURCE_VELOCITY_SCALE;
-          f.vy = 0;
-          f.gravity = JUMP_GRAVITY;
-        }
-        if (f.age >= 3 && f.age < (backwards ? 23 : 33)) placeX(f, f.x + f.vx);
-        else gravity(f);
       } else gravity(f);
       if (f.y === 0) {
-        f.doubleJumped = false;
-        f.airDashed = false;
         f.jumpVariable = 0;
         // 0x411810: landing without a slot-1 handler ends the action, and the
         // free state reads commands on the same tick. The air reactions have
         // none.
         if (AIR_REACTIONS[f.action]) this.action(f, 'idle');
-        // Punch 3's landing handlers (slot 1, PCs 2433/2439) continue it.
-        else if (f.action === 'punch3') return;
         else {
           markActing(f);
           this.action(f, aerialDrills.has(f.action) ? 'drillLand' : 'land');
@@ -2727,15 +2539,6 @@ export class Match {
       this.action(f, 'jump');
       return;
     }
-    if (f.action === 'doubleJump' && f.age < 3) return;
-    // Action 202 lifts off at PC 2848, after the controller has scanned
-    // commands on the floor; its first airborne scan is the next tick's.
-    if (f.action === 'hitUpJump' && f.age === 8) return;
-    if (
-      f.action === 'hitUpRecover' &&
-      f.age < animationDuration('hitUpRecover')
-    )
-      return;
     if (aerialDrills.has(f.action)) {
       if (
         f.action !== 'airDrillSpin' &&
@@ -2758,9 +2561,7 @@ export class Match {
         f.action === 'axeThrow' ||
         reactions.has(f.action) ||
         [
-          'punchHit',
           'cpuIoriRecover',
-          'kickHit',
           'land',
           'drillLand',
           'stand',
@@ -2784,28 +2585,6 @@ export class Match {
           f,
           f.x + f.facing * (f.age < 59 ? 900 : 100) * SOURCE_VELOCITY_SCALE,
         );
-      // Actions 180/188 lunge at raw velocity 600: from their first moving
-      // tick until PC 2393 (13 ticks), and from PC 2584 until PC 2592.
-      if (
-        (f.action === 'punch2' && f.age >= 1 && f.age <= 13) ||
-        (f.action === 'kick2' && f.age >= 2 && f.age < 13)
-      )
-        placeX(f, f.x + f.facing * 600 * SOURCE_VELOCITY_SCALE);
-      // Action 181 hops again after its two-tick pose (PC 2440), then slides
-      // at raw 500 from PC 2447 until PC 2457.
-      if (f.action === 'punch3' && f.age === 14)
-        scriptMotion(f, 300, -300, 120);
-      if (f.action === 'punch3' && f.age >= 29 && f.age <= 41)
-        placeX(f, f.x + f.facing * 500 * SOURCE_VELOCITY_SCALE);
-      // Action 200: six accelerating ticks, then stop before the kick.
-      if (f.action === 'hitUp' && f.age >= 2 && f.age < 8)
-        placeX(
-          f,
-          f.x +
-            f.facing *
-              (600 * SOURCE_VELOCITY_SCALE +
-                (f.age - 1) * 350 * SOURCE_ACCELERATION_SCALE),
-        );
       if (
         (f.action === 'iori' && f.age >= 13 && f.age < 21) ||
         (f.action === 'iori2' && f.age >= 8 && f.age < 23) ||
@@ -2820,41 +2599,13 @@ export class Match {
         );
       return;
     }
-    if (dashes.has(f.action) && f.action !== 'idle' && f.action !== 'script') {
-      if (f.action === 'dash' || f.action === 'backdash') {
-        const backwards = f.action === 'backdash';
-        const startup = backwards ? 10 : 5;
-        if (f.age < startup) return;
-        if (f.age === startup) {
-          // PCs 169/182 set the whole hop; use the shared integrator thereafter.
-          f.vx = f.facing * (backwards ? -500 : 900) * SOURCE_VELOCITY_SCALE;
-          f.vy = (backwards ? -900 : -500) * SOURCE_VELOCITY_SCALE;
-          f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
-          f.airAge = 0;
-          gravity(f);
-        }
-        // The source dash holds its final airborne pose until landing.
-        return;
-      }
-      if (f.age < animationDuration(f.action, f.who)) return;
-    }
     const airborne = f.y < 0 || f.vy < 0;
-    // Air attacks jump into action 7 (PCs 2485/2507/2528, 2664/2692/2719) and
-    // an air reaction that ends airborne enters it through 0x411a80 (+0x7586).
-    // Its op 0x01 (PC 99, flags 0xe) keeps vx, vy and ax and sets gravity 80.
-    if (
-      airborne &&
-      (AIR_REACTIONS[f.action] ||
-        f.action === 'airPunch' ||
-        f.action === 'airKick')
-    ) {
+    // An air reaction that ends airborne enters action 7 through 0x411a80
+    // (+0x7586), which frees the fighter. Its op 0x01 (PC 99, flags 0xe)
+    // keeps vx, vy and ax and sets gravity 80.
+    if (airborne && AIR_REACTIONS[f.action]) {
       const { ax } = f;
-      // 0x411a80 frees a fighter whose air reaction ends; an air attack stays
-      // acting into action 7, whose window (PC 94, levels 0–250) takes no
-      // double jump (255) or air dash (254) before landing.
-      const free = Boolean(AIR_REACTIONS[f.action]);
-      if (free) toNeutral(f);
-      f.doubleJumped = f.airDashed = !free;
+      toNeutral(f);
       this.action(f, 'jump');
       f.ax = ax;
       f.gravity = JUMP_GRAVITY;
@@ -2918,10 +2669,7 @@ export class Match {
     this.action(
       f,
       airborne
-        ? (f.action === 'doubleJump' || f.action === 'hitUpJump') &&
-          f.age < animationDuration(f.action, f.who)
-          ? f.action
-          : 'jump'
+        ? 'jump'
         : direction
           ? direction === f.facing
             ? 'walk'
@@ -3426,27 +3174,7 @@ export class Match {
     }
     // Run contact branches after all hits: an interrupted aerial drill must not
     // apply its own stop or restart, regardless of fighter update order.
-    for (const {
-      f,
-      target,
-      airDrill,
-      blocked,
-      projectile,
-      source,
-    } of contacts) {
-      // Action 200's hit handler enters 201 (a blocked kick does not).
-      if (
-        f.action === 'hitUp' &&
-        !blocked &&
-        !projectile &&
-        !source &&
-        target.hp > 0
-      ) {
-        this.action(f, 'hitUpRecover');
-      }
-      // Op 0x02 slots 2 and 3 (hit, guard) enter 179/187 at contact.
-      if ((f.action === 'punch' || f.action === 'kick') && !projectile)
-        this.action(f, f.action === 'punch' ? 'punchHit' : 'kickHit');
+    for (const { f, target, airDrill, blocked, source } of contacts) {
       if (airDrill && f.action === 'airDrillSpin') {
         f.hitStop += 8;
         target.hitStop += blocked ? 3 : 9;
@@ -3454,15 +3182,15 @@ export class Match {
         this.action(f, 'airDrillContact');
       }
       if (source && 'clip' in source) this.handle(source, blocked);
-      // Op 0x02 slots 2 and 3: Zoma's own box enters its hit or guard
+      // Op 0x02 slots 2 and 3: a script's own box enters its hit or guard
       // handler's action.
       if (source === f && f.action === 'script') {
         const handler = blocked ? f.onGuard : f.onHit;
-        if (handler) this.enterSource(f, handler);
+        if (handler) this.enterKey(f, handler);
       }
       // Op 0x02 slot 2: the super's own box enters its hit branch.
       else if (source === f && f.onHit && !blocked && target.hp > 0) {
-        this.action(f, SOURCE_ACTIONS[f.onHit], true);
+        this.action(f, SOURCE_ACTIONS[f.onHit as number], true);
         this.fireEvents(f);
       }
     }

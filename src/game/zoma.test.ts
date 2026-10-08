@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
-import { ATTACKS, fighterPose, Match } from './match';
-import type { Fighter, Input } from './match';
+import { fighterPose, Match } from './match';
+import type { Input } from './match';
 import type { DummyBehavior } from './dummy';
+import { RYUKO, strike } from './testing';
 
 const ZOMA_IMAGES = new Set(CHARACTERS.zoma.images.map(({ index }) => index));
 
@@ -25,11 +26,6 @@ function zomaPlayer(gap = 120) {
   };
   return { match, zoma, ryuko, steps };
 }
-// The step before the attack's first strike.
-function strike(f: Fighter, action: keyof typeof ATTACKS) {
-  f.action = action;
-  f.age = ATTACKS[action].strikes[0].from - 1;
-}
 
 describe('Zoma (02 ZOMA.PLAYER)', () => {
   it('takes his life from his parameter block: 490, desperate at 147', () => {
@@ -49,7 +45,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
 
   it("takes Ryuko's punch with his own weak hit (74): stops, damage and power", () => {
     const { match, ryuko, zoma } = versus();
-    strike(ryuko, 'punch');
+    strike(match, ryuko, RYUKO.punch);
     match.step();
     // PC 697 stops both for 10 ticks; PC 700 adds 3 power to him, 2 to Ryuko.
     expect(zoma).toMatchObject({ action: 'hit', hp: 480, hitStop: 10 });
@@ -67,7 +63,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     (partner, block, power) => {
       const { match, ryuko, zoma } = versus(120, partner);
       match.step();
-      strike(ryuko, 'punch');
+      strike(match, ryuko, RYUKO.punch);
       match.step();
       expect(zoma).toMatchObject({ action: block, hp: 490, power });
       expect(ZOMA_IMAGES.has(fighterPose(zoma).image)).toBe(true);
@@ -81,7 +77,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     ]) {
       const { match, ryuko, zoma } = versus();
       zoma.hp = life;
-      strike(ryuko, 'punch');
+      strike(match, ryuko, RYUKO.punch);
       match.step();
       expect(zoma.hp).toBe(after);
     }
@@ -92,7 +88,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     for (let seed = 0; seed < 20; seed++) {
       const { match, ryuko, zoma } = versus(120, 'stand', seed);
       ryuko.y = -60;
-      strike(ryuko, 'airPunch');
+      strike(match, ryuko, RYUKO.airPunch);
       match.step();
       expect(zoma.action).toBe('jumpHit');
       branches.add(zoma.branch);
@@ -103,7 +99,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   it('falls through KO NORMAL (58) into KO down (60) while Ryuko wins', () => {
     const { match, ryuko, zoma } = versus();
     zoma.hp = 1;
-    strike(ryuko, 'punch');
+    strike(match, ryuko, RYUKO.punch);
     match.step();
     expect(zoma).toMatchObject({ action: 'down', hp: 0 });
     expect(match.winner).toBe('player');
@@ -283,10 +279,10 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   });
 
   it('counters a guard with Hit Up for a stock: COUNTER HIT (174)', () => {
-    const { zoma, ryuko, steps } = zomaPlayer();
+    const { match, zoma, ryuko, steps } = zomaPlayer();
     zoma.stock = 1;
     steps({ guard: true });
-    strike(ryuko, 'punch');
+    strike(match, ryuko, RYUKO.punch);
     steps({ guard: true });
     expect(zoma).toMatchObject({ action: 'block', hitStop: 10 });
     steps({ guard: true }, 15);
@@ -529,6 +525,16 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     crouching.match.step({}, { command: 19, crouch: true });
     // Down in the written word picks P's crouching action, P SIT (188).
     expect(crouching.zoma.branch).toBe(188);
+  });
+
+  it('leaps from the CPU dash jump (343) into HIGH JUMP (6), its last jump (PC 4696)', () => {
+    const { match, zoma } = versus(500);
+    match.step({}, { command: 24 });
+    expect(zoma).toMatchObject({ action: 'script', branch: 343 });
+    while (zoma.branch === 343) match.step({}, {});
+    expect(zoma).toMatchObject({ branch: 6, age: 0, y: 0 });
+    for (let t = 0; t < 20; t++) match.step({}, {});
+    expect(zoma.y).toBeLessThan(0);
   });
 
   it('plays his own CPU table in Vs. CPU, keyless commands included', () => {

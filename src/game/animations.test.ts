@@ -29,17 +29,13 @@ describe('selected core animation assets', () => {
         { image: 27 },
         { image: 28 },
       ],
-      airPunch: [
-        { image: 53 },
-        { image: 54 },
-        { image: 55 },
-        { image: 56 },
-        { image: 55 },
-        { image: 15 },
-      ],
       win: [{ image: 295 }, { image: 31 }, { image: 366 }],
       draw: [{ image: 24 }, { image: 420 }],
     });
+    // P Jump (182) runs into the fall (7) it jumps to, waiting there to land.
+    expect(script(182).frames.map((f) => f.image)).toEqual([
+      53, 54, 55, 56, 55, 15, 16,
+    ]);
   });
 
   it("exports Sport Court's 75-second track for the optional music", () => {
@@ -73,9 +69,9 @@ describe('selected core animation assets', () => {
   });
 
   it('plays the selected mobility and special poses across authored transitions', () => {
-    expect(animationFrame('doubleJump', 0).image).toBe(29);
-    expect(animationFrame('doubleJump', 8).image).toBe(30);
-    expect(animationFrame('airDash', 3).image).toBe(45);
+    expect(animationFrame(10, 0).image).toBe(29);
+    expect(animationFrame(10, 8).image).toBe(30);
+    expect(animationFrame(16, 3).image).toBe(45);
     expect(animationFrame('drill', 23).image).toBe(121);
     expect(animationDuration('airDrill')).toBe(22);
     expect(animationFrame('airDrill', 21).image).toBe(120);
@@ -292,17 +288,15 @@ describe('selected core animation assets', () => {
 
   it('aligns Hit Up strike, recovery, chase and launch poses with their source boundaries', () => {
     expect(
-      [0, 14, 15, 24, 25, 50, 65].map(
-        (age) => animationFrame('hitUp', age).image,
-      ),
+      [0, 14, 15, 24, 25, 50, 65].map((age) => animationFrame(200, age).image),
     ).toEqual([112, 115, 117, 117, 116, 114, 113]);
-    expect(animationDuration('hitUp')).toBe(75);
+    expect(animationDuration(200)).toBe(75);
+    expect([0, 5, 25, 40].map((age) => animationFrame(201, age).image)).toEqual(
+      [117, 116, 114, 113],
+    );
+    expect(animationDuration(201)).toBe(50);
     expect(
-      [0, 5, 25, 40].map((age) => animationFrame('hitUpRecover', age).image),
-    ).toEqual([117, 116, 114, 113]);
-    expect(animationDuration('hitUpRecover')).toBe(50);
-    expect(
-      [0, 8, 21, 26, 41].map((age) => animationFrame('hitUpJump', age).image),
+      [0, 8, 21, 26, 41].map((age) => animationFrame(202, age).image),
     ).toEqual([12, 13, 14, 15, 16]);
     expect(animationFrame('launchUp', 24).dy).toBe(-10);
     expect(animationFrame('launchUp', 25).dy).toBe(-10);
@@ -318,12 +312,12 @@ describe('selected core animation assets', () => {
 
   it('plays all eight third-kick strike and recovery pairs before ending', () => {
     for (const age of [15, 21, 27, 33, 39, 45, 51, 57]) {
-      expect(animationFrame('kick3', age).image).toBe(82);
-      expect(animationFrame('kick3', age + 3).image).toBe(83);
+      expect(animationFrame(189, age).image).toBe(82);
+      expect(animationFrame(189, age + 3).image).toBe(83);
     }
-    expect(animationFrame('kick3', 63).image).toBe(82);
-    expect(animationFrame('kick3', 78).image).toBe(34);
-    expect(animationDuration('kick3')).toBe(88);
+    expect(animationFrame(189, 63).image).toBe(82);
+    expect(animationFrame(189, 78).image).toBe(34);
+    expect(animationDuration(189)).toBe(88);
   });
 
   it('plays the grab, the Chuck Hit spins and recovery, floor impact, and get-up poses', () => {
