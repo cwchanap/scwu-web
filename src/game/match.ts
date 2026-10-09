@@ -1572,8 +1572,8 @@ export class Match {
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
         // actor's colour. ponytail: flags 2 (the caught opponent's), 4 and 8
         // (global faders) start from 0 (0x41336c–0x413481) and are left out:
-        // no Ryuko record uses 2 or 8, and 4 only fades the round intro's
-        // screen fader from 0 to 0 (PCs 303, 327).
+        // neither fighter's records use 2 or 8 (Zoma's have no faders), and 4
+        // only fades the round intro's screen fader from 0 to 0 (PCs 303, 327).
         if (event.fader && event.fader.flags & 1) {
           const { type, r, g, b, fade, ticks } = event.fader;
           const { color } = actor;
@@ -2134,7 +2134,7 @@ export class Match {
     // writes a running one over the colour of its player's objects.
     this.fighters.forEach((f, owner) => {
       const { fader } = f;
-      // Type 3 (0x40cacf) blends by rand(); no Ryuko record uses it.
+      // Type 3 (0x40cacf) blends by rand(); neither fighter's records use it.
       if (!fader?.left || !--fader.left || fader.type > 2) return;
       const blend = faderColor(fader);
       for (const actor of [f, ...this.effects.filter((e) => e.owner === owner)])
