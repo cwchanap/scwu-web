@@ -107,7 +107,7 @@ const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
 const SOURCE_ACCELERATION_SCALE = (393 / 65536) * 1.5;
 const JUMP_GRAVITY = 80 * SOURCE_ACCELERATION_SCALE;
 // Op 0x01 in each grounded reaction: raw velocity and acceleration from its
-// first moving tick (after the impact displays), until `until` or its end.
+// age, until `until` or its end.
 const slide = (start: number, velocity: number, acceleration = 0) => ({
   start,
   velocity,
@@ -129,7 +129,7 @@ const reactionSlides: Partial<
   blockRapid: slide(9, -650, 8), // 163, PC 2215
   crouchBlockRapid: slide(9, -650, 8), // 165, PC 2245
   // Unclamped: the beam hit stops at its 25th moving tick, then drifts back in.
-  hitRapid: slide(1, -150, 10), // 83, PC 954
+  hitRapid: slide(0, -150, 10), // 83, PC 954
 };
 // Air reactions without a landing handler play the op 0x01 commands of their
 // flattened scripts; land() ends them (0x411810).
@@ -143,7 +143,6 @@ const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airTimeStopGuard: 172, // PC 2323: falls from rest at gravity 70
 };
 // Motion starts at the listed action age; landing enters the next action.
-// Commands before a reaction's first display apply on its first moving tick.
 const launchMotion: Partial<
   Record<
     Action,
@@ -171,13 +170,13 @@ const launchMotion: Partial<
   sweep: { tick: 6, vx: -300, vy: -1020, gravity: 90, land: 'knockdown' },
   launchDown: { tick: 9, vx: -500, vy: 2000, gravity: 100, land: 'slamBounce' },
   // Air Drill response 56 → action 135 (PC 1841); its landing branch enters 124.
-  drillDown: { tick: 1, vx: -800, vy: 2000, gravity: 100, land: 'slamBounce' },
+  drillDown: { tick: 0, vx: -800, vy: 2000, gravity: 100, land: 'slamBounce' },
   slamBounce: { tick: 10, vx: -400, vy: -700, gravity: 70, land: 'bounceDown' },
   // DST response 31 → action 129 (PC 1747); its landing branch at PC 1756.
-  dstToss: { tick: 1, vx: -200, vy: -3000, gravity: 90, land: 'tossBounce' },
+  dstToss: { tick: 0, vx: -200, vy: -3000, gravity: 90, land: 'tossBounce' },
   tossBounce: { tick: 10, vx: -100, vy: -1000, gravity: 80, land: 'knockdown' },
   // Missile response 32 → action 85 (PC 1002); its landing branch at PC 1011.
-  twist: { tick: 1, vx: -500, vy: -1700, gravity: 90, land: 'twistBounce' },
+  twist: { tick: 0, vx: -500, vy: -1700, gravity: 90, land: 'twistBounce' },
   twistBounce: { tick: 5, vx: -200, vy: -1200, gravity: 90, land: 'knockdown' },
   // Response 43 → action 97 (PC 1186), spinning in 98 until its landing → 146.
   fly: { tick: 6, vx: -100, vy: -2400, gravity: 90, land: 'knockdown' },
@@ -611,7 +610,21 @@ export interface Fighter {
   // What the motion pass (travel) does with an engine action this tick: add
   // its velocity, or move it so far along the ground. Scripts add theirs.
   moving: 'velocity' | number;
+  // The next action (+0x38), which the next step enters (enterPending).
+  pending: Pending | null;
 }
+// What a contact, an op 0x14 or a loss queues: a reaction, with the branch
+// it rolled, its op 0x1a stops for the victim and the striker and the
+// striker's op 0x15 power; or the striker's own hit or guard handler.
+type Pending =
+  | {
+      action: Action;
+      branch: ObjectKey | null;
+      stop: number;
+      attackerStop: number;
+      power: number;
+    }
+  | { key: ObjectKey };
 type Window = Extract<SourceEvent, { op: 'window' }>;
 export interface ScriptBox {
   x: number;
@@ -659,6 +672,8 @@ export interface Effect {
   onGuard?: ObjectKey;
   // Slot 1: what landing on the floor enters (0x41241c).
   onLand?: ObjectKey;
+  // The handler a contact queued (+0x38), which the next step enters.
+  pending?: ObjectKey;
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -833,6 +848,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   stopped: 0,
   transfer: 0,
   moving: 0,
+  pending: null,
 });
 // Camera scroll (0x447f2c) in source pixels, which the walls read this tick.
 let cameraLeft = 0;
@@ -1079,7 +1095,25 @@ export class Match {
       if (e.owner === owner && e.follow) e.hitStop += ticks;
   }
 
-  private action(f: Fighter, action: Action, restart = false) {
+  // A reaction rolls its op 0x20 at its first script step, before the hit
+  // effect's objects (the fighters' bucket 0x50 runs before their 0x5d).
+  private roll(who: Who, action: Action): ObjectKey | null {
+    const rolled = rolls(who)[action];
+    const roll = rolled
+      ? script(rolled, who).events.find((e) => e.op === 'random')
+      : undefined;
+    return roll?.op === 'random' &&
+      this.cpu.random() % roll.divisor > roll.above
+      ? `${roll.action}+${roll.offset}`
+      : null;
+  }
+
+  private action(
+    f: Fighter,
+    action: Action,
+    restart = false,
+    branch?: ObjectKey | null,
+  ) {
     if (f.action === action && !restart) return;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
     if (action === 'down')
@@ -1091,15 +1125,7 @@ export class Match {
     // Air reactions land straight into idle, as landing without a handler
     // clears the bits too (0x4124c3).
     if (neutralActions.has(action)) toNeutral(f);
-    // A reaction rolls its op 0x20 at its first script step, before the hit
-    // effect's objects (the fighters' bucket 0x50 runs before their 0x5d).
-    f.branch = null;
-    const rolled = rolls(f.who)[action];
-    const roll = rolled
-      ? script(rolled, f.who).events.find((e) => e.op === 'random')
-      : undefined;
-    if (roll?.op === 'random' && this.cpu.random() % roll.divisor > roll.above)
-      f.branch = `${roll.action}+${roll.offset}`;
+    f.branch = branch === undefined ? this.roll(f.who, action) : branch;
     // 0x410d50 stops a player entering an action on the ground, and keeps an
     // airborne one's motion: Zoma's moves take this.
     const flying = action === 'script' && (f.y < 0 || f.vy !== 0);
@@ -1225,6 +1251,9 @@ export class Match {
   // flags have bit 4 (0x40fa29); op 0x14 clears them (0x41314c).
   private holdVictims() {
     this.fighters.forEach((target, index) => {
+      // A queued action takes the victim at its next step, and op 0x14 has
+      // cleared the holder's flags (0x41314c).
+      if (target.pending) return;
       const holder = this.fighters[1 - index];
       if (
         (target.action === 'superHeld' &&
@@ -1360,19 +1389,16 @@ export class Match {
         );
   }
 
-  // 0x40f36a: a hit or guard enters the striking object's op 0x02 handler,
-  // an action change that drops its boxes.
+  // 0x40f36a, 0x40f88c: a hit or guard queues the striking object's op 0x02
+  // handler, which its next step enters.
   private handle(e: Effect, guarded: boolean) {
     const handler = guarded ? e.onGuard : e.onHit;
     if (handler === undefined) return;
     Object.assign(e, {
-      box: null,
-      objectBox: null,
-      responses: [],
       onHit: undefined,
       onGuard: undefined,
+      pending: handler,
     });
-    this.branchTo(e, handler);
   }
 
   // True when the actor jumped to another timeline.
@@ -1500,12 +1526,15 @@ export class Match {
         if (!reaction || !caught) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
-        this.action(other, reaction.action, true);
-        this.pause(other, reaction.stop);
-        this.pause(self, reaction.stop);
-        const [victimPower, attackerPower] = reactionPower(other);
-        addPower(other, victimPower);
-        addPower(self, attackerPower);
+        // Like a contact it queues the reaction (0x413136), and it clears
+        // the victim's stop (0x413147).
+        other.hitStop = 0;
+        this.queue(
+          other,
+          reaction.action,
+          reaction.stop,
+          reaction.attackerStop ?? reaction.stop,
+        );
         break;
       }
       case 'power':
@@ -1514,7 +1543,7 @@ export class Match {
           const damage = loseLife(other, -event.otherLife);
           self.hits++;
           self.damage += damage;
-          if (other.hp === 0) this.action(other, knockedOut(wasOut), true);
+          if (other.hp === 0) this.queue(other, knockedOut(wasOut));
         }
         addPower(self, event.selfPower);
         addPower(other, event.otherPower);
@@ -1596,10 +1625,16 @@ export class Match {
     return false;
   }
 
-  // Ops 0x07/0x14 move the opponent this super holds or has just tossed.
+  // Ops 0x07/0x14 move the opponent this super holds, is taking hold of (a
+  // queued 128) or has just tossed.
   private catchHeld(target: Fighter) {
-    if (target.action === 'dstToss') this.action(target, 'superHeld');
-    if (target.action !== 'superHeld') return false;
+    const queued =
+      target.pending && 'action' in target.pending
+        ? target.pending.action
+        : null;
+    if (!queued && target.action === 'dstToss')
+      this.action(target, 'superHeld');
+    if ((queued ?? target.action) !== 'superHeld') return false;
     markHeld(target);
     return true;
   }
@@ -1680,15 +1715,14 @@ export class Match {
     f.stopped = 0;
   }
 
-  // The motion pass (0x40f910) follows the hit test. It skips a stopped
-  // player (0x40f963), adds the acceleration to the velocity and the
-  // velocity to the position with no floor, as the next step lands it
-  // (land), then takes the transfer and the walls (settle). ponytail: a
-  // fighter stopped as its step began skips both; the source's step counts
-  // the stop down first (0x412390), so the tick it runs out moves, and a
-  // stop the fighter's own step adds (op 0x1a) holds that tick's motion.
-  private travel(f: Fighter, stopped: boolean) {
-    if (!stopped) {
+  // The motion pass (0x40f910) follows the hit test. It skips a player
+  // still stopped after the steps (0x40f963): a step counts the stop down
+  // and ends (0x412390), so the tick it runs out moves, and a stop a step
+  // adds (op 0x1a) holds that tick's motion. It adds the acceleration to the
+  // velocity and the velocity to the position with no floor, as the next
+  // step lands it (land), then takes the transfer and the walls (settle).
+  private travel(f: Fighter) {
+    if (f.hitStop === 0) {
       if (f.action === 'script' || f.moving === 'velocity') {
         f.vx += f.ax;
         f.vy += f.gravity;
@@ -1821,6 +1855,7 @@ export class Match {
         f: attacker,
         target,
         damage: boxDamage(box, body.taken, blocked),
+        damaging: box.damage > 0,
         effect: box.damage ? responseEffectsOf(attacker.who)[response] : 0,
         hitStop: reaction.stop,
         // The reaction's other stop (0x4136ae) reaches the striker's owner
@@ -1873,7 +1908,7 @@ export class Match {
         f.objectBox,
         () => {
           f.connected = true;
-          if (f.onHit) this.enterKey(f, f.onHit);
+          if (f.onHit && !f.pending) f.pending = { key: f.onHit };
         },
       ]);
     });
@@ -1969,6 +2004,43 @@ export class Match {
     );
   }
 
+  // The victim's next action (+0x38), the last write winning: a contact's
+  // reaction, op 0x14's, or the lose action (0x40e84b). ponytail: it rolls
+  // the reaction's op 0x20 now, a tick before the entry that rolls it in
+  // the source; that keeps the roll before the hit effect's, as the port
+  // steps objects before the fighters, but ahead of the CPU's next rolls.
+  private queue(
+    target: Fighter,
+    action: Action,
+    stop = 0,
+    attackerStop = 0,
+    power = 0,
+  ) {
+    const branch = this.roll(target.who, action);
+    target.pending = { action, branch, stop, attackerStop, power };
+  }
+
+  // 0x412327: a step first enters the action queued for it, stopped or not,
+  // and runs its first records (0x412564) instead of the landing check, the
+  // commands and the CPU. A reaction's are the op 0x01 that halts the victim
+  // (and any drift, which the motion pass adds once the stop runs out), op
+  // 0x1a's stops for it and the striker (0x413637, 0x4136ae), and op 0x15's
+  // power.
+  private enterPending(f: Fighter, other: Fighter) {
+    const pending = f.pending!;
+    f.pending = null;
+    if ('key' in pending) return this.enterKey(f, pending.key);
+    const { action, branch, stop, attackerStop, power } = pending;
+    this.action(f, action, true, branch);
+    f.vx = f.vy = 0;
+    f.moving = 0;
+    this.pause(f, stop);
+    this.pause(other, attackerStop);
+    const [victimPower, attackerPower] = reactionPower(f);
+    addPower(f, victimPower);
+    addPower(other, attackerPower + power);
+  }
+
   private move(
     f: Fighter,
     other: Fighter,
@@ -1976,15 +2048,18 @@ export class Match {
     previous: Input,
     history: number[],
   ) {
-    if (f.hitStop === 0) {
-      f.age++;
-      f.moving = 0;
-      if (this.land(f)) return;
-    }
-    if (this.cancel(f, other, history)) return;
-    if (f.hitStop > 0) {
-      f.hitStop--;
-      return;
+    if (f.pending) this.enterPending(f, other);
+    else {
+      if (f.hitStop === 0) {
+        f.age++;
+        f.moving = 0;
+        if (this.land(f)) return;
+      }
+      if (this.cancel(f, other, history)) return;
+      if (f.hitStop > 0) {
+        f.hitStop--;
+        return;
+      }
     }
     if (f.action === 'superHeld' || f.action === 'shock') return;
     if (this.moveKO(f)) return;
@@ -1992,12 +2067,10 @@ export class Match {
     if (f.action === 'script' && this.moveScripted(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
-    // Commands before a reaction's first display apply on its first moving tick.
     const reaction = AIR_REACTIONS[f.action];
     if (reaction)
       for (const event of script(twin(f.who, reaction), f.who).events)
-        if (event.op === 'motion' && Math.max(event.t, 1) === f.age)
-          motion(f, event);
+        if (event.op === 'motion' && event.t === f.age) motion(f, event);
     if (f.y < 0 || f.vy < 0) {
       f.airAge++;
       f.moving = 'velocity';
@@ -2103,8 +2176,8 @@ export class Match {
   // A display carries the op 0x03, 0x04, 0x0e, 0x1f and 0x25 records its
   // action runs just before it (supers run their whole timelines in
   // fireEvents). The script steps into it before the hit test, so a fighter
-  // enters it as it moves; an action a contact or throw starts is entered as
-  // the tick ends.
+  // enters it as it moves, a queued reaction or handler too; one the tick's
+  // end starts (a released hold) is entered then.
   private enter(f: Fighter, index: number) {
     const pose = fighterPose(f);
     if (pose === f.entered) return;
@@ -2216,6 +2289,19 @@ export class Match {
     // contact spawns moves from the next.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
+      // A queued handler comes first, stopped or not (0x412327): an action
+      // change that drops its boxes.
+      if (e.pending !== undefined) {
+        const key = e.pending;
+        Object.assign(e, {
+          box: null,
+          objectBox: null,
+          responses: [],
+          pending: undefined,
+        });
+        this.branchTo(e, key);
+        continue;
+      }
       // A stopped object skips its script step (0x412390).
       if (e.hitStop > 0) {
         e.hitStop--;
@@ -2294,11 +2380,8 @@ export class Match {
     this.inputs = inputs;
     inputs.forEach((input, i) => this.record(i, input));
     const frozen = this.fighters.map((f) => f.hitStop > 0);
-    // Each step can stop the other fighter before its own (op 0x1a).
-    const paused = [false, false];
     this.koStop = 0;
     this.fighters.forEach((f, i) => {
-      paused[i] = f.hitStop > 0;
       this.move(
         f,
         this.fighters[1 - i],
@@ -2331,7 +2414,7 @@ export class Match {
     // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
     // fighter 0 then pushes against fighter 1's boxes from the last tick, so
     // its own share stays unclamped until its next move.
-    this.travel(a, paused[0]);
+    this.travel(a);
     const pixel = (v: number) => Math.floor(v / 1.5);
     for (const boxA of pushboxes(shown(a), a.age, a.who)) {
       const ax = pixel(a.x) + a.facing * boxA.x;
@@ -2346,18 +2429,17 @@ export class Match {
         if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
       }
     }
-    this.travel(b, paused[1]);
+    this.travel(b);
     this.moveObjects();
-    // A contact only queues the victim's reaction (+0x38, 0x40f541), which
-    // its next step enters (0x412327), so its op 0x1a stops reach no one
-    // before this motion pass. ponytail: the port enters the reaction and
-    // its stops now; the source's striker steps once more before its stop
-    // when it is fighter 0, which steps first.
-    const stopped = new Set<Fighter>();
+    // A contact queues the victim's reaction (+0x38, 0x40f541), which its
+    // next step enters (enterPending), so no stop it adds holds this motion
+    // pass. A box with damage first clears both stop counters (0x40f692,
+    // 0x40f754: the base stops at 0x43a299/0x43a29a are 0).
     for (const {
       f,
       target,
       damage: strength,
+      damaging,
       effect,
       hitStop,
       attackerStop,
@@ -2373,29 +2455,17 @@ export class Match {
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = source === f;
       if (body) f.contact = true;
+      if (damaging) target.hitStop = source.hitStop = 0;
       const wasOut = target.hp === 0;
       f.damage += loseLife(target, strength);
-      // A loss that empties life replaces the victim's next action, the
-      // reaction (+0x38, 0x40f541), with the lose action (0x40e84b), so the
-      // reaction's records never run: no op 0x15 power, no op 0x1a stops.
-      if (target.hp > 0) addPower(f, bonus);
-      // The reaction's op 0x1a runs once however many boxes enter it this
-      // tick (DST's two missiles stop their victim once).
-      if (!stopped.has(target) && target.hp > 0) {
-        this.pause(f, attackerStop);
-        this.pause(target, hitStop);
-        stopped.add(target);
-      }
-      // A chip that empties life still KOs (0x40e7c0).
-      if (blocked && target.hp > 0) this.action(target, reaction, true);
-      else {
-        if (!blocked) f.hits++;
-        this.action(
-          target,
-          target.hp === 0 ? knockedOut(wasOut) : reaction,
-          true,
-        );
-      }
+      if (!blocked) f.hits++;
+      // A loss that empties life, a chip's too (0x40e7c0), queues the lose
+      // action instead (0x40e84b), so the reaction's records never run: no
+      // op 0x15 power, no op 0x1a stops. The last box to reach the victim
+      // sets its reaction, so DST's two missiles stop it once.
+      if (target.hp > 0)
+        this.queue(target, reaction, hitStop, attackerStop, bonus);
+      else this.queue(target, knockedOut(wasOut));
       target.reaction = blocked
         ? target.reaction | 0xc
         : (target.reaction & ~4) | 8;
@@ -2403,11 +2473,6 @@ export class Match {
       // object following its parent; other objects leave the striker as is.
       if (body) target.striker = 'body';
       else if ('clip' in source && source.follow) target.striker = 'object';
-      const [victimPower, attackerPower] = reactionPower(target);
-      addPower(target, victimPower);
-      addPower(f, attackerPower);
-      // Every response stops incoming motion before its impact hold.
-      target.vx = target.vy = 0;
       target.facing = facing === 1 ? -1 : 1;
       // 0x40f567: a box with damage spawns its response's effect action (word
       // 2 of the entry) through 0x406570 at the contact, facing the striker,
@@ -2422,20 +2487,16 @@ export class Match {
           slot: 0,
           z: 0,
         });
-      // The guard reaction's first op 0x24 runs before its first display.
-      if (blocked && target.hp > 0)
-        this.counter(target, this.history[this.fighters.indexOf(target)]);
     }
-    // Run contact branches after all hits: an interrupted aerial drill must not
-    // apply its own stop or restart, regardless of fighter update order.
+    // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at
+    // the contact (0x40f6f1), its hit handler after the motion pass
+    // (0x40fffd), each only for a striker with nothing queued, so a reaction
+    // takes an interrupted aerial drill whatever the fighters' order.
     for (const { f, blocked, source } of contacts) {
       if ('clip' in source) this.handle(source, blocked);
-      // Op 0x02 slots 2 and 3: a script's own box enters its hit or guard
-      // handler's action.
-      if (source === f && f.action === 'script') {
-        const handler = blocked ? f.onGuard : f.onHit;
-        if (handler) this.enterKey(f, handler);
-      }
+      const handler = blocked ? f.onGuard : f.onHit;
+      if (source === f && f.action === 'script' && !f.pending && handler)
+        f.pending = { key: handler };
     }
     for (const fire of objectHits) fire();
     this.holdVictims();

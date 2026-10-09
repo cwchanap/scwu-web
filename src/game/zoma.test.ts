@@ -46,6 +46,8 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   it("takes Ryuko's punch with his own weak hit (74): stops, damage and power", () => {
     const { match, ryuko, zoma } = versus();
     strike(match, ryuko, RYUKO.punch);
+    // The contact queues the reaction, which his next step enters.
+    match.step();
     match.step();
     // PC 697 stops both for 10 ticks; PC 700 adds 3 power to him, 2 to Ryuko.
     expect(zoma).toMatchObject({ action: 'hit', hp: 480, hitStop: 10 });
@@ -64,6 +66,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
       const { match, ryuko, zoma } = versus(120, partner);
       match.step();
       strike(match, ryuko, RYUKO.punch);
+      match.step();
       match.step();
       expect(zoma).toMatchObject({ action: block, hp: 490, power });
       expect(ZOMA_IMAGES.has(fighterPose(zoma).image)).toBe(true);
@@ -90,6 +93,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
       ryuko.y = -60;
       strike(match, ryuko, RYUKO.airPunch);
       match.step();
+      match.step();
       expect(zoma.action).toBe('jumpHit');
       branches.add(zoma.branch);
     }
@@ -101,6 +105,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     zoma.hp = 1;
     strike(match, ryuko, RYUKO.punch);
     match.step();
+    match.step();
     expect(zoma).toMatchObject({ action: 'down', hp: 0 });
     expect(match.winner).toBe('player');
     for (let t = 0; t < 400 && zoma.action !== 'koLand'; t++) match.step();
@@ -111,6 +116,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   it("is held in his own pose table's poses through Ryuko's throw", () => {
     const { match, ryuko, zoma } = versus(80);
     enter(match, ryuko, RYUKO.grab, 6);
+    match.step();
     match.step();
     expect(zoma.action).toBe('superHeld');
     const poses = new Set<number>();
@@ -153,9 +159,12 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const { zoma, ryuko, steps } = zomaPlayer();
     steps({}, 2);
     steps({ punch: true });
-    // The box (PC 2256) strikes at age 7; slots 2 and 3 enter 179 (PCs 2252–2253).
+    // The box (PC 2256) strikes at age 7; slots 2 and 3 queue 179 (PCs
+    // 2252–2253), entered with Ryuko's reaction at their next steps.
     steps({}, 6);
     expect(ryuko.hp).toBe(510);
+    steps({});
+    expect(ryuko.hp).toBe(500);
     steps({});
     expect(ryuko).toMatchObject({ action: 'hit', hp: 500 });
     expect(zoma).toMatchObject({ branch: 179, age: 0, hitStop: 10 });
@@ -262,8 +271,9 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const { match, zoma, ryuko, steps } = zomaPlayer(70);
     steps({}, 2);
     steps({ throw: true });
-    steps({}, 7);
-    // The kind 0xa8 box at age 7 (PC 2770) catches; slot 2 enters 201.
+    steps({}, 8);
+    // The kind 0xa8 box at age 7 (PC 2770) catches; slot 2 enters 201 at
+    // the next step.
     expect(ryuko.action).toBe('superHeld');
     expect(zoma.branch).toBe(201);
     steps({}, 43);
@@ -283,7 +293,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     zoma.stock = 1;
     steps({ guard: true });
     strike(match, ryuko, RYUKO.punch);
-    steps({ guard: true });
+    steps({ guard: true }, 2);
     expect(zoma).toMatchObject({ action: 'block', hitStop: 10 });
     steps({ guard: true }, 15);
     // 149's op 0x24 at age 8 reads Hit Up over the last 10 ticks.
@@ -305,6 +315,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     // PC 2858 spawns it into slot 1 at age 20.
     expect(match.effects.find((e) => e.slot === 1)?.clip).toBe(205);
     for (let t = 0; t < 60 && ryuko.hp === 510; t++) steps({});
+    steps({});
     // Response 50 → Ryuko's FB (110), which enters 75.
     expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 485 });
   });
@@ -362,6 +373,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     steps({}, 22);
     expect(zoma.x - x).toBeCloseTo(15000 * (655 / 65536) * 1.5, 6);
     for (let t = 0; t < 30 && ryuko.hp === 510; t++) steps({});
+    steps({});
     expect(ryuko).toMatchObject({ action: 'launchAway', hp: 475 });
   });
 
@@ -383,6 +395,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(zoma.variables[0]).toBe(10);
     expect(match.effects.filter((e) => e.clip === 223)).toHaveLength(1);
     for (let t = 0; t < 400 && ryuko.hp === 510; t++) steps({});
+    steps({});
     // A bomb (227) falls on the second mark: response 50, 20. Its stop
     // holds Zoma too (0x4136ae).
     expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 490 });
@@ -425,6 +438,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(zoma.black.shown).toBe('opaque');
     expect(BLACK.zoma.opaque.image).toBe(1009);
     for (let t = 0; t < 120 && ryuko.hp === 510; t++) steps({});
+    steps({});
     // The dash's object (242) strikes with response 43 for 84.
     expect(ryuko).toMatchObject({ action: 'fly', hp: 426 });
   });
@@ -444,12 +458,13 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
       seen.add(ryuko.action);
     }
     // Response 31 tosses; ops 0x14 re-place the struck victim (+0xdef9)
-    // through 21s and 60, whose stun the last box's 120 replaces at once,
-    // sending it flying.
+    // through 21s and 60, whose stun the last box's 120, queued that tick,
+    // replaces at the next step, sending it flying.
     expect([...seen]).toEqual([
       'superHeld',
       'dstToss',
       'airHitRapid',
+      'airStun',
       'fly',
       'knockdown',
     ]);
@@ -502,6 +517,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     steps({ blackRush: true });
     expect(zoma).toMatchObject({ branch: 279, stock: 0 });
     for (let t = 0; t < 100 && ryuko.hp === 510; t++) steps({});
+    steps({});
     // Its dash strikes with response 32 (Ryuko's 85).
     expect(ryuko.action).toBe('twist');
   });
@@ -548,11 +564,12 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const match = new Match('cpu', false, 0, ['ryuko', 'zoma']);
     const zoma = match.fighters[1];
     const entered = new Set<unknown>();
-    for (let t = 0; t < 1500; t++) {
+    // FIRE, BOMB and DST have keys; dragon 2 k (214, entry 8) has none.
+    const wanted = [204, 222, 251, 214];
+    for (let t = 0; t < 4000 && !wanted.every((b) => entered.has(b)); t++) {
       match.step({});
       if (zoma.action === 'script') entered.add(zoma.branch);
     }
-    // FIRE, BOMB and DST have keys; dragon 2 k (214, entry 8) has none.
-    expect([...entered]).toEqual(expect.arrayContaining([204, 222, 251, 214]));
+    expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });
 });
