@@ -4686,9 +4686,9 @@ describe('prototype training rules', () => {
     match.step();
     expect(target.hp).toBe(LIFE - 30);
     // A missile (218) replays its display while global 6 is exactly 1 (PC
-    // 3168). ponytail: objects move before their script step, so it moves
-    // once more before the hold, where the source's motion pass (0x40f910)
-    // follows the scripts.
+    // 3168). Objects move before their script step, where the source's
+    // motion pass (0x40f910) follows the scripts and contacts, so these
+    // positions trail the source's drawn ones by a tick of motion.
     const missile = spawn(match, 0, RYUKO.dstMissile, { x: 1000, y: -600 });
     const v = 1000 * (655 / 65536) * 1.5;
     match.freeze = 2;

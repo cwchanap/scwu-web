@@ -2164,11 +2164,14 @@ export class Match {
       y: Math.trunc((view.y + aim.y) / 2),
     });
     cameraLeft = this.camera.x;
-    // Objects spawned during this pass start moving next tick. ponytail:
-    // each object moves before its script step, at the velocity its last
-    // step set, where the source's motion pass (0x40f910) follows the
-    // scripts; a velocity a script changes applies a tick late (the DST
-    // missile's freeze hold, PC 3168). Move after the step to match.
+    // Objects spawned during this pass start moving next tick. The source
+    // runs every script step (each first checks landing, 0x41241c, and the
+    // world bounds, 0x4124c9), then the contact passes (0x40eb60, 0x40f010),
+    // then motion (0x40f910). Moving each object first, at the velocity its
+    // last step set, keeps that sequence: objects land, leave and are tested
+    // for hits from the source's positions. ponytail: they are drawn a tick
+    // of motion behind (the DST missile's freeze hold, PC 3168, shows a tick
+    // late); drawing them in step needs this tick's motion added.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
       // A stopped object skips its script step (0x412390) and motion
@@ -2305,6 +2308,11 @@ export class Match {
       }
     this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
     // Collect contacts before applying them so same-tick attacks can trade.
+    // ponytail: the source tests contacts (0x40eb60, 0x40f010) before the
+    // motion pass (0x40f910), so a fighter, and an object following one, is
+    // tested here a tick of motion ahead, and a struck fighter has already
+    // made this tick's move. Splitting move() into its script and motion
+    // halves, with the contacts between, would match.
     const contacts = [
       ...this.fighters.flatMap((f, i) =>
         !frozen[i] && f.action === 'script' ? this.boxContact(f, i) : [],
