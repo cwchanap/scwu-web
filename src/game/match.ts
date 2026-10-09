@@ -132,7 +132,7 @@ const reactionSlides: Partial<
   hitRapid: slide(1, -150, 10), // 83, PC 954
 };
 // Air reactions without a landing handler play the op 0x01 commands of their
-// flattened scripts; move() ends them on landing (0x411810).
+// flattened scripts; land() ends them (0x411810).
 const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airHit: 74, // PCs 774/778: rise at raw 100, then −300/−650, ax 1, gravity 66
   airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
@@ -608,6 +608,9 @@ export interface Fighter {
   // motion step adds (0x40fa09).
   stopped: number;
   transfer: number;
+  // What the motion pass (travel) does with an engine action this tick: add
+  // its velocity, or move it so far along the ground. Scripts add theirs.
+  moving: 'velocity' | number;
 }
 type Window = Extract<SourceEvent, { op: 'window' }>;
 export interface ScriptBox {
@@ -829,6 +832,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   variables: {},
   stopped: 0,
   transfer: 0,
+  moving: 0,
 });
 // Camera scroll (0x447f2c) in source pixels, which the walls read this tick.
 let cameraLeft = 0;
@@ -846,16 +850,6 @@ const clampCamera = ({ x, y }: { x: number; y: number }) => ({
   x: Math.max(0, Math.min(640, x)),
   y: Math.max(0, Math.min(480, y)),
 });
-function gravity(f: Fighter) {
-  f.vx += f.ax;
-  placeX(f, f.x + f.vx);
-  f.vy += f.gravity;
-  f.y = Math.min(0, f.y + f.vy);
-  if (f.y === 0) {
-    f.vx = f.vy = 0;
-    f.gravity = 0.24;
-  }
-}
 // Op 0x01: flag bit 0 adds; bits 1–4 keep vx, vy, ax and ay unchanged.
 function motion(
   actor: Pick<Fighter, 'vx' | 'vy' | 'ax' | 'gravity' | 'facing'>,
@@ -1130,10 +1124,12 @@ export class Match {
     } else if (action === 'superHeld' || action === 'shock') {
       f.vx = f.vy = 0;
       f.gravity = 0;
+      f.moving = 0;
     } else if (f.gravity === 0) f.gravity = 0.24;
     if (action === 'down' || action === 'koAgain') {
       f.vx = 0;
       f.gravity = 0.24;
+      f.moving = 0;
     }
   }
 
@@ -1154,7 +1150,7 @@ export class Match {
   // (PCs 641–644), then lies while the round is over (PC 645).
   private moveKO(f: Fighter) {
     if (f.action === 'koLand') {
-      if (f.age <= 10) placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+      if (f.age <= 10) f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
       return true;
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
@@ -1168,8 +1164,7 @@ export class Match {
     }
     if (f.age >= launch) {
       f.airAge++;
-      gravity(f);
-      if (f.y === 0) this.action(f, 'koLand');
+      f.moving = 'velocity';
     }
     return true;
   }
@@ -1188,7 +1183,7 @@ export class Match {
     if (!motion) return false;
     // Victim actions hold their impact pose before the motion command.
     if (motion.drift && f.age < motion.tick)
-      placeX(f, f.x + f.facing * motion.drift * SOURCE_VELOCITY_SCALE);
+      f.moving = f.facing * motion.drift * SOURCE_VELOCITY_SCALE;
     if (f.age === motion.tick) {
       f.vx = f.facing * motion.vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
@@ -1197,11 +1192,7 @@ export class Match {
     }
     if (f.age >= motion.tick) {
       f.airAge++;
-      gravity(f);
-      if (f.y === 0) {
-        f.variables[1] = 0;
-        this.action(f, motion.land);
-      }
+      f.moving = 'velocity';
     }
     return true;
   }
@@ -1221,11 +1212,11 @@ export class Match {
             (f.age - slide.start + 1) *
               slide.acceleration *
               SOURCE_ACCELERATION_SCALE);
-        placeX(f, f.x + f.vx);
+        f.moving = f.vx;
       }
     }
     if (f.action === 'bounceDown' && f.age <= 10)
-      placeX(f, f.x - f.facing * 200 * SOURCE_VELOCITY_SCALE);
+      f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
   }
 
   // A held or shocked victim follows its holder's script, or is released
@@ -1619,6 +1610,7 @@ export class Match {
     placeX(target, holder.x + holder.facing * held.x * 1.5);
     target.y = Math.min(0, holder.y + held.y * 1.5);
     target.vx = target.vy = 0;
+    target.moving = 0;
     target.facing =
       held.flags & 4 ? holder.facing : holder.facing === 1 ? -1 : 1;
   }
@@ -1688,27 +1680,87 @@ export class Match {
     f.stopped = 0;
   }
 
-  // A scripted fighter's own motion; false when its timeline has ended on foot.
-  private moveScripted(f: Fighter) {
-    const branch = f.branch;
-    this.fireEvents(f);
-    const airborne = f.y < 0 || f.vy < 0;
-    f.vx += f.ax;
-    f.vy += f.gravity;
-    placeX(f, f.x + f.vx);
-    f.y = Math.min(0, f.y + f.vy);
-    if (f.action !== 'script' || f.branch !== branch) return true;
-    // An airborne move ends on landing: 0x411810 enters the slot-1 handler's
-    // action (her air beams land in Dash F lend, 15, PC 3964), or without
-    // one ends the action.
-    if (airborne && f.y === 0) {
-      f.vx = f.vy = 0;
+  // The motion pass (0x40f910) follows the hit test. It skips a stopped
+  // player (0x40f963), adds the acceleration to the velocity and the
+  // velocity to the position with no floor, as the next step lands it
+  // (land), then takes the transfer and the walls (settle). ponytail: a
+  // fighter stopped as its step began skips both; the source's step counts
+  // the stop down first (0x412390), so the tick it runs out moves, and a
+  // stop the fighter's own step adds (op 0x1a) holds that tick's motion.
+  private travel(f: Fighter, stopped: boolean) {
+    if (!stopped) {
+      if (f.action === 'script' || f.moving === 'velocity') {
+        f.vx += f.ax;
+        f.vy += f.gravity;
+        placeX(f, f.x + f.vx);
+        f.y += f.vy;
+      } else if (f.moving) placeX(f, f.x + f.moving);
+    }
+    this.settle(f);
+  }
+
+  // The pass then moves each unstopped object, and one following its parent
+  // takes the parent's position plus its offset, mirrored by the parent's
+  // facing, stopped or not (0x40f992–0x40f9d9).
+  private moveObjects() {
+    for (const e of this.effects)
+      if (e.hitStop === 0) {
+        e.vx += e.ax;
+        e.vy += e.gravity;
+        e.x += e.vx;
+        e.y += e.vy;
+      }
+    for (const e of this.effects)
+      if (e.follow) {
+        const { parent, x, y } = e.follow;
+        e.x = parent.x + parent.facing * x * 1.5;
+        e.y = parent.y + y * 1.5;
+      }
+  }
+
+  // 0x411810: before its commands and script, a player at or past the floor
+  // while falling lands (0x41187f). Its motion stops, and the landing handler
+  // (slot 1) enters its action (her air beams land in Dash F lend, 15, PC
+  // 3964), or the action ends. True when that ends the step.
+  private land(f: Fighter) {
+    if (f.y < 0 || f.vy <= 0) return false;
+    f.y = 0;
+    f.vx = f.vy = 0;
+    if (f.action === 'script') {
       f.variables[1] = 0;
-      if (!f.onLand) return false;
+      if (!f.onLand) {
+        this.action(f, 'idle');
+        return false;
+      }
       markActing(f);
       this.enterKey(f, f.onLand);
       return true;
     }
+    f.gravity = 0.24;
+    if (f.action === 'down' || f.action === 'koAgain') {
+      this.action(f, 'koLand');
+      return true;
+    }
+    f.variables[1] = 0;
+    const launch = launchMotion[f.action];
+    if (launch) this.action(f, launch.land);
+    // The air reactions have no handler; the free state reads commands on
+    // the same tick.
+    else if (AIR_REACTIONS[f.action]) {
+      this.action(f, 'idle');
+      return false;
+    } else {
+      markActing(f);
+      this.action(f, 'land');
+    }
+    return true;
+  }
+
+  // A scripted fighter's step; false when its timeline has ended on foot.
+  private moveScripted(f: Fighter) {
+    const branch = f.branch;
+    this.fireEvents(f);
+    if (f.action !== 'script' || f.branch !== branch) return true;
     const { end, next, offset = 0 } = script(timeline(f), f.who);
     if (
       end === 'hold' ||
@@ -1722,6 +1774,7 @@ export class Match {
     else if (f.y < 0) {
       this.action(f, 'jump');
       f.gravity = JUMP_GRAVITY;
+      f.moving = 'velocity';
     } else {
       f.vx = f.vy = 0;
       return false;
@@ -1923,12 +1976,12 @@ export class Match {
     previous: Input,
     history: number[],
   ) {
-    if (f.hitStop === 0) f.age++;
-    if (this.cancel(f, other, history)) {
-      // The motion step still moves a script it enters this tick (0x40f910).
-      if (f.hitStop === 0 && f.action === 'script') this.moveScripted(f);
-      return;
+    if (f.hitStop === 0) {
+      f.age++;
+      f.moving = 0;
+      if (this.land(f)) return;
     }
+    if (this.cancel(f, other, history)) return;
     if (f.hitStop > 0) {
       f.hitStop--;
       return;
@@ -1947,26 +2000,17 @@ export class Match {
           motion(f, event);
     if (f.y < 0 || f.vy < 0) {
       f.airAge++;
-      gravity(f);
-      if (f.y === 0) {
-        f.variables[1] = 0;
-        // 0x411810: landing without a slot-1 handler ends the action, and the
-        // free state reads commands on the same tick. The air reactions have
-        // none.
-        if (AIR_REACTIONS[f.action]) this.action(f, 'idle');
-        else {
-          markActing(f);
-          this.action(f, 'land');
-          return;
-        }
-      }
+      f.moving = 'velocity';
     }
     this.recoverKnockdown(f);
     if (f.action === 'knockdown' || f.action === 'bounceDown') return;
     if (f.action === 'takeoff') {
       if (f.age < animationDuration('takeoff', f.who)) return;
+      // Action 4's op 0x01 follows its takeoff display (PC 54), so the jump
+      // moves on this tick.
       launchJump(f);
       this.action(f, 'jump');
+      f.moving = 'velocity';
       return;
     }
     if (
@@ -2043,7 +2087,7 @@ export class Match {
       this.action(f, crouched ? 'crouch' : 'crouchEnter');
       return;
     }
-    if (!airborne) placeX(f, f.x + direction * 2.8);
+    if (!airborne) f.moving = direction * 2.8;
     this.action(
       f,
       airborne
@@ -2164,26 +2208,19 @@ export class Match {
       y: Math.trunc((view.y + aim.y) / 2),
     });
     cameraLeft = this.camera.x;
-    // Objects spawned during this pass start moving next tick. The source
-    // runs every script step (each first checks landing, 0x41241c, and the
-    // world bounds, 0x4124c9), then the contact passes (0x40eb60, 0x40f010),
-    // then motion (0x40f910). Moving each object first, at the velocity its
-    // last step set, keeps that sequence: objects land, leave and are tested
-    // for hits from the source's positions. ponytail: they are drawn a tick
-    // of motion behind (the DST missile's freeze hold, PC 3168, shows a tick
-    // late); drawing them in step needs this tick's motion added.
+    // Every script step runs (0x404d4c), then the contact passes (0x40eb60,
+    // 0x40f010), then the motion pass (0x40f910: travel, moveObjects). Each
+    // step first checks landing (0x41241c, 0x411810) and the world bounds
+    // (0x4124c9) on last tick's motion. An object a step spawns runs its
+    // first records at once and moves in this tick's motion pass; one a
+    // contact spawns moves from the next.
     for (const e of [...this.effects]) {
       if (!this.effects.includes(e)) continue;
-      // A stopped object skips its script step (0x412390) and motion
-      // (0x40f963), but still follows its parent (0x40f992).
+      // A stopped object skips its script step (0x412390).
       if (e.hitStop > 0) {
         e.hitStop--;
         continue;
       }
-      e.vx += e.ax;
-      e.vy += e.gravity;
-      e.x += e.vx;
-      e.y += e.vy;
       // 0x41241c: an object falling to the floor (y 920) stops there, and
       // its landing handler (slot 1) enters its action, dropping its boxes.
       if (!e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
@@ -2237,6 +2274,7 @@ export class Match {
       this.record(0, player);
       this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
+      this.moveObjects();
       return;
     }
     if (!this.winner) this.ticks++;
@@ -2256,8 +2294,11 @@ export class Match {
     this.inputs = inputs;
     inputs.forEach((input, i) => this.record(i, input));
     const frozen = this.fighters.map((f) => f.hitStop > 0);
-    const move = (i: number) => {
-      const f = this.fighters[i];
+    // Each step can stop the other fighter before its own (op 0x1a).
+    const paused = [false, false];
+    this.koStop = 0;
+    this.fighters.forEach((f, i) => {
+      paused[i] = f.hitStop > 0;
       this.move(
         f,
         this.fighters[1 - i],
@@ -2265,21 +2306,32 @@ export class Match {
         this.previous[i],
         this.history[i],
       );
-      this.settle(f);
       this.enter(f, i);
-    };
+    });
+    // Applied after both steps, so a double KO holds once.
+    for (const f of this.fighters) this.pause(f, this.koStop);
+    this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
+    // The hit test meets the fighters and objects where last tick's motion
+    // left them. Contacts are collected before any applies, so same-tick
+    // attacks can trade.
+    const contacts = [
+      ...this.fighters.flatMap((f, i) =>
+        !frozen[i] && f.action === 'script' ? this.boxContact(f, i) : [],
+      ),
+      ...this.effects.flatMap((e) => this.boxContact(e, e.owner)),
+    ];
+    const objectHits = this.objectHits(frozen);
     const [a, b] = this.fighters;
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
     // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
-    // moves when the other is grounded, and a KO'd fighter (life +0xdf05 is 0)
-    // pushes no one. Held and hidden poses set no such box, and hit stop
-    // doesn't stop the push.
+    // (above the floor, 0x40fec9) moves when the other is grounded, and a
+    // KO'd fighter (life +0xdf05 is 0) pushes no one. Held and hidden poses
+    // set no such box, and hit stop doesn't stop the push.
     // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
     // fighter 0 then pushes against fighter 1's boxes from the last tick, so
     // its own share stays unclamped until its next move.
-    this.koStop = 0;
-    move(0);
+    this.travel(a, paused[0]);
     const pixel = (v: number) => Math.floor(v / 1.5);
     for (const boxA of pushboxes(shown(a), a.age, a.who)) {
       const ax = pixel(a.x) + a.facing * boxA.x;
@@ -2290,36 +2342,17 @@ export class Match {
         const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
         if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
         const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
-        if (b.hp > 0 && (a.y < 0 || b.y === 0)) a.x += push;
-        if (a.hp > 0 && (b.y < 0 || a.y === 0)) b.x -= push;
+        if (b.hp > 0 && (a.y < 0 || b.y >= 0)) a.x += push;
+        if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
       }
     }
-    move(1);
-    // Applied after both move, so a double KO holds once.
-    for (const f of this.fighters) this.pause(f, this.koStop);
-    // 0x40f992–0x40f9d9: after its own motion, an object following its
-    // parent takes the parent's position plus its offset, mirrored by the
-    // parent's facing; the fighters have moved before it.
-    for (const e of this.effects)
-      if (e.follow) {
-        const { parent, x, y } = e.follow;
-        e.x = parent.x + parent.facing * x * 1.5;
-        e.y = parent.y + y * 1.5;
-      }
-    this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
-    // Collect contacts before applying them so same-tick attacks can trade.
-    // ponytail: the source tests contacts (0x40eb60, 0x40f010) before the
-    // motion pass (0x40f910), so a fighter, and an object following one, is
-    // tested here a tick of motion ahead, and a struck fighter has already
-    // made this tick's move. Splitting move() into its script and motion
-    // halves, with the contacts between, would match.
-    const contacts = [
-      ...this.fighters.flatMap((f, i) =>
-        !frozen[i] && f.action === 'script' ? this.boxContact(f, i) : [],
-      ),
-      ...this.effects.flatMap((e) => this.boxContact(e, e.owner)),
-    ];
-    const objectHits = this.objectHits(frozen);
+    this.travel(b, paused[1]);
+    this.moveObjects();
+    // A contact only queues the victim's reaction (+0x38, 0x40f541), which
+    // its next step enters (0x412327), so its op 0x1a stops reach no one
+    // before this motion pass. ponytail: the port enters the reaction and
+    // its stops now; the source's striker steps once more before its stop
+    // when it is fighter 0, which steps first.
     const stopped = new Set<Fighter>();
     for (const {
       f,

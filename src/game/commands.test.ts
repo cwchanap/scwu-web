@@ -167,9 +167,10 @@ describe('recovered command recognizer', () => {
   });
 
   it('reads no air command within 50 source pixels of the floor on the way down', () => {
+    // The step scans before the motion pass, from where the last one left it.
     for (const [y, action] of [
-      [-75, 'jump'],
-      [-76, RYUKO.airPunch],
+      [-74, 'jump'],
+      [-75, RYUKO.airPunch],
     ] as const) {
       const match = new Match();
       const [f] = match.fighters;

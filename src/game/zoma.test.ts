@@ -209,7 +209,8 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     // PC 2561 jumps to 192 while variable 1 is 10.
     expect(zoma).toMatchObject({ branch: 192, age: 0 });
     for (let t = 0; t < 120 && zoma.y < 0; t++) steps({});
-    // The landing handler (slot 1 → 10) enters J Lend.
+    // The next step lands it: the handler (slot 1 → 10) enters J Lend.
+    steps({});
     expect(zoma.action).toBe('land');
   });
 
