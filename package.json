@@ -19,7 +19,7 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "phaser": "^3.90.0",
+    "phaser": "^4.2.1",
     "svelte": "^5.57.1"
   },
   "devDependencies": {

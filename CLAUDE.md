@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Browser fighting-game prototype (Ryuko or Zoma on Sport Court) built from reverse-engineered data of the Windows game SCWU. Stack: TypeScript, Svelte 5, Phaser 3, Vite, Vitest; Bun is the package manager/script runner, Python 3.10+ exports assets. `README.md` covers running and controls; `docs/gameplay.md` details how each move and rule plays, and `docs/evidence.md` is the authoritative record of timings and which behavior is recovered vs. authored. Update them when you change gameplay.
+Browser fighting-game prototype (Ryuko or Zoma on Sport Court) built from reverse-engineered data of the Windows game SCWU. Stack: TypeScript, Svelte 5, Phaser 4, Vite, Vitest; Bun is the package manager/script runner, Python 3.10+ exports assets. `README.md` covers running and controls; `docs/gameplay.md` details how each move and rule plays, and `docs/evidence.md` is the authoritative record of timings and which behavior is recovered vs. authored. Update them when you change gameplay.
 
 ## Commands
 

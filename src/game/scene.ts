@@ -163,6 +163,13 @@ export class TrainingScene extends Phaser.Scene {
 
   create() {
     if (this.error) return;
+    // Phaser 4's roundPixels skips scaled objects by default; round the 1.5×
+    // art too, as Phaser 3 did.
+    this.events.on(
+      Phaser.Scenes.Events.ADDED_TO_SCENE,
+      (object: Phaser.GameObjects.GameObject) =>
+        object.setVertexRoundMode('fullAuto'),
+    );
     // Mirror the single-screen court to extend it without a hard tile seam.
     for (const x of [0, WIDTH])
       this.add
