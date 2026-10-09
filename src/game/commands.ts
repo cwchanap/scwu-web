@@ -107,8 +107,8 @@ const DIRECTIONS = [0, 0, 2, 10, 8, 9, 1, 5, 4, 6, 1, 4, 2, 8, 0, 0];
 // 0x410acf–0x410c24 (and the scan's 0x4101a7–0x4102e8): nibble 0 takes any
 // direction, 1–9 exactly theirs (1 none), 10–13 any that has their bit. The
 // buttons, bits 4–9, must all be held, and none of them the tick before.
-// ponytail: Ryuko's steps are all type 0 (bits 14–15 clear); the scan's held
-// types 1–3 (0x4102ed–0x41061a) aren't ported.
+// ponytail: both fighters' steps are all type 0 (bits 14–15 clear); the
+// scan's held types 1–3 (0x4102ed–0x41061a) aren't ported.
 function stepMatches(step: number, word: number, before: number) {
   const nibble = step & 15;
   const direction = word & 15;
