@@ -635,7 +635,15 @@ export interface ScriptBox {
   kind: number;
 }
 // What spawns an object: a fighter or another object.
-type Spawner = { x: number; y: number; facing: -1 | 1; screen?: boolean };
+type Spawner = {
+  x: number;
+  y: number;
+  facing: -1 | 1;
+  screen?: boolean;
+  z?: number;
+};
+// The fighters' priority (+4).
+export const FIGHTER_Z = 0x50;
 // Spawned source objects, positioned like characters by the renderer, each
 // running its flattened timeline: spawns, motion, boxes.
 export interface Effect {
@@ -650,7 +658,9 @@ export interface Effect {
   gravity: number;
   facing: -1 | 1;
   age: number;
-  front: boolean;
+  // Priority (+4, 10–127): the step pass (0x404d4c) and the draw (0x404df1)
+  // take objects by it, lowest first, the fighters at 0x50.
+  z: number;
   // Owning fighter, and the owner's object slot (r[12]) it holds, or −1.
   owner: number;
   slot: number;
@@ -792,7 +802,7 @@ const newEffect = (
   gravity: 0,
   facing: 1,
   age: 0,
-  front: true,
+  z: FIGHTER_Z + 1,
   owner: 0,
   slot: -1,
   screen: false,
@@ -1685,9 +1695,14 @@ export class Match {
       x: screen ? event.x * 1.5 : origin.x + parent.facing * event.x * 1.5,
       y: screen ? event.y * 1.5 : origin.y + event.y * 1.5,
       facing: parent.facing,
-      // Flag bits 0–1 (0x412b83): just behind the spawner, just in front, or
-      // at z r[13], where the fighters are 0x50.
-      front: (event.flags & 3) === 2 ? event.z > 0x50 : (event.flags & 3) !== 0,
+      // Flag bits 0–1 (0x412b83): just behind the spawner (10 at least),
+      // just in front (127 at most), at r[13], or with it.
+      z: [
+        Math.max(10, (parent.z ?? FIGHTER_Z) - 1),
+        Math.min(127, (parent.z ?? FIGHTER_Z) + 1),
+        event.z,
+        parent.z ?? FIGHTER_Z,
+      ][event.flags & 3],
       owner,
       slot: registers ? event.slot : -1,
       screen,
@@ -2007,8 +2022,8 @@ export class Match {
   // The victim's next action (+0x38), the last write winning: a contact's
   // reaction, op 0x14's, or the lose action (0x40e84b). ponytail: it rolls
   // the reaction's op 0x20 now, a tick before the entry that rolls it in
-  // the source; that keeps the roll before the hit effect's, as the port
-  // steps objects before the fighters, but ahead of the CPU's next rolls.
+  // the source; that keeps the roll before the hit effect's, whose first
+  // records the port runs at the contact (run), but ahead of the CPU's.
   private queue(
     target: Fighter,
     action: Action,
@@ -2270,24 +2285,8 @@ export class Match {
       this.nextRound();
   }
 
-  private run(player: Input, opponent?: Input) {
-    // The camera object runs with the scripts, before motion (0x40ffc0), so
-    // the walls use the positions from the end of the last tick. In the Vs.
-    // modes it moves halfway to its aim each tick (0x40b022–0x40b080).
-    const view = this.view();
-    const aim = this.aim();
-    this.camera = clampCamera({
-      x: Math.trunc((view.x + aim.x) / 2),
-      y: Math.trunc((view.y + aim.y) / 2),
-    });
-    cameraLeft = this.camera.x;
-    // Every script step runs (0x404d4c), then the contact passes (0x40eb60,
-    // 0x40f010), then the motion pass (0x40f910: travel, moveObjects). Each
-    // step first checks landing (0x41241c, 0x411810) and the world bounds
-    // (0x4124c9) on last tick's motion. An object a step spawns runs its
-    // first records at once and moves in this tick's motion pass; one a
-    // contact spawns moves from the next.
-    for (const e of [...this.effects]) {
+  private stepObjects(objects: Effect[]) {
+    for (const e of objects) {
       if (!this.effects.includes(e)) continue;
       // A queued handler comes first, stopped or not (0x412327): an action
       // change that drops its boxes.
@@ -2326,10 +2325,37 @@ export class Match {
     // leaves the world unless it follows a parent.
     this.effects = this.effects.filter(
       (e) =>
-        (e.age < animationDuration(e.clip, e.who) || loops(e)) &&
-        (e.follow !== null ||
-          inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e)),
+        !objects.includes(e) ||
+        ((e.age < animationDuration(e.clip, e.who) || loops(e)) &&
+          (e.follow !== null ||
+            inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))),
     );
+  }
+
+  private run(player: Input, opponent?: Input) {
+    // The camera object runs with the scripts, before motion (0x40ffc0), so
+    // the walls use the positions from the end of the last tick. In the Vs.
+    // modes it moves halfway to its aim each tick (0x40b022–0x40b080).
+    const view = this.view();
+    const aim = this.aim();
+    this.camera = clampCamera({
+      x: Math.trunc((view.x + aim.x) / 2),
+      y: Math.trunc((view.y + aim.y) / 2),
+    });
+    cameraLeft = this.camera.x;
+    // Every script step runs (0x404d4c), then the contact passes (0x40eb60,
+    // 0x40f010), then the motion pass (0x40f910: travel, moveObjects). Each
+    // step first checks landing (0x41241c, 0x411810) and the world bounds
+    // (0x4124c9) on last tick's motion. The pass takes the objects alive at
+    // the tick's start by priority (0x404d0b): those behind the fighters,
+    // the fighters, then the rest. ponytail: within a priority it keeps
+    // spawn order, where 0x406570 takes the first free slot; and an object a
+    // step or a contact spawns runs its first records at once, where the
+    // source's first step for it is in the next tick's pass. One a step
+    // spawns moves in this tick's motion pass; one a contact spawns, from
+    // the next.
+    const objects = [...this.effects].sort((a, b) => a.z - b.z);
+    this.stepObjects(objects.filter((e) => e.z < FIGHTER_Z));
     // After a KO or time-out the round phase stays 1 (only a debug key sets
     // 2, 0x406231 and 0x408f38): fighters keep reading commands and
     // striking, and each takes its result's action once back in neutral
@@ -2360,6 +2386,7 @@ export class Match {
       this.record(0, player);
       this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
+      this.stepObjects(objects.filter((e) => e.z >= FIGHTER_Z));
       this.moveObjects();
       return;
     }
@@ -2393,6 +2420,7 @@ export class Match {
     });
     // Applied after both steps, so a double KO holds once.
     for (const f of this.fighters) this.pause(f, this.koStop);
+    this.stepObjects(objects.filter((e) => e.z >= FIGHTER_Z));
     this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
     // The hit test meets the fighters and objects where last tick's motion
     // left them. Contacts are collected before any applies, so same-tick
@@ -2476,16 +2504,16 @@ export class Match {
       target.facing = facing === 1 ? -1 : 1;
       // 0x40f567: a box with damage spawns its response's effect action (word
       // 2 of the entry) through 0x406570 at the contact, facing the striker,
-      // in front and in no slot (flags 5).
+      // in no slot at priority 0x5d (0x40f5d3; flags 4 | 2).
       if (effect)
         this.spawnObject({ x, y, facing }, this.fighters.indexOf(f), {
-          flags: 5,
+          flags: 6,
           action: effect,
           offset: 0,
           x: 0,
           y: 0,
           slot: 0,
-          z: 0,
+          z: 0x5d,
         });
     }
     // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at

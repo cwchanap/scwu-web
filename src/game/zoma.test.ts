@@ -561,12 +561,12 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU, keyless commands included', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'zoma']);
+    const match = new Match('cpu', false, 2, ['ryuko', 'zoma']);
     const zoma = match.fighters[1];
     const entered = new Set<unknown>();
     // FIRE, BOMB and DST have keys; dragon 2 k (214, entry 8) has none.
     const wanted = [204, 222, 251, 214];
-    for (let t = 0; t < 4000 && !wanted.every((b) => entered.has(b)); t++) {
+    for (let t = 0; t < 2000 && !wanted.every((b) => entered.has(b)); t++) {
       match.step({});
       if (zoma.action === 'script') entered.add(zoma.branch);
     }

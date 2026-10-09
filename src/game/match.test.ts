@@ -96,7 +96,7 @@ const object = (
   gravity: 0,
   facing: 1,
   age: 0,
-  front: true,
+  z: 0x51,
   owner,
   slot: 0,
   screen: false,
@@ -816,9 +816,9 @@ describe('fighter clip spawns (op 0x04)', () => {
     const [f] = match.fighters;
     match.step({ jump: true });
     while (f.action !== 'land') match.step();
-    // Flags 4: behind its spawner, in no slot.
+    // Flags 4: behind its spawner (0x50 − 1), in no slot.
     expect(match.effects.filter((e) => e.clip === 400)).toMatchObject([
-      { owner: 0, x: f.x, y: 0, front: false, slot: -1 },
+      { owner: 0, x: f.x, y: 0, z: 0x4f, slot: -1 },
     ]);
   });
 
@@ -838,7 +838,7 @@ describe('fighter clip spawns (op 0x04)', () => {
     }
     // Spawned in the step, before the motion pass slides the target on and
     // gives the dust its own first move.
-    expect(dust()).toMatchObject([{ front: true, slot: -1 }]);
+    expect(dust()).toMatchObject([{ z: 0x51, slot: -1 }]);
     expect(dust()[0].x - dust()[0].vx).toBeCloseTo(x, 6);
   });
 
@@ -858,7 +858,7 @@ describe('fighter clip spawns (op 0x04)', () => {
         x: 327 * 1.5,
         y: 498 * 1.5,
         screen: true,
-        front: false,
+        z: 15,
         color: { mode: 2, r: 25, g: 25, b: 25 },
       },
     ]);
@@ -884,7 +884,7 @@ describe('fighter clip spawns (op 0x04)', () => {
       age: 13,
     });
     expect(match.effects.filter((e) => e.clip === 395)).toMatchObject([
-      { owner: 0, slot: 0, front: false },
+      { owner: 0, slot: 0, z: 0x4f },
     ]);
   });
 
@@ -923,7 +923,7 @@ describe('fighter clip spawns (op 0x04)', () => {
     const dash = () => match.effects.find((e) => e.clip === 396);
     while (!dash()) match.step();
     const smoke = dash()!;
-    const puffs: { age: number; dx: number; front: boolean }[] = [];
+    const puffs: { age: number; dx: number; z: number }[] = [];
     const seen = new Set();
     while (smoke.age < 25) {
       // Each puff spawns where the smoke's step finds it, before either
@@ -934,15 +934,17 @@ describe('fighter clip spawns (op 0x04)', () => {
         if (e.clip === 394 && !seen.has(e)) {
           seen.add(e);
           const dx = Math.round((e.x - e.vx - x) * 1000) / 1000;
-          puffs.push({ age: smoke.age, dx, front: e.front });
+          puffs.push({ age: smoke.age, dx, z: e.z });
         }
     }
-    // Flag 4 draws each behind its spawner, 20, 30 and 40 source pixels on.
+    // Flag 4 puts each just behind its spawner, 20, 30 and 40 source pixels
+    // on: the smoke is 0x51 (flags 5), so the puffs share the fighters' 0x50
+    // and draw after them.
     expect(puffs).toEqual(
       [20, 30, 40].map((x, i) => ({
         age: 10 + 5 * i,
         dx: f.facing * x * 1.5,
-        front: false,
+        z: 0x50,
       })),
     );
   });
@@ -2887,7 +2889,7 @@ describe('prototype training rules', () => {
           blocked ? [370] : [339, '349+17'],
         );
         expect(hitEffects(match)).toMatchObject([
-          { clip, x, y: -136.5, age: 0, facing, front: true, owner: 0 },
+          { clip, x, y: -136.5, age: 0, facing, z: 0x5d, owner: 0 },
         ]);
         // Reactions 73/149 slide only after their stop and impact display.
         expect(target.x).toBe(targetX);
@@ -4549,13 +4551,18 @@ describe('prototype training rules', () => {
     match.step({ punch: true });
     for (let i = 0; i < 30 && f.hitStop === 0; i++) match.step();
     // Punch 1's hit (73) stops Ryuko 10 ticks, and the glow with her
-    // (0x4136ae: +0x28 bit 0x20000000).
-    expect([f.hitStop, glow.hitStop, loose.hitStop]).toEqual([10, 10, 0]);
+    // (0x4136ae: +0x28 bit 0x20000000). The glow (0x51) steps after the
+    // fighters, so it spends a tick of it at once and resumes a tick early.
+    expect([f.hitStop, glow.hitStop, loose.hitStop]).toEqual([10, 9, 0]);
     const [glowAge, looseAge] = [glow.age, loose.age];
-    ticks(match, 10);
-    expect([glow.age, loose.age]).toEqual([glowAge, looseAge + 10]);
+    ticks(match, 9);
+    expect([f.hitStop, glow.age, loose.age]).toEqual([
+      1,
+      glowAge,
+      looseAge + 9,
+    ]);
     match.step();
-    expect(glow.age).toBe(glowAge + 1);
+    expect([f.hitStop, glow.age]).toEqual([0, glowAge + 1]);
   });
 
   it('blocks an axe, permits jumping over it, and expires missed projectiles', () => {

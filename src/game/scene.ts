@@ -10,6 +10,7 @@ import type { Color, Pose } from './animations';
 import {
   afterimageColor,
   fighterPose,
+  FIGHTER_Z,
   FixedClock,
   GROUND,
   HEIGHT,
@@ -58,7 +59,7 @@ const ART_SCALE = 1.5;
 // A viewport object behind the fighters (the KO flash, z 15 like action 43)
 // sits over the court.
 const effectDepth = (e: Effect) =>
-  e.front ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1;
+  e.z >= FIGHTER_Z ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1;
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
