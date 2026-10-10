@@ -158,8 +158,12 @@ describe('recovered command recognizer', () => {
       match.step({ punch: true });
       for (let t = 0; t < 30 && f.hitStop === 0; t++) match.step();
       expect(playing(f)).toBe(RYUKO.punchHit);
+      // Pressed during the contact stop, it enters once the stop ends.
       for (const input of [KEYS[direction], {}, KEYS[direction]])
         match.step(input);
+      expect(playing(f)).toBe(RYUKO.punchHit);
+      while (f.hitStop > 0) match.step();
+      match.step();
       expect([RYUKO.dash, RYUKO.backdash].includes(playing(f) as 13 | 14)).toBe(
         dashed,
       );

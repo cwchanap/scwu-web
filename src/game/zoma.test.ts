@@ -477,8 +477,12 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     steps({}, 2);
     steps({ drill: true });
     for (let t = 0; t < 20 && ryuko.action !== 'uppercut'; t++) steps({});
-    // DRAGON's window (PC 2896) passes levels 40–41 once it has connected.
+    // DRAGON's window (PC 2896) passes levels 40–41 once it has connected,
+    // read once the contact stop ends.
     steps({ musashi: true });
+    expect(zoma).toMatchObject({ branch: 208, stock: 3 });
+    while (zoma.hitStop > 0) steps({});
+    steps({});
     expect(zoma).toMatchObject({ branch: '236+9', stock: 1 });
   });
 

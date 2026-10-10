@@ -1590,19 +1590,26 @@ describe('recovered cancels', () => {
     match.step({ drill: true });
     expect(playing(f)).toBe(RYUKO.punch);
     while (playing(f) === RYUKO.punch) match.step();
-    // 179 accepts them always; the drill waits out the contact stop.
+    // 179 accepts them always, but a stopped step skips the scan (0x412390):
+    // the drill enters on the first step after the contact stop.
     match.step({ drill: true });
+    expect(f.hitStop).toBeGreaterThan(0);
+    while (f.hitStop > 0) match.step();
+    expect(playing(f)).toBe(RYUKO.punchHit);
+    match.step();
     expect({ ...f, action: named(f) }).toMatchObject({
       action: 'drill',
       age: 0,
     });
-    expect(f.hitStop).toBeGreaterThan(0);
     const beam = new Match();
     beam.fighters[1].x = beam.fighters[0].x + 130;
     beam.fighters[0].stock = 1;
     beam.step({ punch: true });
     ticks(beam, 8);
     beam.step({ getterBeam: true });
+    expect(beam.fighters[0].hitStop).toBeGreaterThan(0);
+    while (beam.fighters[0].hitStop > 0) beam.step();
+    beam.step();
     expect({
       ...beam.fighters[0],
       action: named(beam.fighters[0]),

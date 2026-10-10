@@ -2015,10 +2015,12 @@ export class Match {
     return true;
   }
 
-  // Op 0x1e windows, read on every tick, contact stops included. Scripts and
-  // clips set the window themselves, which 0x41193a reads: mode 1 once the
-  // move's box has connected, 2 always; type 0 passes a command whose
-  // action's level lies in [min, max], type 1 only the action it names.
+  // Op 0x1e windows, read after the landing check (0x41193a) on steps a stop
+  // doesn't skip (0x412390), so a press made during a stop enters once it
+  // ends, while still in its command's window. Scripts and clips set the
+  // window themselves: mode 1 once the move's box has connected, 2 always;
+  // type 0 passes a command whose action's level lies in [min, max], type 1
+  // only the action it names.
   private cancel(f: Fighter, other: Fighter, history: number[]) {
     const window = f.window;
     if (!window || !(window.mode === 2 || (window.mode === 1 && f.contact)))
@@ -2078,9 +2080,8 @@ export class Match {
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
-      }
-      if (this.cancel(f, other, history)) return;
-      if (f.hitStop > 0) {
+        if (this.cancel(f, other, history)) return;
+      } else {
         f.hitStop--;
         return;
       }
