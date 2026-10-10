@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   addPower,
   afterimageColor,
@@ -5248,7 +5248,6 @@ describe('prototype training rules', () => {
       Object.assign(player, { y: -10, vy: 0 });
       player.pending = {
         action: 'airBlock',
-        branch: null,
         stop: 0,
         attackerStop: 0,
         power: 0,
@@ -5747,6 +5746,33 @@ describe('recovered CPU', () => {
   it('seeds the CPU from the match', () => {
     expect(new Match('cpu', false, 7).cpu.seed).toBe(7);
   });
+
+  it('reads its table in its fighter’s step, but not on an entry, a stop or a hold (0x411867)', () => {
+    const match = new Match('cpu');
+    const think = vi.spyOn(match.cpu, 'input');
+    match.step({});
+    expect(think).toHaveBeenCalledTimes(1);
+    match.fighters[1].pending = {
+      action: 'idle',
+      stop: 3,
+      attackerStop: 0,
+      power: 0,
+    };
+    // The step enters the queued action (0x412327), then counts its three
+    // stop ticks down (0x412390).
+    for (let tick = 0; tick < 4; tick++) match.step({});
+    expect(think).toHaveBeenCalledTimes(1);
+    match.step({});
+    expect(think).toHaveBeenCalledTimes(2);
+    // Op 0x07 sets the held fighter's +0x40 to -1 (0x41303a), and its step
+    // returns at once (0x412397).
+    Object.assign(match.fighters[1], {
+      action: 'superHeld',
+      held: { pose: 1, flags: 0, x: 0, y: 0 },
+    });
+    match.step({});
+    expect(think).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('recovered rush and time-stop reactions', () => {
@@ -5797,7 +5823,6 @@ describe('recovered rush and time-stop reactions', () => {
     Object.assign(target, { y: -120, vx: 5, vy: -3 });
     target.pending = {
       action: 'airTimeStopGuard',
-      branch: null,
       stop: 0,
       attackerStop: 0,
       power: 0,
@@ -5821,7 +5846,6 @@ describe('recovered air and rapid reaction motion', () => {
     Object.assign(target, { x: 1200, y, vx: 0, vy: 0 });
     target.pending = {
       action,
-      branch: null,
       stop: 0,
       attackerStop: 0,
       power: 0,
@@ -5918,7 +5942,13 @@ describe('recovered air and rapid reaction motion', () => {
       const [f, target] = match.fighters;
       enter(match, f, RYUKO.kick3);
       target.x = f.x + 140;
-      while (target.action !== 'hitRapid') match.step();
+      let contact = seed;
+      while (target.action !== 'hitRapid') {
+        contact = match.cpu.seed;
+        match.step();
+      }
+      // The contact only queued it: nothing rolled by that tick's end.
+      expect(contact).toBe(seed);
       const branch = new CpuVM([], 0, seed).random() % 3 > 1;
       expect(target.branch).toBe(branch ? '83+18' : null);
       branches.add(target.branch);

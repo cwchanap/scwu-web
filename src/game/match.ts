@@ -613,13 +613,12 @@ export interface Fighter {
   // The next action (+0x38), which the next step enters (enterPending).
   pending: Pending | null;
 }
-// What a contact, an op 0x14 or a loss queues: a reaction, with the branch
-// it rolled, its op 0x1a stops for the victim and the striker and the
-// striker's op 0x15 power; or the striker's own hit or guard handler.
+// What a contact, an op 0x14 or a loss queues: a reaction, with its op 0x1a
+// stops for the victim and the striker and the striker's op 0x15 power; or
+// the striker's own hit or guard handler.
 type Pending =
   | {
       action: Action;
-      branch: ObjectKey | null;
       stop: number;
       attackerStop: number;
       power: number;
@@ -1027,16 +1026,16 @@ export class Match {
   }
 
   // 0x4146d0 records each player's input word every tick, frozen or not.
-  // The CPU clears its history first (0x411307), then writes the command it
-  // enters (commands.ts). Authored: the player's command keys do the same, so
-  // a key enters its own command whatever was typed before it.
-  private record(i: number, input: Input) {
+  // The CPU clears its history first (0x411307, `clear`), then writes the
+  // command it enters (commands.ts). Authored: the player's command keys do
+  // the same, so a key enters its own command whatever was typed before it.
+  private record(i: number, input: Input, clear = false) {
     const history = this.history[i];
     const [f, other] = [this.fighters[i], this.fighters[1 - i]];
     const key = KEYS[f.who].find(
       ([control]) => input[control] && !this.previous[i][control],
     );
-    if (key || (this.cpuDriven && i === 1)) history.fill(0);
+    if (key || clear) history.fill(0);
     const word = inputWord(input, other.x >= f.x);
     history.push(word);
     history.shift();
@@ -1944,12 +1943,23 @@ export class Match {
       .map(([, , fire]) => fire);
   }
 
+  // An authored partner's input. The CPU's word starts as 0x4146d0 records
+  // player 2's keys, none, until its step writes its own (think).
   private ai(): Input {
     const [player, opponent] = this.fighters;
     const { partner } = this.practice;
-    if (this.mode === 'practice' && partner !== 'cpu')
-      return dummyInput(partner, opponent, player, this.ticks);
-    return this.cpu.input(opponent, player);
+    return this.mode === 'practice' && partner !== 'cpu'
+      ? dummyInput(partner, opponent, player, this.ticks)
+      : {};
+  }
+
+  // 0x411867: the CPU (0x411270) runs at the start of its fighter's step,
+  // which skips it while entering a queued action (0x412327), stopped
+  // (0x412390) or held by op 0x07 (+0x40 at -1, 0x412397).
+  private think(f: Fighter, other: Fighter) {
+    const input = (this.inputs[1] = this.cpu.input(f, other));
+    this.record(1, input, true);
+    return input;
   }
 
   // 0x40f3a2: a CPU victim ignores its input. Free (+0x15e & 0xc is 0) it
@@ -2021,12 +2031,7 @@ export class Match {
   }
 
   // The victim's next action (+0x38), the last write winning: a contact's
-  // reaction, op 0x14's, or the lose action (0x40e84b). ponytail: it rolls
-  // the reaction's op 0x20 now, where the source rolls at the entry. The
-  // port's CPU runs before both steps (ai), the source's in each player's
-  // step (0x411867) but not on an entry, so this keeps a fighter 0 victim's
-  // roll ahead of the CPU's; it also puts it ahead of the objects behind
-  // the fighters, which step first.
+  // reaction, op 0x14's, or the lose action (0x40e84b).
   private queue(
     target: Fighter,
     action: Action,
@@ -2034,22 +2039,21 @@ export class Match {
     attackerStop = 0,
     power = 0,
   ) {
-    const branch = this.roll(target.who, action);
-    target.pending = { action, branch, stop, attackerStop, power };
+    target.pending = { action, stop, attackerStop, power };
   }
 
   // 0x412327: a step first enters the action queued for it, stopped or not,
-  // and runs its first records (0x412564) instead of the landing check, the
-  // commands and the CPU. A reaction's are the op 0x01 that halts the victim
-  // (and any drift, which the motion pass adds once the stop runs out), op
-  // 0x1a's stops for it and the striker (0x413637, 0x4136ae), and op 0x15's
-  // power.
+  // and runs its first records (0x412564) instead of the CPU, the landing
+  // check and the commands. A reaction's are its op 0x20 (roll), the op 0x01
+  // that halts the victim (and any drift, which the motion pass adds once
+  // the stop runs out), op 0x1a's stops for it and the striker (0x413637,
+  // 0x4136ae), and op 0x15's power.
   private enterPending(f: Fighter, other: Fighter) {
     const pending = f.pending!;
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
-    const { action, branch, stop, attackerStop, power } = pending;
-    this.action(f, action, true, branch);
+    const { action, stop, attackerStop, power } = pending;
+    this.action(f, action, true);
     f.vx = f.vy = 0;
     f.moving = 0;
     this.pause(f, stop);
@@ -2069,6 +2073,8 @@ export class Match {
     if (f.pending) this.enterPending(f, other);
     else {
       if (f.hitStop === 0) {
+        if (this.cpuDriven && f === this.fighters[1] && !f.held?.pose)
+          input = this.think(f, other);
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
