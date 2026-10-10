@@ -1313,6 +1313,24 @@ describe('recovered victim responses', () => {
     expect(struck({}, { crouch: true })).toBe('blockStop');
   });
 
+  it('frees a stopped victim a damaging box reaches before the motion pass (0x40f692)', () => {
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 120;
+    victim.y = -40;
+    victim.pending = { action: 'airHit', stop: 30, attackerStop: 0, power: 0 };
+    match.step();
+    expect(victim).toMatchObject({ action: 'airHit', hitStop: 30 });
+    const { x, y, vx, vy, gravity } = victim;
+    strike(match, f, RYUKO.punch);
+    match.step();
+    // The contact pass clears both stops, and the motion pass that follows
+    // (0x40f910) moves the victim on the contact tick.
+    expect(victim.hitStop).toBe(0);
+    expect(victim.x).toBeCloseTo(x + vx, 6);
+    expect(victim.y).toBeCloseTo(y + vy + gravity, 6);
+  });
+
   it('slams any grounded victim of punch 3 into a floor bounce', () => {
     for (const defense of [{}, { guard: true, crouch: true }]) {
       // Response 77 → action 123, including through a crouching guard.

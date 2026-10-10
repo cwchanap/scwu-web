@@ -2456,37 +2456,13 @@ export class Match {
       ...this.effects.flatMap((e) => this.boxContact(e, e.owner)),
     ];
     const objectHits = this.objectHits(frozen);
-    const [a, b] = this.fighters;
-    // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
-    // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
-    // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
-    // (above the floor, 0x40fec9) moves when the other is grounded, and a
-    // KO'd fighter (life +0xdf05 is 0) pushes no one. Held and hidden poses
-    // set no such box, and hit stop doesn't stop the push.
-    // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
-    // fighter 0 then pushes against fighter 1's boxes from the last tick, so
-    // its own share stays unclamped until its next move.
-    this.travel(a);
-    const pixel = (v: number) => Math.floor(v / 1.5);
-    for (const boxA of pushboxes(shown(a), a.age, a.who)) {
-      const ax = pixel(a.x) + a.facing * boxA.x;
-      const ay = pixel(a.y) + boxA.y;
-      for (const boxB of pushboxes(shown(b), b.age, b.who)) {
-        const bx = pixel(b.x) + b.facing * boxB.x;
-        const by = pixel(b.y) + boxB.y;
-        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
-        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
-        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
-        if (b.hp > 0 && (a.y < 0 || b.y >= 0)) a.x += push;
-        if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
-      }
-    }
-    this.travel(b);
-    this.moveObjects();
-    // A contact queues the victim's reaction (+0x38, 0x40f541), which its
-    // next step enters (enterPending), so no stop it adds holds this motion
-    // pass. A box with damage first clears both stop counters (0x40f692,
-    // 0x40f754: the base stops at 0x43a299/0x43a29a are 0).
+    // The contact passes apply before the motion pass (0x40ffdc–0x40ffe6). A
+    // box with damage clears both stop counters (0x40f692, 0x40f754: the
+    // base stops at 0x43a299/0x43a29a are 0), so the victim and striker move
+    // this tick, and the push and walls read the life, facing and reaction
+    // bits a contact sets. It queues the victim's reaction (+0x38, 0x40f541),
+    // which its next step enters (enterPending), so no stop that reaction
+    // adds holds this motion pass.
     for (const {
       f,
       target,
@@ -2540,6 +2516,33 @@ export class Match {
           z: 0x5d,
         });
     }
+    const [a, b] = this.fighters;
+    // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
+    // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
+    // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
+    // (above the floor, 0x40fec9) moves when the other is grounded, and a
+    // KO'd fighter (life +0xdf05 is 0) pushes no one. Held and hidden poses
+    // set no such box, and hit stop doesn't stop the push.
+    // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
+    // fighter 0 then pushes against fighter 1's boxes from the last tick, so
+    // its own share stays unclamped until its next move.
+    this.travel(a);
+    const pixel = (v: number) => Math.floor(v / 1.5);
+    for (const boxA of pushboxes(shown(a), a.age, a.who)) {
+      const ax = pixel(a.x) + a.facing * boxA.x;
+      const ay = pixel(a.y) + boxA.y;
+      for (const boxB of pushboxes(shown(b), b.age, b.who)) {
+        const bx = pixel(b.x) + b.facing * boxB.x;
+        const by = pixel(b.y) + boxB.y;
+        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
+        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
+        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
+        if (b.hp > 0 && (a.y < 0 || b.y >= 0)) a.x += push;
+        if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
+      }
+    }
+    this.travel(b);
+    this.moveObjects();
     // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at
     // the contact (0x40f6f1), its hit handler after the motion pass
     // (0x40fffd), each only for a striker with nothing queued, so a reaction
