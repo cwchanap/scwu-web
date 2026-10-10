@@ -2080,6 +2080,25 @@ describe('recovered supers', () => {
     expect(target.action).not.toBe('superHeld');
   });
 
+  it('lifts a cornered Musashi victim against the wall and pushes Ryuko back once (0x40fa29)', () => {
+    const { match, ryuko, target } = superMatch(130);
+    ryuko.x = 1760;
+    target.x = 1890;
+    ticks(match, 100);
+    match.step({ musashi: true });
+    until(match, () => named(ryuko) === 'musashiHit' && ryuko.age === 15);
+    // Op 0x07 lifts the victim 105 ahead, past the wall. Its own motion step
+    // clamps it and hands the overflow to Ryuko (0x40fb08), who takes it at
+    // her next one, placing the victim from there (flag 0x10).
+    const wall = match.cameraX + 590 * 1.5;
+    expect(target.x).toBe(wall);
+    match.step();
+    expect(ryuko.x).toBeCloseTo(wall - 105 * 1.5, 6);
+    ticks(match, 15);
+    expect(ryuko.x).toBeCloseTo(wall - 105 * 1.5, 6);
+    expect(target.x).toBe(wall);
+  });
+
   it('darkens the court while a super holds variable 14 (action 43)', () => {
     const { match, ryuko, target } = superMatch(300);
     match.step({ getterBeam: true });

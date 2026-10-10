@@ -452,6 +452,10 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     for (let t = 0; t < 80 && ryuko.action !== 'superHeld'; t++) steps({});
     // The kind 8 box (PC 3500) catches with response 30; slot 2 enters 253.
     expect(zoma.branch).toBe(253);
+    // Op 0x07 places the victim from Zoma past the floor too: 15 below his
+    // feet at age 20, where flag 0x10 keeps it.
+    while (zoma.age < 20) steps({});
+    expect(ryuko.y).toBeCloseTo(15 * 1.5);
     const seen = new Set<string>();
     for (let t = 0; t < 500 && ryuko.action !== 'getUp'; t++) {
       steps({});

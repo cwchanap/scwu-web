@@ -1262,23 +1262,21 @@ export class Match {
   }
 
   // A held or shocked victim follows its holder's script, or is released
-  // without it (authored: when the holder is hit, KO'd or done). The
-  // holder's motion step re-places it every tick while the last op 0x07's
-  // flags have bit 4 (0x40fa29); op 0x14 clears them (0x41314c).
+  // without it (authored: when the holder is hit, KO'd or done).
   private holdVictims() {
     this.fighters.forEach((target, index) => {
-      // A queued action takes the victim at its next step, and op 0x14 has
-      // cleared the holder's flags (0x41314c).
+      // A queued action takes the victim at its next step.
       if (target.pending) return;
       const holder = this.fighters[1 - index];
       if (
         (target.action === 'superHeld' &&
           (holder.action !== 'script' || holder.hp === 0)) ||
         (target.action === 'shock' && playingSource(holder) !== 294)
-      )
+      ) {
+        // One held below the floor is set on it.
+        target.y = Math.min(0, target.y);
         this.action(target, target.y < 0 ? 'airHit' : 'hit');
-      if (target.action === 'superHeld' && (target.held?.flags ?? 0) & 0x10)
-        this.placeHeld(holder, target);
+      }
     });
   }
 
@@ -1530,8 +1528,10 @@ export class Match {
           x: event.x,
           y: event.y,
         };
-        // The hold replaces the victim's stop (+0x40 at -1, 0x41303a).
+        // The hold replaces the victim's stop (+0x40 at -1, 0x41303a) and
+        // zeroes its motion (0x412f66).
         other.hitStop = 0;
+        Object.assign(other, { vx: 0, vy: 0, ax: 0, gravity: 0, moving: 0 });
         this.placeHeld(self, other);
         break;
       case 'apply': {
@@ -1657,13 +1657,14 @@ export class Match {
     return true;
   }
 
+  // Ops 0x07 and 0x14, and a flag-0x10 hold's motion step, place the victim
+  // from the holder past walls and floor alike; its own motion step then
+  // clamps it to the walls (settle).
   private placeHeld(holder: Fighter, target: Fighter) {
     const held = target.held;
     if (!held) return;
-    placeX(target, holder.x + holder.facing * held.x * 1.5);
-    target.y = Math.min(0, holder.y + held.y * 1.5);
-    target.vx = target.vy = 0;
-    target.moving = 0;
+    target.x = holder.x + holder.facing * held.x * 1.5;
+    target.y = holder.y + held.y * 1.5;
     target.facing =
       held.flags & 4 ? holder.facing : holder.facing === 1 ? -1 : 1;
   }
@@ -1730,8 +1731,18 @@ export class Match {
   // Fighter 1 moves it this tick, fighter 0 the next.
   private settle(f: Fighter) {
     const other = this.fighters[1 - this.fighters.indexOf(f)];
-    placeX(f, f.x + f.transfer);
+    f.x += f.transfer;
     f.transfer = 0;
+    // 0x40fa29: a hold with flag 0x10 places its victim here, before the
+    // holder's walls, until op 0x14 clears it (0x41314c). A victim moving
+    // later in the pass clamps itself; fighter 0 stays where it is put.
+    if (
+      other.action === 'superHeld' &&
+      !other.pending &&
+      (other.held?.flags ?? 0) & 0x10
+    )
+      this.placeHeld(f, other);
+    placeX(f, f.x);
     const reeling = f.striker === 'body' && (other.reaction & 12) === 8;
     if (f.hp > 0 && f.reaction & 8 && f.striker && !reeling)
       other.transfer += f.stopped;
