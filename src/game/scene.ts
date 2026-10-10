@@ -534,8 +534,10 @@ export class TrainingScene extends Phaser.Scene {
       const { effects } = this.match;
       this.pool(this.effectSprites, effects.length).forEach((sprite, index) => {
         const effect = effects[index];
-        sprite.setVisible(!!effect);
-        if (!effect) return;
+        // The draw lists only the objects alive at the tick's start
+        // (0x404df1), and one yet to step has no display.
+        sprite.setVisible(!!effect && effect.age >= 0);
+        if (!effect || effect.age < 0) return;
         // Viewport objects (op 0x04 flag 0x40) ignore the camera.
         const pose = animationFrame(effect.clip, effect.age, effect.who);
         this.place(

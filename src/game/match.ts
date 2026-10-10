@@ -1692,6 +1692,7 @@ export class Match {
     const child = newEffect({
       clip,
       who,
+      age: -1,
       x: screen ? event.x * 1.5 : origin.x + parent.facing * event.x * 1.5,
       y: screen ? event.y * 1.5 : origin.y + event.y * 1.5,
       facing: parent.facing,
@@ -1708,10 +1709,9 @@ export class Match {
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
     });
-    // A script without displays never advances, so its events all fire at t=0
-    // (anime beam 296 only spawns 297 and 299); nothing is left to draw.
-    if (animationDuration(clip, who)) this.effects.push(child);
-    this.fireEffect(child);
+    // 0x406570 runs no script: the object first steps in the next tick's
+    // pass (stepObjects), which lists only the objects alive at its start.
+    this.effects.push(child);
   }
 
   // A player's motion step (0x40fa09–0x40fc9f) adds its transfer (+0xdf49),
@@ -1902,7 +1902,8 @@ export class Match {
     type At = { x: number; y: number; facing: -1 | 1; owner: number };
     const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>][] = [];
     const strikers: [At, ScriptBox, () => void][] = [];
-    for (const e of this.effects) {
+    // An object yet to step shows nothing.
+    for (const e of this.effects.filter((e) => e.age >= 0)) {
       const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
       for (const body of animationFrame(e.clip, e.age, e.who).body ?? [])
         if (body.kind & 6) bodies.push([at, body]);
@@ -2021,9 +2022,11 @@ export class Match {
 
   // The victim's next action (+0x38), the last write winning: a contact's
   // reaction, op 0x14's, or the lose action (0x40e84b). ponytail: it rolls
-  // the reaction's op 0x20 now, a tick before the entry that rolls it in
-  // the source; that keeps the roll before the hit effect's, whose first
-  // records the port runs at the contact (run), but ahead of the CPU's.
+  // the reaction's op 0x20 now, where the source rolls at the entry. The
+  // port's CPU runs before both steps (ai), the source's in each player's
+  // step (0x411867) but not on an entry, so this keeps a fighter 0 victim's
+  // roll ahead of the CPU's; it also puts it ahead of the objects behind
+  // the fighters, which step first.
   private queue(
     target: Fighter,
     action: Action,
@@ -2317,7 +2320,9 @@ export class Match {
           continue;
         }
       }
-      if (++e.age < animationDuration(e.clip, e.who) || loops(e))
+      // A script without displays never advances, so its events all fire at
+      // its first step (anime beam 296 only spawns 297 and 299).
+      if (++e.age === 0 || e.age < animationDuration(e.clip, e.who) || loops(e))
         this.fireEffect(e);
     }
     // A script that runs out reaches the next action's op 0x00, which
@@ -2348,12 +2353,9 @@ export class Match {
     // step first checks landing (0x41241c, 0x411810) and the world bounds
     // (0x4124c9) on last tick's motion. The pass takes the objects alive at
     // the tick's start by priority (0x404d0b): those behind the fighters,
-    // the fighters, then the rest. ponytail: within a priority it keeps
-    // spawn order, where 0x406570 takes the first free slot; and an object a
-    // step or a contact spawns runs its first records at once, where the
-    // source's first step for it is in the next tick's pass. One a step
-    // spawns moves in this tick's motion pass; one a contact spawns, from
-    // the next.
+    // the fighters, then the rest, so an object a step or a contact spawns
+    // first steps in the next tick's pass. ponytail: within a priority it
+    // keeps spawn order, where 0x406570 takes the first free slot.
     const objects = [...this.effects].sort((a, b) => a.z - b.z);
     this.stepObjects(objects.filter((e) => e.z < FIGHTER_Z));
     // After a KO or time-out the round phase stays 1 (only a debug key sets

@@ -143,7 +143,7 @@ export const objects = (match: Match, index: number, owner?: number) =>
   );
 
 // Spawns one of fighter `owner`'s objects at a stage position as op 0x04
-// does, running its first records: in slot `slot`, or in none.
+// does, in slot `slot` or in none; it first steps at the next tick.
 export function spawn(
   match: Match,
   owner: number,
@@ -168,6 +168,5 @@ export function spawn(
     slot: slot ?? 0,
     z: 0,
   });
-  // Its own children follow it.
   return match.effects[spawned];
 }
