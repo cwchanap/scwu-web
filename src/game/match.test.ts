@@ -1283,6 +1283,30 @@ describe('recovered victim responses', () => {
     },
   );
 
+  it('reads a stopped victim’s down from the word its stop saved (0x40f2ff)', () => {
+    // A block the air punch's overhead responses (5/6) beat only crouching.
+    const struck = (before: Input, during: Input) => {
+      const match = new Match();
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 120;
+      victim.pending = {
+        action: 'blockStop',
+        stop: 30,
+        attackerStop: 0,
+        power: 0,
+      };
+      // The step entering it runs its op 0x1a, saving the word (0x413676).
+      match.step({}, before);
+      expect(victim).toMatchObject({ action: 'blockStop', hitStop: 30 });
+      f.y = -60;
+      strike(match, f, RYUKO.airPunch);
+      ticks(match, 2, {}, during);
+      return victim.action;
+    };
+    expect(struck({ crouch: true }, {})).toBe('jumpHit');
+    expect(struck({}, { crouch: true })).toBe('blockStop');
+  });
+
   it('slams any grounded victim of punch 3 into a floor bounce', () => {
     for (const defense of [{}, { guard: true, crouch: true }]) {
       // Response 77 → action 123, including through a crouching guard.

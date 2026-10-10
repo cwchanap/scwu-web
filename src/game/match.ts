@@ -548,6 +548,9 @@ export interface Fighter {
   age: number;
   airAge: number;
   hitStop: number;
+  // The input word op 0x1a's stop saved (+0x4dfd83), while its flag
+  // (+0x4dfd7f) holds.
+  stopInput: Input | null;
   connected: boolean;
   hits: number;
   damage: number;
@@ -828,6 +831,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   age: 0,
   airAge: 0,
   hitStop: 0,
+  stopInput: null,
   connected: false,
   hits: 0,
   damage: 0,
@@ -1097,9 +1101,12 @@ export class Match {
 
   // Op 0x1a's stops (0x413637 self, 0x4136ae other) reach a player and
   // every object following it (+0x28 bit 0x20000000, op 0x04 flag 0x20).
+  // Each saves the player's input word this tick (0x413676, 0x413715).
   private pause(f: Fighter, ticks: number) {
+    if (!ticks) return;
     f.hitStop += ticks;
     const owner = this.fighters.indexOf(f);
+    f.stopInput = { ...this.inputs[owner] };
     for (const e of this.effects)
       if (e.owner === owner && e.follow) e.hitStop += ticks;
   }
@@ -1980,10 +1987,12 @@ export class Match {
     return guard && !(box.kind & 0x40);
   }
 
-  // 0x40f4be: down in the victim's input word this tick picks the crouching
-  // responses, as do the port's crouching actions.
+  // 0x40f4be: down in the victim's input word picks the crouching responses,
+  // as do the port's crouching actions. The word is this tick's, or the one
+  // a stop saved until the victim's next free step (0x40f2ff).
   private crouching(target: Fighter) {
-    const input = this.inputs[this.fighters.indexOf(target)];
+    const input =
+      target.stopInput ?? this.inputs[this.fighters.indexOf(target)];
     return target.action.startsWith('crouch') || Boolean(input.crouch);
   }
 
@@ -2075,8 +2084,12 @@ export class Match {
     if (f.pending) this.enterPending(f, other);
     else {
       if (f.hitStop === 0) {
-        if (this.cpuDriven && f === this.fighters[1] && !f.held?.pose)
-          input = this.think(f, other);
+        // 0x4123c5: a step neither stopped nor held drops the saved word.
+        if (!f.held?.pose) {
+          f.stopInput = null;
+          if (this.cpuDriven && f === this.fighters[1])
+            input = this.think(f, other);
+        }
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
