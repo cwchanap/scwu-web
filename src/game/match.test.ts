@@ -616,13 +616,19 @@ describe('Daisetsuzan Oroshi command throw', () => {
         x: attacker.x + facing * 90,
       });
       const offsets = new Set<number>();
+      const ages = new Set<number>();
       for (let tick = 0; tick < 185; tick++) {
         match.step();
-        if (target.action === 'superHeld')
+        if (target.action === 'superHeld') {
           offsets.add(Math.round((target.x - attacker.x) * facing));
+          if (target.held?.pose) ages.add(target.age);
+        }
       }
-      // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
+      // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5,
+      // from the catch's age 4, and the held victim's steps return at once
+      // (0x412397).
       expect([...offsets]).toEqual([90, -15, -90, 0]);
+      expect(ages.size).toBe(1);
       expect(attacker.age).toBe(185);
       // PC 3111 places the victim at (14, −96) and enters 129, whose script
       // runs after Ryuko's this tick: it launches at once at −200/−3000.

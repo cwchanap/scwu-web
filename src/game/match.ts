@@ -1530,6 +1530,8 @@ export class Match {
           x: event.x,
           y: event.y,
         };
+        // The hold replaces the victim's stop (+0x40 at -1, 0x41303a).
+        other.hitStop = 0;
         this.placeHeld(self, other);
         break;
       case 'apply': {
@@ -2083,13 +2085,13 @@ export class Match {
   ) {
     if (f.pending) this.enterPending(f, other);
     else {
+      // Held by op 0x07 (+0x40 at -1), the step returns at once (0x412397).
+      if (f.held?.pose) return;
       if (f.hitStop === 0) {
-        // 0x4123c5: a step neither stopped nor held drops the saved word.
-        if (!f.held?.pose) {
-          f.stopInput = null;
-          if (this.cpuDriven && f === this.fighters[1])
-            input = this.think(f, other);
-        }
+        // 0x4123c5: an unstopped step drops the word a stop saved.
+        f.stopInput = null;
+        if (this.cpuDriven && f === this.fighters[1])
+          input = this.think(f, other);
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
