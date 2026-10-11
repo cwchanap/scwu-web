@@ -231,7 +231,8 @@ export interface Script {
   loop: number;
   // The first event of a loop's target record.
   loopEvent?: number;
-  end: 'end' | 'hold' | 'loop' | 'jump';
+  // Running out, a zero-length display, a loop, a jump, or op 0x05.
+  end: 'end' | 'hold' | 'loop' | 'jump' | 'delete';
   // A final op 0x0a's target and its record offset.
   next: number | null;
   offset?: number;

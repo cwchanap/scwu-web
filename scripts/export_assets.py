@@ -161,14 +161,15 @@ def flatten(p, c, index, played=(), offset=0):
     0x1f, 0x20) are exported or skipped, never evaluated: their fall-through
     path is the super's normal path, and the match takes an op 0x16, 0x1f or
     0x20 branch by switching to its target's own timeline. Op 0x0b calls stay
-    events. `offset` starts at a branch's jump target.
+    events. `offset` starts at a branch's jump target; one past the action's
+    end runs out at once (0x4125ea).
     Like a clip's, each display also carries the op 0x03, 0x04, 0x0e, 0x1f and
     0x25 events run just before it, for reactions drawn from their timelines.
     """
     frames, events, bodies, pending = [], [], {}, []
     # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
     # its own action, as Zoma's run loops, starts with those its earlier records set.
-    for pc in range(p.action(index).start, p.action(index).start + offset):
+    for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
         if p.records[pc][0] == 0x19:
             bodies = body_boxes(bodies, p.records[pc])
     t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
@@ -220,6 +221,8 @@ def flatten(p, c, index, played=(), offset=0):
             action, pc = target, dest
             continue
         elif op == 0x05:
+            # It ends a player's action and deletes any other object (0x412617).
+            result["end"] = "delete"
             break
         elif op == 0x19:
             bodies = body_boxes(bodies, record)
@@ -622,12 +625,18 @@ def main():
 
 # Each stage: its file, hash, and the looping track (type 0x11) the port's
 # Music box plays. After loading a stage, 0x40677c plays the first word of its
-# 0x409-byte block, a silent sound in all of these ('235no wav' or 'no sound');
+# 0x409-byte block, a silent sound in all of these ('235no wav', 'no sound' or 'No');
 # two stage actions play the track only after SIN's, KAY's or DIDO's supers.
 STAGES = {
     "court": ("Sport Court", "0-SPORT COURT", "dac3aca92f717921fca4cc1c777a5fe91657b1295b4d56eae1acfcd4c7570988", 2),
     "train": ("Train Morning", "1-TRAIN MORNING", "d183b2f684062c63586c241cd867aad7a96dc6b7df4a15a17555314b276468f3", 1),
+    "sakuranight": ("Sakura Night", "2-SAKURA NIGHT", "411358a796f19eb3719fc2043ca971ecbcca18b0787b00c3729972724b6132cc", 3),
+    "trainnight": ("Train Night", "3-TRAIN NIGHT", "59af004e91dfa6413b79b7210e937f8a37a338440c35b1bea7bb9f9fc2989311", 1),
     "dojin": ("Dojin BKG", "4-DOJIN BKG", "265a5a7a2af246bce2b3c4d855e5aff12b9361de15b937cd5868be97eb53866e", 1),
+    "japan": ("Japan Street", "5-JAPAN STREET", "08174c41c6c743485f5cb221ac374cb3d095d0935faba2564758e6ca5654aa21", 1),
+    "park": ("Park Morning", "6-PARK MORNING", "bc93dd038159ab36eac1490d18dee1a5c2cedd81ea0bfe06e800bb9f896e7148", 1),
+    "parknight": ("Park Night", "7-PARK NIGHT", "949ddb6f871ab35421628ca6a7a20d026c351a14af2c08d9718c59bd18447a3b", 2),
+    "sakura": ("Sakura Street", "8-SAKURA STREET", "5cc441325518e4c456d1617fbbdc5b8cbf077ee2070b44c9869e5ed4235c61aa", 1),
     # Greek's 'off' (action 3) plays sound 3; sound 2 is a 71-second track.
     "greek": ("Greek", "9-GREEK", "14bc51c38cf6d9931b9578c80ea6f072a33cb2b7adab47403c29dae1b5fedc18", 3),
     "space": ("Space", "10-SPACE", "45523d1e3e1e19c929af26dd04b199b1b574781acc6c19ef1f6edea47dc1a095", 1),
@@ -637,6 +646,7 @@ STAGES = {
     "brboss": ("BR Boss Base", "14-BR BOSS BASE", "7026e76455e6efa96076f08907be988a3299e80a836435f39ee707e667ee670b", 2),
     "gi": ("GI Stage", "15-GI STAGE", "2695d56c7d9c91a1496049e9a783fa0a7e0e9e37fbcd42abbf8cd411d63f9b4f", 1),
     "spacenight": ("Space Night", "16-SPACE NIGHT", "ce2fb3eec353168a698f7f7c159e8130a9734ee84d4014440cb38f1079ecdc86", 2),
+    "streetnight": ("Street Night", "17-STREET NIGHT", "e2227cda8dfa921a3a1eec07e7976dc825af62eb84d8239c9f0ca472f8e1891d", 2),
 }
 
 
@@ -648,6 +658,7 @@ def export_stage(key, name, filename, sha256, track):
     display, at z 0xc, or 0x64 from the first action of kind 3 (+0x23) on. Its
     first step keeps the start record (0x41221d), whose r[1] bits 3 and 4 scroll
     the object by the camera times r[2:4] and r[4:6] percent (0x40da94–0x40db80).
+    The objects it spawns are stage objects too (0x412c40), scrolled by theirs.
     """
     data = (RESEARCH / f"extracted/{filename}.STAGE").read_bytes()
     if hashlib.sha256(data).hexdigest() != sha256:
@@ -661,24 +672,30 @@ def export_stage(key, name, filename, sha256, track):
             continue
         if struct.unpack_from("<I", raw, 35)[0] == 3:
             z = 0x64
-        if not any(r[0] == 0x0c for r in p.records[a.start:a.end]):
-            continue
-        header = p.records[a.start]
+        if any(r[0] == 0x0c for r in p.records[a.start:a.end]):
+            objects.append(dict(action=a.index, z=z))
+    scripts = flatten_queue(p, c, [(o["action"], 0) for o in objects], set(), set())
+    # The match runs a stage object's colour, motion, spawns and op 0x20
+    # rolls; its op 0x1f checks (of globals 10, 11 and 14 among them), and the
+    # music behind them, keep their fall-through path.
+    events = [e for script in scripts.values() for e in script["events"]]
+    if any(e["op"] not in ("color", "motion", "spawn", "random") for e in events):
+        sys.exit(f"{name} runs records the match does not; refusing to export.")
+    spawned = {(e["action"], e["offset"]) for e in events if e["op"] == "spawn" and e["action"]}
+    # A stage object restarts after a display (0x4127b7), and is deleted without one.
+    if any(offset or not any(r[0] == 0x0c for r in p.records[p.action(action).start:p.action(action).end])
+           for action, offset in spawned):
+        sys.exit(f"{name} spawns an object past its start record or without a display; refusing to export.")
+    scroll = {}
+    for action in {o["action"] for o in objects} | {action for action, _ in spawned}:
+        header = p.records[p.action(action).start]
         # Bits 1 and 2 tile the image across the screen (0x40db84); no stage uses them.
         if header[1] & 6 or s16(header, 2) < 0 or s16(header, 4) < 0:
-            sys.exit(f"{name} action {a.index} tiles or scrolls backward; refusing to export.")
-        objects.append(dict(action=a.index, z=z, x=s16(header, 2) if header[1] & 8 else 0,
-                            y=s16(header, 4) if header[1] & 0x10 else 0))
-    scripts = flatten_queue(p, c, [(o["action"], 0) for o in objects], set(), set())
-    # The match runs a stage object's colour and op 0x20 rolls; its op 0x1f
-    # checks (of globals 10, 11 and 14 among them), and the music behind
-    # them, keep their fall-through path.
-    for script in scripts.values():
-        if any(e["op"] not in ("color", "random") for e in script["events"]):
-            sys.exit(f"{name} runs records the match does not; refusing to export.")
+            sys.exit(f"{name} action {action} tiles or scrolls backward; refusing to export.")
+        scroll[action] = [s16(header, 2) if header[1] & 8 else 0, s16(header, 4) if header[1] & 0x10 else 0]
     # Image 0 is the background here, not a marker.
     images = export_images(c, f"stages/{key}", {f["image"] for s in scripts.values() for f in s["frames"]})
-    return dict(name=name, source_sha256=sha256, objects=objects, scripts=scripts, images=images,
+    return dict(name=name, source_sha256=sha256, objects=objects, scroll=scroll, scripts=scripts, images=images,
                 music=export_sounds(c, key, [track])[0])
 
 

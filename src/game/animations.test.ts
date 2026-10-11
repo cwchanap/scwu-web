@@ -40,7 +40,13 @@ describe('selected core animation assets', () => {
     for (const [stage, seconds] of [
       ['court', 75],
       ['train', 139],
+      ['sakuranight', 131],
+      ['trainnight', 114],
       ['dojin', 170],
+      ['japan', 99],
+      ['park', 126],
+      ['parknight', 120],
+      ['sakura', 129],
       ['greek', 129],
       ['space', 94],
       ['boss', 126],
@@ -49,6 +55,7 @@ describe('selected core animation assets', () => {
       ['brboss', 129],
       ['gi', 134],
       ['spacenight', 91],
+      ['streetnight', 82],
     ] as const) {
       const wav = readFileSync(
         new URL(

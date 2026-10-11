@@ -6454,4 +6454,64 @@ describe('stage objects', () => {
       expect(train).toMatchObject({ clip: again ? '7+31' : 7, age: 0 });
     }
   });
+
+  it("spawns Sakura Night's petals as stage objects, which fly until op 0x05 deletes them (0x412c40)", () => {
+    // Action 21's first step rolls (PC 202): rand % 3 > 1 jumps 5 records
+    // on; otherwise PC 203 spawns petal 2 at (280, 300), one in front.
+    let seed = 0;
+    while (rand(seed)[1] % 3 > 1) seed++;
+    const match = new Match(
+      'practice',
+      false,
+      seed,
+      ['ryuko', 'ryuko'],
+      'sakuranight',
+    );
+    match.layers = match.layers.filter((layer) => layer.clip === 21);
+    match.step();
+    const petal = match.layers[1];
+    expect(petal).toMatchObject({
+      clip: 2,
+      who: 'sakuranight',
+      x: 280 * 1.5,
+      y: (300 - 920) * 1.5,
+      z: 0xd,
+      owner: -1,
+      stage: { home: 2, x: 100, y: 100 },
+    });
+    expect(match.effects).toEqual([]);
+    // Its first step sets ax -7, vx 300 and vy 150 (PC 4), and the motion
+    // pass moves it.
+    match.step();
+    const v = (655 / 65536) * 1.5;
+    const a = (393 / 65536) * 1.5;
+    expect(petal.x).toBeCloseTo(280 * 1.5 + 300 * v - 7 * a, 9);
+    expect(petal.y).toBeCloseTo((300 - 920) * 1.5 + 150 * v, 9);
+    // Its displays run 365 ticks (PCs 5-24), then op 0x05 deletes it.
+    ticks(match, 364);
+    expect(match.layers).toContain(petal);
+    match.step();
+    expect(match.layers).not.toContain(petal);
+  });
+
+  it("restarts Sakura Street's action 17 at once when its roll passes the action's end (PC 159)", () => {
+    // After two 13-tick displays PC 156 jumps back into the loop when
+    // rand % 6 > 1. Falling through, two displays later PC 159 jumps 255
+    // records on, past the action's end, when rand % 6 > 4.
+    let seed = 0;
+    while (rand(seed)[1] % 6 > 1 || rand(rand(seed)[0])[1] % 6 <= 4) seed++;
+    const match = new Match(
+      'practice',
+      false,
+      seed,
+      ['ryuko', 'ryuko'],
+      'sakura',
+    );
+    match.layers = match.layers.filter((layer) => layer.clip === 17);
+    const [layer] = match.layers;
+    ticks(match, 52);
+    expect(layer).toMatchObject({ clip: 17, age: 51 });
+    match.step();
+    expect(layer).toMatchObject({ clip: 17, age: 0 });
+  });
 });

@@ -644,6 +644,8 @@ type Spawner = {
   facing: -1 | 1;
   screen?: boolean;
   z?: number;
+  who?: Container;
+  stage?: Effect['stage'];
 };
 // The fighters' priority (+4).
 export const FIGHTER_Z = 0x50;
@@ -927,10 +929,16 @@ export function addPower(f: Fighter, amount: number) {
   }
 }
 
+// A stage object restarts the action it began in, and scrolls by that
+// action's start record (0x41221d).
+const stageScroll = (stage: Stage, home: number) => {
+  const [x, y] = (STAGES[stage].scroll as Record<number, number[]>)[home];
+  return { home, x, y };
+};
 // Round setup (0x408c3f) makes each stage object (0x406610) at the stage's
 // top left, owned by no player; it first steps in the tick's pass.
 const stageObjects = (stage: Stage) =>
-  STAGES[stage].objects.map(({ action, z, x, y }) =>
+  STAGES[stage].objects.map(({ action, z }) =>
     newEffect({
       clip: action,
       who: stage,
@@ -938,7 +946,7 @@ const stageObjects = (stage: Stage) =>
       y: -920 * 1.5,
       z,
       owner: -1,
-      stage: { home: action, x, y },
+      stage: stageScroll(stage, action),
     }),
   );
 
@@ -1366,7 +1374,17 @@ export class Match {
     actor.age = 0;
     if ('clip' in actor) {
       actor.clip = key;
-      this.fireEffect(actor);
+      // A stage object that runs out with no display between, as Sakura
+      // Street's roll past the end of action 17 does (PC 159, 0x4125ea),
+      // restarts at once (0x4127b7).
+      const { frames, end } = script(key, actor.who);
+      if (
+        !this.fireEffect(actor) &&
+        actor.stage &&
+        !frames.length &&
+        end === 'end'
+      )
+        this.branchTo(actor, actor.stage.home);
     } else {
       actor.branch = key;
       actor.fired = -1;
@@ -1702,18 +1720,22 @@ export class Match {
       'op' | 'busy' | 'busyOffset'
     >,
   ) {
+    // A stage object's children are stage objects (0x412c40): on the stage
+    // whatever flag 0x40 says (0x412b38), in no slot (0x412a7b, 0x412c99),
+    // and scrolled by their own start records.
+    const { stage } = parent;
     // Without flag bit 2 (0x412a88) the record first deletes the owner's
     // object in slot r[12], then registers the new one there (0x412caf); an
     // object's deletion clears its slot (0x40e4a0). A nonzero r[5:7] instead
     // jumps the spawner while the slot's object lives (runEvent).
-    const registers = !(event.flags & 4);
+    const registers = !stage && !(event.flags & 4);
     if (registers)
       this.effects = this.effects.filter(
         (e) => e.owner !== owner || e.slot !== event.slot,
       );
     if (!event.action) return;
     const clip = sourceKey(event.action, event.offset);
-    const screen = (event.flags & 0x40) !== 0;
+    const screen = !stage && (event.flags & 0x40) !== 0;
     // Children of viewport objects start from the same point on the stage.
     const origin =
       'screen' in parent && parent.screen
@@ -1722,7 +1744,7 @@ export class Match {
             y: parent.y + this.cameraY - GROUND,
           }
         : parent;
-    const who = this.fighters[owner].who;
+    const who = stage ? parent.who! : this.fighters[owner].who;
     const child = newEffect({
       clip,
       who,
@@ -1742,10 +1764,11 @@ export class Match {
       slot: registers ? event.slot : -1,
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
+      ...(stage && { stage: stageScroll(who as Stage, event.action) }),
     });
     // 0x406570 runs no script: the object first steps in the next tick's
     // pass (stepObjects), which lists only the objects alive at its start.
-    this.effects.push(child);
+    (stage ? this.layers : this.effects).push(child);
   }
 
   // A player's motion step (0x40fa09–0x40fc9f) adds its transfer (+0xdf49),
@@ -1792,18 +1815,19 @@ export class Match {
     this.settle(f);
   }
 
-  // The pass then moves each unstopped object, and one following its parent
-  // takes the parent's position plus its offset, mirrored by the parent's
-  // facing, stopped or not (0x40f992–0x40f9d9).
+  // The pass then moves each unstopped object, the stage's too, and one
+  // following its parent takes the parent's position plus its offset,
+  // mirrored by the parent's facing, stopped or not (0x40f992–0x40f9d9).
   private moveObjects() {
-    for (const e of this.effects)
+    const objects = [...this.layers, ...this.effects];
+    for (const e of objects)
       if (e.hitStop === 0) {
         e.vx += e.ax;
         e.vy += e.gravity;
         e.x += e.vx;
         e.y += e.vy;
       }
-    for (const e of this.effects)
+    for (const e of objects)
       if (e.follow) {
         const { parent, x, y } = e.follow;
         e.x = parent.x + parent.facing * x * 1.5;
@@ -2369,7 +2393,8 @@ export class Match {
       }
       // 0x41241c: an object falling to the floor (y 920) stops there, and
       // its landing handler (slot 1) enters its action, dropping its boxes.
-      if (!e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
+      // A stage object skips this and the world bounds (0x4123cb).
+      if (!e.stage && !e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
         Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
         const land = e.onLand;
         if (land !== undefined) {
@@ -2400,6 +2425,14 @@ export class Match {
         ((e.age < animationDuration(e.clip, e.who) || loops(e)) &&
           (e.follow !== null ||
             inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))),
+    );
+    // Op 0x05 deletes a stage object too (0x412617), as Sakura Night's
+    // petals (2–5) end; one holding a display stays.
+    this.layers = this.layers.filter(
+      (e) =>
+        !objects.includes(e) ||
+        e.age < animationDuration(e.clip, e.who) ||
+        script(e.clip, e.who).end !== 'delete',
     );
   }
 

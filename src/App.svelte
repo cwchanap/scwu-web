@@ -21,7 +21,13 @@
   const stageLabels: Record<Stage, string> = {
     court: 'Sport Court',
     train: 'Train Morning',
+    sakuranight: 'Sakura Night',
+    trainnight: 'Train Night',
     dojin: 'Dojin BKG',
+    japan: 'Japan Street',
+    park: 'Park Morning',
+    parknight: 'Park Night',
+    sakura: 'Sakura Street',
     greek: 'Greek',
     space: 'Space',
     boss: 'Boss Base',
@@ -30,6 +36,7 @@
     brboss: 'BR Boss Base',
     gi: 'GI Stage',
     spacenight: 'Space Night',
+    streetnight: 'Street Night',
   };
   const partnerLabels: Record<DummyBehavior, string> = {
     stand: 'Stand',
@@ -552,9 +559,9 @@
         </p>
         <p>
           Below the arena, choose your fighter and the opponent, Zoma or Ryuko,
-          and one of eleven stages, in either mode. Free practice has no timer,
-          and you also choose how the partner behaves: standing, guarding high
-          or low, guarding in the air, attacking in range, jumping in, or
+          and one of eighteen stages, in either mode. Free practice has no
+          timer, and you also choose how the partner behaves: standing, guarding
+          high or low, guarding in the air, attacking in range, jumping in, or
           playing as the original CPU. Max stock refills your supers whenever
           you stand idle, and Low health keeps you at 30% for desperation moves.
           Vs. CPU is the original game's CPU, playing the opponent's own moves,
