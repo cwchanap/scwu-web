@@ -26,6 +26,7 @@ import {
   RESPONSE_EFFECTS,
 } from './animations';
 import { rand } from './standing';
+import { STAGES, type Stage } from './characters';
 import {
   base,
   enter,
@@ -6381,6 +6382,16 @@ describe('sound cues (op 0x03)', () => {
 });
 
 describe('stage objects', () => {
+  it("runs and draws every stage's objects for a minute", () => {
+    for (const stage of Object.keys(STAGES) as Stage[]) {
+      const match = new Match('practice', false, 1, ['ryuko', 'zoma'], stage);
+      for (let tick = 0; tick < 6000; tick++) {
+        match.step();
+        for (const layer of match.layers)
+          animationFrame(layer.clip, layer.age, layer.who);
+      }
+    }
+  });
   it("makes Sport Court's objects at round setup, whose dancers roll before the fighters step (0x406610)", () => {
     const seed = 3;
     const match = new Match('practice', false, seed);

@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko or Zoma on Sport Court or Train Morning, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko or Zoma on eleven of its stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -88,7 +88,7 @@ Zoma's specials and supers take Ryuko's keys, and his original motion commands w
 | 4, or ↓←↓→ K               | Shin Spark below 30% health (else BOMB), 3 stocks               |
 | 1 or 2 after DRAGON hits   | SPAKE or DST cancels it, 2 stocks                               |
 
-Below the arena, choose your fighter and the opponent (Ryuko or Zoma), the stage (Sport Court or Train Morning) and the mode:
+Below the arena, choose your fighter and the opponent (Ryuko or Zoma), the stage (Sport Court, Train Morning, Dojin BKG, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage or Space Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter at 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -104,7 +104,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** two fighters, two stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** two fighters, eleven of the 18 stages (the other seven have scenery that moves or spawns objects, which the port does not run yet), local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 

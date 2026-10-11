@@ -104,6 +104,7 @@ export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
   private stage: Stage = 'court';
+  private wantedStage = this.stage;
   match = new Match(
     'practice',
     false,
@@ -149,9 +150,7 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   preload() {
-    for (const [stage, { images }] of Object.entries(STAGES))
-      for (const image of images)
-        this.load.image(`${stage}-${image.index}`, BASE + image.filename);
+    this.loadStage(this.stage);
     for (const [who, { images }] of Object.entries(CHARACTERS))
       for (const image of images)
         this.load.image(`${who}-${image.index}`, BASE + image.filename);
@@ -283,9 +282,24 @@ export class TrainingScene extends Phaser.Scene {
     this.opponent = who;
     this.reset(this.match.mode);
   }
+  // A stage's images load when it is first picked; the current one plays on
+  // until they arrive.
   setStage(stage: Stage) {
-    this.stage = stage;
-    this.reset(this.match.mode);
+    this.wantedStage = stage;
+    const start = () => {
+      if (this.wantedStage !== stage) return;
+      this.stage = stage;
+      this.reset(this.match.mode);
+    };
+    if (this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`))
+      return start();
+    this.loadStage(stage);
+    this.load.once(Phaser.Loader.Events.COMPLETE, start);
+    this.load.start();
+  }
+  private loadStage(stage: Stage) {
+    for (const image of STAGES[stage].images)
+      this.load.image(`${stage}-${image.index}`, BASE + image.filename);
   }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
@@ -500,10 +514,14 @@ export class TrainingScene extends Phaser.Scene {
       );
       // A stage object draws its display's top left at its offset, less the
       // scroll times its start record's percentages (0x40da41–0x40dcf3), so
-      // a 0% one stays on the screen. ponytail: Phaser scales the shake by
-      // them too, where the source adds it whole (0x40da94); only a partly
-      // scrolling layer, which neither stage has, would show it.
+      // a 0% one stays on the screen. It adds the shake whole (0x40da94),
+      // moving opposite the world objects, where Phaser takes it from the
+      // camera scaled by the percentages.
       const { layers } = this.match;
+      const shake = {
+        x: this.shake.x.offset * ART_SCALE,
+        y: this.shake.y.offset * ART_SCALE,
+      };
       this.pool(this.layerSprites, layers.length).forEach((sprite, index) => {
         const layer = layers[index];
         sprite.setVisible(!!layer && layer.age >= 0);
@@ -515,8 +533,10 @@ export class TrainingScene extends Phaser.Scene {
           .setDepth(layer.z < FIGHTER_Z ? 0.1 : 4.5)
           .setScrollFactor(x / 100, y / 100)
           .setPosition(
-            layer.x + pose.dx * ART_SCALE,
-            layer.y + (920 + pose.dy - 4.8 * y) * ART_SCALE,
+            layer.x + pose.dx * ART_SCALE + shake.x * (1 + x / 100),
+            layer.y +
+              (920 + pose.dy - 4.8 * y) * ART_SCALE +
+              shake.y * (1 + y / 100),
           )
           .setFlip(pose.flip_x, pose.flip_y);
       });

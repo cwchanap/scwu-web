@@ -622,11 +622,21 @@ def main():
 
 # Each stage: its file, hash, and the looping track (type 0x11) the port's
 # Music box plays. After loading a stage, 0x40677c plays the first word of its
-# 0x409-byte block, a silent sound in both ('235no wav', 'no sound.wav'); stage
-# actions 2 and 3 play the track only after SIN's, KAY's or DIDO's supers.
+# 0x409-byte block, a silent sound in all of these ('235no wav' or 'no sound');
+# two stage actions play the track only after SIN's, KAY's or DIDO's supers.
 STAGES = {
     "court": ("Sport Court", "0-SPORT COURT", "dac3aca92f717921fca4cc1c777a5fe91657b1295b4d56eae1acfcd4c7570988", 2),
     "train": ("Train Morning", "1-TRAIN MORNING", "d183b2f684062c63586c241cd867aad7a96dc6b7df4a15a17555314b276468f3", 1),
+    "dojin": ("Dojin BKG", "4-DOJIN BKG", "265a5a7a2af246bce2b3c4d855e5aff12b9361de15b937cd5868be97eb53866e", 1),
+    # Greek's 'off' (action 3) plays sound 3; sound 2 is a 71-second track.
+    "greek": ("Greek", "9-GREEK", "14bc51c38cf6d9931b9578c80ea6f072a33cb2b7adab47403c29dae1b5fedc18", 3),
+    "space": ("Space", "10-SPACE", "45523d1e3e1e19c929af26dd04b199b1b574781acc6c19ef1f6edea47dc1a095", 1),
+    "boss": ("Boss Base", "11-BOSS BASE", "837cda375858da2db614f0402d088984a5a13c47b17ae17b4bd5acc35273a54a", 2),
+    "office": ("ZM Office", "12-ZM OFFICE", "da3102370d33a92f0afd24f92bf30645f3c1ba9dba3f2931ee730209b91ae50b", 2),
+    "office2": ("ZM Office T2", "13-ZM OFFICE T2", "a2e6150db7f6545c6f3a8c9626d0e221381680ad639d8acf4ecb3885a66b4054", 2),
+    "brboss": ("BR Boss Base", "14-BR BOSS BASE", "7026e76455e6efa96076f08907be988a3299e80a836435f39ee707e667ee670b", 2),
+    "gi": ("GI Stage", "15-GI STAGE", "2695d56c7d9c91a1496049e9a783fa0a7e0e9e37fbcd42abbf8cd411d63f9b4f", 1),
+    "spacenight": ("Space Night", "16-SPACE NIGHT", "ce2fb3eec353168a698f7f7c159e8130a9734ee84d4014440cb38f1079ecdc86", 2),
 }
 
 

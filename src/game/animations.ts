@@ -239,8 +239,9 @@ export interface Script {
 const scripts = {
   ryuko: data.scripts,
   zoma: zoma.scripts,
-  court: STAGES.court.scripts,
-  train: STAGES.train.scripts,
+  ...Object.fromEntries(
+    Object.entries(STAGES).map(([stage, { scripts }]) => [stage, scripts]),
+  ),
 } as unknown as Record<Container, Record<string, Script>>;
 // A source action, or "action+offset" for an op 0x20 branch entering mid-action.
 export type ObjectKey = number | `${number}+${number}`;

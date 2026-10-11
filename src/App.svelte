@@ -21,6 +21,15 @@
   const stageLabels: Record<Stage, string> = {
     court: 'Sport Court',
     train: 'Train Morning',
+    dojin: 'Dojin BKG',
+    greek: 'Greek',
+    space: 'Space',
+    boss: 'Boss Base',
+    office: 'ZM Office',
+    office2: 'ZM Office T2',
+    brboss: 'BR Boss Base',
+    gi: 'GI Stage',
+    spacenight: 'Space Night',
   };
   const partnerLabels: Record<DummyBehavior, string> = {
     stand: 'Stand',
@@ -543,15 +552,15 @@
         </p>
         <p>
           Below the arena, choose your fighter and the opponent, Zoma or Ryuko,
-          and the stage, Sport Court or Train Morning, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you at 30%
-          for desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          and one of eleven stages, in either mode. Free practice has no timer,
+          and you also choose how the partner behaves: standing, guarding high
+          or low, guarding in the air, attacking in range, jumping in, or
+          playing as the original CPU. Max stock refills your supers whenever
+          you stand idle, and Low health keeps you at 30% for desperation moves.
+          Vs. CPU is the original game's CPU, playing the opponent's own moves,
+          specials and supers. Reduce their health to zero, or lead on health
+          when time runs out. Changing modes, fighters or the stage starts a
+          fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
