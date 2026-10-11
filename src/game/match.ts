@@ -32,9 +32,10 @@ import {
   responseEffectsOf,
   responsesOf,
   ryukoTwin,
+  STAGES,
   twin,
 } from './characters';
-import type { Who } from './characters';
+import type { Container, Stage, Who } from './characters';
 import {
   BACK_DASH,
   commanded,
@@ -651,7 +652,7 @@ export const FIGHTER_Z = 0x50;
 export interface Effect {
   clip: ObjectKey;
   // The owner's container, which holds the object's action.
-  who: Who;
+  who: Container;
   x: number;
   y: number;
   vx: number;
@@ -686,6 +687,8 @@ export interface Effect {
   onLand?: ObjectKey;
   // The handler a contact queued (+0x38), which the next step enters.
   pending?: ObjectKey;
+  // A stage object: the action it restarts and its scroll percentages.
+  stage?: { home: number; x: number; y: number };
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -924,6 +927,21 @@ export function addPower(f: Fighter, amount: number) {
   }
 }
 
+// Round setup (0x408c3f) makes each stage object (0x406610) at the stage's
+// top left, owned by no player; it first steps in the tick's pass.
+const stageObjects = (stage: Stage) =>
+  STAGES[stage].objects.map(({ action, z, x, y }) =>
+    newEffect({
+      clip: action,
+      who: stage,
+      age: -1,
+      y: -920 * 1.5,
+      z,
+      owner: -1,
+      stage: { home: action, x, y },
+    }),
+  );
+
 // Authored start: both walk-ins end 360 pixels apart around the stage center.
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
   { ...fighter(STAGE_WIDTH / 2 - 180 - introWalk(a), 1, a), action: 'intro' },
@@ -943,6 +961,8 @@ export class Match {
   round = 1;
   wins: [number, number] = [0, 0];
   effects: Effect[] = [];
+  // The stage's objects, which step with the others by priority.
+  layers: Effect[];
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
@@ -976,7 +996,9 @@ export class Match {
     seed = 0,
     // Player 1's and player 2's characters.
     readonly characters: [Who, Who] = ['ryuko', 'ryuko'],
+    readonly stage: Stage = 'court',
   ) {
+    this.layers = stageObjects(stage);
     const cpu = characters[1];
     this.cpu = new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]);
     this.calls = intro;
@@ -1022,6 +1044,7 @@ export class Match {
     this.endingTicks = 0;
     this.roundTicks = 0;
     this.effects = [];
+    this.layers = stageObjects(this.stage);
     this.freeze = 0;
     this.koStop = 0;
     this.quake.x = this.quake.y = null;
@@ -1309,10 +1332,12 @@ export class Match {
       if (this.runEvent(f, owner, event)) return;
   }
 
+  // True when the object jumped to another timeline.
   private fireEffect(e: Effect) {
     rearm(e, e.clip, e.age);
     for (const event of eventsAt(e.clip, e.age, e.who))
-      if (this.runEvent(e, e.owner, event)) return;
+      if (this.runEvent(e, e.owner, event)) return true;
+    return false;
   }
 
   // An action change (0x410cf0) by number: the engine states and Ryuko's
@@ -2323,7 +2348,7 @@ export class Match {
 
   private stepObjects(objects: Effect[]) {
     for (const e of objects) {
-      if (!this.effects.includes(e)) continue;
+      if (!e.stage && !this.effects.includes(e)) continue;
       // A queued handler comes first, stopped or not (0x412327): an action
       // change that drops its boxes.
       if (e.pending !== undefined) {
@@ -2357,6 +2382,14 @@ export class Match {
       // its first step (anime beam 296 only spawns 297 and 299).
       if (++e.age === 0 || e.age < animationDuration(e.clip, e.who) || loops(e))
         this.fireEffect(e);
+      // A stage object that runs out after a display runs its last records,
+      // then restarts its first action (+0x34, 0x4127b7).
+      else if (
+        e.stage &&
+        script(e.clip, e.who).end === 'end' &&
+        !this.fireEffect(e)
+      )
+        this.branchTo(e, e.stage.home);
     }
     // A script that runs out reaches the next action's op 0x00, which
     // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
@@ -2389,7 +2422,7 @@ export class Match {
     // the fighters, then the rest, so an object a step or a contact spawns
     // first steps in the next tick's pass. ponytail: within a priority it
     // keeps spawn order, where 0x406570 takes the first free slot.
-    const objects = [...this.effects].sort((a, b) => a.z - b.z);
+    const objects = [...this.layers, ...this.effects].sort((a, b) => a.z - b.z);
     this.stepObjects(objects.filter((e) => e.z < FIGHTER_Z));
     // After a KO or time-out the round phase stays 1 (only a debug key sets
     // 2, 0x406231 and 0x408f38): fighters keep reading commands and

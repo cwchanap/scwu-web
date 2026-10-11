@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
-  import type { Who } from './game/characters';
+  import type { Stage, Who } from './game/characters';
   import { DUMMY_BEHAVIORS } from './game/dummy';
   import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
@@ -17,6 +17,11 @@
   });
   let fighter = $state<Who>('ryuko');
   let opponent = $state<Who>('zoma');
+  let stage = $state<Stage>('court');
+  const stageLabels: Record<Stage, string> = {
+    court: 'Sport Court',
+    train: 'Train Morning',
+  };
   const partnerLabels: Record<DummyBehavior, string> = {
     stand: 'Stand',
     guard: 'Guard',
@@ -119,6 +124,11 @@
   function setOpponent(who: Who) {
     opponent = who;
     session?.scene.setOpponent(who);
+    focusArena();
+  }
+  function setStage(next: Stage) {
+    stage = next;
+    session?.scene.setStage(next);
     focusArena();
   }
   function pause() {
@@ -231,7 +241,7 @@
       {:else if !status.ready}
         <div class="stage-overlay">
           <h2>Loading SCWU…</h2>
-          <p>Opening Sport Court.</p>
+          <p>Opening {stageLabels[stage]}.</p>
         </div>
       {:else if status.paused}
         <div class="pause-overlay" aria-live="polite">
@@ -283,6 +293,18 @@
           >
             <option value="zoma">Zoma</option>
             <option value="ryuko">Ryuko</option>
+          </select></label
+        >
+        <label
+          >Stage
+          <select
+            value={stage}
+            disabled={!status.ready}
+            onchange={(event) => setStage(event.currentTarget.value as Stage)}
+          >
+            {#each Object.entries(stageLabels) as [value, label] (value)}
+              <option {value}>{label}</option>
+            {/each}
           </select></label
         >
         {#if mode === 'practice'}
@@ -521,19 +543,20 @@
         </p>
         <p>
           Below the arena, choose your fighter and the opponent, Zoma or Ryuko,
-          in either mode. Free practice has no timer, and you also choose how
-          the partner behaves: standing, guarding high or low, guarding in the
-          air, attacking in range, jumping in, or playing as the original CPU.
-          Max stock refills your supers whenever you stand idle, and Low health
-          keeps you at 30% for desperation moves. Vs. CPU is the original game's
-          CPU, playing the opponent's own moves, specials and supers. Reduce
-          their health to zero, or lead on health when time runs out. Changing
-          modes or fighters starts a fresh match.
+          and the stage, Sport Court or Train Morning, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you at 30%
+          for desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
           resume and <kbd>R</kbd> to restart. On touch devices, use the buttons below
-          the court; landscape gives you more room.
+          the arena; landscape gives you more room.
         </p>
       </div>
       <button
@@ -546,6 +569,7 @@
   {/if}
 
   <footer class="page-footer">
-    SPORT COURT <span>Original SCWU art · Web training rules</span>
+    {stageLabels[stage].toUpperCase()}
+    <span>Original SCWU art · Web training rules</span>
   </footer>
 </main>

@@ -531,6 +531,7 @@ describe('recovered neutral and round animations', () => {
       });
       ticks(match, 651 + 50);
       expect(match.round).toBe(1);
+      const { stock, power } = match.fighters[1];
       Object.assign(match.fighters[0], {
         stock: 2,
         power: 40,
@@ -554,7 +555,7 @@ describe('recovered neutral and round animations', () => {
         ]),
       ).toEqual([
         ['intro', LIFE, 2, 40, false],
-        ['intro', LIFE, 0, 0, false],
+        ['intro', LIFE, stock, power, false],
       ]);
     });
 
@@ -5614,8 +5615,16 @@ it('uses fixed ticks regardless of render partition and drops suspended time', (
 });
 
 describe('CPU IORI', () => {
+  // Without Sport Court's dancers, which roll at their first step, the
+  // CPU's roll is the match's first.
+  const cpuMatch = (seed = 0) => {
+    const match = new Match('cpu', false, seed);
+    match.layers = [];
+    return match;
+  };
+
   it('plays 410 and 411, then continues into iori3', () => {
-    const match = new Match('cpu');
+    const match = cpuMatch();
     const [ryuko, cpu] = match.fighters;
     cpu.x = ryuko.x + 1000; // out of reach: timing only
     match.step({}, { cpuIori: true });
@@ -5643,7 +5652,7 @@ describe('CPU IORI', () => {
       return seed;
     };
     for (const recover of [false, true]) {
-      const match = new Match('cpu', false, seedFor(recover));
+      const match = cpuMatch(seedFor(recover));
       const [ryuko, cpu] = match.fighters;
       cpu.x = ryuko.x + 1000;
       match.step({}, { cpuIori: true });
@@ -5655,7 +5664,7 @@ describe('CPU IORI', () => {
     }
     // Images 441, 321 and 31 for five ticks each, then idle.
     expect(animationDuration('411+31')).toBe(15);
-    const match = new Match('cpu', false, seedFor(true));
+    const match = cpuMatch(seedFor(true));
     const cpu = match.fighters[1];
     cpu.x = match.fighters[0].x + 1000;
     match.step({}, { cpuIori: true });
@@ -5679,9 +5688,11 @@ describe('CPU IORI', () => {
 
 describe('recovered CPU', () => {
   // An empty table leaves only the guard roll acting.
+  // The CPU rolls alone, without the stage's objects.
   function vsCpu(vm: CpuVM, gap = 120) {
     const match = new Match('cpu');
     match.cpu = vm;
+    match.layers = [];
     const [ryuko, cpu] = match.fighters;
     cpu.x = ryuko.x + gap;
     return { match, ryuko, cpu };
@@ -6013,6 +6024,7 @@ describe('recovered air and rapid reaction motion', () => {
     const branches = new Set<Fighter['branch']>();
     for (let seed = 0; seed < 20; seed++) {
       const match = new Match('practice', false, seed);
+      match.layers = [];
       const [f, target] = match.fighters;
       enter(match, f, RYUKO.kick3);
       target.x = f.x + 140;
@@ -6365,5 +6377,70 @@ describe('sound cues (op 0x03)', () => {
       { owner: 0, index: 34 },
       { owner: 1, index: 34 },
     ]);
+  });
+});
+
+describe('stage objects', () => {
+  it("makes Sport Court's objects at round setup, whose dancers roll before the fighters step (0x406610)", () => {
+    const seed = 3;
+    const match = new Match('practice', false, seed);
+    // Actions 1–14 each hold a display: four screen objects, the court's
+    // halves, its floor strip and seven dancers, all at z 0xc.
+    expect(match.layers.map((layer) => [layer.clip, layer.z])).toEqual(
+      Array.from({ length: 14 }, (_, i) => [i + 1, 0xc]),
+    );
+    match.step();
+    // Each dancer's first step rolls its op 0x20 (PC 65): rand % 3 > 1
+    // dances its second set, 26 records in.
+    const cpu = new CpuVM([], 0, seed);
+    const sets = [8, 9, 10, 11, 12, 13, 14].map((action) =>
+      cpu.random() % 3 > 1 ? `${action}+26` : action,
+    );
+    expect(new Set(sets.map((set) => typeof set))).toEqual(
+      new Set(['number', 'string']),
+    );
+    expect(match.layers.slice(7).map((layer) => layer.clip)).toEqual(sets);
+    expect(match.cpu.seed).toBe(cpu.seed);
+  });
+
+  it('restarts a Train Morning object that runs out (0x4127b7)', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko'], 'train');
+    const tv = match.layers.find((layer) => layer.clip === 6)!;
+    // The TV's 25 displays (PCs 31–55) run 640 ticks from its first step.
+    ticks(match, 640);
+    expect(tv.age).toBe(639);
+    match.step();
+    expect(tv).toMatchObject({ clip: 6, age: 0 });
+  });
+
+  it('rolls as the train leaves: it passes again, or its action restarts (PC 88)', () => {
+    const seedFor = (pass: boolean) => {
+      let seed = 0;
+      while (rand(seed)[1] % 6 > 1 !== pass) seed++;
+      return seed;
+    };
+    // PCs 58–87: 1008 + 8 + 8 + 6 + 25 × 8 + 500 ticks, then op 0x20 jumps
+    // back to the last display (offset 31) when rand % 6 > 1.
+    for (const pass of [false, true]) {
+      const seed = seedFor(pass);
+      const match = new Match(
+        'practice',
+        false,
+        seed,
+        ['ryuko', 'ryuko'],
+        'train',
+      );
+      // The train alone rolls.
+      match.layers = match.layers.filter((layer) => layer.clip === 7);
+      const [train] = match.layers;
+      ticks(match, 1730 + 1);
+      expect(train).toMatchObject({ clip: pass ? '7+31' : 7, age: 0 });
+      if (!pass) continue;
+      // Its 500 ticks end in the same roll; running out restarts action 7,
+      // where the train arrives, not the branch.
+      ticks(match, 500);
+      const again = rand(rand(seed)[0])[1] % 6 > 1;
+      expect(train).toMatchObject({ clip: again ? '7+31' : 7, age: 0 });
+    }
   });
 });

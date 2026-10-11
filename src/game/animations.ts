@@ -1,5 +1,5 @@
-import { CHARACTERS } from './characters';
-import type { Who } from './characters';
+import { CHARACTERS, STAGES } from './characters';
+import type { Container, Who } from './characters';
 import data from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import type { Frame } from './standing';
@@ -239,14 +239,16 @@ export interface Script {
 const scripts = {
   ryuko: data.scripts,
   zoma: zoma.scripts,
-} as unknown as Record<Who, Record<string, Script>>;
+  court: STAGES.court.scripts,
+  train: STAGES.train.scripts,
+} as unknown as Record<Container, Record<string, Script>>;
 // A source action, or "action+offset" for an op 0x20 branch entering mid-action.
 export type ObjectKey = number | `${number}+${number}`;
 // The victim action selected by each op 0x17 response id.
 export const RESPONSES: readonly number[] = data.responses;
 // The hit-effect action each response spawns at contact (0 = none).
 export const RESPONSE_EFFECTS: readonly number[] = data.response_effects;
-export function script(index: ObjectKey, who: Who = 'ryuko') {
+export function script(index: ObjectKey, who: Container = 'ryuko') {
   const found = scripts[who][index];
   if (!found) throw new Error(`Source action ${index} was not exported`);
   return found;
@@ -255,7 +257,11 @@ const scriptEvents = new Map<string, Map<number, ScriptEvent[]>>();
 // Events that run when a scripted action or object reaches the given age. A
 // looping timeline repeats: each time it wraps, the records after its last
 // display run, then those from the loop's target on.
-export function eventsAt(index: ObjectKey, age: number, who: Who = 'ryuko') {
+export function eventsAt(
+  index: ObjectKey,
+  age: number,
+  who: Container = 'ryuko',
+) {
   let byTick = scriptEvents.get(`${who}:${index}`);
   const found = script(index, who);
   if (!byTick) {
@@ -275,7 +281,7 @@ export function eventsAt(index: ObjectKey, age: number, who: Who = 'ryuko') {
   ];
 }
 // A zero-length display waits for gameplay (landing); hold it like a long pose.
-const scriptClip = (index: ObjectKey, who: Who = 'ryuko') => {
+const scriptClip = (index: ObjectKey, who: Container = 'ryuko') => {
   const { frames, loop } = script(index, who);
   return clip(
     frames,
@@ -284,7 +290,7 @@ const scriptClip = (index: ObjectKey, who: Who = 'ryuko') => {
   );
 };
 const objectClips = new Map<string, Clip | null>();
-function objectClip(index: ObjectKey, who: Who) {
+function objectClip(index: ObjectKey, who: Container) {
   const key = `${who}:${index}`;
   if (!objectClips.has(key))
     objectClips.set(
@@ -293,10 +299,12 @@ function objectClip(index: ObjectKey, who: Who) {
     );
   return objectClips.get(key)!;
 }
-// Image 0 (a solid marker block) and 8191 are the source's blank displays,
-// as is an empty image (Zoma's 2000).
-export const isBlank = (pose: Pose) =>
-  pose.image === 0 || pose.image === 8191 || !pose.width;
+// Image 0 (a solid marker block) and 8191 are a player's blank displays, as
+// is an empty image (Zoma's 2000, a stage's 1000). A stage's image 0 is its
+// background.
+export const isBlank = (pose: Pose, who: Container = 'ryuko') =>
+  ((pose.image === 0 || pose.image === 8191) && who in CHARACTERS) ||
+  !pose.width;
 // Op 0x07 draws the held opponent with an entry of its held-pose table. Bit 2
 // faces the holder's way with a mirrored image; bit 3 flips it vertically.
 export function heldFrame(
@@ -508,7 +516,7 @@ const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
 export const isObject = (
   action: AnimatedAction | ObjectKey,
 ): action is ObjectKey => !Object.hasOwn(animations, action);
-function clipOf(action: AnimatedAction | ObjectKey, who: Who) {
+function clipOf(action: AnimatedAction | ObjectKey, who: Container) {
   if (isObject(action)) return objectClip(action, who);
   const found = who === 'ryuko' ? animations[action] : zomaAnimations[action];
   if (!found) throw new Error(`Zoma has no ${action} clip yet`);
@@ -516,7 +524,7 @@ function clipOf(action: AnimatedAction | ObjectKey, who: Who) {
 }
 export function animationDuration(
   action: AnimatedAction | ObjectKey,
-  who: Who = 'ryuko',
+  who: Container = 'ryuko',
 ) {
   const found = clipOf(action, who);
   return found ? found.ticks.reduce((total, ticks) => total + ticks, 0) : 0;
@@ -565,7 +573,7 @@ export function pushboxes(
 export function animationFrame(
   action: AnimatedAction | ObjectKey,
   age: number,
-  who: Who = 'ryuko',
+  who: Container = 'ryuko',
 ): Pose {
   const found = clipOf(action, who);
   if (!found) throw new Error(`Source object ${action} has no displays`);

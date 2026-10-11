@@ -4,7 +4,7 @@ How each mode, move and rule plays. The controls are in the [README](../README.m
 
 ## Modes
 
-Below the arena, choose your fighter, Ryuko (the default) or Zoma, and the opponent, Zoma (the default) or Ryuko, in either mode. Free practice has no timer, and there you also choose the partner's behavior: stand still, hold a standing or crouching guard, jump and guard in the air, punch once a second when you are in range, back away and jump in with an air kick, or play the original CPU (the same one as Vs. CPU, without the round timer). Zoma has his normals, movement, Hit Up, Chuck, COUNTER HIT, specials and supers, and takes every one of Ryuko's moves in his own poses. **Max stock** tops each fighter up to three stocks whenever they stand idle, and **Low health** holds Ryuko at 30% health for the desperation moves. These settings apply at once and persist across resets. The partner uses the same rules as the player; apart from the original CPU, its behaviors are authored for testing.
+Below the arena, choose your fighter, Ryuko (the default) or Zoma, the opponent, Zoma (the default) or Ryuko, and the stage, Sport Court (the default) or Train Morning, in either mode. Each stage plays its own animated scenery behind the fighters: Sport Court's seven cheerleaders, who each pick one of two dances as the round starts, and Train Morning's TV, passengers, and a train that rushes through about ten seconds in and again every half minute or so. Free practice has no timer, and there you also choose the partner's behavior: stand still, hold a standing or crouching guard, jump and guard in the air, punch once a second when you are in range, back away and jump in with an air kick, or play the original CPU (the same one as Vs. CPU, without the round timer). Zoma has his normals, movement, Hit Up, Chuck, COUNTER HIT, specials and supers, and takes every one of Ryuko's moves in his own poses. **Max stock** tops each fighter up to three stocks whenever they stand idle, and **Low health** holds Ryuko at 30% health for the desperation moves. These settings apply at once and persist across resets. The partner uses the same rules as the player; apart from the original CPU, its behaviors are authored for testing.
 
 ## Vs. CPU rounds
 
@@ -12,7 +12,7 @@ Vs. CPU plays the original game's CPU. Every half second or less, it picks a mov
 
 ## Session
 
-Tick **Music** above the arena for Sport Court's track, which the original keeps silent in this matchup. Changing modes or Reset restarts the match. Leaving the window pauses the match and clears held input; resume explicitly. Touch buttons support simultaneous movement and actions. Landscape is recommended on phones.
+Tick **Music** above the arena for the stage's track, which the original keeps silent in these matchups. Changing modes, fighters or the stage, or Reset, restarts the match. Leaving the window pauses the match and clears held input; resume explicitly. Touch buttons support simultaneous movement and actions. Landscape is recommended on phones.
 
 ## Basics
 

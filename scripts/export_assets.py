@@ -603,19 +603,12 @@ def main():
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))
     images = export_images(c, "ryuko", image_ids)
-    stage = Container((RESEARCH / "extracted/0-SPORT COURT.STAGE").read_bytes())
-    pixels, palette, _ = stage.pixels_and_palette(0)
-    record = stage.images[0]
-    write_if_changed(PUBLIC / "sport-court.png", indexed_png(record.width, record.height, pixels, palette))
-    # Sport Court's 75-second track ('Sprotmorning.WAV', type 0x11, so it loops), which
-    # stage actions 2 and 3 play only after SIN's, KAY's or DIDO's supers: the port's
-    # optional music.
-    music = export_sounds(stage, "stage", [2])[0]
     idle = p.action(1)
-    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, music=music, clips=clips,
+    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
         **tables, scripts=scripts, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     zoma = export_zoma(p)
     export_ui()
+    write_json(GENERATED / "stages.json", {key: export_stage(key, *stage) for key, stage in STAGES.items()})
     # Python is an independent oracle. Keep fixtures out of the browser bundle.
     cases = []
     for speed, seeds in [(10, range(12)), (0, [0, 1, 42]), (7, [0, 1, 42]), (20, [0, 1, 42])]:
@@ -624,7 +617,59 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko and {zoma} Zoma images, Sport Court, idle programs, and {len(cases)} oracle traces.")
+    print(f"Exported {len(images)} Ryuko and {zoma} Zoma images, {len(STAGES)} stages, idle programs, and {len(cases)} oracle traces.")
+
+
+# Each stage: its file, hash, and the looping track (type 0x11) the port's
+# Music box plays. After loading a stage, 0x40677c plays the first word of its
+# 0x409-byte block, a silent sound in both ('235no wav', 'no sound.wav'); stage
+# actions 2 and 3 play the track only after SIN's, KAY's or DIDO's supers.
+STAGES = {
+    "court": ("Sport Court", "0-SPORT COURT", "dac3aca92f717921fca4cc1c777a5fe91657b1295b4d56eae1acfcd4c7570988", 2),
+    "train": ("Train Morning", "1-TRAIN MORNING", "d183b2f684062c63586c241cd867aad7a96dc6b7df4a15a17555314b276468f3", 1),
+}
+
+
+def export_stage(key, name, filename, sha256, track):
+    """A stage's objects, their timelines and images, and its track.
+
+    Round setup (0x408c3f) calls 0x406610, which makes an object (type 4, at
+    0, 0) of every named action between the first and the last that holds a
+    display, at z 0xc, or 0x64 from the first action of kind 3 (+0x23) on. Its
+    first step keeps the start record (0x41221d), whose r[1] bits 3 and 4 scroll
+    the object by the camera times r[2:4] and r[4:6] percent (0x40da94–0x40db80).
+    """
+    data = (RESEARCH / f"extracted/{filename}.STAGE").read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha256:
+        sys.exit(f"{name} source hash differs from the verified handoff; refusing to export.")
+    c = Container(data)
+    p = Program(c)
+    objects, z = [], 0xc
+    for a in p.actions[1:-1]:
+        raw = c.data[c.table39_offset + 39 * a.index:][:39]
+        if not raw[0]:
+            continue
+        if struct.unpack_from("<I", raw, 35)[0] == 3:
+            z = 0x64
+        if not any(r[0] == 0x0c for r in p.records[a.start:a.end]):
+            continue
+        header = p.records[a.start]
+        # Bits 1 and 2 tile the image across the screen (0x40db84); no stage uses them.
+        if header[1] & 6 or s16(header, 2) < 0 or s16(header, 4) < 0:
+            sys.exit(f"{name} action {a.index} tiles or scrolls backward; refusing to export.")
+        objects.append(dict(action=a.index, z=z, x=s16(header, 2) if header[1] & 8 else 0,
+                            y=s16(header, 4) if header[1] & 0x10 else 0))
+    scripts = flatten_queue(p, c, [(o["action"], 0) for o in objects], set(), set())
+    # The match runs a stage object's colour and op 0x20 rolls; its op 0x1f
+    # checks (of globals 10, 11 and 14 among them), and the music behind
+    # them, keep their fall-through path.
+    for script in scripts.values():
+        if any(e["op"] not in ("color", "random") for e in script["events"]):
+            sys.exit(f"{name} runs records the match does not; refusing to export.")
+    # Image 0 is the background here, not a marker.
+    images = export_images(c, f"stages/{key}", {f["image"] for s in scripts.values() for f in s["frames"]})
+    return dict(name=name, source_sha256=sha256, objects=objects, scripts=scripts, images=images,
+                music=export_sounds(c, key, [track])[0])
 
 
 def export_sounds(c, prefix, indices):

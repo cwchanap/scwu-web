@@ -1,10 +1,15 @@
-// Each player's exported container data: Ryuko's (01 RYUKO.PLAYER, the
-// assets.json the stage and music share) and Zoma's (02 ZOMA.PLAYER).
+// Each player's exported container data: Ryuko's (01 RYUKO.PLAYER) and
+// Zoma's (02 ZOMA.PLAYER); and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
+import stages from './generated/stages.json';
 
 export type Who = 'ryuko' | 'zoma';
 export const CHARACTERS = { ryuko, zoma };
+export type Stage = keyof typeof stages;
+export const STAGES = stages;
+// The container an object's scripts and images come from.
+export type Container = Who | Stage;
 
 // The life in the player's parameter block (+0x7caa): 510 and 490. Both
 // blocks put the desperation threshold at 30% (+0x7ca6), which 0x40e7c0

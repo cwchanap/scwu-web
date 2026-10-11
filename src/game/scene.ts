@@ -1,7 +1,6 @@
 import Phaser from 'phaser';
-import { CHARACTERS, lifeOf } from './characters';
-import type { Who } from './characters';
-import data from './generated/assets.json';
+import { CHARACTERS, lifeOf, STAGES } from './characters';
+import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
@@ -104,10 +103,14 @@ const idleVM = (who: Who, seed?: number) =>
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
-  match = new Match('practice', false, randomSeed(), [
-    this.fighter,
-    this.opponent,
-  ]);
+  private stage: Stage = 'court';
+  match = new Match(
+    'practice',
+    false,
+    randomSeed(),
+    [this.fighter, this.opponent],
+    this.stage,
+  );
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
@@ -119,6 +122,7 @@ export class TrainingScene extends Phaser.Scene {
   private shadows: Phaser.GameObjects.Ellipse[] = [];
   private blacks: Phaser.GameObjects.Image[] = [];
   private effectSprites: Phaser.GameObjects.Image[] = [];
+  private layerSprites: Phaser.GameObjects.Image[] = [];
   private trailSprites: Phaser.GameObjects.Image[] = [];
   // Op 0x0e's shake, stepped once per drawn frame like the source's draw
   // loop, and the drawn-frame count whose parity flips it.
@@ -134,9 +138,9 @@ export class TrainingScene extends Phaser.Scene {
   // (0x415f00), so each player's copy of a sound restarts rather than
   // overlapping itself; different sounds mix.
   private voices = new Map<string, Phaser.Sound.BaseSound>();
-  // Authored: Sport Court's looping track (stage sound 2), off by default and
-  // loaded on first use. The original plays it only after SIN's, KAY's or
-  // DIDO's supers; like a stage load (0x40677c), each match starts it over.
+  // Authored: the stage's looping track, off by default and loaded on first
+  // use. The original plays it only after SIN's, KAY's or DIDO's supers; like
+  // a stage load (0x40677c), each match starts it over.
   private music = false;
   private track?: Phaser.Sound.BaseSound;
 
@@ -145,7 +149,9 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image('court', `${BASE}sport-court.png`);
+    for (const [stage, { images }] of Object.entries(STAGES))
+      for (const image of images)
+        this.load.image(`${stage}-${image.index}`, BASE + image.filename);
     for (const [who, { images }] of Object.entries(CHARACTERS))
       for (const image of images)
         this.load.image(`${who}-${image.index}`, BASE + image.filename);
@@ -171,13 +177,6 @@ export class TrainingScene extends Phaser.Scene {
       (object: Phaser.GameObjects.GameObject) =>
         object.setVertexRoundMode('fullAuto'),
     );
-    // Mirror the single-screen court to extend it without a hard tile seam.
-    for (const x of [0, WIDTH])
-      this.add
-        .image(x, HEIGHT - 960 * 1.5, 'court')
-        .setOrigin(0)
-        .setScale(1.5)
-        .setFlipX(x !== 0);
     for (const f of this.match.fighters) {
       // Action 43, a viewport object at (327, 498) in bucket 15 (op 0x04
       // flags 0x46 at PCs 300/325): over the court, behind every object.
@@ -284,12 +283,19 @@ export class TrainingScene extends Phaser.Scene {
     this.opponent = who;
     this.reset(this.match.mode);
   }
+  setStage(stage: Stage) {
+    this.stage = stage;
+    this.reset(this.match.mode);
+  }
   reset(mode: Mode) {
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    this.match = new Match(mode, mode === 'cpu', randomSeed(), [
-      this.fighter,
-      this.opponent,
-    ]);
+    this.match = new Match(
+      mode,
+      mode === 'cpu',
+      randomSeed(),
+      [this.fighter, this.opponent],
+      this.stage,
+    );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.playMusic();
@@ -309,17 +315,19 @@ export class TrainingScene extends Phaser.Scene {
 
   setMusic(on: boolean) {
     this.music = on;
-    if (!on) this.track?.stop();
-    else if (this.cache.audio.exists('music')) this.playMusic();
-    else {
-      this.load.audio('music', BASE + data.music.filename);
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.playMusic());
-      this.load.start();
-    }
+    this.playMusic();
   }
   private playMusic() {
-    if (!this.music || !this.cache.audio.exists('music')) return;
-    this.track ??= this.sound.add('music', { loop: true });
+    this.track?.stop();
+    if (!this.music) return;
+    const key = `music-${this.stage}`;
+    if (!this.cache.audio.exists(key)) {
+      this.load.audio(key, BASE + STAGES[this.stage].music.filename);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.playMusic());
+      this.load.start();
+      return;
+    }
+    this.track = this.sound.get(key) ?? this.sound.add(key, { loop: true });
     this.track.play();
     if (this.paused) this.track.pause();
   }
@@ -347,7 +355,7 @@ export class TrainingScene extends Phaser.Scene {
 
   // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
   // each tinted image is drawn once and cached.
-  private texture(image: number, { r, g, b }: Color, who: Who) {
+  private texture(image: number, { r, g, b }: Color, who: Container) {
     const key = `${who}-${image}`;
     if (!r && !g && !b) return key;
     const tinted = `${key}:${r},${g},${b}`;
@@ -388,9 +396,9 @@ export class TrainingScene extends Phaser.Scene {
     sprite: Phaser.GameObjects.Image,
     pose: Pose,
     color: Color,
-    who: Who,
+    who: Container,
   ) {
-    if (isBlank(pose)) return sprite.setVisible(false);
+    if (isBlank(pose, who)) return sprite.setVisible(false);
     return sprite
       .setVisible(true)
       .setTexture(this.texture(pose.image, color, who))
@@ -402,7 +410,7 @@ export class TrainingScene extends Phaser.Scene {
 
   private place(
     sprite: Phaser.GameObjects.Image,
-    who: Who,
+    who: Container,
     pose: Pose,
     x: number,
     y: number,
@@ -490,6 +498,28 @@ export class TrainingScene extends Phaser.Scene {
         this.match.cameraX + this.shake.x.offset * ART_SCALE,
         this.match.cameraY + this.shake.y.offset * ART_SCALE,
       );
+      // A stage object draws its display's top left at its offset, less the
+      // scroll times its start record's percentages (0x40da41–0x40dcf3), so
+      // a 0% one stays on the screen. ponytail: Phaser scales the shake by
+      // them too, where the source adds it whole (0x40da94); only a partly
+      // scrolling layer, which neither stage has, would show it.
+      const { layers } = this.match;
+      this.pool(this.layerSprites, layers.length).forEach((sprite, index) => {
+        const layer = layers[index];
+        sprite.setVisible(!!layer && layer.age >= 0);
+        if (!layer || layer.age < 0) return;
+        const pose = animationFrame(layer.clip, layer.age, layer.who);
+        const { x, y } = layer.stage!;
+        this.paint(sprite, pose, layer.color, layer.who)
+          .setOrigin(0)
+          .setDepth(layer.z < FIGHTER_Z ? 0.1 : 4.5)
+          .setScrollFactor(x / 100, y / 100)
+          .setPosition(
+            layer.x + pose.dx * ART_SCALE,
+            layer.y + (920 + pose.dy - 4.8 * y) * ART_SCALE,
+          )
+          .setFlip(pose.flip_x, pose.flip_y);
+      });
       this.sprites.forEach((sprite, i) => {
         const f = this.match.fighters[i];
         const pose = this.pose(i);
