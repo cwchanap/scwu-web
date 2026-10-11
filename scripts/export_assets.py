@@ -85,10 +85,10 @@ def decode_event(record):
         last = max((k for k, step in enumerate(steps) if step & 0x2000), default=-1)
         return dict(op="command", action=u16(record, 1), offset=record[3], window=record[4], steps=steps[:last + 1])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
-    # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 6 (an IORI
-    # cancel) and 12 (EX Fire 2) and global 6 (the freeze); other tests keep their
-    # fall-through path.
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x46, 0x4c, 0x86):
+    # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 4 (Kiki's
+    # K' follow-up), 6 (an IORI cancel) and 12 (EX Fire 2) and global 6 (the freeze);
+    # other tests keep their fall-through path.
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x44, 0x46, 0x4c, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer
@@ -450,93 +450,142 @@ def gameplay(p, index):
     return out
 
 
-def export_zoma(ryuko):
-    data, c, p = player("02 ZOMA", "bfc7a239fb33782fac6ff6c6ff22a2f50d0d8abc59c2182052e9cc32a422ff0e")
-    # The engine's own states, from his default-action table (+0x757a: 1–5, 7,
-    # 8, 18–27) and his jumps' landing handler (slot 1 → 10, PC 42).
-    neutral = {
-        "idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,
-        "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24,
-    }
-    # Twins of Ryuko's victim actions: the response table pairs them (a response
-    # id selects each one's own), with their landing and follow-up actions.
-    twins = {
-        "guard": (149, 149), "crouchGuard": (151, 151), "airGuard": (153, 153),
-        "blockHeavy": (154, 154), "crouchBlockHeavy": (156, 156), "airBlockHeavy": (158, 158),
-        "hit": (73, 74), "airHit": (74, 75), "hitHeavy": (75, 76), "airHitHeavy": (76, 77),
-        "jumpHit": (77, 78), "drillDown": (135, 136),
-        "blockRapid": (163, 163), "crouchBlockRapid": (165, 165), "airBlockRapid": (167, 167),
-        "timeStopGuard": (168, 168), "crouchTimeStopGuard": (170, 170), "airTimeStopGuard": (172, 172),
-        "dstToss": (129, 130), "dstTossSpin": (130, 131), "dstTossSpin2": (131, 132),
-        "twist": (85, 86), "twisting": (86, 87), "twisting2": (87, 88),
-        "hitPull": (121, 122), "blockStop": (159, 159), "crouchBlockStop": (161, 161),
-        "launchDown": (123, 124), "slamBounce": (124, 125), "bounceDown": (147, 147),
-        "launchUp": (81, 82), "launchAway": (80, 81), "sweep": (79, 80),
-        "grabbed": (128, 129), "knockdown": (146, 146), "getUp": (145, 145),
-        "ko": (60, 58), "koAgain": (61, 59), "down": (62, 60), "lose": (59, 57),
-        "hitRapid": (83, 84), "airHitRapid": (84, 85), "rushAirHit": (122, 123),
-        "fly": (97, 98), "flySpin": (98, 99), "shock": (88, 90), "shockLoop": (90, 91),
-        "fb": (110, 111), "fbb": (111, 112), "fbh": (112, 113), "chuckToss": (132, 133),
-        "uppercut": (96, 97), "stun": (108, 109), "airStun": (109, 110),
-    }
-    # Twins that differ, beyond their numbering and layout:
-    differ = {
-        # P+K (0x2090) where Ryuko's counter checks Hit Up, and 10 ticks for
-        # Ryuko's 8; the crouching guard adds 2 power to Zoma (op 0x15).
-        "guard", "crouchGuard",
-        # An op 0x20 that rolls which displays play.
-        "jumpHit",
-        # Op 0x1a after op 0x15, both before the first display.
-        "launchDown",
-        # Ryuko's clear player variable 3 (knockdowns) and set 6 (the shock);
-        # the KOs test and set variable 3 at 30, not 40 and 50, and KO DOWN
-        # global 15 equal to 100, not above 99. The KO's last display waits
-        # for landing (1205 ticks, not 0).
-        "knockdown", "bounceDown", "shock", "ko", "down",
-        # Display lengths after the reaction's motion commands.
-        "dstTossSpin2", "airHitRapid", "rushAirHit", "shockLoop", "airStun",
-        # Ryuko's deletes objects 7-9 and rolls whether to skip its sound.
-        "chuckToss",
-        # Ryuko's also deletes object 7, and rolls rand % 6 > 2 to his rand % 3 > 1.
-        "uppercut",
-    }
+# Twins of Ryuko's victim actions: the response table pairs them (a response
+# id selects each one's own), with their landing and follow-up actions.
+ZOMA_TWINS = {
+    "guard": (149, 149), "crouchGuard": (151, 151), "airGuard": (153, 153),
+    "blockHeavy": (154, 154), "crouchBlockHeavy": (156, 156), "airBlockHeavy": (158, 158),
+    "hit": (73, 74), "airHit": (74, 75), "hitHeavy": (75, 76), "airHitHeavy": (76, 77),
+    "jumpHit": (77, 78), "drillDown": (135, 136),
+    "blockRapid": (163, 163), "crouchBlockRapid": (165, 165), "airBlockRapid": (167, 167),
+    "timeStopGuard": (168, 168), "crouchTimeStopGuard": (170, 170), "airTimeStopGuard": (172, 172),
+    "dstToss": (129, 130), "dstTossSpin": (130, 131), "dstTossSpin2": (131, 132),
+    "twist": (85, 86), "twisting": (86, 87), "twisting2": (87, 88),
+    "hitPull": (121, 122), "blockStop": (159, 159), "crouchBlockStop": (161, 161),
+    "launchDown": (123, 124), "slamBounce": (124, 125), "bounceDown": (147, 147),
+    "launchUp": (81, 82), "launchAway": (80, 81), "sweep": (79, 80),
+    "grabbed": (128, 129), "knockdown": (146, 146), "getUp": (145, 145),
+    "ko": (60, 58), "koAgain": (61, 59), "down": (62, 60), "lose": (59, 57),
+    "hitRapid": (83, 84), "airHitRapid": (84, 85), "rushAirHit": (122, 123),
+    "fly": (97, 98), "flySpin": (98, 99), "shock": (88, 90), "shockLoop": (90, 91),
+    "fb": (110, 111), "fbb": (111, 112), "fbh": (112, 113), "chuckToss": (132, 133),
+    "uppercut": (96, 97), "stun": (108, 109), "airStun": (109, 110),
+    # 'ヒット DRAGON Fireball' (125) plays as the uppercut (96) does; Yinan
+    # (126) rises straight up.
+    "dragonFireball": (125, 126), "liftUp": (126, 127), "tatumakiIn": (99, 100), "tatumakiOut": (100, 101),
+}
+# The other players lay theirs out alike, but for Kiki's KOs and lose action
+# (+0x75a0: 58), one later.
+KIKI_TWINS = dict(ZOMA_TWINS, ko=(60, 59), koAgain=(61, 60), down=(62, 61), lose=(59, 58))
+# As in Ryuko's export, these play from their timelines (or only open one),
+# not as clips, so flattening follows their jumps.
+TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
+             "fb", "fbb", "fbh", "stun", "airStun"}
+# The reactions whose op 0x01 commands, op 0x20 rolls and branches the match
+# plays, the lose action that opens every KO and the air guards.
+SCRIPTED = ["airHit", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
+            "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
+            "airBlockRapid", "airTimeStopGuard", "lose"]
+
+# Each other player: its file and hash; the engine's own states, from its
+# default-action table (+0x757a) and its jumps' landing handler (slot 1); its
+# twins of Ryuko's victim actions, and those that differ beyond their
+# numbering and layout; its result, darkening and intro actions; and the
+# images its HUD face (+0x75a6) and *name action show.
+FIGHTERS = {
+    "zoma": dict(
+        source=("02 ZOMA", "bfc7a239fb33782fac6ff6c6ff22a2f50d0d8abc59c2182052e9cc32a422ff0e"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 42
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=ZOMA_TWINS,
+        differ={
+            # P+K (0x2090) where Ryuko's counter checks Hit Up, and 10 ticks for
+            # Ryuko's 8; the crouching guard adds 2 power to Zoma (op 0x15).
+            "guard", "crouchGuard",
+            # An op 0x20 that rolls which displays play.
+            "jumpHit",
+            # Op 0x1a after op 0x15, both before the first display.
+            "launchDown",
+            # Ryuko's clear player variable 3 (knockdowns) and set 6 (the shock);
+            # the KOs test and set variable 3 at 30, not 40 and 50, and KO DOWN
+            # global 15 equal to 100, not above 99. The KO's last display waits
+            # for landing (1205 ticks, not 0).
+            "knockdown", "bounceDown", "shock", "ko", "down",
+            # Display lengths after the reaction's motion commands.
+            "dstTossSpin2", "airHitRapid", "rushAirHit", "shockLoop", "airStun",
+            # Ryuko's deletes objects 7-9 and rolls whether to skip its sound.
+            "chuckToss",
+            # Ryuko's also deletes object 7, and rolls rand % 6 > 2 to his rand % 3 > 1.
+            "uppercut", "dragonFireball", "liftUp",
+        },
+        # Results: WIN and the draw call DEMO STAND once (PCs 542, 630). His
+        # super darkening panel, image 1009 (action 40). The Vs. intro: 28
+        # jumps to 30 + 3 (PCs 265, 301), which jumps to Start N (31) + 2 (PC
+        # 306), as Ryuko's 30 to 33 + 4.
+        actions=dict(win=56, winStand=41, draw=63, black=40, intro=(31, 2)),
+        # 2001: the HUD face action 71 shows; 340: the name *name (64) shows.
+        image_ids={2001, 340},
+    ),
+    "kiki": dict(
+        source=("03 KIKI", "257ea3cc05c2a91815074efbb0029b7b0a3770590fc80b058db37e891077152a"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 51
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=KIKI_TWINS,
+        differ={
+            # Hit Up, as Ryuko's counter, but within 10 ticks, as Zoma's.
+            "guard", "crouchGuard",
+            # Ryuko's and Zoma's also clear player variable 14 (the darkening),
+            # 8 and 6.
+            "airHitHeavy", "launchAway", "lose",
+            # Zoma's op 0x20 that rolls which displays play.
+            "jumpHit",
+            # Zoma's order of op 0x1a and op 0x15, and raw vx −800 at PC 1522,
+            # not −500.
+            "launchDown",
+            # Zoma's KO tests and landing wait.
+            "ko", "down",
+            # Zoma's display lengths.
+            "rushAirHit", "shock", "shockLoop", "airStun",
+            # No op 0x20.
+            "uppercut", "dragonFireball", "liftUp",
+        },
+        # Results: WIN calls DEMO Stand (28) once, then 'win rp' (57) three
+        # times (PCs 534, 536), and the draw calls DEMO Stand once (PC 620).
+        # Her darkening panel, image 1009 (action 42). The Vs. intro: 30
+        # jumps to 32 for global 3 = 0 (PC 283), past its display for global
+        # 14 = 0 (PC 318), then to Round 1 (33) + 2 (PC 323).
+        actions=dict(win=56, winStand=28, winRp=57, draw=64, black=42, intro=(33, 2)),
+        # 2001: the HUD face action 71 shows (PC 666); 217: *name (65, PC 627).
+        image_ids={2001, 217},
+    ),
+}
+
+
+def export_fighter(ryuko, key, source, neutral, twins, differ, actions, image_ids):
+    data, c, p = player(*source)
     for name, (r, z) in twins.items():
         if (gameplay(ryuko, r) == gameplay(p, z)) == (name in differ):
-            sys.exit(f"Zoma's {name} ({z}) no longer matches the recorded comparison with Ryuko's {r}; refusing to export.")
-    # As in Ryuko's export, these play from their timelines (or only open
-    # one), not as clips, so flattening follows their jumps.
-    timelines = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
-                 "fb", "fbb", "fbh", "stun", "airStun"}
-    actions = dict(neutral, **{name: z for name, (_, z) in twins.items() if name not in timelines},
-                   # Results: WIN and the draw call DEMO STAND once (PCs 542, 630).
-                   win=56, winStand=41, draw=63,
-                   # His super darkening panel, image 1009 (action 40).
-                   black=40,
-                   # The Vs. intro: 28 jumps to 30 + 3 (PCs 265, 301), which
-                   # jumps to Start N (31) + 2 (PC 306), as Ryuko's 30 to 33 + 4.
-                   intro=(31, 2))
-    # 2001: the HUD face action 71 shows; 340: the name *name (64) shows.
-    image_ids = {2001, 340}
+            sys.exit(f"{source[0]}'s {name} ({z}) no longer matches the recorded comparison with Ryuko's {r}; "
+                     "refusing to export.")
+    actions = dict(neutral, **{name: z for name, (_, z) in twins.items() if name not in TIMELINES}, **actions)
+    image_ids = set(image_ids)
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
-    # His moves play from their timelines: the actions of his command entries
-    # (DST to K, and the CPU's dashes 22-24), each with its level (header
-    # r[2]), which a cancel window compares.
+    # The moves play from their timelines: the actions of the command entries,
+    # each with its level (header r[2]), which a cancel window compares.
     entries = tables["commands"]["entries"]
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
-    # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
-    # match plays, the lose action (57) that opens every KO, every response's
-    # hit effect and every object the clips spawn; his moves, COUNTER HIT
-    # (174) and the guard reactions whose op 0x24 enters it.
-    queue = [(i, 0) for i in [75, 76, 77, 78, 81, 84, 85, 90, 97, 98, 109, 110, 123, 153, 158, 167, 172, 57,
-                              *filter(None, tables["response_effects"]), *moves, 174,
-                              149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
+    # The scripted reactions, every response's hit effect and every object
+    # the clips spawn; the moves, COUNTER HIT (174) and the guard reactions
+    # whose op 0x24 enters it.
+    queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED), *filter(None, tables["response_effects"]),
+                              *moves, 174, 149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
-    sounds = export_sounds(c, "zoma", cued(clips, scripts))
-    images = export_images(c, "zoma", image_ids)
+    sounds = export_sounds(c, key, cued(clips, scripts))
+    images = export_images(c, key, image_ids)
     idle = p.action(1)
-    write_json(GENERATED / "zoma.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
+    write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins={r: z for r, z in twins.values()},
         neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
@@ -576,6 +625,9 @@ def main():
         "hitPull": 121, "blockStop": 159, "crouchBlockStop": 161,
         "launchDown": 123, "slamBounce": 124, "bounceDown": 147,
         "launchUp": 81, "launchAway": 80, "sweep": 79, "chuckToss": 132, "uppercut": 96,
+        # 'ヒット DRAGON Yinan': the uppercut's rise, straight up (PC 1715);
+        # 'ヒット  Tatumaki <<' and '>>', hops in and out (PCs 1217, 1240).
+        "liftUp": 126, "tatumakiIn": 99, "tatumakiOut": 100,
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
         "ko": 60, "koAgain": 61, "down": 62, "win": 57, "winStand": 58, "draw": 65,
@@ -593,13 +645,14 @@ def main():
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
     # match plays (the shock 88, FLY NO HIT 97, the rush air hit 122, the beam
-    # hits 83 and 84, hits 75, 80, 96 and 132 and the air reactions), the lose
+    # hits 83 and 84, hits 75–77, 80, 96, 99, 100, 126 and 132 and the air reactions), the lose
     # action (59) whose records open every KO, every response's hit effect and
     # every object the clips spawn; her moves, and the guard reactions whose op
     # 0x24 enters COUNTER HIT (174). Each brings what its events spawn, call
     # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 80, 96, 108, 109, 132, 153, 158, 167, 172, 59,
+    queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 80, 96, 99, 100, 126, 108, 109, 132, 153, 158, 167,
+                              172, 59,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
@@ -609,7 +662,7 @@ def main():
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
         **tables, scripts=scripts, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
-    zoma = export_zoma(p)
+    counts = {key: export_fighter(p, key, **fighter) for key, fighter in FIGHTERS.items()}
     export_ui()
     write_json(GENERATED / "stages.json", {key: export_stage(key, *stage) for key, stage in STAGES.items()})
     # Python is an independent oracle. Keep fixtures out of the browser bundle.
@@ -620,7 +673,8 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko and {zoma} Zoma images, {len(STAGES)} stages, idle programs, and {len(cases)} oracle traces.")
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma and {counts['kiki']} Kiki images, {len(STAGES)} stages, "
+          f"idle programs, and {len(cases)} oracle traces.")
 
 
 # Each stage: its file, hash, and the looping track (type 0x11) the port's

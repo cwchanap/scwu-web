@@ -1,7 +1,6 @@
-import { CHARACTERS, STAGES } from './characters';
+import { CHARACTERS, STAGES, twin } from './characters';
 import type { Container, Who } from './characters';
 import data from './generated/assets.json';
-import zoma from './generated/zoma.json';
 import type { Frame } from './standing';
 
 // Op 0x19 box in source pixels: centre and half size from the fighter's origin.
@@ -56,10 +55,9 @@ export type Pose = Frame & {
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
-const zomaClips = zoma.clips as unknown as Record<
-  keyof typeof zoma.clips,
-  Pose[]
->;
+const fighterClips = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([who, { clips }]) => [who, clips]),
+) as unknown as Record<Who, Record<string, Pose[]>>;
 interface Clip {
   frames: Pose[];
   ticks: number[];
@@ -237,13 +235,11 @@ export interface Script {
   next: number | null;
   offset?: number;
 }
-const scripts = {
-  ryuko: data.scripts,
-  zoma: zoma.scripts,
-  ...Object.fromEntries(
-    Object.entries(STAGES).map(([stage, { scripts }]) => [stage, scripts]),
+const scripts = Object.fromEntries(
+  [...Object.entries(CHARACTERS), ...Object.entries(STAGES)].map(
+    ([who, { scripts }]) => [who, scripts],
   ),
-} as unknown as Record<Container, Record<string, Script>>;
+) as unknown as Record<Container, Record<string, Script>>;
 // A source action, or "action+offset" for an op 0x20 branch entering mid-action.
 export type ObjectKey = number | `${number}+${number}`;
 // The victim action selected by each op 0x17 response id.
@@ -368,6 +364,11 @@ export const animations = {
   chuckToss: clip(clips.chuckToss, false, [2, 2, 2, 25, 1]),
   // Response 42 (Zoma's DRAGON) → action 96, waiting for its landing.
   uppercut: clip(clips.uppercut, false, [5, 30, 10, 1]),
+  // Response 82 (Kiki's EN3) → action 126, the same rise straight up.
+  liftUp: clip(clips.liftUp, false, [5, 30, 10, 1]),
+  // Responses 44 and 45 (Kiki's EN3 beam) → actions 99 and 100.
+  tatumakiIn: clip(clips.tatumakiIn, false, [2, 2, 2, 25, 1]),
+  tatumakiOut: clip(clips.tatumakiOut, false, [2, 2, 2, 25, 1]),
   // Responses 59 and 60 (Zoma's EN300 and DST) → actions 108 and 109, whose
   // op 0x20 reorders their shaking (+17, +18).
   stun: scriptClip(108),
@@ -443,75 +444,93 @@ const waits = (frames: Pose[]) =>
   frames.map(({ duration }) =>
     duration > 0 && duration < 1000 ? duration : 1,
   );
-const z = zomaClips;
-// Zoma's neutral, guard, victim and result clips: the engine's own states
-// and the twins of Ryuko's victim actions (export_zoma), shaped like his.
-const zomaAnimations: Partial<Record<AnimatedAction, Clip>> = {
-  walk: clip(z.walk, true),
-  backwalk: clip(z.backwalk, true),
-  takeoff: clip(z.jump.slice(0, 1)),
-  jump: clip(z.jump.slice(1), false, waits(z.jump.slice(1))),
-  land: clip(z.land),
-  crouchEnter: clip(z.crouchEnter),
-  // Action 19 holds a single zero-length display.
-  crouch: clip(z.crouch, true, waits(z.crouch)),
-  stand: clip(z.stand),
-  turn: clip(z.turn),
-  crouchTurn: clip(z.crouchTurn),
-  // Start N (31) from PC 309: no op 0x01, so he stands where he starts.
-  intro: clip(z.intro),
-  guard: clip(z.guard.slice(0, 1)),
-  crouchGuard: clip(z.crouchGuard.slice(0, 1)),
-  airGuard: clip(z.airGuard.slice(0, 1)),
-  block: clip(z.guard),
-  crouchBlock: clip(z.crouchGuard),
-  airBlock: clip(z.airGuard),
-  blockHeavy: clip(z.blockHeavy),
-  crouchBlockHeavy: clip(z.crouchBlockHeavy),
-  airBlockHeavy: clip(z.airBlockHeavy),
-  blockRapid: clip(z.blockRapid),
-  crouchBlockRapid: clip(z.crouchBlockRapid),
-  airBlockRapid: clip(z.airBlockRapid),
-  timeStopGuard: clip(z.timeStopGuard),
-  crouchTimeStopGuard: clip(z.crouchTimeStopGuard),
-  airTimeStopGuard: clip(z.airTimeStopGuard),
-  blockStop: clip(z.blockStop),
-  crouchBlockStop: clip(z.crouchBlockStop),
-  hit: clip(z.hit),
-  hitHeavy: clip(z.hitHeavy),
-  airHit: clip(z.airHit),
-  airHitHeavy: clip(z.airHitHeavy),
-  jumpHit: clip(z.jumpHit),
-  hitPull: clip(z.hitPull),
-  hitRapid: scriptClip(84, 'zoma'),
-  airHitRapid: scriptClip(85, 'zoma'),
-  drillDown: clip(z.drillDown, false, waits(z.drillDown)),
-  launchDown: clip(z.launchDown, false, waits(z.launchDown)),
-  slamBounce: clip(z.slamBounce, false, waits(z.slamBounce)),
-  bounceDown: clip(z.bounceDown),
-  launchUp: clip(z.launchUp, false, waits(z.launchUp)),
-  launchAway: clip(z.launchAway, false, waits(z.launchAway)),
-  sweep: clip(z.sweep, false, waits(z.sweep)),
-  chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
-  uppercut: clip(z.uppercut, false, waits(z.uppercut)),
-  stun: scriptClip(109, 'zoma'),
-  airStun: scriptClip(110, 'zoma'),
-  dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
-  tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
-  twist: clip([z.twist[0], ...z.twisting], 1),
-  twistBounce: clip([z.twist[1], ...z.twisting2], 1),
-  superHeld: clip(z.grabbed.slice(0, 1)),
-  knockdown: clip(z.knockdown),
-  getUp: clip(z.getUp),
-  down: clip(z.ko, false, waits(z.ko)),
-  koAgain: clip(z.koAgain),
-  koLand: clip(z.down),
-  // WIN (56) and the draw (63) call DEMO STAND (41) once, then hold.
-  win: clip([...z.winStand, ...z.win]),
-  draw: clip([...z.winStand, ...z.draw]),
-  fly: scriptClip(98, 'zoma'),
-  shock: scriptClip(90, 'zoma'),
-  rushAirHit: scriptClip(123, 'zoma'),
+// The other players' neutral, guard, victim and result clips: the engine's
+// own states and the twins of Ryuko's victim actions (export_fighter), shaped
+// like his.
+function twinAnimations(who: Exclude<Who, 'ryuko'>) {
+  const z = fighterClips[who];
+  const timeline = (index: number) => scriptClip(twin(who, index), who);
+  const table: Partial<Record<AnimatedAction, Clip>> = {
+    walk: clip(z.walk, true),
+    backwalk: clip(z.backwalk, true),
+    takeoff: clip(z.jump.slice(0, 1)),
+    jump: clip(z.jump.slice(1), false, waits(z.jump.slice(1))),
+    land: clip(z.land),
+    crouchEnter: clip(z.crouchEnter),
+    // Action 19 holds a single zero-length display.
+    crouch: clip(z.crouch, true, waits(z.crouch)),
+    stand: clip(z.stand),
+    turn: clip(z.turn),
+    crouchTurn: clip(z.crouchTurn),
+    // Zoma's Start N (31) from PC 309 and Kiki's Round 1 (33) from PC 326:
+    // no op 0x01, so each stands where they start.
+    intro: clip(z.intro),
+    guard: clip(z.guard.slice(0, 1)),
+    crouchGuard: clip(z.crouchGuard.slice(0, 1)),
+    airGuard: clip(z.airGuard.slice(0, 1)),
+    block: clip(z.guard),
+    crouchBlock: clip(z.crouchGuard),
+    airBlock: clip(z.airGuard),
+    blockHeavy: clip(z.blockHeavy),
+    crouchBlockHeavy: clip(z.crouchBlockHeavy),
+    airBlockHeavy: clip(z.airBlockHeavy),
+    blockRapid: clip(z.blockRapid),
+    crouchBlockRapid: clip(z.crouchBlockRapid),
+    airBlockRapid: clip(z.airBlockRapid),
+    timeStopGuard: clip(z.timeStopGuard),
+    crouchTimeStopGuard: clip(z.crouchTimeStopGuard),
+    airTimeStopGuard: clip(z.airTimeStopGuard),
+    blockStop: clip(z.blockStop),
+    crouchBlockStop: clip(z.crouchBlockStop),
+    hit: clip(z.hit),
+    hitHeavy: clip(z.hitHeavy),
+    airHit: clip(z.airHit),
+    airHitHeavy: clip(z.airHitHeavy),
+    jumpHit: clip(z.jumpHit),
+    hitPull: clip(z.hitPull),
+    hitRapid: timeline(83),
+    airHitRapid: timeline(84),
+    drillDown: clip(z.drillDown, false, waits(z.drillDown)),
+    launchDown: clip(z.launchDown, false, waits(z.launchDown)),
+    slamBounce: clip(z.slamBounce, false, waits(z.slamBounce)),
+    bounceDown: clip(z.bounceDown),
+    launchUp: clip(z.launchUp, false, waits(z.launchUp)),
+    launchAway: clip(z.launchAway, false, waits(z.launchAway)),
+    sweep: clip(z.sweep, false, waits(z.sweep)),
+    chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
+    uppercut: clip(z.uppercut, false, waits(z.uppercut)),
+    liftUp: clip(z.liftUp, false, waits(z.liftUp)),
+    tatumakiIn: clip(z.tatumakiIn, false, waits(z.tatumakiIn)),
+    tatumakiOut: clip(z.tatumakiOut, false, waits(z.tatumakiOut)),
+    stun: timeline(108),
+    airStun: timeline(109),
+    dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
+    tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
+    twist: clip([z.twist[0], ...z.twisting], 1),
+    twistBounce: clip([z.twist[1], ...z.twisting2], 1),
+    superHeld: clip(z.grabbed.slice(0, 1)),
+    knockdown: clip(z.knockdown),
+    getUp: clip(z.getUp),
+    down: clip(z.ko, false, waits(z.ko)),
+    koAgain: clip(z.koAgain),
+    koLand: clip(z.down),
+    // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
+    // 'win rp' (57) three times between its displays (PC 536).
+    win: clip(
+      z.winRp
+        ? [...z.winStand, z.win[0], ...Array(3).fill(z.winRp).flat(), z.win[1]]
+        : [...z.winStand, ...z.win],
+    ),
+    draw: clip([...z.winStand, ...z.draw]),
+    fly: timeline(97),
+    shock: timeline(88),
+    rushAirHit: timeline(122),
+  };
+  return table;
+}
+const TWIN_ANIMATIONS = {
+  zoma: twinAnimations('zoma'),
+  kiki: twinAnimations('kiki'),
 };
 
 // Object keys name a spawned source object, played from its flattened timeline.
@@ -520,8 +539,11 @@ export const isObject = (
 ): action is ObjectKey => !Object.hasOwn(animations, action);
 function clipOf(action: AnimatedAction | ObjectKey, who: Container) {
   if (isObject(action)) return objectClip(action, who);
-  const found = who === 'ryuko' ? animations[action] : zomaAnimations[action];
-  if (!found) throw new Error(`Zoma has no ${action} clip yet`);
+  const found =
+    who === 'ryuko'
+      ? animations[action]
+      : TWIN_ANIMATIONS[who as Exclude<Who, 'ryuko'>][action];
+  if (!found) throw new Error(`${who} has no ${action} clip yet`);
   return found;
 }
 export function animationDuration(
@@ -538,18 +560,20 @@ export function animationDuration(
 // as scene.ts draws idle from its VM.
 export const clipPose = (action: Shown, age: number, who: Who = 'ryuko') =>
   action === 'idle'
-    ? (who === 'ryuko' ? clips : zomaClips).idle[0]
+    ? fighterClips[who].idle[0]
     : animationFrame(action, age, who);
 function bodies(action: Shown, age: number, who: Who): BodyBox[] {
   return clipPose(action, age, who).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
 // (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436);
-// Zoma's action 40 shows his image 1009 alike.
-export const BLACK: Record<Who, { opaque: Pose; half: Pose }> = {
-  ryuko: { opaque: clips.black[1], half: clips.black[2] },
-  zoma: { opaque: zomaClips.black[1], half: zomaClips.black[2] },
-};
+// Zoma's action 40 and Kiki's 42 show image 1009 alike.
+export const BLACK = Object.fromEntries(
+  Object.entries(fighterClips).map(([who, { black }]) => [
+    who,
+    { opaque: black[1], half: black[2] },
+  ]),
+) as Record<Who, { opaque: Pose; half: Pose }>;
 // The op 0x23 state a fighter's clip sets before its first display. Ryuko's
 // neutral, knockdown and win clips reset it there; none changes it later.
 export const entryColor = (action: Shown, who: Who = 'ryuko') =>

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import data from './generated/assets.json';
-import { STAGES } from './characters';
+import { CHARACTERS, STAGES } from './characters';
 import {
   animationDuration,
   animationFrame,
@@ -70,8 +70,8 @@ describe('selected core animation assets', () => {
   });
 
   it('has loadable, non-empty textures for every selected display', () => {
-    const stages = Object.values(STAGES).flatMap((stage) => stage.images);
-    for (const image of [...data.images, ...stages]) {
+    const sources = [...Object.values(CHARACTERS), ...Object.values(STAGES)];
+    for (const image of sources.flatMap(({ images }) => images)) {
       const png = readFileSync(
         new URL(`../../public/assets/${image.filename}`, import.meta.url),
       );

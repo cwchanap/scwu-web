@@ -161,6 +161,12 @@ const launchMotion: Partial<
   launchUp: { tick: 25, vx: -160, vy: -1700, gravity: 60, land: 'knockdown' },
   // Response 42 (Zoma's DRAGON) → action 96 (PC 1163), landing into 146.
   uppercut: { tick: 5, vx: -200, vy: -1620, gravity: 70, land: 'knockdown' },
+  // Response 82 (Kiki's EN3) → action 126, rising straight up (PC 1715).
+  liftUp: { tick: 5, vx: 0, vy: -1620, gravity: 70, land: 'knockdown' },
+  // Responses 44 and 45 (Kiki's EN3 beam) → actions 99 and 100, hopping in
+  // and out from their first tick (PCs 1217, 1240).
+  tatumakiIn: { tick: 0, vx: 500, vy: -720, gravity: 90, land: 'knockdown' },
+  tatumakiOut: { tick: 0, vx: -500, vy: -720, gravity: 90, land: 'knockdown' },
   // Response 60 (Zoma's DST) → action 109: nine ticks of shaking, then PC
   // 1434 drops it into 146 (PC 1433).
   airStun: { tick: 9, vx: 0, vy: -830, gravity: 80, land: 'knockdown' },
@@ -223,6 +229,9 @@ const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
   crouchTimeStopGuard: [2, 0],
   airTimeStopGuard: [2, 0],
   rushAirHit: [1, 0],
+  // PCs 1212, 1235.
+  tatumakiIn: [3, 0],
+  tatumakiOut: [3, 0],
 };
 for (const action of [
   'hitHeavy',
@@ -236,6 +245,7 @@ for (const action of [
   'twist',
   'fly',
   'uppercut',
+  'liftUp',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as do 132 (PC 1783) and 108–109 (PCs
@@ -270,6 +280,13 @@ const RESPONSE_REACTIONS: Record<
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
   96: { action: 'uppercut', stop: 13 },
+  // Kiki's ranbu reaches 'DRAGON Fireball' through response 63, which plays
+  // as 96 does, and her EN3 'DRAGON Yinan' through 82.
+  125: { action: 'uppercut', stop: 13 },
+  126: { action: 'liftUp', stop: 13 },
+  // Its beam reaches 99 and 100 through responses 44 and 45, with no op 0x1a.
+  99: { action: 'tatumakiIn', stop: 0 },
+  100: { action: 'tatumakiOut', stop: 0 },
   // Ryuko's DST missiles (218), Zoma's hatchets and Shin Spark reach it
   // through response 32 (PC 1000: 13 stop ticks).
   85: { action: 'twist', stop: 13 },
@@ -384,10 +401,15 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
-// 1159, 1403, 1425, 1619, 1787): 75, 76, 80, 96 and 132 only skip a sound,
-// while 83, 84, 108, 109 and 122 swap their first three poses.
+// 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
+// 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
+// first three poses. Ryuko's jump hit (77) has none, but Zoma's and Kiki's
+// (78, PC 784) roll which displays play.
 const ROLLED: Partial<Record<Action, number>> = {
   uppercut: 96,
+  liftUp: 126,
+  tatumakiIn: 99,
+  tatumakiOut: 100,
   stun: 108,
   airStun: 109,
   hitHeavy: 75,
@@ -397,18 +419,23 @@ const ROLLED: Partial<Record<Action, number>> = {
   hitRapid: 83,
   airHitRapid: 84,
   rushAirHit: 122,
+  jumpHit: 77,
 };
-// Zoma's twins roll alike, but for his chuck toss (133), as does his jump
-// hit (78, PC 784).
-const ZOMA_ROLLED: Partial<Record<Action, number>> = {
-  ...Object.fromEntries(
-    Object.entries(ROLLED)
-      .filter(([action]) => action !== 'chuckToss')
-      .map(([action, index]) => [action, twin('zoma', index)]),
-  ),
-  jumpHit: 78,
-};
-const rolls = (who: Who) => (who === 'ryuko' ? ROLLED : ZOMA_ROLLED);
+// Each player's twins that roll in its own records: Zoma's chuck toss (133)
+// and Kiki's rises (97, 127) don't.
+const ROLLS = Object.fromEntries(
+  (Object.keys(CHARACTERS) as Who[]).map((who) => [
+    who,
+    Object.fromEntries(
+      Object.entries(ROLLED)
+        .map(([action, index]) => [action, twin(who, index)] as const)
+        .filter(([, index]) =>
+          script(index, who).events.some((e) => e.op === 'random'),
+        ),
+    ),
+  ]),
+) as Record<Who, Partial<Record<Action, number>>>;
+const rolls = (who: Who) => ROLLS[who];
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
 // A looping script never runs out, so its object lives until deleted.
 const loops = (e: Effect) => script(e.clip, e.who).end === 'loop';
@@ -429,14 +456,12 @@ const shown = (f: Fighter): Shown =>
   f.action === 'script' ? f.branch! : f.action;
 // Each player's engine states by number (the export's `neutral`), which a
 // handler enters as the port's actions, and their moves' levels (header r[2]).
-const NEUTRAL = {
-  ryuko: CHARACTERS.ryuko.neutral,
-  zoma: CHARACTERS.zoma.neutral,
-} as Record<Who, Record<string, Action>>;
-const LEVELS = {
-  ryuko: CHARACTERS.ryuko.levels,
-  zoma: CHARACTERS.zoma.levels,
-} as Record<Who, Record<string, number>>;
+const NEUTRAL = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([who, { neutral }]) => [who, neutral]),
+) as unknown as Record<Who, Record<string, Action>>;
+const LEVELS = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([who, { levels }]) => [who, levels]),
+) as unknown as Record<Who, Record<string, number>>;
 // Each victim action's source number (Ryuko's), for the guard reactions.
 const REACTION_INDEX = new Map(
   Object.entries(RESPONSE_REACTIONS).map(([index, { action }]) => [
@@ -1258,7 +1283,10 @@ export class Match {
     if (motion.drift && f.age < motion.tick)
       f.moving = f.facing * motion.drift * SOURCE_VELOCITY_SCALE;
     if (f.age === motion.tick) {
-      f.vx = f.facing * motion.vx * SOURCE_VELOCITY_SCALE;
+      // Kiki's HISA Down (124) flies out at raw −800 (PC 1522).
+      const vx =
+        f.who === 'kiki' && f.action === 'launchDown' ? -800 : motion.vx;
+      f.vx = f.facing * vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
       f.gravity = motion.gravity * SOURCE_ACCELERATION_SCALE;
       f.airAge = 0;
@@ -1522,6 +1550,9 @@ export class Match {
       case 'freeze':
         this.freeze += event.add;
         break;
+      // ponytail: slot 5 (+0x74) takes a struck object to its action
+      // (0x40edde), as Kiki's potatoes (189, 190) enter POTETO HIT (194);
+      // the port strikes only fighters, so it never fires.
       case 'handler':
         if (!('clip' in actor)) {
           const key = event.action && sourceKey(event.action, event.offset);

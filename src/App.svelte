@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { KEYS } from './game/commands';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
@@ -86,20 +87,37 @@
     { control: 'megaBeam', label: 'Mega Beam', symbol: '5' },
   ];
   const supers = new Set<Control>(SUPER_CONTROLS);
-  // Zoma's specials take Ryuko's special keys (commands.ts).
-  const zomaLabels: Partial<Record<Control, string>> = {
-    getterBeam: 'Spake',
-    musashi: 'DST',
-    changeAttack: 'EN300',
-    blackRush: 'Shin Spark',
-    drill: 'Dragon',
-    axe: 'Fire',
-    iori: 'Dragon 2',
-    dst: 'Bomb',
-    ex: 'G Beam',
-  };
+  // The others' moves take Ryuko's keys (commands.ts).
+  const fighterLabels: Partial<Record<Who, Partial<Record<Control, string>>>> =
+    {
+      zoma: {
+        getterBeam: 'Spake',
+        musashi: 'DST',
+        changeAttack: 'EN300',
+        blackRush: 'Shin Spark',
+        drill: 'Dragon',
+        axe: 'Fire',
+        iori: 'Dragon 2',
+        dst: 'Bomb',
+        ex: 'G Beam',
+      },
+      kiki: {
+        getterBeam: 'Ranbu',
+        musashi: 'Magic Fire',
+        changeAttack: 'EN3',
+        drill: 'Dragon O',
+        axe: "K'",
+        iori: 'Tatumaki',
+      },
+    };
   const labelOf = (control: Control, label: string) =>
-    (fighter === 'zoma' && zomaLabels[control]) || label;
+    fighterLabels[fighter]?.[control] || label;
+  // A move key the fighter has no command for has no button.
+  const moveKeys = new Set(
+    Object.values(KEYS).flatMap((keys) => keys.map(([control]) => control)),
+  );
+  const has = (control: Control) =>
+    !moveKeys.has(control) || KEYS[fighter].some(([key]) => key === control);
 
   onMount(() => {
     let disposed = false;
@@ -298,6 +316,7 @@
           >
             <option value="ryuko">Ryuko</option>
             <option value="zoma">Zoma</option>
+            <option value="kiki">Kiki</option>
           </select></label
         >
         <label
@@ -309,6 +328,7 @@
           >
             <option value="zoma">Zoma</option>
             <option value="ryuko">Ryuko</option>
+            <option value="kiki">Kiki</option>
           </select></label
         >
         <label
@@ -375,7 +395,7 @@
     </div>
   </section>
   <div class="touch-controls" aria-label="Touch controls">
-    {#each touchControls.filter((item) => fighter === 'ryuko' || item.control !== 'megaBeam') as item (item.control)}
+    {#each touchControls.filter( (item) => has(item.control) ) as item (item.control)}
       <button
         class:attack-control={[
           'punch',
@@ -420,9 +440,11 @@
       ><kbd>O</kbd> Throw</span
     ><span><kbd>H</kbd> Hit Up</span><span
       ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
-    ><span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span><span
-      ><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-    ><span><kbd>1</kbd>–<kbd>{fighter === 'zoma' ? 4 : 5}</kbd> Supers</span>
+    >{#if has('dst')}<span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span
+      >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
+      >{/if}<span
+      ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
+    >
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -558,8 +580,29 @@
           or DST cancels it for two stocks.
         </p>
         <p>
-          Below the arena, choose your fighter and the opponent, Zoma or Ryuko,
-          and one of eighteen stages, in either mode. Free practice has no
+          Choose Kiki to play her. <kbd>J</kbd> and <kbd>K</kbd> chain as Zoma's
+          do, her third punch a long lunge and her third kick a flying fist;
+          down with <kbd>K</kbd> throws a hopping potato. <kbd>Shift</kbd>
+          or → → hops forward (with back held, back), and in the air → → air dashes.
+          <kbd>H</kbd>
+          is her Hit Up (up on a hit chases),
+          <kbd>O</kbd> her chuck, a close grab that ends in a blast, and
+          blocking with a stock, <kbd>H</kbd> spends it on COUNTER HIT. Her
+          specials:
+          <kbd>U</kbd> or ↓→ <kbd>K</kbd> DRAGON O, a rising multi-hit (also in
+          the air), <kbd>I</kbd> or ↓→ <kbd>J</kbd> K', then → <kbd>K</kbd> a
+          dashing strike (stronger if repeated soon after it hits), →
+          <kbd>J</kbd> a shot or ← <kbd>K</kbd> BLACK OUT, and <kbd>F</kbd> or
+          ↓← <kbd>K</kbd> TATUMAKI, a hopping spin. Her supers: <kbd>1</kbd> or
+          ↓→↓← <kbd>J</kbd> ranbu, a dash into a slam and flurry, <kbd>2</kbd>
+          or ↓→↓→ <kbd>J</kbd> MAGIC FIRE, eleven fireballs, for a stock each,
+          and <kbd>3</kbd> or ↓→↓→ <kbd>K</kbd> EN3 majic dance for three: it lifts
+          the opponent, then witches fly in and a beam hops them in and out. As TATUMAKI
+          lands, ranbu or MAGIC FIRE cancels it for two stocks.
+        </p>
+        <p>
+          Below the arena, choose your fighter and the opponent, Zoma, Ryuko or
+          Kiki, and one of eighteen stages, in either mode. Free practice has no
           timer, and you also choose how the partner behaves: standing, guarding
           high or low, guarding in the air, attacking in range, jumping in, or
           playing as the original CPU. Max stock refills your supers whenever

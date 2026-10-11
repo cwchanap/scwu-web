@@ -7,6 +7,7 @@
 import type { Who } from './characters';
 import data from './generated/assets.json';
 import zoma from './generated/zoma.json';
+import kiki from './generated/kiki.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -18,10 +19,11 @@ export interface CommandEntry {
   crouch: number;
   steps: number[];
 }
-// Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25) and the
-// distance in source pixels that splits their near and far actions (+0x7ca3).
+// Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20)
+// and the distance in source pixels that splits their near and far actions
+// (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
-  { ryuko: data.commands, zoma: zoma.commands };
+  { ryuko: data.commands, zoma: zoma.commands, kiki: kiki.commands };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
 export const ENTRIES = entriesOf('ryuko');
@@ -86,8 +88,20 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 5],
     ['dash', 15],
   ],
+  // Kiki's supers ranbu, MAGIC FIRE and EN3 majic dance on 1-3, and her
+  // specials DRAGON O (5), K' (4) and TATUMAKI (6) on Ryuko's special keys,
+  // then DASH F (11) and DASH B (12).
+  kiki: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['drill', 5],
+    ['iori', 6],
+    ['axe', 4],
+    ['dash', 11],
+  ],
 };
-export const BACK_DASH: Record<Who, number> = { ryuko: 14, zoma: 16 };
+export const BACK_DASH: Record<Who, number> = { ryuko: 14, zoma: 16, kiki: 12 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
 

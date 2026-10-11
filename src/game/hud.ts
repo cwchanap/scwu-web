@@ -113,12 +113,13 @@ export function gaugeImage(tick: number) {
 }
 
 // Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
-// for 40 ticks each (PCs 712–730). Zoma's action 71 shows 2001 (PC 677).
+// for 40 ticks each (PCs 712–730). Zoma's and Kiki's action 71 shows 2001
+// (PCs 677, 666).
 export const faceImage = (face: number) =>
   face < 0 ? 2001 : [2002, 2001, 2000, 2001][Math.floor(face / 40) % 4];
 // The *NAME action's image: Ryuko's 66 shows 464 (PC 675), Zoma's 64 340
-// (PC 637).
-const NAMES: Record<Who, number> = { ryuko: 464, zoma: 340 };
+// (PC 637) and Kiki's 65 217 (PC 627).
+const NAMES: Record<Who, number> = { ryuko: 464, zoma: 340, kiki: 217 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
 const STOCK_OFFSETS = [

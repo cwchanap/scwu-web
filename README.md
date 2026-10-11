@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko or Zoma on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma or Kiki on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -88,7 +88,28 @@ Zoma's specials and supers take Ryuko's keys, and his original motion commands w
 | 4, or ↓←↓→ K               | Shin Spark below 30% health (else BOMB), 3 stocks               |
 | 1 or 2 after DRAGON hits   | SPAKE or DST cancels it, 2 stocks                               |
 
-Below the arena, choose your fighter and the opponent (Ryuko or Zoma), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+Kiki's moves take Ryuko's keys too:
+
+| Input                          | Kiki's move                                                     |
+| ------------------------------ | --------------------------------------------------------------- |
+| J / K                          | P 1 / K 1; on a hit or block, J or K again for P2 / K 2         |
+| J / K during P2 or K 2         | P3 (a long lunging punch) / K 3 (a flying fist)                 |
+| Down + J / K                   | Crouching punch / a hopping potato                              |
+| J / K in the air               | Air punch / kick (a different form after a double jump or dash) |
+| Shift or → →; Shift + ← or ← ← | Dash hop forward; back                                          |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                           |
+| H                              | Hit Up; on a hit, ↑ chases into the air                         |
+| O                              | Chuck: a close grab that ends in a blast                        |
+| Blocking with a stock: H       | COUNTER HIT                                                     |
+| U, or ↓→ K                     | DRAGON O, a rising multi-hit (ground or air)                    |
+| I, or ↓→ J                     | K'; then → K a dashing strike, → J a shot, or ← K BLACK OUT     |
+| F, or ↓← K                     | TATUMAKI, a hopping spin (ground or air)                        |
+| 1, or ↓→↓← J                   | ranbu: a dash into a slam and flurry, 1 stock                   |
+| 2, or ↓→↓→ J                   | MAGIC FIRE: eleven fireballs, 1 stock                           |
+| 3, or ↓→↓→ K                   | EN3 majic dance: a lift, then witches and a beam, 3 stocks      |
+| 1 or 2 as TATUMAKI lands       | ranbu or MAGIC FIRE cancels it, 2 stocks                        |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma or Kiki), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter at 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -104,7 +125,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** two fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** three fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -116,7 +137,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's and Zoma's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's and Kiki's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.
