@@ -99,10 +99,12 @@ export class StandingVM {
     opcode: number;
   }[] = [];
 
+  // `variables` seeds the player variables by selector (0x40 is variable 0).
   constructor(
     public program: IdleProgram,
     seed = 0,
     speed = 10,
+    variables: Record<number, number> = {},
   ) {
     if (
       !Number.isInteger(program.start) ||
@@ -117,6 +119,7 @@ export class StandingVM {
     )
       throw new Error('Invalid idle program');
     this.pc = program.start;
+    this.variables = { ...variables };
     this.seed = seed >>> 0;
     this.scale = timingScale(speed);
   }
@@ -203,9 +206,25 @@ export class StandingVM {
           continue;
         }
       } else if (op === 31) {
-        if (r[4] >> 6 === 3 || r[5] !== 1)
+        // A player variable's test (r[5] bits 2-3: 1 ==, 2 >, 3 <) jumps to
+        // r[1:3] + r[3]: Chung's checks EX mode (variable 0 at 100, PC 9).
+        const compare = (r[5] >> 2) & 3;
+        if (r[4] >> 6 === 1 && compare && !(r[5] & 3)) {
+          const variable = this.variables[r[4]] ?? 0;
+          const value = s16(r, 9);
+          if (
+            compare === 1
+              ? variable === value
+              : compare === 2
+                ? variable > value
+                : variable < value
+          ) {
+            this.target(u16(r, 1), r[3]);
+            continue;
+          }
+        } else if (r[4] >> 6 === 3 || r[5] !== 1)
           throw new Error(`Unsupported variable operation at PC ${pc}`);
-        this.variables[r[4]] = s16(r, 7);
+        else this.variables[r[4]] = s16(r, 7);
       } else if (op === 25) {
         if (r[9] >= 20) throw new Error('Collision slot out of range');
         this.collisionRecords[r[9]] = u16(r, 5) && u16(r, 7) ? pc : null;

@@ -6,6 +6,7 @@ import { CONTROLS } from './commands';
 import data from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
+import chung from './generated/chung.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -22,21 +23,23 @@ export interface CpuEntry {
   steps: CpuStep[];
 }
 // Ryuko's table: 100 slots of 111 bytes after the held-pose table, 43 used;
-// Zoma's uses 44, Kiki's 43.
+// Zoma's uses 44, Kiki's 43, Chung's 40.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
   zoma: zoma.cpu,
   kiki: kiki.cpu,
+  chung: chung.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
-// and Kiki's K' 18-20), write every command into their history as the engine
+// Kiki's K' 18-20 and Chung's cpu jump 21), write every command into their history as the engine
 // does (0x4115e3).
 export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   ryuko: CONTROLS,
   zoma: {},
   kiki: {},
+  chung: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;

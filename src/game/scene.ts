@@ -21,6 +21,7 @@ import {
 import type {
   Control,
   Effect,
+  Fighter,
   Mode,
   PracticeOptions,
   ShakeAxis,
@@ -97,8 +98,12 @@ const keyMap: Record<string, Control> = {
   Digit5: 'megaBeam',
 };
 
-const idleVM = (who: Who, seed?: number) =>
-  new StandingVM(CHARACTERS[who].idle, seed);
+// The free state's program (action 1), which reads the fighter's variable 0
+// (EX mode).
+const idleVM = (f: Fighter, seed?: number) =>
+  new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
+    0x40: f.variables[0] ?? 0,
+  });
 
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
@@ -130,7 +135,9 @@ export class TrainingScene extends Phaser.Scene {
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
   private quake: Match['quake'] = { x: null, y: null };
   private frame = 0;
-  private idle = this.match.fighters.map((f, i) => idleVM(f.who, i));
+  private idle = this.match.fighters.map((f, i) => idleVM(f, i));
+  // Whether each fighter's idle program ran on the last unfrozen step.
+  private idling = [true, true];
   private ready = false;
   private error = '';
   private lastStatus = '';
@@ -323,7 +330,8 @@ export class TrainingScene extends Phaser.Scene {
 
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
-    this.idle = this.match.fighters.map((f, i) => idleVM(f.who, i));
+    this.idle = this.match.fighters.map((f, i) => idleVM(f, i));
+    this.idling = [true, true];
     this.idle.forEach((vm) => vm.tick());
   }
 
@@ -482,14 +490,15 @@ export class TrainingScene extends Phaser.Scene {
           for (const index of letteringSounds(this.match))
             this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {
-            if (
-              frozen[i] ||
-              this.match.fighters[i].action !== 'idle' ||
-              this.match.fighters[i].hitStop > 0
-            )
+            const f = this.match.fighters[i];
+            if (frozen[i] || f.hitStop > 0) return;
+            if (f.action !== 'idle') {
+              this.idling[i] = false;
               return;
-            if (vm.ended)
-              this.idle[i] = idleVM(this.match.fighters[i].who, vm.seed);
+            }
+            // Entering action 1 starts its program again (0x410cf0).
+            if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
+            this.idling[i] = true;
             this.idle[i].tick();
           });
         });

@@ -8,6 +8,7 @@ import type { Who } from './characters';
 import data from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
+import chung from './generated/chung.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -19,11 +20,17 @@ export interface CommandEntry {
   crouch: number;
   steps: number[];
 }
-// Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20)
+// Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
+// Chung's 22)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
-  { ryuko: data.commands, zoma: zoma.commands, kiki: kiki.commands };
+  {
+    ryuko: data.commands,
+    zoma: zoma.commands,
+    kiki: kiki.commands,
+    chung: chung.commands,
+  };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
 export const ENTRIES = entriesOf('ryuko');
@@ -100,8 +107,28 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['axe', 4],
     ['dash', 11],
   ],
+  // Chung's supers gesar, KICK UP and EN3 on 1-3; his specials Dragon (6),
+  // orochi (4), BK (8) and Fire ball (7) on Ryuko's special keys, --TYPE--
+  // (13, TO EX) on EX, then Dash F (14) and Dash B (15). Jump wall move (5)
+  // and air fire (9) take their commands only.
+  chung: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['drill', 6],
+    ['iori', 4],
+    ['dst', 8],
+    ['axe', 7],
+    ['ex', 13],
+    ['dash', 14],
+  ],
 };
-export const BACK_DASH: Record<Who, number> = { ryuko: 14, zoma: 16, kiki: 12 };
+export const BACK_DASH: Record<Who, number> = {
+  ryuko: 14,
+  zoma: 16,
+  kiki: 12,
+  chung: 15,
+};
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
 

@@ -324,11 +324,14 @@ export function heldFrame(
   };
 }
 
-// Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends.
-export const INTRO_EX_TICK = clips.intro
-  .slice(2)
-  .filter((frame) => frame.pc < 348)
-  .reduce((total, frame) => total + frame.duration, 0);
+// Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
+// Chung's ROUND 1 checks at PC 338, from PC 332.
+const ticksBefore = (frames: Pose[], pc: number) =>
+  frames
+    .filter((frame) => frame.pc < pc)
+    .reduce((total, frame) => total + frame.duration, 0);
+export const INTRO_EX_TICK = ticksBefore(clips.intro.slice(2), 348);
+export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -369,6 +372,19 @@ export const animations = {
   // Responses 44 and 45 (Kiki's EN3 beam) → actions 99 and 100.
   tatumakiIn: clip(clips.tatumakiIn, false, [2, 2, 2, 25, 1]),
   tatumakiOut: clip(clips.tatumakiOut, false, [2, 2, 2, 25, 1]),
+  // Response 48 (Chung's crouching kick and air fire) → action 104, HISA's
+  // flight burning.
+  fireLaunch: clip(clips.fireLaunch, false, [2, 2, 2, 25, 1]),
+  // Response 37 (Chung's chuck) → action 91, flying flat out until a wall
+  // enters 95, which holds there, then drops.
+  flySide: clip(clips.flySide, false, [2, 2, 2, 1]),
+  flySideWall: clip(clips.flySideWall, false, [3, 3, 3, 3, 3, 3, 1]),
+  // Response 57 (Chung's EN300) → action 136, spinning in 93 until a wall
+  // enters 94, which bounces back out into 87's spin.
+  twistSide: clip([...clips.twistSide, ...clips.twistFly], 3),
+  twistWall: clip([...clips.twistWall, ...clips.twisting2], 2),
+  // Response 61 (Chung's lee) → action 137, a float before HISA.
+  gonMiss: clip(clips.gonMiss),
   // Responses 59 and 60 (Zoma's EN300 and DST) → actions 108 and 109, whose
   // op 0x20 reorders their shaking (+17, +18).
   stun: scriptClip(108),
@@ -462,8 +478,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
-    // Zoma's Start N (31) from PC 309 and Kiki's Round 1 (33) from PC 326:
-    // no op 0x01, so each stands where they start.
+    // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326 and
+    // Chung's ROUND 1 (33) from PC 332: no op 0x01, so each stands where they
+    // start.
     intro: clip(z.intro),
     guard: clip(z.guard.slice(0, 1)),
     crouchGuard: clip(z.crouchGuard.slice(0, 1)),
@@ -502,6 +519,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     liftUp: clip(z.liftUp, false, waits(z.liftUp)),
     tatumakiIn: clip(z.tatumakiIn, false, waits(z.tatumakiIn)),
     tatumakiOut: clip(z.tatumakiOut, false, waits(z.tatumakiOut)),
+    fireLaunch: clip(z.fireLaunch, false, waits(z.fireLaunch)),
+    flySide: clip(z.flySide, false, waits(z.flySide)),
+    flySideWall: clip(z.flySideWall, false, waits(z.flySideWall)),
+    twistSide: clip([...z.twistSide, ...z.twistFly], z.twistSide.length),
+    twistWall: clip([...z.twistWall, ...z.twisting2], z.twistWall.length),
+    gonMiss: clip(z.gonMiss),
     stun: timeline(108),
     airStun: timeline(109),
     dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
@@ -531,6 +554,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
 const TWIN_ANIMATIONS = {
   zoma: twinAnimations('zoma'),
   kiki: twinAnimations('kiki'),
+  chung: twinAnimations('chung'),
 };
 
 // Object keys name a spawned source object, played from its flattened timeline.

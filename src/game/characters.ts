@@ -1,20 +1,21 @@
 // Each player's exported container data: Ryuko's (01 RYUKO.PLAYER), Zoma's
-// (02 ZOMA.PLAYER) and Kiki's (03 KIKI.PLAYER); and each stage's objects,
-// images and track.
+// (02 ZOMA.PLAYER), Kiki's (03 KIKI.PLAYER) and Chung's (04 CHUNG.PLAYER);
+// and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
+import chung from './generated/chung.json';
 import stages from './generated/stages.json';
 
-export type Who = 'ryuko' | 'zoma' | 'kiki';
-export const CHARACTERS = { ryuko, zoma, kiki };
+export type Who = 'ryuko' | 'zoma' | 'kiki' | 'chung';
+export const CHARACTERS = { ryuko, zoma, kiki, chung };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
 // The container an object's scripts and images come from.
 export type Container = Who | Stage;
 
-// The life in the player's parameter block (+0x7caa): Ryuko's 510, the
-// others' 490. Each block puts the desperation threshold at 30% (+0x7ca6),
+// The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
+// 510, Zoma's and Kiki's 490. Each block puts the desperation threshold at 30% (+0x7ca6),
 // which 0x40e7c0 compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
 export const desperationOf = (who: Who) => Math.trunc((lifeOf(who) * 30) / 100);
@@ -30,7 +31,7 @@ export const responseEffectsOf = (who: Who): readonly number[] =>
 // through the response table and checks they play alike; the match runs
 // theirs through their Ryuko twins' rules.
 const twins = Object.fromEntries(
-  (['zoma', 'kiki'] as const).map((who) => {
+  (['zoma', 'kiki', 'chung'] as const).map((who) => {
     const own = new Map(
       Object.entries(CHARACTERS[who].twins).map(([r, z]) => [Number(r), z]),
     );

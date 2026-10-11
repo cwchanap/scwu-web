@@ -109,6 +109,15 @@
         axe: "K'",
         iori: 'Tatumaki',
       },
+      chung: {
+        getterBeam: 'Gesar',
+        musashi: 'Lee',
+        changeAttack: 'EN300',
+        drill: 'Dragon',
+        axe: 'Fire Ball',
+        iori: 'Orochi',
+        dst: 'Burn Knock',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -317,6 +326,7 @@
             <option value="ryuko">Ryuko</option>
             <option value="zoma">Zoma</option>
             <option value="kiki">Kiki</option>
+            <option value="chung">Chung</option>
           </select></label
         >
         <label
@@ -329,6 +339,7 @@
             <option value="zoma">Zoma</option>
             <option value="ryuko">Ryuko</option>
             <option value="kiki">Kiki</option>
+            <option value="chung">Chung</option>
           </select></label
         >
         <label
@@ -601,16 +612,38 @@
           lands, ranbu or MAGIC FIRE cancels it for two stocks.
         </p>
         <p>
-          Below the arena, choose your fighter and the opponent, Zoma, Ryuko or
-          Kiki, and one of eighteen stages, in either mode. Free practice has no
-          timer, and you also choose how the partner behaves: standing, guarding
-          high or low, guarding in the air, attacking in range, jumping in, or
-          playing as the original CPU. Max stock refills your supers whenever
-          you stand idle, and Low health keeps you at 30% for desperation moves.
-          Vs. CPU is the original game's CPU, playing the opponent's own moves,
-          specials and supers. Reduce their health to zero, or lead on health
-          when time runs out. Changing modes, fighters or the stage starts a
-          fresh match.
+          Choose Chung to play him. <kbd>J</kbd> and <kbd>K</kbd> chain as
+          Zoma's do, his third punch a strike that catches and blasts the
+          opponent away; down with <kbd>K</kbd> is a burning kick that knocks
+          down. <kbd>Shift</kbd> or → → dashes (with back held, back), up in the
+          air double jumps, and → → there air dashes. <kbd>H</kbd> is his Hit
+          Up, <kbd>O</kbd> his chuck, a close grab that hurls the opponent into
+          the screen's edge, and blocking with a stock, <kbd>H</kbd> spends it
+          on COUNTER HIT. <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> switches to EX mode
+          for half a stock, where several of his moves take their EX forms, and
+          back again. His specials: <kbd>U</kbd> or →↓↘ <kbd>J</kbd> Dragon
+          (also in the air), <kbd>I</kbd> or ↓→ <kbd>J</kbd> Fire ball, a thrown
+          star,
+          <kbd>F</kbd> or ←↓→ <kbd>K</kbd> orochi, <kbd>G</kbd> or ↓←
+          <kbd>J</kbd> Burn Knock, ↓← <kbd>K</kbd> jump wall move, and in the
+          air ↓→ <kbd>K</kbd> air fire. His supers: <kbd>1</kbd> or ↓←↓→
+          <kbd>J</kbd> gesar (in the air, nin star), <kbd>2</kbd> or ↓→↓→
+          <kbd>K</kbd> lee, kicks that carry the opponent up and leave them
+          floating, for a stock each (Evil gesar and Evil Lee below 30% health),
+          and <kbd>3</kbd> or ↓←↓← <kbd>K</kbd> EN300 for three: it shocks the opponent,
+          then lifts and tosses them about.
+        </p>
+        <p>
+          Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
+          Kiki or Chung, and one of eighteen stages, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you at 30%
+          for desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

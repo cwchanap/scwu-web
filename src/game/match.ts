@@ -3,6 +3,7 @@ import {
   animationDuration,
   animationFrame,
   clipPose,
+  CHUNG_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
@@ -155,6 +156,8 @@ const launchMotion: Partial<
       land: AnimatedAction;
       // Raw horizontal velocity before the launch, with no fall.
       drift?: number;
+      // The action a wall enters (op 0x02 slot 4).
+      wall?: AnimatedAction;
     }
   >
 > = {
@@ -167,6 +170,35 @@ const launchMotion: Partial<
   // and out from their first tick (PCs 1217, 1240).
   tatumakiIn: { tick: 0, vx: 500, vy: -720, gravity: 90, land: 'knockdown' },
   tatumakiOut: { tick: 0, vx: -500, vy: -720, gravity: 90, land: 'knockdown' },
+  // Response 48 (Chung's crouching kick and air fire) → action 104: HISA's
+  // flight (PC 1318).
+  fireLaunch: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
+  // Response 37 (Chung's chuck) → action 91: flat out with no fall (PC
+  // 1081) until a wall enters 95 (PC 1079), which drops at age 18 (PC 1141).
+  flySide: {
+    tick: 6,
+    vx: -1500,
+    vy: -500,
+    gravity: 0,
+    land: 'knockdown',
+    wall: 'flySideWall',
+  },
+  flySideWall: { tick: 18, vx: 0, vy: 0, gravity: 50, land: 'knockdown' },
+  // Response 57 (Chung's EN300) → action 136, the same flight (PC 1862),
+  // spinning in 93 until a wall enters 94 (PC 1106), which bounces it back
+  // out (PC 1126) into 87.
+  twistSide: {
+    tick: 6,
+    vx: -1500,
+    vy: -500,
+    gravity: 0,
+    land: 'knockdown',
+    wall: 'twistWall',
+  },
+  twistWall: { tick: 8, vx: 700, vy: -800, gravity: 60, land: 'knockdown' },
+  // Response 61 (Chung's lee) → action 137, floating from its first tick
+  // (PC 1871) until GON_MISS_TICKS.
+  gonMiss: { tick: 0, vx: -330, vy: -430, gravity: 0, land: 'knockdown' },
   // Response 60 (Zoma's DST) → action 109: nine ticks of shaking, then PC
   // 1434 drops it into 146 (PC 1433).
   airStun: { tick: 9, vx: 0, vy: -830, gravity: 80, land: 'knockdown' },
@@ -246,6 +278,9 @@ for (const action of [
   'fly',
   'uppercut',
   'liftUp',
+  'fireLaunch',
+  'flySide',
+  'twistSide',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as do 132 (PC 1783) and 108–109 (PCs
@@ -287,6 +322,13 @@ const RESPONSE_REACTIONS: Record<
   // Its beam reaches 99 and 100 through responses 44 and 45, with no op 0x1a.
   99: { action: 'tatumakiIn', stop: 0 },
   100: { action: 'tatumakiOut', stop: 0 },
+  // Chung's crouching kick and air fire reach 104 through response 48, his
+  // chuck 91 through 37, his EN300 136 through 57 and his lee 137 through 61;
+  // the last two have no op 0x1a.
+  104: { action: 'fireLaunch', stop: 13 },
+  91: { action: 'flySide', stop: 13 },
+  136: { action: 'twistSide', stop: 0 },
+  137: { action: 'gonMiss', stop: 0 },
   // Ryuko's DST missiles (218), Zoma's hatchets and Shin Spark reach it
   // through response 32 (PC 1000: 13 stop ticks).
   85: { action: 'twist', stop: 13 },
@@ -420,6 +462,7 @@ const ROLLED: Partial<Record<Action, number>> = {
   airHitRapid: 84,
   rushAirHit: 122,
   jumpHit: 77,
+  flySide: 91,
 };
 // Each player's twins that roll in its own records: Zoma's chuck toss (133)
 // and Kiki's rises (97, 127) don't.
@@ -444,13 +487,17 @@ const sourceKey = (action: number, offset: number): ObjectKey =>
   offset ? `${action}+${offset}` : action;
 // The timeline a scripted fighter runs.
 const timeline = (f: Fighter) => f.branch!;
-// The source action a scripted fighter plays, or null.
-const playingSource = (f: Fighter) =>
-  f.action === 'script' ? Number(String(f.branch).split('+')[0]) : null;
 // Op 0x1f player variable 0 at 10: Ryuko's EX mode, which EX Ch (204, PC
-// 2867) sets and NOR Ch (205, PC 2880) clears. Zoma's counts his bombs.
-export const exMode = (f: Fighter) =>
-  f.who === 'ryuko' && f.variables[0] === 10;
+// 2867) sets and NOR Ch (205, PC 2880) clears; Chung's at 100, set by TO EX
+// (229, PC 3191) and cleared by TO NOR (230, PC 3204). Zoma's counts his
+// bombs. Each intro's op 0x16 jumps while down is held when the tick comes:
+// Ryuko's to 'Chage Character' (37), Chung's (PC 338) to Change EX (35),
+// which set it and jump back.
+const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
+  ryuko: { value: 10, intro: INTRO_EX_TICK },
+  chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
+};
+export const exMode = (f: Fighter) => f.variables[0] === EX_MODE[f.who]?.value;
 // What a fighter shows: under 'script', its source action's timeline.
 const shown = (f: Fighter): Shown =>
   f.action === 'script' ? f.branch! : f.action;
@@ -901,9 +948,11 @@ const clampX = (x: number) =>
   Math.max((cameraLeft + 50) * 1.5, Math.min((cameraLeft + 590) * 1.5, x));
 // Moves stop at the walls at once; settle hands on the distance stopped. The
 // left wall measures it as (50 − camera) − x (0x40fbdd), not from the wall.
+// True when a wall stopped it.
 function placeX(f: Fighter, x: number) {
   f.x = clampX(x);
   f.stopped += f.x > x ? Math.max(0, (50 - cameraLeft) * 1.5 - x) : f.x - x;
+  return f.x !== x;
 }
 const clampCamera = ({ x, y }: { x: number; y: number }) => ({
   x: Math.max(0, Math.min(640, x)),
@@ -1276,6 +1325,24 @@ export class Match {
       this.action(f, 'getUp');
   }
 
+  // GON MISS (137) floats until its display ends (PC 1873). Then its op
+  // 0x15 (PC 1874) takes 40 life from the victim and adds 5 power to it and
+  // 3 to the striker, and PC 1875 jumps into HISA (80), running its first
+  // records at once: 13 stop ticks for both and its own power. Life that
+  // runs out queues the lose action.
+  private gonMiss(f: Fighter, other: Fighter) {
+    if (f.action !== 'gonMiss' || f.age < animationDuration(f.action, f.who))
+      return false;
+    const wasOut = f.hp === 0;
+    other.damage += loseLife(f, 40);
+    addPower(f, 5);
+    addPower(other, 3);
+    this.queue(f, 'launchAway', 13, 13);
+    this.enterPending(f, other);
+    if (f.hp === 0) this.queue(f, knockedOut(wasOut));
+    return true;
+  }
+
   private moveLaunch(f: Fighter) {
     const motion = launchMotion[f.action];
     if (!motion) return false;
@@ -1283,9 +1350,12 @@ export class Match {
     if (motion.drift && f.age < motion.tick)
       f.moving = f.facing * motion.drift * SOURCE_VELOCITY_SCALE;
     if (f.age === motion.tick) {
-      // Kiki's HISA Down (124) flies out at raw −800 (PC 1522).
+      // Kiki's and Chung's HISA Down (124, 127) fly out at raw −800 (PCs
+      // 1522, 1582).
       const vx =
-        f.who === 'kiki' && f.action === 'launchDown' ? -800 : motion.vx;
+        (f.who === 'kiki' || f.who === 'chung') && f.action === 'launchDown'
+          ? -800
+          : motion.vx;
       f.vx = f.facing * vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
       f.gravity = motion.gravity * SOURCE_ACCELERATION_SCALE;
@@ -1327,11 +1397,11 @@ export class Match {
       // A queued action takes the victim at its next step.
       if (target.pending) return;
       const holder = this.fighters[1 - index];
-      if (
-        (target.action === 'superHeld' &&
-          (holder.action !== 'script' || holder.hp === 0)) ||
-        (target.action === 'shock' && playingSource(holder) !== 294)
-      ) {
+      const held =
+        target.action === 'superHeld' ||
+        target.action === 'shock' ||
+        Boolean(target.held?.pose);
+      if (held && (holder.action !== 'script' || holder.hp === 0)) {
         // One held below the floor is set on it.
         target.y = Math.min(0, target.y);
         this.action(target, target.y < 0 ? 'airHit' : 'hit');
@@ -1595,7 +1665,7 @@ export class Match {
           return this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       case 'hold':
-        if (!this.catchHeld(other)) break;
+        if (!this.struck(other)) break;
         other.held = {
           pose: event.pose,
           flags: event.flags,
@@ -1610,12 +1680,7 @@ export class Match {
         break;
       case 'apply': {
         const reaction = RESPONSE_REACTIONS[victimOf(other, event.response)];
-        // Op 0x14 (0x413057) reaches whoever this player's box last struck
-        // (+0xdef9, 0x40f2e0), held or not: DST juggles its tossed victim.
-        const caught =
-          this.catchHeld(other) ||
-          (other.striker !== null && other.hp > 0 && markHeld(other));
-        if (!reaction || !caught) break;
+        if (!reaction || !this.struck(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         // Like a contact it queues the reaction (0x413136), and it clears
@@ -1731,6 +1796,16 @@ export class Match {
     return true;
   }
 
+  // Ops 0x07 (0x412e93) and 0x14 (0x413057) reach whoever this player's box
+  // last struck (+0xdef9, 0x40f2e0), held or not: DST juggles its tossed
+  // victim, and Chung's EN300 holds the one its shock struck.
+  private struck(target: Fighter) {
+    return (
+      this.catchHeld(target) ||
+      (target.striker !== null && target.hp > 0 && Boolean(markHeld(target)))
+    );
+  }
+
   // Ops 0x07 and 0x14, and a flag-0x10 hold's motion step, place the victim
   // from the holder past walls and floor alike; its own motion step then
   // clamps it to the walls (settle).
@@ -1808,7 +1883,7 @@ export class Match {
   // the striker is reeling from a hit itself (0x40faf0); guarding, it still
   // takes it. An object striker's bits stay clear, so its owner always does.
   // Fighter 1 moves it this tick, fighter 0 the next.
-  private settle(f: Fighter) {
+  private settle(f: Fighter, walled = false) {
     const other = this.fighters[1 - this.fighters.indexOf(f)];
     f.x += f.transfer;
     f.transfer = 0;
@@ -1821,7 +1896,11 @@ export class Match {
       (other.held?.flags ?? 0) & 0x10
     )
       this.placeHeld(f, other);
-    placeX(f, f.x);
+    walled = placeX(f, f.x) || walled;
+    // 0x40fcab: stopped by a wall, a player with a wall handler (op 0x02 slot
+    // 4, +0x70) queues its action (+0x38).
+    const wall = launchMotion[f.action]?.wall;
+    if (walled && wall) this.queue(f, wall);
     const reeling = f.striker === 'body' && (other.reaction & 12) === 8;
     if (f.hp > 0 && f.reaction & 8 && f.striker && !reeling)
       other.transfer += f.stopped;
@@ -1835,15 +1914,16 @@ export class Match {
   // velocity and the velocity to the position with no floor, as the next
   // step lands it (land), then takes the transfer and the walls (settle).
   private travel(f: Fighter) {
+    let walled = false;
     if (f.hitStop === 0) {
       if (f.action === 'script' || f.moving === 'velocity') {
         f.vx += f.ax;
         f.vy += f.gravity;
-        placeX(f, f.x + f.vx);
+        walled = placeX(f, f.x + f.vx);
         f.y += f.vy;
-      } else if (f.moving) placeX(f, f.x + f.moving);
+      } else if (f.moving) walled = placeX(f, f.x + f.moving);
     }
-    this.settle(f);
+    this.settle(f, walled);
   }
 
   // The pass then moves each unstopped object, the stage's too, and one
@@ -2196,6 +2276,7 @@ export class Match {
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
     if (f.action === 'script' && this.moveScripted(f)) return;
+    if (this.gonMiss(f, other)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
     const reaction = AIR_REACTIONS[f.action];
@@ -2503,13 +2584,11 @@ export class Match {
       for (const [i, f] of this.fighters.entries()) {
         if (f.action !== 'intro') continue;
         f.age++;
-        // Action 33's op 0x16 at PC 348 jumps to 'Chage Character' (37)
-        // while down is held; it sets variable 0 to 10 and jumps back.
-        // Zoma's intro has no such check.
-        const ryuko = f.who === 'ryuko';
-        if (ryuko && f.age === INTRO_EX_TICK && [player, opponent][i]?.crouch)
-          f.variables[0] = 10;
-        if (ryuko && f.age <= INTRO_WALK_TICKS)
+        // EX_MODE: Zoma's and Kiki's intros have no such check.
+        const ex = EX_MODE[f.who];
+        if (f.age === ex?.intro && [player, opponent][i]?.crouch)
+          f.variables[0] = ex.value;
+        if (f.who === 'ryuko' && f.age <= INTRO_WALK_TICKS)
           f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
         if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }
