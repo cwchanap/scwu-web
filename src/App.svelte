@@ -118,6 +118,16 @@
         iori: 'Orochi',
         dst: 'Burn Knock',
       },
+      amiro: {
+        getterBeam: 'SCC',
+        musashi: 'Medeo',
+        changeAttack: 'NT',
+        blackRush: 'Funnal',
+        drill: 'Dragon',
+        axe: 'Beam',
+        iori: 'Coment Chuck',
+        dst: 'Morning Star',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -327,6 +337,7 @@
             <option value="zoma">Zoma</option>
             <option value="kiki">Kiki</option>
             <option value="chung">Chung</option>
+            <option value="amiro">Amiro</option>
           </select></label
         >
         <label
@@ -340,6 +351,7 @@
             <option value="ryuko">Ryuko</option>
             <option value="kiki">Kiki</option>
             <option value="chung">Chung</option>
+            <option value="amiro">Amiro</option>
           </select></label
         >
         <label
@@ -634,8 +646,28 @@
           then lifts and tosses them about.
         </p>
         <p>
+          Choose Amiro to play her. <kbd>J</kbd> and <kbd>K</kbd> chain as
+          Chung's do: her third punch lunges and hurls the opponent into the
+          screen's edge, her third kick throws a bouncing ball, and down with
+          <kbd>K</kbd> sweeps. <kbd>H</kbd> is her Hit Up, <kbd>O</kbd> her
+          chuck, a grab and a spinning toss, and blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd> switches to EX mode for half a stock, and back, which
+          swaps her specials and supers for other forms. Her specials:
+          <kbd>U</kbd> or →↓↘ <kbd>J</kbd> Dragon (also in the air),
+          <kbd>I</kbd> or ↓→↓→ <kbd>K</kbd> BEAM, <kbd>F</kbd> or ←↓→
+          <kbd>K</kbd> Coment chuck, a grab that throws the opponent straight
+          up, and <kbd>G</kbd> or ↓← <kbd>J</kbd> morning star, a flail. Her
+          supers: <kbd>1</kbd> or →↓←→↓← <kbd>J</kbd> scc, a grab, a toss up and
+          a beam, <kbd>3</kbd> or ↓←↓← <kbd>K</kbd> NT, a flying unit that
+          strikes from range, and <kbd>4</kbd> or ↓→↓→ <kbd>J</kbd> funnal,
+          drones that fire beams, for a stock each, and <kbd>2</kbd> or ↓←↓→
+          <kbd>J</kbd> medeo, a meteor drop, for three (Evil forms of NT, funnal and
+          medeo below 30% health).
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki or Chung, and one of eighteen stages, in either mode. Free
+          Kiki, Chung or Amiro, and one of eighteen stages, in either mode. Free
           practice has no timer, and you also choose how the partner behaves:
           standing, guarding high or low, guarding in the air, attacking in
           range, jumping in, or playing as the original CPU. Max stock refills

@@ -9,6 +9,7 @@ import data from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
 import chung from './generated/chung.json';
+import amiro from './generated/amiro.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -30,6 +31,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     zoma: zoma.commands,
     kiki: kiki.commands,
     chung: chung.commands,
+    amiro: amiro.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -122,12 +124,28 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 13],
     ['dash', 14],
   ],
+  // Amiro's supers scc, medeo, NT and funnal on 1-4; her specials Dragon (7),
+  // Coment chuck (6), morning star (8) and BEAM (5) on Ryuko's special keys,
+  // ----- (9, EX Ch) on EX, then Dash F (13) and Dash B (14).
+  amiro: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['blackRush', 4],
+    ['drill', 7],
+    ['iori', 6],
+    ['dst', 8],
+    ['axe', 5],
+    ['ex', 9],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
   zoma: 16,
   kiki: 12,
   chung: 15,
+  amiro: 14,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

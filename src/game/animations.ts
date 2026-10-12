@@ -325,13 +325,15 @@ export function heldFrame(
 }
 
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
-// Chung's ROUND 1 checks at PC 338, from PC 332.
+// Chung's ROUND 1 checks at PC 338, from PC 332, and Amiro's Round BR at PC
+// 382.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
     .reduce((total, frame) => total + frame.duration, 0);
 export const INTRO_EX_TICK = ticksBefore(clips.intro.slice(2), 348);
 export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
+export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -375,6 +377,8 @@ export const animations = {
   // Response 48 (Chung's crouching kick and air fire) → action 104, HISA's
   // flight burning.
   fireLaunch: clip(clips.fireLaunch, false, [2, 2, 2, 25, 1]),
+  // Response 52 (Amiro's Coment chuck and scc) → action 134, thrown up.
+  chuckUp: clip(clips.chuckUp, false, [1, 30, 10, 1]),
   // Response 37 (Chung's chuck) → action 91, flying flat out until a wall
   // enters 95, which holds there, then drops.
   flySide: clip(clips.flySide, false, [2, 2, 2, 1]),
@@ -480,7 +484,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     crouchTurn: clip(z.crouchTurn),
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326 and
     // Chung's ROUND 1 (33) from PC 332: no op 0x01, so each stands where they
-    // start.
+    // start. Amiro's Round BR (33) drives in on her car (introMotion).
     intro: clip(z.intro),
     guard: clip(z.guard.slice(0, 1)),
     crouchGuard: clip(z.crouchGuard.slice(0, 1)),
@@ -520,6 +524,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     tatumakiIn: clip(z.tatumakiIn, false, waits(z.tatumakiIn)),
     tatumakiOut: clip(z.tatumakiOut, false, waits(z.tatumakiOut)),
     fireLaunch: clip(z.fireLaunch, false, waits(z.fireLaunch)),
+    chuckUp: clip(z.chuckUp, false, waits(z.chuckUp)),
     flySide: clip(z.flySide, false, waits(z.flySide)),
     flySideWall: clip(z.flySideWall, false, waits(z.flySideWall)),
     twistSide: clip([...z.twistSide, ...z.twistFly], z.twistSide.length),
@@ -555,6 +560,7 @@ const TWIN_ANIMATIONS = {
   zoma: twinAnimations('zoma'),
   kiki: twinAnimations('kiki'),
   chung: twinAnimations('chung'),
+  amiro: twinAnimations('amiro'),
 };
 
 // Object keys name a spawned source object, played from its flattened timeline.

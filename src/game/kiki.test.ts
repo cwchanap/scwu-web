@@ -53,7 +53,7 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('kiki')[id]]] : [],
     );
-    expect(paired).toHaveLength(63);
+    expect(paired).toHaveLength(64);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 

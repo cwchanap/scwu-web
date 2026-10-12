@@ -3,6 +3,7 @@ import {
   animationDuration,
   animationFrame,
   clipPose,
+  AMIRO_INTRO_EX_TICK,
   CHUNG_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
@@ -173,6 +174,9 @@ const launchMotion: Partial<
   // Response 48 (Chung's crouching kick and air fire) → action 104: HISA's
   // flight (PC 1318).
   fireLaunch: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
+  // Response 52 (Amiro's Coment chuck and scc) → action 134: thrown straight
+  // up after its first display (PC 1825), landing into 146 (PC 1824).
+  chuckUp: { tick: 1, vx: -160, vy: -2000, gravity: 80, land: 'knockdown' },
   // Response 37 (Chung's chuck) → action 91: flat out with no fall (PC
   // 1081) until a wall enters 95 (PC 1079), which drops at age 18 (PC 1141).
   flySide: {
@@ -283,10 +287,11 @@ for (const action of [
   'twistSide',
 ] as const)
   REACTION_POWER[action] = [5, 3];
-// Action 135 credits only the victim, as do 132 (PC 1783) and 108–109 (PCs
-// 1400, 1421).
+// Action 135 credits only the victim, as do 132 (PC 1783), 134 (PC 1818) and
+// 108–109 (PCs 1400, 1421).
 REACTION_POWER.drillDown = [5, 0];
 REACTION_POWER.chuckToss = [8, 0];
+REACTION_POWER.chuckUp = [5, 0];
 REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929).
 const reactionPower = (f: Fighter): [number, number] => {
@@ -294,11 +299,28 @@ const reactionPower = (f: Fighter): [number, number] => {
   const extra = f.who === 'zoma' && f.action === 'crouchBlock' ? 2 : 0;
   return [victim + extra, attacker];
 };
-// Action 33 walks at raw velocity 200 until PC 339, after its first 50 ticks.
-// Zoma's Start N (31) has no op 0x01, so he starts where Ryuko's walk ends.
-const INTRO_WALK_TICKS = 50;
+// The intros' op 0x01 runs, as [ticks, raw vx] from the clip's start: action
+// 33 walks at 200 until PC 339, after its first 50 ticks; Amiro's Round BR
+// (33) drives in at 600 after its first display (PC 367), then at 60 (PC
+// 372). The others' have no op 0x01, so they start where these end.
+const INTRO_MOTION: Partial<Record<Who, [number, number][]>> = {
+  ryuko: [[50, 200]],
+  amiro: [
+    [2, 0],
+    [32, 600],
+    [15, 60],
+  ],
+};
+const introVx = (who: Who, age: number) => {
+  for (const [ticks, vx] of INTRO_MOTION[who] ?? []) {
+    if (age < ticks) return vx;
+    age -= ticks;
+  }
+  return 0;
+};
 const introWalk = (who: Who) =>
-  who === 'ryuko' ? INTRO_WALK_TICKS * 200 * SOURCE_VELOCITY_SCALE : 0;
+  (INTRO_MOTION[who] ?? []).reduce((x, [ticks, vx]) => x + ticks * vx, 0) *
+  SOURCE_VELOCITY_SCALE;
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
 // Victim actions reached through the response table, with their op 0x1a stops
@@ -329,6 +351,8 @@ const RESPONSE_REACTIONS: Record<
   91: { action: 'flySide', stop: 13 },
   136: { action: 'twistSide', stop: 0 },
   137: { action: 'gonMiss', stop: 0 },
+  // Amiro's Coment chuck and scc reach 134 through response 52 (op 0x14).
+  134: { action: 'chuckUp', stop: 0 },
   // Ryuko's DST missiles (218), Zoma's hatchets and Shin Spark reach it
   // through response 32 (PC 1000: 13 stop ticks).
   85: { action: 'twist', stop: 13 },
@@ -442,12 +466,22 @@ function struck(
 }
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
+// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's and
+// Amiro's HISA Down (124, 127, 128) at −800 (PCs 1522, 1582, 1883), and
+// Amiro's Tatumaki >> (105) at −300 (PC 1398).
+const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
+  kiki: { launchDown: -800 },
+  chung: { launchDown: -800 },
+  amiro: { launchDown: -800, tatumakiOut: -300 },
+};
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
 // first three poses. Ryuko's jump hit (77) has none, but Zoma's and Kiki's
-// (78, PC 784) roll which displays play.
+// (78, PC 784) roll which displays play, and Amiro's knockdown (84, PC
+// 990) whether to skip its sound.
 const ROLLED: Partial<Record<Action, number>> = {
+  sweep: 79,
   uppercut: 96,
   liftUp: 126,
   tatumakiIn: 99,
@@ -492,12 +526,19 @@ const timeline = (f: Fighter) => f.branch!;
 // (229, PC 3191) and cleared by TO NOR (230, PC 3204). Zoma's counts his
 // bombs. Each intro's op 0x16 jumps while down is held when the tick comes:
 // Ryuko's to 'Chage Character' (37), Chung's (PC 338) to Change EX (35),
-// which set it and jump back.
+// which set it and jump back. Amiro's at 100 too, set by EX Ch (214, PC 3287)
+// and cleared by NOR Ch (215, PC 3300); her intro's (PC 382) enters EX
+// CHANGE (39) + 3, which jumps to the same displays in Round 1 (32 + 6).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
+  amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
 };
-export const exMode = (f: Fighter) => f.variables[0] === EX_MODE[f.who]?.value;
+// Zoma and Kiki have none, whatever their variable 0 holds.
+export const exMode = (f: Fighter) => {
+  const ex = EX_MODE[f.who];
+  return ex !== undefined && f.variables[0] === ex.value;
+};
 // What a fighter shows: under 'script', its source action's timeline.
 const shown = (f: Fighter): Shown =>
   f.action === 'script' ? f.branch! : f.action;
@@ -1294,10 +1335,12 @@ export class Match {
   // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
   // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
-  // (PCs 641–644), then lies while the round is over (PC 645).
+  // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
+  // is over (PC 645).
   private moveKO(f: Fighter) {
     if (f.action === 'koLand') {
-      if (f.age <= 10) f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
+      if (f.age <= (f.who === 'amiro' ? 12 : 10))
+        f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
       return true;
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
@@ -1350,12 +1393,7 @@ export class Match {
     if (motion.drift && f.age < motion.tick)
       f.moving = f.facing * motion.drift * SOURCE_VELOCITY_SCALE;
     if (f.age === motion.tick) {
-      // Kiki's and Chung's HISA Down (124, 127) fly out at raw −800 (PCs
-      // 1522, 1582).
-      const vx =
-        (f.who === 'kiki' || f.who === 'chung') && f.action === 'launchDown'
-          ? -800
-          : motion.vx;
+      const vx = LAUNCH_VX[f.who]?.[f.action] ?? motion.vx;
       f.vx = f.facing * vx * SOURCE_VELOCITY_SCALE;
       f.vy = motion.vy * SOURCE_VELOCITY_SCALE;
       f.gravity = motion.gravity * SOURCE_ACCELERATION_SCALE;
@@ -2588,8 +2626,10 @@ export class Match {
         const ex = EX_MODE[f.who];
         if (f.age === ex?.intro && [player, opponent][i]?.crouch)
           f.variables[0] = ex.value;
-        if (f.who === 'ryuko' && f.age <= INTRO_WALK_TICKS)
-          f.x = clampX(f.x + f.facing * 200 * SOURCE_VELOCITY_SCALE);
+        f.x = clampX(
+          f.x + f.facing * introVx(f.who, f.age - 1) * SOURCE_VELOCITY_SCALE,
+        );
+        this.enter(f, i);
         if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }
       // History keeps recording, so a button held through the intro must be

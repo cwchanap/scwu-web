@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki or Chung on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung or Amiro on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -131,7 +131,29 @@ So do Chung's:
 | 2, or ↓→↓→ K                   | lee: kicks that carry the opponent up to float, 1 stock            |
 | 3, or ↓←↓← K                   | EN300: a shock, then lifts and tosses, 3 stocks                    |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki or Chung), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+So do Amiro's:
+
+| Input                          | Amiro's move                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1; on a hit or block, J or K again for P2 / K2, then P3 / K3                            |
+| P3 / K3                        | A lunge that hurls the opponent into the screen's edge / a bouncing ball                      |
+| Down + J / K                   | Crouching punch / a sweep                                                                     |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                            |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                         |
+| H                              | Hit Up                                                                                        |
+| O                              | Chuck: a close grab and a spinning toss                                                       |
+| Blocking with a stock: H       | COUNTER HIT                                                                                   |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): EX forms of her specials and supers                    |
+| U, or →↓↘ J                    | Dragon (ground or air); in EX mode EX Beam, an anti-air beam, or in the air EX Air Dragon     |
+| I, or ↓→↓→ K                   | BEAM; in EX mode funnal call, a drone that fires a beam                                       |
+| F, or ←↓→ K                    | Coment chuck: a grab that throws the opponent straight up; in EX mode Crush                   |
+| G, or ↓← J                     | morning star, a flail; in EX mode NT                                                          |
+| 1, or →↓←→↓← J                 | scc: a grab, a toss up and a beam, 1 stock (in EX mode WHIP)                                  |
+| 2, or ↓←↓→ J                   | medeo: a meteor drop, 3 stocks (Evil En3 below 30% health)                                    |
+| 3, or ↓←↓← K                   | NT: a flying unit that strikes from range, 1 stock (EVIL NT below 30% health, EXR in EX mode) |
+| 4, or ↓→↓→ J                   | funnal: drones that fire beams, 1 stock (evil funnal below 30% health, EFB in EX mode)        |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung or Amiro), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter at 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -147,7 +169,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** four fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** five fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -159,7 +181,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's and Chung's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's and Amiro's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

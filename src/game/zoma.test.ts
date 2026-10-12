@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
-import { fighterPose, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Input } from './match';
 import type { DummyBehavior } from './dummy';
 import { enter, RYUKO, strike } from './testing';
@@ -28,6 +28,15 @@ function zomaPlayer(gap = 120) {
 }
 
 describe('Zoma (02 ZOMA.PLAYER)', () => {
+  it('keeps his HUD face, as Kiki does, having no EX mode (action 71)', () => {
+    const match = new Match('practice', false, 0, ['zoma', 'kiki']);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.fighters.map((f) => [exMode(f), f.face])).toEqual([
+      [false, -1],
+      [false, -1],
+    ]);
+  });
+
   it('takes his life from his parameter block: 490, desperate at 147', () => {
     expect([lifeOf('zoma'), desperationOf('zoma')]).toEqual([490, 147]);
     const { zoma } = versus();
@@ -39,7 +48,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('zoma')[id]]] : [],
     );
-    expect(paired).toHaveLength(63);
+    expect(paired).toHaveLength(64);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
