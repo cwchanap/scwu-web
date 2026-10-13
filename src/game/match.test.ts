@@ -1086,13 +1086,19 @@ describe('practice partner', () => {
     expect(cpu.fighters[0].stock).toBe(0);
   });
 
-  it('holds Ryuko at 30% with Low health, for the desperation moves', () => {
-    const { match, ryuko } = partner('stand', 150);
-    match.practice.lowHealth = true;
-    match.step();
-    expect(ryuko.hp).toBe(153);
-    match.step({ dst: true });
-    expect(named(ryuko)).toBe('evilDst');
+  it('holds Ryuko just under 30% with Low health, for the desperation moves', () => {
+    for (const [input, action] of [
+      [{ dst: true }, 'evilDst'],
+      [{ blackRush: true }, 'blackRush'],
+    ] as const) {
+      const { match, ryuko } = partner('stand', 150);
+      match.practice.lowHealth = true;
+      ryuko.stock = 3;
+      match.step();
+      expect(ryuko.hp).toBe(152);
+      match.step(input);
+      expect(named(ryuko)).toBe(action);
+    }
   });
 });
 

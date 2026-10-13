@@ -146,6 +146,16 @@
         iori: 'H Punch',
         dst: 'Counter',
       },
+      suneo: {
+        getterBeam: 'HH',
+        musashi: 'GP',
+        changeAttack: 'EN300',
+        blackRush: 'BP',
+        drill: 'Drill Knee',
+        axe: 'Fire Ball',
+        iori: 'G Driver',
+        dst: 'Bike',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -358,6 +368,7 @@
             <option value="amiro">Amiro</option>
             <option value="anmc">ANMC P</option>
             <option value="giant">Giant</option>
+            <option value="suneo">G Suneo</option>
           </select></label
         >
         <label
@@ -374,6 +385,7 @@
             <option value="amiro">Amiro</option>
             <option value="anmc">ANMC P</option>
             <option value="giant">Giant</option>
+            <option value="suneo">G Suneo</option>
           </select></label
         >
         <label
@@ -734,16 +746,42 @@
           en300, which calls his friends, then a screen-wide barrage, for three.
         </p>
         <p>
+          Choose G Suneo to play her. <kbd>J</kbd> and <kbd>K</kbd> chain as
+          Chung's do: her third punch hurls the opponent into the screen's edge,
+          her third kick is a leaping kick that strikes again and again, and
+          down with <kbd>J</kbd> or <kbd>K</kbd> is a rising punch or a sliding
+          sweep. <kbd>H</kbd> is her Hit Up, <kbd>O</kbd> her chuck: a grab, a
+          hop back and a leaping throw that spins the opponent away. Blocking
+          with a stock, <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓
+          ↓ <kbd>H</kbd> switches to EX mode for half a stock, and back, which
+          swaps her second kick, crouching and air attacks, Hit Up, chuck and
+          specials for other forms. Her specials: <kbd>U</kbd> or →↓↘
+          <kbd>K</kbd> DRILL KNIEE, a rising knee (also in the air),
+          <kbd>I</kbd> or ↓→ <kbd>J</kbd> FIRE BALL, a shot that speeds up,
+          which a super can cancel, <kbd>F</kbd> or ↓← <kbd>J</kbd> G DRIVER, a
+          drill lance thrust that hurls the opponent into the screen's edge (in
+          EX mode a shocking strike), and <kbd>G</kbd> or ↓← <kbd>K</kbd> BIKE,
+          a leap on a golden lion (also in the air; in EX mode a wheel that
+          strikes again and again). Her supers: <kbd>2</kbd> or →↓←→↓←
+          <kbd>J</kbd> GP, a grab and a beating out of sight, and <kbd>4</kbd>
+          or ↓→↓→ <kbd>J</kbd> BP, a flying fist that strikes three times (a
+          ring below 30% health), for a stock each, <kbd>3</kbd> or ↓→↓→
+          <kbd>K</kbd>
+          en300, a shock, then a hammer, for three, and, below 30% health,
+          <kbd>1</kbd> or <kbd>K</kbd> <kbd>K</kbd> ← <kbd>J</kbd> <kbd>K</kbd>
+          hh, a screen-wide shock into a long beating, for three.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P or Giant, and one of eighteen stages, in
-          either mode. Free practice has no timer, and you also choose how the
-          partner behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, jumping in, or playing as the original CPU. Max
-          stock refills your supers whenever you stand idle, and Low health
-          keeps you at 30% for desperation moves. Vs. CPU is the original game's
-          CPU, playing the opponent's own moves, specials and supers. Reduce
-          their health to zero, or lead on health when time runs out. Changing
-          modes, fighters or the stage starts a fresh match.
+          Kiki, Chung, Amiro, ANMC P, Giant or G Suneo, and one of eighteen
+          stages, in either mode. Free practice has no timer, and you also
+          choose how the partner behaves: standing, guarding high or low,
+          guarding in the air, attacking in range, jumping in, or playing as the
+          original CPU. Max stock refills your supers whenever you stand idle,
+          and Low health keeps you just under 30% for desperation moves. Vs. CPU
+          is the original game's CPU, playing the opponent's own moves, specials
+          and supers. Reduce their health to zero, or lead on health when time
+          runs out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

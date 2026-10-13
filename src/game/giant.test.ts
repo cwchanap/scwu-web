@@ -52,7 +52,7 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[id, twins[ryuko], responsesOf('giant')[id]]] : [],
     );
-    expect(paired).toHaveLength(67);
+    expect(paired).toHaveLength(68);
     // Responses 69 and 70 (Kiki's En300, ANMC P's jump fire ball) name
     // UNCOUNTER DOWN and Air Fire (126, 127) where Ryuko's name DOWN and J
     // atttack: copies of his 83 and 81 that clear variable 4.

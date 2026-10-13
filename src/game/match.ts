@@ -7,6 +7,7 @@ import {
   ANMC_INTRO_EX_TICK,
   CHUNG_INTRO_EX_TICK,
   GIANT_INTRO_EX_TICK,
+  SUNEO_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
@@ -126,6 +127,7 @@ const reactionSlides: Partial<
   hit: { ...slide(5, -280), until: 25 }, // 73, PCs 758–760
   hitHeavy: slide(9, -650, 10), // 75, PC 800
   jumpHit: slide(9, -250, 10), // 77, PC 845
+  inatuma: slide(42, -650, 10), // 118, PC 1557
   hitPull: slide(9, 650, -10), // 121, PC 1602
   block: slide(8, -320), // 149, PC 2019
   crouchBlock: slide(8, -320), // 151, PC 2043
@@ -143,6 +145,7 @@ const reactionSlides: Partial<
 const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airHit: 74, // PCs 774/778: rise at raw 100, then −300/−650, ax 1, gravity 66
   airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
+  airInatuma: 120, // PC 1579: hangs still, without gravity
   airHitRapid: 84, // PCs 979/990: drift at −100, then −400/−830, gravity 80
   airBlock: 153, // PCs 2060/2063: −420, ax −15, gravity 70; vy 0 at age 3
   airBlockHeavy: 158, // PCs 2133/2136: −450 and vy 0 at age 6
@@ -289,6 +292,8 @@ for (const action of [
   'fireLaunch',
   'flySide',
   'twistSide',
+  'inatuma',
+  'airInatuma',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as do 132 (PC 1783), 134 (PC 1818) and
@@ -342,6 +347,8 @@ const RESPONSE_REACTIONS: Record<
   75: { action: 'hitHeavy', stop: 15 },
   76: { action: 'airHitHeavy', stop: 15 },
   77: { action: 'jumpHit', stop: 15 },
+  // G Suneo's EX D Driver reaches 118 through response 68.
+  118: { action: 'inatuma', stop: 15 },
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
   96: { action: 'uppercut', stop: 13 },
@@ -478,14 +485,16 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's,
-// ANMC P's and Giant's HISA Down (124, 127, 128, 125, 130) at −800 (PCs 1522,
-// 1582, 1883, 1631, 1799), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// ANMC P's, Giant's and G Suneo's HISA Down (124, 127, 128, 125, 130, 135) at
+// −800 (PCs 1522, 1582, 1883, 1631, 1799, 1756), and Amiro's Tatumaki >>
+// (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
   amiro: { launchDown: -800, tatumakiOut: -300 },
   anmc: { launchDown: -800 },
   giant: { launchDown: -800 },
+  suneo: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -549,13 +558,16 @@ const timeline = (f: Fighter) => f.branch!;
 // PC 3312); his intro's (PC 363) enters 'Chage Character' (39), as Ryuko's.
 // Giant's at 100, set by TO EX (231, PC 3408) and cleared by TO NORMAL (232,
 // PC 3421); his intro's (PC 328) enters Chung Style (37), which jumps back to
-// Round 1 (33 + 18).
+// Round 1 (33 + 18). G Suneo's at 100, set by TO EX (235, PC 3491) and
+// cleared by TO NORMAL (236, PC 3504); her intro's (PC 403) enters change
+// character (41), which sets it and jumps back (35 + 13, PC 464).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
   amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
   anmc: { value: 100, intro: ANMC_INTRO_EX_TICK },
   giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
+  suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
 };
 // Zoma and Kiki have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -666,6 +678,8 @@ const reactions = new Set<Action>([
   'airHitRapid',
   ...(Object.keys(launchMotion) as Action[]),
   'jumpHit',
+  'inatuma',
+  'airInatuma',
   'hitPull',
   'shock',
   'stun',
@@ -1225,6 +1239,8 @@ export class Match {
         history,
         key[0] === 'dash' && (word & 3) === 1 ? BACK_DASH[f.who] : key[1],
         f.who,
+        0,
+        true,
       );
     // Each word takes the step's direction too (0x411644).
     else if (input.command) inject(history, input.command, f.who, word & 15);
@@ -2364,7 +2380,12 @@ export class Match {
     const counter = own === undefined ? undefined : countersOf(f.who)[own];
     if (counter && f.variables[4] === 100) return this.enterSource(f, counter);
     if (counter === 0) f.variables[4] = 0;
-    this.action(f, action, true);
+    // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor.
+    this.action(
+      f,
+      action === 'inatuma' && f.y < 0 ? 'airInatuma' : action,
+      true,
+    );
     f.vx = f.vy = 0;
     f.moving = 0;
     this.pause(f, stop);
@@ -2407,6 +2428,15 @@ export class Match {
     if (this.gonMiss(f, other)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
+    // ERUS INATUMA AIR runs out into heavy air hit + 19 (PC 1582), its launch
+    // at age 6 (PC 823; export_fighter checks every player's), past its roll.
+    if (
+      f.action === 'airInatuma' &&
+      f.age >= animationDuration('airInatuma', f.who)
+    ) {
+      this.action(f, 'airHitHeavy', true, null);
+      f.age = 6;
+    }
     const reaction = AIR_REACTIONS[f.action];
     if (reaction)
       for (const event of script(twin(f.who, reaction), f.who).events)
@@ -2738,10 +2768,13 @@ export class Match {
           f.stock = MAX_STOCK;
           f.power = 0;
         }
+      // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
+      // Spark and G Suneo's hh enter their desperation forms only below it
+      // (op 0x11 at 153, 147 and 150 or more; the rest at it or below).
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(
           this.fighters[0].hp,
-          desperationOf(this.fighters[0].who),
+          desperationOf(this.fighters[0].who) - 1,
         );
     }
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];

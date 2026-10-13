@@ -334,8 +334,8 @@ export function heldFrame(
 
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
 // Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
-// ANMC P's Round 1 at PC 363, from PC 356, and Giant's Round 1 at PC 328,
-// from PC 313.
+// ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
+// from PC 313, and G Suneo's Round 1 at PC 403, from PC 393.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -345,6 +345,7 @@ export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
 export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
 export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
 export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
+export const SUNEO_INTRO_EX_TICK = ticksBefore(fighterClips.suneo.intro, 403);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -439,6 +440,12 @@ export const animations = {
   hitHeavy: clip(clips.hitHeavy),
   airHit: clip(clips.airHit),
   airHitHeavy: clip(clips.airHitHeavy),
+  // Response 68 (G Suneo's EX D Driver) → 'ヒット ERUS INATUMA' (118), which
+  // calls its rp (119) seven times (PC 1554) before its slide; airborne, its
+  // op 0x16 (PC 1541) enters ERUS INATUMA AIR (120), which calls it the same
+  // (PC 1580), then runs out into 76's launch (PC 1582).
+  inatuma: clip([...Array(7).fill(clips.inatumaRp).flat(), ...clips.inatuma]),
+  airInatuma: clip(Array(7).fill(clips.inatumaRp).flat()),
   // Op 0x20 in 83/84 picks which of two pose orders plays (PCs 957, 982); the
   // match rolls it and draws branch 83/84 + 18.
   hitRapid: scriptClip(83),
@@ -526,9 +533,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
-    // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356 and
-    // Giant's Round 1 (33) from PC 313: no op 0x01, so each stands where they
-    // start. Amiro's Round BR (33)
+    // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
+    // Giant's Round 1 (33) from PC 313 and G Suneo's Round 1 (35) from PC
+    // 393: no op 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car (introMotion).
     intro: clip(z.intro),
     ...guardAnimations(z),
@@ -536,6 +543,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     hitHeavy: clip(z.hitHeavy),
     airHit: clip(z.airHit),
     airHitHeavy: clip(z.airHitHeavy),
+    inatuma: clip([...Array(7).fill(z.inatumaRp).flat(), ...z.inatuma]),
+    airInatuma: clip(Array(7).fill(z.inatumaRp).flat()),
     jumpHit: clip(z.jumpHit),
     hitPull: clip(z.hitPull),
     hitRapid: timeline(83),
@@ -574,11 +583,19 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     koAgain: clip(z.koAgain),
     koLand: clip(z.down),
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
-    // 'win rp' (57) three times between its displays (PC 536), and Giant's
-    // loops from PC 560 (winLoop, PC 564).
+    // 'win rp' (57) three times before its last display (PC 536) and G
+    // Suneo's 'win talk' (67) seven times (PC 707), and Giant's loops from
+    // PC 560 (winLoop, PC 564).
     win: clip(
       z.winRp
-        ? [...z.winStand, z.win[0], ...Array(3).fill(z.winRp).flat(), z.win[1]]
+        ? [
+            ...z.winStand,
+            ...z.win.slice(0, -1),
+            ...Array(who === 'kiki' ? 3 : 7)
+              .fill(z.winRp)
+              .flat(),
+            ...z.win.slice(-1),
+          ]
         : [...z.winStand, ...z.win],
       z.winLoop
         ? z.winStand.length + z.win.findIndex((f) => f.pc === z.winLoop[0].pc)
@@ -598,6 +615,7 @@ const TWIN_ANIMATIONS = {
   amiro: twinAnimations('amiro'),
   anmc: twinAnimations('anmc'),
   giant: twinAnimations('giant'),
+  suneo: twinAnimations('suneo'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

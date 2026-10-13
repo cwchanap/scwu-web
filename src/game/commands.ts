@@ -12,6 +12,7 @@ import chung from './generated/chung.json';
 import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
+import suneo from './generated/suneo.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -24,7 +25,7 @@ export interface CommandEntry {
   steps: number[];
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
-// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18)
+// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -36,6 +37,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     amiro: amiro.commands,
     anmc: anmc.commands,
     giant: giant.commands,
+    suneo: suneo.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -68,7 +70,8 @@ export const CONTROLS: Record<number, [Control, string?]> = {
   22: ['cpuIori'],
 };
 // Authored: the port's command keys, in the order one is taken when several
-// are pressed together. Each writes its entry's steps as the CPU does.
+// are pressed together. Each writes its entry's steps as the CPU does,
+// spacing a repeated button (inject).
 const RYUKO_KEYS: [Control, number][] = [
   ['getterBeam', 4],
   ['musashi', 3],
@@ -172,6 +175,22 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 9],
     ['dash', 13],
   ],
+  // G Suneo's supers hh, GP and en300 on 1-3 and BP on 4; her specials
+  // DRILL KNIEE (5), G DRIVER (7), BIKE (8) and FIRE BALL (6) on Ryuko's
+  // special keys, --TYPE CHANGE-- (9, TO EX) on EX, then DASH F (13) and
+  // DASH B (14).
+  suneo: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 4],
+    ['blackRush', 3],
+    ['drill', 5],
+    ['iori', 7],
+    ['dst', 8],
+    ['axe', 6],
+    ['ex', 9],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -181,6 +200,7 @@ export const BACK_DASH: Record<Who, number> = {
   amiro: 14,
   anmc: 12,
   giant: 14,
+  suneo: 14,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
@@ -279,9 +299,15 @@ export function inject(
   entry: number,
   who: Who = 'ryuko',
   direction = 0,
+  spaced = false,
 ) {
   const words = entriesOf(who)
     [entry - 1].steps.filter((step) => step & 0x2000)
-    .map((step) => DIRECTIONS[step & 15] | (step & 0x3f0) | direction);
+    .map((step) => DIRECTIONS[step & 15] | (step & 0x3f0) | direction)
+    // Authored: a key puts a blank tick before a button its last step held,
+    // the fresh press each step needs (G Suneo's hh: K, K, ←, J, K).
+    .flatMap((word, k, words) =>
+      spaced && k && word & words[k - 1] & 0x3f0 ? [0, word] : [word],
+    );
   history.splice(history.length - words.length, words.length, ...words);
 }

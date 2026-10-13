@@ -69,9 +69,9 @@ it('exports every HUD and lettering texture at its original dimensions', () => {
 });
 
 it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
-  expect([-1, 0, 39, 40, 80, 120, 159, 160].map(faceImage)).toEqual([
-    2001, 2002, 2002, 2001, 2000, 2001, 2001, 2002,
-  ]);
+  expect(
+    [-1, 0, 39, 40, 80, 120, 159, 160].map((face) => faceImage(face)),
+  ).toEqual([2001, 2002, 2002, 2001, 2000, 2001, 2001, 2002]);
 });
 
 it("voices the KO lettering's 'KO' (KGT sound 1, PC 180) for every result", () => {
