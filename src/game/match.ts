@@ -195,6 +195,16 @@ const launchMotion: Partial<
     wall: 'flySideWall',
   },
   flySideWall: { tick: 18, vx: 0, vy: 0, gravity: 50, land: 'knockdown' },
+  // Response 73 (Yo's GIGA PRESS) → action 140: flat out at its first tick
+  // (PC 1907) with no fall until a wall enters 95 (PC 1906).
+  chuckYo: {
+    tick: 0,
+    vx: -1100,
+    vy: 0,
+    gravity: 0,
+    land: 'knockdown',
+    wall: 'flySideWall',
+  },
   // Response 57 (Chung's EN300) → action 136, the same flight (PC 1862),
   // spinning in 93 until a wall enters 94 (PC 1106), which bounces it back
   // out (PC 1126) into 87.
@@ -315,7 +325,8 @@ const reactionPower = (f: Fighter): [number, number] =>
 // The intros' op 0x01 runs, as [ticks, raw vx] from the clip's start: action
 // 33 walks at 200 until PC 339, after its first 50 ticks; Amiro's Round BR
 // (33) drives in at 600 after its first display (PC 367), then at 60 (PC
-// 372). The others' have no op 0x01, so they start where these end.
+// 372); Yo's Round 1 (35) rides in at 110 from PC 378 until PC 385. The
+// others' have no op 0x01, so they start where these end.
 const INTRO_MOTION: Partial<Record<Who, [number, number][]>> = {
   ryuko: [[50, 200]],
   amiro: [
@@ -323,6 +334,7 @@ const INTRO_MOTION: Partial<Record<Who, [number, number][]>> = {
     [32, 600],
     [15, 60],
   ],
+  yo: [[90, 110]],
 };
 const introVx = (who: Who, age: number) => {
   for (const [ticks, vx] of INTRO_MOTION[who] ?? []) {
@@ -376,6 +388,9 @@ const RESPONSE_REACTIONS: Record<
   // through 81 (op 0x14), neither with an op 0x1a.
   133: { action: 'musicAttack', stop: 0 },
   143: { action: 'vanish', stop: 0 },
+  // Yo's GIGA PRESS reaches 140 through response 73 (op 0x14), with no op
+  // 0x1a.
+  140: { action: 'chuckYo', stop: 0 },
   // Ryuko's DST missiles (218), Zoma's hatchets and Shin Spark reach it
   // through response 32 (PC 1000: 13 stop ticks).
   85: { action: 'twist', stop: 13 },
@@ -485,9 +500,9 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's,
-// ANMC P's, Giant's and G Suneo's HISA Down (124, 127, 128, 125, 130, 135) at
-// −800 (PCs 1522, 1582, 1883, 1631, 1799, 1756), and Amiro's Tatumaki >>
-// (105) at −300 (PC 1398).
+// ANMC P's, Giant's, G Suneo's and Yo's HISA Down (124, 127, 128, 125, 130,
+// 135, 126) at −800 (PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582), and
+// Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -495,6 +510,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   anmc: { launchDown: -800 },
   giant: { launchDown: -800 },
   suneo: { launchDown: -800 },
+  yo: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -569,7 +585,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
   suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
 };
-// Zoma and Kiki have none, whatever their variable 0 holds.
+// Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
   const ex = EX_MODE[f.who];
   return ex !== undefined && f.variables[0] === ex.value;
@@ -720,6 +736,8 @@ export interface Fighter {
   // Op 0x02 slots 3 (guard) and 1 (landing): each a jump target, 0 for none.
   onGuard: ObjectKey;
   onLand: ObjectKey;
+  // Slot 4 (+0x70): what a wall enters.
+  onWall: ObjectKey;
   // Op 0x1e's cancel window (+0xdf91): action changes keep it, and the
   // return to neutral clears it (0x411b0c). Zoma's moves read it.
   window: Window | null;
@@ -1008,6 +1026,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   onHit: 0,
   onGuard: 0,
   onLand: 0,
+  onWall: 0,
   window: null,
   color: NORMAL_COLOR,
   trail: null,
@@ -1344,7 +1363,7 @@ export class Match {
     f.objectBox = null;
     f.responses = [];
     // 0x40e510 clears the handlers.
-    f.onHit = f.onGuard = f.onLand = 0;
+    f.onHit = f.onGuard = f.onLand = f.onWall = 0;
     // A source action's own op 0x23 sets its colour, and a clip action's op
     // 0x1e its window as its display starts (enter).
     if (action !== 'script') {
@@ -1745,6 +1764,7 @@ export class Match {
           if (event.slot === 1) actor.onLand = key;
           else if (event.slot === 2) actor.onHit = key;
           else if (event.slot === 3) actor.onGuard = key;
+          else if (event.slot === 4) actor.onWall = key;
         } else if (event.slot >= 1 && event.slot <= 3)
           actor[(['onLand', 'onHit', 'onGuard'] as const)[event.slot - 1]] =
             sourceKey(event.action, event.offset);
@@ -1814,6 +1834,11 @@ export class Match {
         break;
       }
       case 'power':
+        // 0x40e7c0 adds a gain to the player's own life, up to full life
+        // (0x40ea9f): Yo's ZOMBI WALK bite, 2 a pass through ZOMBI RP (PC
+        // 3056), then 6 (PC 3011). No script lowers its own.
+        if (event.selfLife > 0)
+          self.hp = Math.min(lifeOf(self.who), self.hp + event.selfLife);
         if (event.otherLife < 0) {
           const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
@@ -2028,9 +2053,12 @@ export class Match {
       this.placeHeld(f, other);
     walled = placeX(f, f.x) || walled;
     // 0x40fcab: stopped by a wall, a player with a wall handler (op 0x02 slot
-    // 4, +0x70) queues its action (+0x38).
+    // 4, +0x70) queues its action (+0x38): a flight's, or a move's, as Yo's
+    // Press Hit carrying its victim (PC 3291).
     const wall = launchMotion[f.action]?.wall;
     if (walled && wall) this.queue(f, wall);
+    else if (walled && f.action === 'script' && f.onWall && !f.pending)
+      f.pending = { key: f.onWall };
     const reeling = f.striker === 'body' && (other.reaction & 12) === 8;
     if (f.hp > 0 && f.reaction & 8 && f.striker && !reeling)
       other.transfer += f.stopped;
@@ -2742,7 +2770,7 @@ export class Match {
       for (const [i, f] of this.fighters.entries()) {
         if (f.action !== 'intro') continue;
         f.age++;
-        // EX_MODE: Zoma's and Kiki's intros have no such check.
+        // EX_MODE: Zoma's, Kiki's and Yo's intros have no such check.
         const ex = EX_MODE[f.who];
         if (f.age === ex?.intro && [player, opponent][i]?.crouch)
           f.variables[0] = ex.value;

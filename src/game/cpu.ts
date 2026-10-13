@@ -11,6 +11,7 @@ import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
 import suneo from './generated/suneo.json';
+import yo from './generated/yo.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -28,7 +29,7 @@ export interface CpuEntry {
 }
 // Ryuko's table: 100 slots of 111 bytes after the held-pose table, 43 used;
 // Zoma's uses 44, Kiki's 43, Chung's 40, Amiro's 37, ANMC P's 45, Giant's 43,
-// G Suneo's 41.
+// G Suneo's 41, Yo's 41.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
@@ -39,6 +40,7 @@ export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   anmc: anmc.cpu,
   giant: giant.cpu,
   suneo: suneo.cpu,
+  yo: yo.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
@@ -55,6 +57,7 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   anmc: {},
   giant: {},
   suneo: {},
+  yo: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;

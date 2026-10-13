@@ -395,6 +395,9 @@ export const animations = {
   // enters 95, which holds there, then drops.
   flySide: clip(clips.flySide, false, [2, 2, 2, 1]),
   flySideWall: clip(clips.flySideWall, false, [3, 3, 3, 3, 3, 3, 1]),
+  // Response 73 (Yo's GIGA PRESS) → action 140, which jumps back to itself
+  // (PC 1911) until a wall enters 95.
+  chuckYo: clip(clips.chuckYo, true),
   // Response 57 (Chung's EN300) → action 136, spinning in 93 until a wall
   // enters 94, which bounces back out into 87's spin.
   twistSide: clip([...clips.twistSide, ...clips.twistFly], 3),
@@ -536,8 +539,13 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
     // Giant's Round 1 (33) from PC 313 and G Suneo's Round 1 (35) from PC
     // 393: no op 0x01, so each stands where they start. Amiro's Round BR (33)
-    // drives in on her car (introMotion).
-    intro: clip(z.intro),
+    // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
+    // her robot (introMotion), then calls Demo Stand three times (PC 392).
+    intro: clip(
+      who === 'yo'
+        ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
+        : z.intro,
+    ),
     ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
@@ -565,6 +573,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     chuckUp: clip(z.chuckUp, false, waits(z.chuckUp)),
     flySide: clip(z.flySide, false, waits(z.flySide)),
     flySideWall: clip(z.flySideWall, false, waits(z.flySideWall)),
+    chuckYo: clip(z.chuckYo, true),
     twistSide: clip([...z.twistSide, ...z.twistFly], z.twistSide.length),
     twistWall: clip([...z.twistWall, ...z.twisting2], z.twistWall.length),
     gonMiss: clip(z.gonMiss),
@@ -616,6 +625,7 @@ const TWIN_ANIMATIONS = {
   anmc: twinAnimations('anmc'),
   giant: twinAnimations('giant'),
   suneo: twinAnimations('suneo'),
+  yo: twinAnimations('yo'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

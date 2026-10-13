@@ -382,8 +382,9 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=()):
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "spawn" and event["busy"]:
                 queue.append((event["busy"], event["busyOffset"]))
-            # A landing handler (slot 1) not played as a clip runs its timeline.
-            if event["op"] == "handler" and event["slot"] == 1 and event["action"] not in played:
+            # A landing or wall handler (slot 1 or 4) not played as a clip runs
+            # its timeline: Yo's Press Hit enters 239 + 15 (PC 3291).
+            if event["op"] == "handler" and event["slot"] in (1, 4) and event["action"] not in played:
                 queue.append((event["action"], event["offset"]))
             if event["op"] == "handler" and event["slot"] in (2, 3):
                 queue.append((event["action"], event["offset"]))
@@ -529,6 +530,8 @@ ZOMA_TWINS = {
     # G Suneo's EX D Driver's: 'ヒット ERUS INATUMA' (118), its rp (119) and
     # ERUS INATUMA AIR (120).
     "inatuma": (118, 119), "inatumaRp": (119, 120), "airInatuma": (120, 121),
+    # Yo's GIGA PRESS's: 'Chuck Yo' (140).
+    "chuckYo": (140, 140),
 }
 # The other players lay theirs out alike, but for Kiki's KOs and lose action
 # (+0x75a0: 58), one later.
@@ -566,6 +569,9 @@ GIANT_TWINS = {name: (r, r + next(d for top, d in ((73, 2), (85, 4), (89, 5), (1
 # (139), which G Suneo lacks.
 SUNEO_TWINS = {name: (r, r + next(d for top, d in ((73, 10), (77, 12), (89, 13), (139, 12), (173, 11))
                                   if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
+# Yo's sit two after Zoma's, three for Twis and Twis 2 (Yo's ★変なＴＥＣＨ, 89,
+# comes before them, Zoma's after), so Yo's KOs and lose action are Ryuko's.
+YO_TWINS = {name: (r, z + (3 if name in ("twisting", "twisting2") else 2)) for name, (r, z) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -692,6 +698,8 @@ FIGHTERS = {
             # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
             # AIR clears instead (PCs 1541, 1568–1571).
             "inatuma", "airInatuma",
+            # A 70-tick display (PC 1812) to Ryuko's 5 before it loops.
+            "chuckYo",
         },
         # Results: WIN calls Demo stand (27) once (PC 543), spawns P3 smoke1
         # (188) behind a blank display and holds image 293; the draw calls 27
@@ -735,6 +743,8 @@ FIGHTERS = {
             # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
             # AIR clears instead (PCs 1541, 1568–1571).
             "inatuma", "airInatuma",
+            # Clears variable 7 too, with Chung's 70-tick display (PC 2138).
+            "chuckYo",
         },
         # Results: WIN calls Demo stand (27) once (PC 638) and loops image 197
         # (PC 649); the draw calls 27 once (PC 736). Her darkening panel, image
@@ -779,6 +789,8 @@ FIGHTERS = {
             # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
             # AIR clears instead (PCs 1541, 1568–1571).
             "inatuma", "airInatuma",
+            # Chung's 70-tick display (PC 1869).
+            "chuckYo",
         },
         # Results: WIN calls DEMO STAND (30) once (PC 571) and holds image 324
         # (PC 582); the draw calls 30 once (PC 675). ponytail: WIN's rand % 11 > 6
@@ -887,6 +899,8 @@ FIGHTERS = {
             # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
             # AIR clears instead (PCs 1541, 1568–1571).
             "inatuma", "airInatuma",
+            # Clears variable 7 first and 14 before 8 and 5, not after.
+            "chuckYo",
         },
         # Results: 勝ち (66) calls Demo stand (49) once (PC 695), then 'win
         # talk' (67) seven times (PC 707), and holds image 416 (PC 709); the
@@ -905,6 +919,49 @@ FIGHTERS = {
         # 2000–2002 and 2006: the HUD faces action 81 shows, cycling 2002,
         # 2006, 2000 and 2006 in EX mode (PCs 845–863); 601: *name (76, PC 808).
         image_ids={2000, 2001, 2002, 2006, 601},
+    ),
+    "yo": dict(
+        source=("09 YO", "f235ef166878351309dd48b8ae90c1283d79a42f3311d423d67874d142723383"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 11,  # PC 45
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=YO_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 1909), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20; TWIS
+            # SIDE FLY rolls it to skip its sound (PC 1072), where Ryuko's has none.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "twistSideHit",
+            # Zoma's, rolling rand % 3 > 1 (PC 1133); DRAGON Fireball and Yinan
+            # hold their last display (0) where Ryuko's wait 1205 ticks for landing.
+            "uppercut", "dragonFireball", "liftUp",
+            # Clears variable 8 before 6 (PCs 817–818), not after.
+            "jumpHit",
+            # Zoma's order of op 0x1a and op 0x15, and Kiki's raw vx −800 (PC 1582).
+            "launchDown",
+            # Zoma's KO tests (PC 613), landing wait and KO DOWN (PC 661), and
+            # Zoma's shock, which doesn't set variable 6.
+            "ko", "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "twistSide",
+            # Chung's: flySide rolls rand % 3 > 1 as well.
+            "flySide", "flySideWall",
+            # Clears variable 14 before 8 and 5 (PC 1849), not after.
+            "vanish",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+        },
+        # Results: 勝ち (58) calls Demo Stand (29) once (PC 596) and holds image
+        # 350 (PC 602); the draw calls 29 once (PC 681). The darkening panel,
+        # image 1009 (action 44). The Vs. intro: 開始時 (32) jumps to 開始時 BR
+        # (34) for global 3 = 0 (PC 331), past its display for global 14 = 0
+        # (PC 367), then to Round 1 (35) + 5 (PC 372), which walks in (PC 378)
+        # and calls Demo Stand three times (PC 392).
+        actions=dict(win=58, winStand=29, draw=65, black=44, intro=(35, 5)),
+        # 2001: the HUD face action 73 shows (PC 728); 390: *name (66, PC 688).
+        image_ids={2001, 390},
     ),
 }
 
@@ -1036,6 +1093,8 @@ def main():
         "musicAttack": 133, "vanish": 143,
         # 'ヒット ERUS INATUMA', which calls its rp (119) seven times (PC 1554).
         "inatuma": 118, "inatumaRp": 119,
+        # 'Chuck Yo', flying flat out to the wall its slot 4 handler hits, 95.
+        "chuckYo": 140,
         "grabbed": 128,
         "knockdown": 146, "getUp": 145,
         "ko": 60, "koAgain": 61, "down": 62, "win": 57, "winStand": 58, "draw": 65,
@@ -1081,7 +1140,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant and {counts['suneo']} G Suneo images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo and {counts['yo']} Yo images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

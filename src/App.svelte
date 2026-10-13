@@ -156,6 +156,16 @@
         iori: 'G Driver',
         dst: 'Bike',
       },
+      yo: {
+        getterBeam: 'Giga Press',
+        musashi: 'Hidden',
+        changeAttack: 'Snake',
+        blackRush: 'EN300',
+        drill: 'Dragon',
+        axe: 'Tofu',
+        iori: 'Zombi Walk',
+        dst: 'Run In',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -369,6 +379,7 @@
             <option value="anmc">ANMC P</option>
             <option value="giant">Giant</option>
             <option value="suneo">G Suneo</option>
+            <option value="yo">Yo</option>
           </select></label
         >
         <label
@@ -386,6 +397,7 @@
             <option value="anmc">ANMC P</option>
             <option value="giant">Giant</option>
             <option value="suneo">G Suneo</option>
+            <option value="yo">Yo</option>
           </select></label
         >
         <label
@@ -671,8 +683,11 @@
           (also in the air), <kbd>I</kbd> or ↓→ <kbd>J</kbd> Fire ball, a thrown
           star,
           <kbd>F</kbd> or ←↓→ <kbd>K</kbd> orochi, <kbd>G</kbd> or ↓←
-          <kbd>J</kbd> Burn Knock, ↓← <kbd>K</kbd> jump wall move, and in the
-          air ↓→ <kbd>K</kbd> air fire. His supers: <kbd>1</kbd> or ↓←↓→
+          <kbd>J</kbd> Burn Knock, ↓← <kbd>K</kbd> jump wall move, a leap back
+          that clings to the wall (<kbd>K</kbd> kicks off it, <kbd>J</kbd> or ↑
+          leaps away), and in the air ↓→ <kbd>K</kbd> air fire. His supers:
+          <kbd>1</kbd>
+          or ↓←↓→
           <kbd>J</kbd> gesar (in the air, nin star), <kbd>2</kbd> or ↓→↓→
           <kbd>K</kbd> lee, kicks that carry the opponent up and leave them
           floating, for a stock each (Evil gesar and Evil Lee below 30% health),
@@ -772,8 +787,31 @@
           hh, a screen-wide shock into a long beating, for three.
         </p>
         <p>
+          Choose Yo to play her, in a costume for most moves. <kbd>J</kbd> and
+          <kbd>K</kbd> chain as Chung's do: her third punch is a pistol shot,
+          her third kick a kick in a long coat, and down with <kbd>J</kbd> or
+          <kbd>K</kbd> is a licker's tongue lash or a plant's lash into a
+          knockdown. <kbd>H</kbd> is her Hit Up, a monster rising from the
+          floor, <kbd>O</kbd> her chuck: zombie hands burst from the floor to
+          hold the opponent, then a kick. Blocking with a stock, <kbd>H</kbd>
+          spends it on COUNTER HIT. She has no EX mode. Her specials:
+          <kbd>U</kbd> or →↓↘ <kbd>J</kbd> Dragon, a man springing out of a
+          trunk with the opponent, <kbd>I</kbd> or ↓← <kbd>K</kbd> TOFU, a
+          gatling burst, <kbd>F</kbd> or ←↓→ <kbd>K</kbd> ZOMBI WALK, a zombie's
+          shuffle that grabs and bites the opponent, healing her, which a super
+          can cancel, <kbd>G</kbd> or ↓← <kbd>J</kbd> Run in, a monster's charge
+          and claw, and in the air ↓→ <kbd>J</kbd> Fire ball, a rocket. Her
+          supers: <kbd>1</kbd> or ↓→↓← <kbd>J</kbd> GIGA PRESS, a charge that
+          carries the opponent into the screen's edge, then slams them, and
+          <kbd>3</kbd> or ↓←↓← <kbd>J</kbd> snake, a giant snake rising from the
+          floor, for a stock each, <kbd>4</kbd> or ↓→↓→ <kbd>K</kbd> en300, a
+          cannon blast across the screen, for three, and, below 30% health,
+          <kbd>2</kbd> or ↓←↓← <kbd>K</kbd> HIDDEN, a hidden brute's rush and beating,
+          for a stock.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant or G Suneo, and one of eighteen
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo or Yo, and one of eighteen
           stages, in either mode. Free practice has no timer, and you also
           choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the

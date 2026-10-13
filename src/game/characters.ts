@@ -1,7 +1,7 @@
 // Each player's exported container data: Ryuko's (01 RYUKO.PLAYER), Zoma's
 // (02 ZOMA.PLAYER), Kiki's (03 KIKI.PLAYER), Chung's (04 CHUNG.PLAYER),
 // Amiro's (05 AMIRO.PLAYER), ANMC P's (06 ANMC P.PLAYER), Giant's
-// (07 GIANT.PLAYER) and G Suneo's (08 G SUNEO.PLAYER);
+// (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER) and Yo's (09 YO.PLAYER);
 // and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
@@ -11,10 +11,19 @@ import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
 import suneo from './generated/suneo.json';
+import yo from './generated/yo.json';
 import stages from './generated/stages.json';
 
 export type Who =
-  'ryuko' | 'zoma' | 'kiki' | 'chung' | 'amiro' | 'anmc' | 'giant' | 'suneo';
+  | 'ryuko'
+  | 'zoma'
+  | 'kiki'
+  | 'chung'
+  | 'amiro'
+  | 'anmc'
+  | 'giant'
+  | 'suneo'
+  | 'yo';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -24,6 +33,7 @@ export const CHARACTERS = {
   anmc,
   giant,
   suneo,
+  yo,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -32,7 +42,7 @@ export type Container = Who | Stage;
 
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
-// Suneo's 500. Each block puts the desperation threshold at 30% (+0x7ca6),
+// Suneo's 500, Yo's 480. Each block puts the desperation threshold at 30% (+0x7ca6),
 // which 0x40e7c0 compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
 export const desperationOf = (who: Who) => Math.trunc((lifeOf(who) * 30) / 100);
@@ -49,24 +59,24 @@ export const responseEffectsOf = (who: Who): readonly number[] =>
 // theirs through their Ryuko twins' rules. Giant's UNCOUNTER reactions (126,
 // 127) also follow DOWN's and J Att's.
 const twins = Object.fromEntries(
-  (['zoma', 'kiki', 'chung', 'amiro', 'anmc', 'giant', 'suneo'] as const).map(
-    (who) => {
-      const own = new Map(
-        Object.entries(CHARACTERS[who].twins).map(([r, z]) => [Number(r), z]),
-      );
-      const aliases: Record<string, number> = CHARACTERS[who].aliases;
-      return [
-        who,
-        {
-          own,
-          ryuko: new Map([
-            ...[...own].map(([r, z]) => [z, r] as const),
-            ...Object.entries(aliases).map(([z, r]) => [Number(z), r] as const),
-          ]),
-        },
-      ];
-    },
-  ),
+  (
+    ['zoma', 'kiki', 'chung', 'amiro', 'anmc', 'giant', 'suneo', 'yo'] as const
+  ).map((who) => {
+    const own = new Map(
+      Object.entries(CHARACTERS[who].twins).map(([r, z]) => [Number(r), z]),
+    );
+    const aliases: Record<string, number> = CHARACTERS[who].aliases;
+    return [
+      who,
+      {
+        own,
+        ryuko: new Map([
+          ...[...own].map(([r, z]) => [z, r] as const),
+          ...Object.entries(aliases).map(([z, r]) => [Number(z), r] as const),
+        ]),
+      },
+    ];
+  }),
 );
 // Giant's reactions that open by testing his counter's variable 4, with the
 // action it enters at 100, or 0 for those that clear it (export_fighter).

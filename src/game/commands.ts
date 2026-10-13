@@ -13,6 +13,7 @@ import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
 import suneo from './generated/suneo.json';
+import yo from './generated/yo.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -25,7 +26,7 @@ export interface CommandEntry {
   steps: number[];
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
-// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20)
+// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -38,6 +39,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     anmc: anmc.commands,
     giant: giant.commands,
     suneo: suneo.commands,
+    yo: yo.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -191,6 +193,21 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 9],
     ['dash', 13],
   ],
+  // Yo's supers GIGA PRESS, HIDDEN, snake and en300 on 1-4; her specials
+  // Dragon (6), ZOMBI WALK (5), Run in (8) and TOFU (9) on Ryuko's special
+  // keys, then Dash F (13) and Dash B (14). Fire ball (7), in the air, takes
+  // its command only.
+  yo: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['blackRush', 4],
+    ['drill', 6],
+    ['iori', 5],
+    ['dst', 8],
+    ['axe', 9],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -201,6 +218,7 @@ export const BACK_DASH: Record<Who, number> = {
   anmc: 12,
   giant: 14,
   suneo: 14,
+  yo: 14,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

@@ -50,7 +50,7 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('chung')[id]]] : [],
     );
-    expect(paired).toHaveLength(68);
+    expect(paired).toHaveLength(69);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
@@ -118,6 +118,29 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
     expect(ryuko.y).toBeGreaterThan(y);
     until(match, () => ryuko.action !== 'flySideWall');
     expect([ryuko.action, ryuko.y]).toEqual(['knockdown', 0]);
+  });
+
+  it('clings to the wall his jump move reaches (op 0x02 slot 4, PC 3846), kicking off it with K', () => {
+    for (const [press, after, damage] of [
+      [{}, 7, 0],
+      [{ kick: true }, 269, 30],
+      [{ punch: true }, 273, 0],
+    ] as const) {
+      const { match, chung, ryuko } = chungPlayer(375);
+      chung.x = 225;
+      match.step();
+      enter(match, chung, 266);
+      // JUMP WALL (267) stops him there, then 'wall rp' (268) checks K, P
+      // and up every 5 ticks (PCs 3859–3861) and falls (7) once they run out.
+      until(match, () => chung.branch === 267);
+      const x = chung.x;
+      until(match, () => chung.age === 8);
+      match.step(press);
+      until(match, () => chung.branch !== 267);
+      expect([chung.branch, x, ryuko.hp]).toEqual([after, 75, 510]);
+      until(match, () => chung.action === 'idle');
+      expect(510 - ryuko.hp).toBe(damage);
+    }
   });
 
   it('spins EN300’s victim to the wall, which bounces it back into 87 (responses 57, 94)', () => {
