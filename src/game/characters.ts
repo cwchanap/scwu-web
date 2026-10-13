@@ -1,6 +1,7 @@
 // Each player's exported container data: Ryuko's (01 RYUKO.PLAYER), Zoma's
 // (02 ZOMA.PLAYER), Kiki's (03 KIKI.PLAYER), Chung's (04 CHUNG.PLAYER),
-// Amiro's (05 AMIRO.PLAYER) and ANMC P's (06 ANMC P.PLAYER);
+// Amiro's (05 AMIRO.PLAYER), ANMC P's (06 ANMC P.PLAYER) and Giant's
+// (07 GIANT.PLAYER);
 // and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
@@ -8,17 +9,19 @@ import kiki from './generated/kiki.json';
 import chung from './generated/chung.json';
 import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
+import giant from './generated/giant.json';
 import stages from './generated/stages.json';
 
-export type Who = 'ryuko' | 'zoma' | 'kiki' | 'chung' | 'amiro' | 'anmc';
-export const CHARACTERS = { ryuko, zoma, kiki, chung, amiro, anmc };
+export type Who =
+  'ryuko' | 'zoma' | 'kiki' | 'chung' | 'amiro' | 'anmc' | 'giant';
+export const CHARACTERS = { ryuko, zoma, kiki, chung, amiro, anmc, giant };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
 // The container an object's scripts and images come from.
 export type Container = Who | Stage;
 
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
-// 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450. Each block puts the desperation threshold at 30% (+0x7ca6),
+// 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550. Each block puts the desperation threshold at 30% (+0x7ca6),
 // which 0x40e7c0 compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
 export const desperationOf = (who: Who) => Math.trunc((lifeOf(who) * 30) / 100);
@@ -32,15 +35,30 @@ export const responseEffectsOf = (who: Who): readonly number[] =>
 
 // export_fighter pairs each other player's victim actions with Ryuko's
 // through the response table and checks they play alike; the match runs
-// theirs through their Ryuko twins' rules.
+// theirs through their Ryuko twins' rules. Giant's UNCOUNTER reactions (126,
+// 127) also follow DOWN's and J Att's.
 const twins = Object.fromEntries(
-  (['zoma', 'kiki', 'chung', 'amiro', 'anmc'] as const).map((who) => {
+  (['zoma', 'kiki', 'chung', 'amiro', 'anmc', 'giant'] as const).map((who) => {
     const own = new Map(
       Object.entries(CHARACTERS[who].twins).map(([r, z]) => [Number(r), z]),
     );
-    return [who, { own, ryuko: new Map([...own].map(([r, z]) => [z, r])) }];
+    const aliases: Record<string, number> = CHARACTERS[who].aliases;
+    return [
+      who,
+      {
+        own,
+        ryuko: new Map([
+          ...[...own].map(([r, z]) => [z, r] as const),
+          ...Object.entries(aliases).map(([z, r]) => [Number(z), r] as const),
+        ]),
+      },
+    ];
   }),
 );
+// Giant's reactions that open by testing his counter's variable 4, with the
+// action it enters at 100, or 0 for those that clear it (export_fighter).
+export const countersOf = (who: Who): Record<string, number> =>
+  (CHARACTERS[who] as { counters?: Record<string, number> }).counters ?? {};
 const named = (who: Who) => who[0].toUpperCase() + who.slice(1);
 // Ryuko's source action `index` in the player's own container.
 export function twin(who: Who, index: number) {
@@ -50,11 +68,13 @@ export function twin(who: Who, index: number) {
     throw new Error(`${named(who)} has no twin of Ryuko's action ${index}`);
   return found;
 }
-// The Ryuko action whose rules a player's victim action follows; 0 (none)
-// stays 0.
+// The Ryuko action whose rules a player's victim action follows, if any.
+export const twinOf = (who: Who, index: number) =>
+  who === 'ryuko' ? index : twins[who].ryuko.get(index);
+// The same, required; 0 (none) stays 0.
 export function ryukoTwin(who: Who, index: number) {
   if (who === 'ryuko' || !index) return index;
-  const found = twins[who].ryuko.get(index);
+  const found = twinOf(who, index);
   if (found === undefined)
     throw new Error(`${named(who)}'s action ${index} has no Ryuko twin`);
   return found;

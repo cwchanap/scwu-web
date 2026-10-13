@@ -11,6 +11,7 @@ import kiki from './generated/kiki.json';
 import chung from './generated/chung.json';
 import amiro from './generated/amiro.json';
 import anmc from './generated/anmc.json';
+import giant from './generated/giant.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -23,7 +24,7 @@ export interface CommandEntry {
   steps: number[];
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
-// Chung's 22, Amiro's 20, ANMC P's 21)
+// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -34,6 +35,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     chung: chung.commands,
     amiro: amiro.commands,
     anmc: anmc.commands,
+    giant: giant.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -156,6 +158,20 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 13],
     ['dash', 11],
   ],
+  // Giant's supers fire, HARIKEN and en300 on 1-3; his specials Rock punch
+  // (5), H PUNCH (7), counter (6) and base ball (8) on Ryuko's special keys,
+  // --TYPE-- (9, TO EX) on EX, then Dash F (13) and Dash B (14).
+  giant: [
+    ['getterBeam', 2],
+    ['musashi', 3],
+    ['changeAttack', 1],
+    ['drill', 5],
+    ['iori', 7],
+    ['dst', 6],
+    ['axe', 8],
+    ['ex', 9],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -164,6 +180,7 @@ export const BACK_DASH: Record<Who, number> = {
   chung: 15,
   amiro: 14,
   anmc: 12,
+  giant: 14,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

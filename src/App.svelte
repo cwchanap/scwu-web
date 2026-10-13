@@ -137,6 +137,15 @@
         iori: 'Twis Att',
         dst: 'Ball Fire',
       },
+      giant: {
+        getterBeam: 'Fire',
+        musashi: 'Hariken',
+        changeAttack: 'EN300',
+        drill: 'Rock Punch',
+        axe: 'Base Ball',
+        iori: 'H Punch',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -348,6 +357,7 @@
             <option value="chung">Chung</option>
             <option value="amiro">Amiro</option>
             <option value="anmc">ANMC P</option>
+            <option value="giant">Giant</option>
           </select></label
         >
         <label
@@ -363,6 +373,7 @@
             <option value="chung">Chung</option>
             <option value="amiro">Amiro</option>
             <option value="anmc">ANMC P</option>
+            <option value="giant">Giant</option>
           </select></label
         >
         <label
@@ -697,10 +708,36 @@
           <kbd>K</kbd> en300, a barrage of shots, for three.
         </p>
         <p>
+          Choose Giant to play him. <kbd>J</kbd> and <kbd>K</kbd> chain as
+          Chung's do: his third punch knocks the opponent away, his third kick
+          grabs and twists them away but knocks him down too, and down with
+          <kbd>J</kbd> or <kbd>K</kbd> is an uppercut or a sweep. <kbd>H</kbd>
+          is his Hit Up, <kbd>O</kbd> his chuck: a grab, then a song that dazes
+          the opponent until the music explodes, throwing you both. Blocking
+          with a stock, <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓
+          ↓ <kbd>H</kbd> switches to EX mode for half a stock, and back, which
+          swaps his third punch and kick, Hit Up, specials and supers for other
+          forms. His specials: <kbd>U</kbd> or →←↓→ <kbd>J</kbd> Rock punch, a
+          rocket punch that flies out from range, <kbd>I</kbd> or ↓→
+          <kbd>K</kbd> base ball, a pitch of random kind (in the air, a diving
+          punch), <kbd>F</kbd> or ↓→ <kbd>J</kbd> H PUNCH, a hammer punch that
+          hurls the opponent into the screen's edge, which a super can cancel,
+          and <kbd>G</kbd> or →↓← <kbd>K</kbd> counter: struck during its stance
+          he takes double damage, then strikes back, rushing in to beat the
+          opponent inside a cloud of dust. His supers: <kbd>1</kbd> or ↓→↓→
+          <kbd>J</kbd>
+          fire, a fire beam (also in the air; Evil fire below 30% health), and
+          <kbd>2</kbd>
+          or ↓→↓→ <kbd>K</kbd> HARIKEN, a whirlwind, for a stock each, and
+          <kbd>3</kbd>
+          or ↓←↓← <kbd>J</kbd>
+          en300, which calls his friends, then a screen-wide barrage, for three.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro or ANMC P, and one of eighteen stages, in either
-          mode. Free practice has no timer, and you also choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
+          Kiki, Chung, Amiro, ANMC P or Giant, and one of eighteen stages, in
+          either mode. Free practice has no timer, and you also choose how the
+          partner behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health
           keeps you at 30% for desperation moves. Vs. CPU is the original game's

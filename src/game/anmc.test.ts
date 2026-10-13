@@ -63,7 +63,7 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('anmc')[id]]] : [],
     );
-    expect(paired).toHaveLength(64);
+    expect(paired).toHaveLength(67);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 
@@ -83,17 +83,22 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
   });
 
   it('chucks with cHUCK NEW (232), or CHUCK (238) in EX mode (PC 3143)', () => {
-    for (const [ex, moves] of [
-      [0, [232, 233]],
-      [100, [238, 239]],
+    for (const [ex, moves, toss] of [
+      [0, [232, 233], 'twist'],
+      // CHUCK HIT tosses through response 38 (PC 3265): Fly twis (92), which
+      // flies as Chuck Twis side does.
+      [100, [238, 239], 'twistSide'],
     ] as const) {
       const { anmc, ryuko, steps } = anmcPlayer();
       anmc.variables[0] = ex;
       steps({}, 2);
-      expect(chain(anmc, steps, { throw: true })).toEqual(
-        expect.arrayContaining([...moves]),
-      );
-      expect(ryuko.hp).toBe(485);
+      const seen = new Set<unknown>();
+      for (let t = 0; ryuko.hp === 510 && t < 400; t++) {
+        steps(t % 6 ? {} : { throw: true });
+        if (anmc.action === 'script') seen.add(anmc.branch);
+      }
+      expect([...seen]).toEqual(expect.arrayContaining([...moves]));
+      expect([ryuko.hp, ryuko.action]).toEqual([485, toss]);
     }
   });
 

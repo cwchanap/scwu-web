@@ -222,6 +222,8 @@ export type SourceEvent =
       above: number;
       action: number;
       offset: number;
+      // In an inlined call.
+      called?: boolean;
     };
 export interface Script {
   frames: (Pose & { t: number })[];
@@ -278,6 +280,12 @@ export function eventsAt(
     ...found.events.filter((e, i) => i >= found.loopEvent! && e.t === start),
   ];
 }
+// A looping clip whose events the match runs itself.
+const silent = (frames: Pose[]) =>
+  clip(
+    frames.map((frame) => ({ ...frame, events: undefined })),
+    true,
+  );
 // A zero-length display waits for gameplay (landing); hold it like a long pose.
 const scriptClip = (index: ObjectKey, who: Container = 'ryuko') => {
   const { frames, loop } = script(index, who);
@@ -325,8 +333,9 @@ export function heldFrame(
 }
 
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
-// Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382
-// and ANMC P's Round 1 at PC 363, from PC 356.
+// Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
+// ANMC P's Round 1 at PC 363, from PC 356, and Giant's Round 1 at PC 328,
+// from PC 313.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -335,6 +344,7 @@ export const INTRO_EX_TICK = ticksBefore(clips.intro.slice(2), 348);
 export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
 export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
 export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
+export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -390,6 +400,12 @@ export const animations = {
   twistWall: clip([...clips.twistWall, ...clips.twisting2], 2),
   // Response 61 (Chung's lee) → action 137, a float before HISA.
   gonMiss: clip(clips.gonMiss),
+  // Response 49 (Giant's chuck) → action 133, a looped daze; the match runs
+  // each pass's records (Match.musicAttack), so the clip carries none.
+  musicAttack: silent(clips.musicAttack),
+  // Response 81 (Giant's counter hit) → action 143: nothing shown and no
+  // body for 100 ticks (PCs 1962–1964), then rambu AIR (122, PC 1965).
+  vanish: clip(clips.vanish),
   // Responses 59 and 60 (Zoma's EN300 and DST) → actions 108 and 109, whose
   // op 0x20 reorders their shaking (+17, +18).
   stun: scriptClip(108),
@@ -510,8 +526,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
-    // Chung's ROUND 1 (33) from PC 332 and ANMC P's Round 1 (35) from PC 356:
-    // no op 0x01, so each stands where they start. Amiro's Round BR (33)
+    // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356 and
+    // Giant's Round 1 (33) from PC 313: no op 0x01, so each stands where they
+    // start. Amiro's Round BR (33)
     // drives in on her car (introMotion).
     intro: clip(z.intro),
     ...guardAnimations(z),
@@ -542,6 +559,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     twistSide: clip([...z.twistSide, ...z.twistFly], z.twistSide.length),
     twistWall: clip([...z.twistWall, ...z.twisting2], z.twistWall.length),
     gonMiss: clip(z.gonMiss),
+    musicAttack: silent(z.musicAttack),
+    vanish: clip(z.vanish),
     stun: timeline(108),
     airStun: timeline(109),
     dstToss: clip([z.dstToss[0], ...z.dstTossSpin], 1),
@@ -555,11 +574,15 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     koAgain: clip(z.koAgain),
     koLand: clip(z.down),
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
-    // 'win rp' (57) three times between its displays (PC 536).
+    // 'win rp' (57) three times between its displays (PC 536), and Giant's
+    // loops from PC 560 (winLoop, PC 564).
     win: clip(
       z.winRp
         ? [...z.winStand, z.win[0], ...Array(3).fill(z.winRp).flat(), z.win[1]]
         : [...z.winStand, ...z.win],
+      z.winLoop
+        ? z.winStand.length + z.win.findIndex((f) => f.pc === z.winLoop[0].pc)
+        : false,
     ),
     draw: clip([...z.winStand, ...z.draw]),
     fly: timeline(97),
@@ -574,6 +597,7 @@ const TWIN_ANIMATIONS = {
   chung: twinAnimations('chung'),
   amiro: twinAnimations('amiro'),
   anmc: twinAnimations('anmc'),
+  giant: twinAnimations('giant'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

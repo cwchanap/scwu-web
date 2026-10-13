@@ -6,6 +6,7 @@ import {
   AMIRO_INTRO_EX_TICK,
   ANMC_INTRO_EX_TICK,
   CHUNG_INTRO_EX_TICK,
+  GIANT_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
@@ -30,7 +31,9 @@ import type {
 } from './animations';
 import {
   CHARACTERS,
+  countersOf,
   desperationOf,
+  twinOf,
   lifeOf,
   responseEffectsOf,
   responsesOf,
@@ -358,6 +361,14 @@ const RESPONSE_REACTIONS: Record<
   137: { action: 'gonMiss', stop: 0 },
   // Amiro's Coment chuck and scc reach 134 through response 52 (op 0x14).
   134: { action: 'chuckUp', stop: 0 },
+  // Giant's BASE BALL MISS ATT reaches 92 through response 38, which flies as
+  // 136 does with 91's stops (PC 1096). ponytail: its first three displays'
+  // body boxes don't push (kind 2, PC 1097) where 136's do (PC 1857).
+  92: { action: 'twistSide', stop: 13 },
+  // His chuck reaches 133 through response 49 and his counter hit 143
+  // through 81 (op 0x14), neither with an op 0x1a.
+  133: { action: 'musicAttack', stop: 0 },
+  143: { action: 'vanish', stop: 0 },
   // Ryuko's DST missiles (218), Zoma's hatchets and Shin Spark reach it
   // through response 32 (PC 1000: 13 stop ticks).
   85: { action: 'twist', stop: 13 },
@@ -398,11 +409,6 @@ const RESPONSE_REACTIONS: Record<
   170: { action: 'crouchTimeStopGuard', stop: 0 },
   172: { action: 'airTimeStopGuard', stop: 0 },
 };
-// 0x40f539: a response id selects the victim action from the victim's own
-// table. A Zoma victim's follows its Ryuko twin's rules (export_zoma), so
-// this gives Ryuko's number for it.
-const victimOf = (target: Fighter, id: number) =>
-  ryukoTwin(target.who, responsesOf(target.who)[id]);
 // Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker.
 const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 // A loss that empties life sets the lose action 59 (0x40e83e), which enters
@@ -471,14 +477,15 @@ function struck(
 }
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
-// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's
-// and ANMC P's HISA Down (124, 127, 128, 125) at −800 (PCs 1522, 1582, 1883,
-// 1631), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's,
+// ANMC P's and Giant's HISA Down (124, 127, 128, 125, 130) at −800 (PCs 1522,
+// 1582, 1883, 1631, 1799), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
   amiro: { launchDown: -800, tatumakiOut: -300 },
   anmc: { launchDown: -800 },
+  giant: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -540,11 +547,15 @@ const timeline = (f: Fighter) => f.branch!;
 // CHANGE (39) + 3, which jumps to the same displays in Round 1 (32 + 6).
 // ANMC P's at 100, set by to ex (242, PC 3299) and cleared by TO NOR (243,
 // PC 3312); his intro's (PC 363) enters 'Chage Character' (39), as Ryuko's.
+// Giant's at 100, set by TO EX (231, PC 3408) and cleared by TO NORMAL (232,
+// PC 3421); his intro's (PC 328) enters Chung Style (37), which jumps back to
+// Round 1 (33 + 18).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
   amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
   anmc: { value: 100, intro: ANMC_INTRO_EX_TICK },
+  giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
 };
 // Zoma and Kiki have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -743,14 +754,16 @@ export interface Fighter {
   pending: Pending | null;
 }
 // What a contact, an op 0x14 or a loss queues: a reaction, with its op 0x1a
-// stops for the victim and the striker and the striker's op 0x15 power; or
-// the striker's own hit or guard handler.
+// stops for the victim and the striker, the striker's op 0x15 power and the
+// victim's own action its response named; or the striker's own hit or guard
+// handler.
 type Pending =
   | {
       action: Action;
       stop: number;
       attackerStop: number;
       power: number;
+      own?: number;
     }
   | { key: ObjectKey };
 type Window = Extract<SourceEvent, { op: 'window' }>;
@@ -918,8 +931,9 @@ export function faderColor({ start, target, left, ticks }: Fader) {
 }
 // The display a fighter shows.
 export function fighterPose(f: Fighter): Pose {
-  if (f.action === 'superHeld' && f.held?.pose)
-    return heldFrame(f.held.pose, f.held.flags, f.who);
+  // Op 0x07 replaces a held player's display, whatever its action: Giant's
+  // counter hit holds a vanished victim (PC 4334).
+  if (f.held?.pose) return heldFrame(f.held.pose, f.held.flags, f.who);
   if (f.branch) return animationFrame(f.branch, f.age, f.who);
   return clipPose(
     shown(f),
@@ -1385,6 +1399,33 @@ export class Match {
       this.action(f, 'getUp');
   }
 
+  // GIANT!! MUSIC ATTACK (133) loops until another action takes the victim,
+  // each pass first running its records: Ryuko's rolls rand() % 31 > 1 to
+  // jump past its sound (PCs 1803–1807); Giant's spawns love heart (440, PC
+  // 1944).
+  private musicAttack(f: Fighter) {
+    if (f.action !== 'musicAttack') return false;
+    if (f.age % animationDuration('musicAttack', f.who)) return true;
+    const owner = this.fighters.indexOf(f);
+    for (const event of script(twin(f.who, 133), f.who).events) {
+      if (event.t) break;
+      if (event.op !== 'random') this.runEvent(f, owner, event);
+      else if (this.cpu.random() % event.divisor > event.above) break;
+    }
+    return true;
+  }
+
+  // Chuck 消える (143) holds its blank display for 100 ticks, then jumps into
+  // rambu AIR (122, PC 1965), running its first records at once.
+  private vanish(f: Fighter, other: Fighter) {
+    if (f.action !== 'vanish') return false;
+    if (f.age >= animationDuration('vanish', f.who)) {
+      this.queue(f, 'rushAirHit');
+      this.enterPending(f, other);
+    }
+    return true;
+  }
+
   // GON MISS (137) floats until its display ends (PC 1873). Then its op
   // 0x15 (PC 1874) takes 40 life from the victim and adds 5 power to it and
   // 3 to the striker, and PC 1875 jumps into HISA (80), running its first
@@ -1455,6 +1496,7 @@ export class Match {
       const held =
         target.action === 'superHeld' ||
         target.action === 'shock' ||
+        target.action === 'musicAttack' ||
         Boolean(target.held?.pose);
       if (held && (holder.action !== 'script' || holder.hp === 0)) {
         // One held below the floor is set on it.
@@ -1501,14 +1543,17 @@ export class Match {
     return false;
   }
 
-  // An action change (0x410cf0) by number: the engine states and Ryuko's
-  // victim reactions (Musashi's finish ends in FLY NO HIT, 97) play as the
-  // port's actions, and any other source action runs its timeline.
+  // An action change (0x410cf0) by number: the engine states and a player's
+  // own victim reactions (Ryuko's Musashi finish ends in FLY NO HIT, 97;
+  // Giant's chuck in his, 101) play as the port's actions, and any other
+  // source action runs its timeline. ponytail: a reaction entered so skips
+  // its op 0x15 power and op 0x1a stops; a jump past them (Giant's Drop P
+  // lend enters TWIS HIT + 12) skips them in the source too, and
+  // export_fighter checks none goes further, past a display.
   private enterSource(f: Fighter, index: number, offset = 0) {
-    const named = offset
-      ? undefined
-      : (NEUTRAL[f.who][index] ??
-        (f.who === 'ryuko' ? RESPONSE_REACTIONS[index]?.action : undefined));
+    const named =
+      (offset ? undefined : NEUTRAL[f.who][index]) ??
+      RESPONSE_REACTIONS[twinOf(f.who, index) ?? 0]?.action;
     if (named) return this.action(f, named, true);
     this.action(f, 'script', true);
     f.branch = sourceKey(index, offset);
@@ -1734,7 +1779,8 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
-        const reaction = RESPONSE_REACTIONS[victimOf(other, event.response)];
+        const own = responsesOf(other.who)[event.response];
+        const reaction = RESPONSE_REACTIONS[ryukoTwin(other.who, own)];
         if (!reaction || !this.struck(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
@@ -1746,6 +1792,8 @@ export class Match {
           reaction.action,
           reaction.stop,
           reaction.attackerStop ?? reaction.stop,
+          0,
+          own,
         );
         break;
       }
@@ -1832,6 +1880,17 @@ export class Match {
         if (!('clip' in actor) && actor.action !== 'script') break;
         if (this.cpu.random() % event.divisor <= event.above || !event.action)
           break;
+        // One in a call jumps within the called action, rejoining this path
+        // at its next display (Giant's super base ball picks a ball, PC
+        // 5358): the target's records up to there replace this tick's rest.
+        if (event.called) {
+          const key = sourceKey(event.action, event.offset);
+          for (const next of script(key, actor.who).events) {
+            if (next.t) break;
+            this.runEvent(actor, owner, next);
+          }
+          return true;
+        }
         return this.branchTo(actor, sourceKey(event.action, event.offset));
     }
     return false;
@@ -2095,7 +2154,11 @@ export class Match {
       guarding,
       this.crouching(target),
     );
-    const victim = victimOf(target, response);
+    // 0x40f539: a response id selects the victim action from the victim's
+    // own table. Another player's follows its Ryuko twin's rules
+    // (export_fighter), so `victim` is Ryuko's number for it.
+    const own = responsesOf(target.who)[response];
+    const victim = ryukoTwin(target.who, own);
     const reaction = RESPONSE_REACTIONS[victim];
     if (!reaction) return [];
     const blocked = blocks.has(reaction.action);
@@ -2117,6 +2180,7 @@ export class Match {
         blocked,
         source,
         bonus: STRIKER_POWER[victim] ?? 0,
+        own,
       },
     ];
   }
@@ -2277,8 +2341,9 @@ export class Match {
     stop = 0,
     attackerStop = 0,
     power = 0,
+    own?: number,
   ) {
-    target.pending = { action, stop, attackerStop, power };
+    target.pending = { action, stop, attackerStop, power, own };
   }
 
   // 0x412327: a step first enters the action queued for it, stopped or not,
@@ -2291,7 +2356,14 @@ export class Match {
     const pending = f.pending!;
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
-    const { action, stop, attackerStop, power } = pending;
+    const { action, stop, attackerStop, power, own } = pending;
+    // Giant's reactions open by testing his counter's variable 4 (PCs 723,
+    // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
+    // 4271–4282), they enter counter hit (279) before their stops and power.
+    // Most others clear it (PCs 744, 788, ...).
+    const counter = own === undefined ? undefined : countersOf(f.who)[own];
+    if (counter && f.variables[4] === 100) return this.enterSource(f, counter);
+    if (counter === 0) f.variables[4] = 0;
     this.action(f, action, true);
     f.vx = f.vy = 0;
     f.moving = 0;
@@ -2328,6 +2400,7 @@ export class Match {
       }
     }
     if (f.action === 'superHeld' || f.action === 'shock') return;
+    if (this.musicAttack(f) || this.vanish(f, other)) return;
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
     if (f.action === 'script' && this.moveScripted(f)) return;
@@ -2722,6 +2795,7 @@ export class Match {
       blocked,
       source,
       bonus,
+      own,
     } of contacts) {
       source.connected = true;
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
@@ -2736,7 +2810,7 @@ export class Match {
       // op 0x15 power, no op 0x1a stops. The last box to reach the victim
       // sets its reaction, so DST's two missiles stop it once.
       if (target.hp > 0)
-        this.queue(target, reaction, hitStop, attackerStop, bonus);
+        this.queue(target, reaction, hitStop, attackerStop, bonus, own);
       else this.queue(target, knockedOut(wasOut));
       target.reaction = blocked
         ? target.reaction | 0xc
