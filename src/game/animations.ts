@@ -325,8 +325,8 @@ export function heldFrame(
 }
 
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
-// Chung's ROUND 1 checks at PC 338, from PC 332, and Amiro's Round BR at PC
-// 382.
+// Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382
+// and ANMC P's Round 1 at PC 363, from PC 356.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -334,6 +334,7 @@ const ticksBefore = (frames: Pose[], pc: number) =>
 export const INTRO_EX_TICK = ticksBefore(clips.intro.slice(2), 348);
 export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
 export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
+export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -464,6 +465,32 @@ const waits = (frames: Pose[]) =>
   frames.map(({ duration }) =>
     duration > 0 && duration < 1000 ? duration : 1,
   );
+// A player's guard clips; with `ex`, ANMC P's EX forms (export_fighter).
+const guardAnimations = (
+  z: Record<string, Pose[]>,
+  ex = '',
+): Partial<Record<AnimatedAction, Clip>> => {
+  const g = (name: string) => z[name + ex];
+  return {
+    guard: clip(g('guard').slice(0, 1)),
+    crouchGuard: clip(g('crouchGuard').slice(0, 1)),
+    airGuard: clip(g('airGuard').slice(0, 1)),
+    block: clip(g('guard')),
+    crouchBlock: clip(g('crouchGuard')),
+    airBlock: clip(g('airGuard')),
+    blockHeavy: clip(g('blockHeavy')),
+    crouchBlockHeavy: clip(g('crouchBlockHeavy')),
+    airBlockHeavy: clip(g('airBlockHeavy')),
+    blockRapid: clip(g('blockRapid')),
+    crouchBlockRapid: clip(g('crouchBlockRapid')),
+    airBlockRapid: clip(g('airBlockRapid')),
+    timeStopGuard: clip(g('timeStopGuard')),
+    crouchTimeStopGuard: clip(g('crouchTimeStopGuard')),
+    airTimeStopGuard: clip(g('airTimeStopGuard')),
+    blockStop: clip(g('blockStop')),
+    crouchBlockStop: clip(g('crouchBlockStop')),
+  };
+};
 // The other players' neutral, guard, victim and result clips: the engine's
 // own states and the twins of Ryuko's victim actions (export_fighter), shaped
 // like his.
@@ -482,27 +509,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
-    // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326 and
-    // Chung's ROUND 1 (33) from PC 332: no op 0x01, so each stands where they
-    // start. Amiro's Round BR (33) drives in on her car (introMotion).
+    // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
+    // Chung's ROUND 1 (33) from PC 332 and ANMC P's Round 1 (35) from PC 356:
+    // no op 0x01, so each stands where they start. Amiro's Round BR (33)
+    // drives in on her car (introMotion).
     intro: clip(z.intro),
-    guard: clip(z.guard.slice(0, 1)),
-    crouchGuard: clip(z.crouchGuard.slice(0, 1)),
-    airGuard: clip(z.airGuard.slice(0, 1)),
-    block: clip(z.guard),
-    crouchBlock: clip(z.crouchGuard),
-    airBlock: clip(z.airGuard),
-    blockHeavy: clip(z.blockHeavy),
-    crouchBlockHeavy: clip(z.crouchBlockHeavy),
-    airBlockHeavy: clip(z.airBlockHeavy),
-    blockRapid: clip(z.blockRapid),
-    crouchBlockRapid: clip(z.crouchBlockRapid),
-    airBlockRapid: clip(z.airBlockRapid),
-    timeStopGuard: clip(z.timeStopGuard),
-    crouchTimeStopGuard: clip(z.crouchTimeStopGuard),
-    airTimeStopGuard: clip(z.airTimeStopGuard),
-    blockStop: clip(z.blockStop),
-    crouchBlockStop: clip(z.crouchBlockStop),
+    ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
     airHit: clip(z.airHit),
@@ -561,7 +573,18 @@ const TWIN_ANIMATIONS = {
   kiki: twinAnimations('kiki'),
   chung: twinAnimations('chung'),
   amiro: twinAnimations('amiro'),
+  anmc: twinAnimations('anmc'),
 };
+// ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
+// PCs 1970, 2015, ...): the same records showing his other costume.
+// ponytail: 'time stop sit EX' (195) also spawns 365 and slides at raw −650
+// (PCs 2566–2567), which only the hidden super's guard reaches; the port
+// draws its images over the normal guard's rules.
+const EX_ANIMATIONS = Object.fromEntries(
+  Object.entries(fighterClips)
+    .filter(([, z]) => z.guardEx)
+    .map(([who, z]) => [who, guardAnimations(z, 'Ex')]),
+) as Partial<Record<Who, Partial<Record<AnimatedAction, Clip>>>>;
 
 // Object keys name a spawned source object, played from its flattened timeline.
 export const isObject = (
@@ -588,10 +611,15 @@ export function animationDuration(
 // fighter's pose. Idle keeps action 1's one box (PCs 10 and 24).
 // A fighter action's display at an age; idle stands for action 1's first,
 // as scene.ts draws idle from its VM.
-export const clipPose = (action: Shown, age: number, who: Who = 'ryuko') =>
+export const clipPose = (
+  action: Shown,
+  age: number,
+  who: Who = 'ryuko',
+  ex = false,
+) =>
   action === 'idle'
     ? fighterClips[who].idle[0]
-    : animationFrame(action, age, who);
+    : animationFrame(action, age, who, ex);
 function bodies(action: Shown, age: number, who: Who): BodyBox[] {
   return clipPose(action, age, who).body ?? [];
 }
@@ -626,15 +654,19 @@ export function pushboxes(
     .reverse();
 }
 
+// `ex`: in EX mode, where the player has an EX form of the clip.
 export function animationFrame(
   action: AnimatedAction | ObjectKey,
   age: number,
   who: Container = 'ryuko',
+  ex = false,
 ): Pose {
-  const found = clipOf(action, who);
+  const found =
+    (ex && EX_ANIMATIONS[who as Who]?.[action as AnimatedAction]) ||
+    clipOf(action, who);
   if (!found) throw new Error(`Source object ${action} has no displays`);
   const { frames, ticks, loopStart } = found;
-  const duration = animationDuration(action, who);
+  const duration = ticks.reduce((total, n) => total + n, 0);
   const intro = ticks
     .slice(0, Math.max(0, loopStart))
     .reduce((total, n) => total + n, 0);

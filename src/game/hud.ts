@@ -113,20 +113,21 @@ export function gaugeImage(tick: number) {
 }
 
 // Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
-// for 40 ticks each (PCs 712–730), as Chung's 73 (PCs 675–692) and Amiro's
-// 75 (PCs 786–803). Zoma's and
+// for 40 ticks each (PCs 712–730), as Chung's 73 (PCs 675–692), Amiro's 75
+// (PCs 786–803) and ANMC P's 72 (PCs 717–735). Zoma's and
 // Kiki's action 71 shows 2001 (PCs 677, 666).
 export const faceImage = (face: number) =>
   face < 0 ? 2001 : [2002, 2001, 2000, 2001][Math.floor(face / 40) % 4];
 // The *NAME action's image: Ryuko's 66 shows 464 (PC 675), Zoma's 64 340
-// (PC 637), Kiki's 65 217 (PC 627), Chung's 65 375 (PC 635) and Amiro's 67
-// 427 (PC 746).
+// (PC 637), Kiki's 65 217 (PC 627), Chung's 65 375 (PC 635), Amiro's 67
+// 427 (PC 746) and ANMC P's 69 183 (PC 682).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
   kiki: 217,
   chung: 375,
   amiro: 427,
+  anmc: 183,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

@@ -84,6 +84,8 @@ export class StandingVM {
   variables: Record<number, number> = {};
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
+  // Op 0x09 calls: where each returns, its repeats left and its entry.
+  calls: { ret: number; remaining: number; entry: number }[] = [];
   events: (Frame & { tick: number; action: number })[] = [];
   branches: {
     tick: number;
@@ -142,8 +144,16 @@ export class StandingVM {
       if (steps >= 299)
         throw new Error('Instruction budget exceeded before a display');
       if (this.pc >= this.program.end) {
-        this.ended = true;
-        break;
+        // Running out repeats a call at its entry or returns from it
+        // (0x4125ea, 0x4126ae); with none, the action ends.
+        const call = this.calls.at(-1);
+        if (!call) {
+          this.ended = true;
+          break;
+        }
+        if (--call.remaining) this.pc = this.program.start + call.entry;
+        else this.pc = this.calls.pop()!.ret;
+        continue;
       }
       if (this.pc < this.program.start)
         throw new Error('PC precedes the current action');
@@ -187,6 +197,14 @@ export class StandingVM {
       if (op === 10) {
         if (u16(r, 1)) {
           this.target(u16(r, 1), r[3]);
+          continue;
+        }
+      } else if (op === 9) {
+        // Op 0x09 (0x4129a9) calls r[2:4] r[1] times, entering at r[4]: ANMC
+        // P's idle repeats its last three displays three times (PC 20).
+        if (r[1]) {
+          this.calls.push({ ret: pc + 1, remaining: r[1], entry: r[4] });
+          this.target(u16(r, 2), r[4]);
           continue;
         }
       } else if (op === 32) {

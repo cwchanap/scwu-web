@@ -128,6 +128,15 @@
         iori: 'Coment Chuck',
         dst: 'Morning Star',
       },
+      anmc: {
+        getterBeam: 'Super Chuck',
+        musashi: 'Super Ball',
+        changeAttack: 'EN300',
+        drill: 'Fly Move',
+        axe: 'Fire Ball',
+        iori: 'Twis Att',
+        dst: 'Ball Fire',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -338,6 +347,7 @@
             <option value="kiki">Kiki</option>
             <option value="chung">Chung</option>
             <option value="amiro">Amiro</option>
+            <option value="anmc">ANMC P</option>
           </select></label
         >
         <label
@@ -352,6 +362,7 @@
             <option value="kiki">Kiki</option>
             <option value="chung">Chung</option>
             <option value="amiro">Amiro</option>
+            <option value="anmc">ANMC P</option>
           </select></label
         >
         <label
@@ -666,16 +677,36 @@
           medeo below 30% health).
         </p>
         <p>
+          Choose ANMC P to play him. <kbd>J</kbd> and <kbd>K</kbd> chain as
+          Chung's do: his third punch rushes in and hurls the opponent into the
+          screen's edge, his third kick blasts them away, and down with
+          <kbd>K</kbd> knocks down. <kbd>H</kbd> is his Hit Up, <kbd>O</kbd> his
+          chuck, a grab that spins the opponent away, and blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd>
+          switches to EX mode for half a stock, and back: he guards in a winged bird
+          costume instead of his mecha suit, and his kicks, chuck and twis att take
+          other forms. His specials: <kbd>U</kbd> or ↓← <kbd>J</kbd>
+          fly move, a rocket leap, <kbd>I</kbd> or ↓→ <kbd>J</kbd> fire ball,
+          lobbed in a high arc, <kbd>F</kbd> or ↓← <kbd>K</kbd> twis att, a
+          spinning rush that a super can cancel, and <kbd>G</kbd> or ↓→
+          <kbd>K</kbd> ball fire, a straight shot (both shots also in the air).
+          His supers: <kbd>1</kbd> or →↓←→↓← <kbd>J</kbd> SUPER CHUCK, a grab
+          and a beating, and <kbd>2</kbd> or ↓→↓→ <kbd>J</kbd> super ball, balls
+          that fire beams, for a stock each, and <kbd>3</kbd> or ↓→↓→
+          <kbd>K</kbd> en300, a barrage of shots, for three.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung or Amiro, and one of eighteen stages, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you at 30%
-          for desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          Kiki, Chung, Amiro or ANMC P, and one of eighteen stages, in either
+          mode. Free practice has no timer, and you also choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you at 30% for desperation moves. Vs. CPU is the original game's
+          CPU, playing the opponent's own moves, specials and supers. Reduce
+          their health to zero, or lead on health when time runs out. Changing
+          modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

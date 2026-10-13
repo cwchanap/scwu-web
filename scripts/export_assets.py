@@ -269,9 +269,15 @@ def player_tables(data, c, image_ids):
         last = max((k for k, step in enumerate(steps) if step & 0x2000), default=-1)
         commands.append(dict(name=data[entry:entry + 0x20].split(b"\0")[0].decode("cp932").strip(),
                              window=window, air=air, near=near, far=far, crouch=crouch, steps=steps[:last + 1]))
+    # The response table after it (player +0x6daa), as many entries as its count
+    # says (0x403b87): 83 in most players, 84 in ANMC P's.
+    response_offset = c.common_end + 4 + count * 82 + 4
+    response_count = struct.unpack_from("<I", data, response_offset - 4)[0]
+    if not 83 <= response_count <= 0x320 // 4:
+        sys.exit("Unexpected response table layout; refusing to export.")
     # Op 0x07 replaces a held fighter's display with an entry of this 15 x 6-byte
     # table (image, dx, dy), read by the engine into player offset 0x70ca.
-    held_offset = c.common_end + 4 + count * 82 + 4 + 83 * 4 + 4
+    held_offset = response_offset + response_count * 4 + 4
     if struct.unpack_from("<I", data, held_offset - 4)[0] != 15:
         sys.exit("Unexpected held-pose table layout; refusing to export.")
     held = []
@@ -281,13 +287,10 @@ def player_tables(data, c, image_ids):
         held.append(dict(image=packed & 8191, dx=dx, dy=dy, width=image.width, height=image.height))
         if packed & 8191:
             image_ids.add(packed & 8191)
-    # The 83-entry response table before it (player +0x6daa): the victim action
-    # for each response id, then the hit-effect action 0x40f567 spawns.
-    response_offset = held_offset - 4 - 83 * 4
-    if struct.unpack_from("<I", data, response_offset - 4)[0] != 83:
-        sys.exit("Unexpected response table layout; refusing to export.")
-    responses = [u16(data, response_offset + 4 * i) for i in range(83)]
-    response_effects = [u16(data, response_offset + 4 * i + 2) for i in range(83)]
+    # Each response entry: the victim action for that response id, then the
+    # hit-effect action 0x40f567 spawns.
+    responses = [u16(data, response_offset + 4 * i) for i in range(response_count)]
+    response_effects = [u16(data, response_offset + 4 * i + 2) for i in range(response_count)]
     # The CPU table 10 bytes after the held-pose table: 100 entries of 111 bytes
     # (name, +0x20 flags, +0x21 probability, +0x22/+0x24 distance, ten 7-byte
     # steps at +0x2a), played by the CPU routine at 0x411270. Keep entries up to
@@ -330,8 +333,13 @@ def pose_clips(p, c, actions, image_ids):
         index, offset = index if isinstance(index, tuple) else (index, 0)
         action = p.action(index)
         frames, bodies, color, events = [], None, None, []
-        for pc in range(action.start, action.end):
-            if p.records[pc][0] == 0x19:
+        pc = action.start - 1
+        while (pc := pc + 1) < action.end:
+            # An op 0x0a forward within the action skips the records between:
+            # ANMC P's WIN (PC 579) passes the sound its roll plays instead.
+            if p.records[pc][0] == 0x0a and u16(p.records[pc], 1) == index and pc < action.start + p.records[pc][3]:
+                pc = action.start + p.records[pc][3] - 1
+            elif p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
@@ -504,6 +512,15 @@ CHUNG_TWINS = {name: (r, z + (4 if name in ("twist", "twisting", "twisting2") el
 AMIRO_TWINS = {name: (r, z + (5 if name in ("airHitRapid", "twist", "twisting", "twisting2") else 4))
                for name, (r, z) in ZOMA_TWINS.items()} | {
     name: (r, k + 2) for name, (r, k) in KIKI_TWINS.items() if name in ("ko", "koAgain", "down", "lose")}
+# ANMC P's sit one after Zoma's, his Twising 2 two (his ★変なＴＥＣＨ, 89, comes
+# before it), his KOs and lose action three after Ryuko's, and each guard
+# before its CONO and EX forms.
+ANMC_TWINS = {name: (r, z + (2 if name == "twisting2" else 1)) for name, (r, z) in ZOMA_TWINS.items()} | {
+    name: (r, r + 3) for name, (r, _) in ZOMA_TWINS.items() if name in ("ko", "koAgain", "down", "lose")} | dict(
+    guard=(149, 150), crouchGuard=(151, 154), airGuard=(153, 158), blockHeavy=(154, 160), crouchBlockHeavy=(156, 164),
+    airBlockHeavy=(158, 168), blockStop=(159, 170), crouchBlockStop=(161, 174), blockRapid=(163, 178),
+    crouchBlockRapid=(165, 182), airBlockRapid=(167, 186), timeStopGuard=(168, 188), crouchTimeStopGuard=(170, 190),
+    airTimeStopGuard=(172, 192))
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -513,6 +530,10 @@ TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", 
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
             "airBlockRapid", "airTimeStopGuard", "lose"]
+
+GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+          "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+          "crouchTimeStopGuard", "airTimeStopGuard")
 
 # Each other player: its file and hash; the engine's own states, from its
 # default-action table (+0x757a) and its jumps' landing handler (slot 1); its
@@ -667,6 +688,49 @@ FIGHTERS = {
         # 786–803), as Ryuko's; 427: *name (67, PC 746).
         image_ids={2000, 2001, 2002, 427},
     ),
+    "anmc": dict(
+        source=("06 ANMC P", "0f4d92aaafd0d6bf6e410034ec2af28d1d5d8a337ae05bf1bf2cae49bb3e4b4f"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 52
+                 "crouchEnter": 20, "crouch": 21, "stand": 22, "turn": 25, "crouchTurn": 26},
+        twins=ANMC_TWINS,
+        differ={
+            # Each jumps to its EX form while variable 0 is 100 (op 0x1f, PCs
+            # 1970, 2015, ...), past its op 0x15; Kiki's Hit Up within 10 ticks.
+            "guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+            "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+            "crouchTimeStopGuard", "airTimeStopGuard",
+            # Zoma's op 0x20 that rolls which displays play.
+            "jumpHit",
+            # Rolls rand % 6 > 2 to skip its sound (PC 1719).
+            "dstToss",
+            # Op 0x01 before op 0x02 (PCs 1700–1701).
+            "grabbed",
+            # Kiki's raw vx −800 (PC 1631).
+            "launchDown",
+            # Zoma's KO tests, Ryuko's landing wait; Zoma's KO DOWN.
+            "ko", "down",
+            # Amiro's rand % 4 > 2, and airStun's two waits as one.
+            "hitRapid", "airHitRapid", "stun", "airStun",
+            # Op 0x15 gives the victim 5 power and the attacker 3 (PC 1229), not
+            # Ryuko's 3 and none.
+            "tatumakiOut",
+            # Kiki's, with no op 0x20.
+            "uppercut", "dragonFireball", "liftUp",
+            # Zoma's.
+            "dstTossSpin2", "rushAirHit", "shock", "flySide", "flySideWall", "twistSide",
+        },
+        # Results: WIN calls DEMO STAND (30) once (PC 571) and holds image 324
+        # (PC 582); the draw calls 30 once (PC 675). ponytail: WIN's rand % 11 > 6
+        # into Win 2 (60, PC 572), a jetpack flight up at raw vy −300 (PC 586),
+        # isn't played; the clip takes the fall-through. His darkening panel, image
+        # 1009 (action 45). The Vs. intro: 32 jumps to 開始時 BR (34) for global
+        # 3 = 0 (PC 310), past its display for global 14 = 0 (PC 348), then to
+        # Round 1 (35) + 2 (PC 353).
+        actions=dict(win=59, winStand=30, draw=68, black=45, intro=(35, 2)),
+        # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
+        # 717–735), as Ryuko's; 183: *name (69, PC 682).
+        image_ids={2000, 2001, 2002, 183},
+    ),
 }
 
 
@@ -677,6 +741,14 @@ def export_fighter(ryuko, key, source, neutral, twins, differ, actions, image_id
             sys.exit(f"{source[0]}'s {name} ({z}) no longer matches the recorded comparison with Ryuko's {r}; "
                      "refusing to export.")
     actions = dict(neutral, **{name: z for name, (_, z) in twins.items() if name not in TIMELINES}, **actions)
+    # ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f
+    # == 100, PCs 1970, 2015, ...): the same records showing his other costume.
+    for name in GUARDS:
+        action = p.action(twins[name][1])
+        test = next((r for r in p.records[action.start:action.end] if r[0] == 0x1f and r[4] == 0x40 and r[5] == 4
+                     and u16(r, 9) == 100), None)
+        if test:
+            actions[name + "Ex"] = u16(test, 1)
     image_ids = set(image_ids)
     clips = pose_clips(p, c, actions, image_ids)
     tables = player_tables(data, c, image_ids)
@@ -688,9 +760,8 @@ def export_fighter(ryuko, key, source, neutral, twins, differ, actions, image_id
     # The scripted reactions, every response's hit effect and every object
     # the clips spawn; the moves, and the guard reactions whose op 0x24
     # enters COUNTER HIT.
-    guards = ("guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
-              "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard")
-    queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + list(guards)),
+    guards = [name for name in GUARDS if not name.startswith("air")]
+    queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
                               *filter(None, tables["response_effects"]), *moves]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids)
     sounds = export_sounds(c, key, cued(clips, scripts))
@@ -791,7 +862,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung and {counts['amiro']} Amiro images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro and {counts['anmc']} ANMC P images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

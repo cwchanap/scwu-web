@@ -4,6 +4,7 @@ import {
   animationFrame,
   clipPose,
   AMIRO_INTRO_EX_TICK,
+  ANMC_INTRO_EX_TICK,
   CHUNG_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
@@ -293,12 +294,16 @@ REACTION_POWER.drillDown = [5, 0];
 REACTION_POWER.chuckToss = [8, 0];
 REACTION_POWER.chuckUp = [5, 0];
 REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
-// Zoma's crouching guard (151) adds 2 more to him (PC 1929).
-const reactionPower = (f: Fighter): [number, number] => {
-  const [victim, attacker] = REACTION_POWER[f.action] ?? [0, 0];
-  const extra = f.who === 'zoma' && f.action === 'crouchBlock' ? 2 : 0;
-  return [victim + extra, attacker];
+// Zoma's crouching guard (151) adds 2 more to him (PC 1929); ANMC P's
+// Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229).
+const OWN_REACTION_POWER: Partial<
+  Record<Who, Partial<Record<Action, [number, number]>>>
+> = {
+  zoma: { crouchBlock: [3, 0] },
+  anmc: { tatumakiOut: [5, 3] },
 };
+const reactionPower = (f: Fighter): [number, number] =>
+  OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
 // The intros' op 0x01 runs, as [ticks, raw vx] from the clip's start: action
 // 33 walks at 200 until PC 339, after its first 50 ticks; Amiro's Round BR
 // (33) drives in at 600 after its first display (PC 367), then at 60 (PC
@@ -466,13 +471,14 @@ function struck(
 }
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
-// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's and
-// Amiro's HISA Down (124, 127, 128) at −800 (PCs 1522, 1582, 1883), and
-// Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's
+// and ANMC P's HISA Down (124, 127, 128, 125) at −800 (PCs 1522, 1582, 1883,
+// 1631), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
   amiro: { launchDown: -800, tatumakiOut: -300 },
+  anmc: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -498,6 +504,9 @@ const ROLLED: Partial<Record<Action, number>> = {
   jumpHit: 77,
   flySide: 91,
 };
+// ponytail: ANMC P's Chuck Twis (131) rolls rand % 6 > 2 to skip its sound
+// (PC 1719), but the toss plays as a clip, so it always sounds and draws no
+// roll; add dstToss here once it plays from its timeline.
 // Each player's twins that roll in its own records: Zoma's chuck toss (133)
 // and Kiki's rises (97, 127) don't.
 const ROLLS = Object.fromEntries(
@@ -529,10 +538,13 @@ const timeline = (f: Fighter) => f.branch!;
 // which set it and jump back. Amiro's at 100 too, set by EX Ch (214, PC 3287)
 // and cleared by NOR Ch (215, PC 3300); her intro's (PC 382) enters EX
 // CHANGE (39) + 3, which jumps to the same displays in Round 1 (32 + 6).
+// ANMC P's at 100, set by to ex (242, PC 3299) and cleared by TO NOR (243,
+// PC 3312); his intro's (PC 363) enters 'Chage Character' (39), as Ryuko's.
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
   amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
+  anmc: { value: 100, intro: ANMC_INTRO_EX_TICK },
 };
 // Zoma and Kiki have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -909,7 +921,12 @@ export function fighterPose(f: Fighter): Pose {
   if (f.action === 'superHeld' && f.held?.pose)
     return heldFrame(f.held.pose, f.held.flags, f.who);
   if (f.branch) return animationFrame(f.branch, f.age, f.who);
-  return clipPose(shown(f), f.action === 'jump' ? f.airAge : f.age, f.who);
+  return clipPose(
+    shown(f),
+    f.action === 'jump' ? f.airAge : f.age,
+    f.who,
+    exMode(f),
+  );
 }
 const newEffect = (
   fields: Partial<Effect> & Pick<Effect, 'clip' | 'who'>,

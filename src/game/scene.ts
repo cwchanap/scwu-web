@@ -57,9 +57,10 @@ export const initialStatus: GameStatus = {
 };
 const ART_SCALE = 1.5;
 // A viewport object behind the fighters (the KO flash, z 15 like action 43)
-// sits over the court.
+// sits over the court. Within its band a higher z draws in front: ANMC P's
+// EN300 cut-in (305, z 50) over its background (304, z 49).
 const effectDepth = (e: Effect) =>
-  e.z >= FIGHTER_Z ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1;
+  (e.z >= FIGHTER_Z ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1) + e.z / 1000;
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
