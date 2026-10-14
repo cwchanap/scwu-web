@@ -100,7 +100,7 @@ const keyMap: Record<string, Control> = {
 };
 
 // The free state's program (action 1), which reads the fighter's variable 0
-// (EX mode).
+// (EX mode) and, for SIN, its life.
 const idleVM = (f: Fighter, seed?: number) =>
   new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
     0x40: f.variables[0] ?? 0,
@@ -500,6 +500,7 @@ export class TrainingScene extends Phaser.Scene {
             // Entering action 1 starts its program again (0x410cf0).
             if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
             this.idling[i] = true;
+            this.idle[i].life = f.hp;
             this.idle[i].tick();
           });
         });

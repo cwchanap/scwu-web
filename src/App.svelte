@@ -166,6 +166,16 @@
         iori: 'Zombi Walk',
         dst: 'Run In',
       },
+      sin: {
+        getterBeam: 'Baku',
+        musashi: 'Sup Run C',
+        changeAttack: 'EN300',
+        blackRush: 'Nozan',
+        drill: 'S Punch',
+        axe: 'Low Chuck',
+        iori: 'Run Chuck',
+        dst: 'Clack Chuck',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -380,6 +390,7 @@
             <option value="giant">Giant</option>
             <option value="suneo">G Suneo</option>
             <option value="yo">Yo</option>
+            <option value="sin">SIN</option>
           </select></label
         >
         <label
@@ -398,6 +409,7 @@
             <option value="giant">Giant</option>
             <option value="suneo">G Suneo</option>
             <option value="yo">Yo</option>
+            <option value="sin">SIN</option>
           </select></label
         >
         <label
@@ -810,10 +822,37 @@
           for a stock.
         </p>
         <p>
+          Choose SIN to play him, a shapeshifter in another guise for most
+          moves. <kbd>J</kbd> and <kbd>K</kbd> chain as Chung's do: his second
+          punch is a horned demon's dashing slash, his third a golden serpent's
+          lunge, his second kick a sweep, then a rising kick, and his third a
+          wolf's leap, and down with <kbd>J</kbd> or <kbd>K</kbd> is a chainsaw
+          thrust or a low blade into a knockdown. <kbd>H</kbd> is his Hit Up,
+          <kbd>O</kbd> his chuck: a masked man's grab and throw. Blocking with a
+          stock, <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd> switches to EX mode for half a stock, and back, which
+          swaps his stance and his grabs for other forms, and below 30% health
+          he stands in a red blaze. His specials:
+          <kbd>U</kbd> or ↓→ <kbd>J</kbd> S PUNCH, a dashing flurry of blasts,
+          which BAKU or SUP RUN C can cancel for two stocks, <kbd>I</kbd> or ←↓→
+          <kbd>J</kbd> low chuck, a hooked pole that catches the opponent's feet
+          and flips them, <kbd>F</kbd> or →↓← <kbd>K</kbd> RUN CHUCK, a dashing
+          grab that leaps and drops the opponent on their head (also in the
+          air), <kbd>G</kbd> or ←↓→ <kbd>K</kbd> Clack chuck, a grab, a leap and
+          a slam (both harder below 30% health), and ↓← <kbd>J</kbd> WOLF att, a
+          wolf's leap. His supers: <kbd>1</kbd> or ↓←↓→ <kbd>J</kbd> BAKU, a
+          masked brute's charge, and <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> SUP RUN
+          C, RUN CHUCK into a clawed figure's slashes (also in the air), for a
+          stock each, <kbd>3</kbd> or →↓←→↓← <kbd>J</kbd> EN300, a grab and
+          machete cuts (in EX mode three lion-head pillars), for three, and,
+          below 30% health, <kbd>4</kbd> or →↓←→↓← <kbd>K</kbd> NOZAN, a grab and
+          a long beating out of sight, for three.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo or Yo, and one of eighteen
-          stages, in either mode. Free practice has no timer, and you also
-          choose how the partner behaves: standing, guarding high or low,
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo or SIN, and one of
+          eighteen stages, in either mode. Free practice has no timer, and you
+          also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the
           original CPU. Max stock refills your supers whenever you stand idle,
           and Low health keeps you just under 30% for desperation moves. Vs. CPU

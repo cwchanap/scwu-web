@@ -335,7 +335,8 @@ export function heldFrame(
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
 // Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
 // ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
-// from PC 313, and G Suneo's Round 1 at PC 403, from PC 393.
+// from PC 313, G Suneo's Round 1 at PC 403, from PC 393, and SIN's Round 1
+// at PC 403, from PC 396.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -346,6 +347,7 @@ export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
 export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
 export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
 export const SUNEO_INTRO_EX_TICK = ticksBefore(fighterClips.suneo.intro, 403);
+export const SIN_INTRO_EX_TICK = ticksBefore(fighterClips.sin.intro, 403);
 
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
@@ -540,11 +542,14 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Giant's Round 1 (33) from PC 313 and G Suneo's Round 1 (35) from PC
     // 393: no op 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
-    // her robot (introMotion), then calls Demo Stand three times (PC 392).
+    // her robot (introMotion), then calls Demo Stand three times (PC 392);
+    // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
     intro: clip(
       who === 'yo'
         ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
-        : z.intro,
+        : who === 'sin'
+          ? [...z.intro, ...z.winStand]
+          : z.intro,
     ),
     ...guardAnimations(z),
     hit: clip(z.hit),
@@ -593,8 +598,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     koLand: clip(z.down),
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
     // 'win rp' (57) three times before its last display (PC 536) and G
-    // Suneo's 'win talk' (67) seven times (PC 707), and Giant's loops from
-    // PC 560 (winLoop, PC 564).
+    // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
+    // 560 (winLoop, PC 564) and SIN's from PC 617 (PC 619), past the records
+    // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
+    // SIN's draw holds its last display (PC 714).
     win: clip(
       z.winRp
         ? [
@@ -605,12 +612,14 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               .flat(),
             ...z.win.slice(-1),
           ]
-        : [...z.winStand, ...z.win],
-      z.winLoop
-        ? z.winStand.length + z.win.findIndex((f) => f.pc === z.winLoop[0].pc)
-        : false,
+        : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
+      z.winLoop ? z.winStand.length + z.win.length : false,
     ),
-    draw: clip([...z.winStand, ...z.draw]),
+    draw: clip(
+      [...z.winStand, ...z.draw],
+      false,
+      waits([...z.winStand, ...z.draw]),
+    ),
     fly: timeline(97),
     shock: timeline(88),
     rushAirHit: timeline(122),
@@ -626,6 +635,7 @@ const TWIN_ANIMATIONS = {
   giant: twinAnimations('giant'),
   suneo: twinAnimations('suneo'),
   yo: twinAnimations('yo'),
+  sin: twinAnimations('sin'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

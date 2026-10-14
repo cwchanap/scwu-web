@@ -82,6 +82,8 @@ export class StandingVM {
   ended = false;
   frame: Frame | null = null;
   variables: Record<number, number> = {};
+  // The fighter's life (+0xdf05) for op 0x11, which the scene sets each tick.
+  life?: number;
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
   // Op 0x09 calls: where each returns, its repeats left and its entry.
@@ -243,6 +245,17 @@ export class StandingVM {
         } else if (r[4] >> 6 === 3 || r[5] !== 1)
           throw new Error(`Unsupported variable operation at PC ${pc}`);
         else this.variables[r[4]] = s16(r, 7);
+      } else if (op === 17) {
+        // Op 0x11 (0x413164) jumps to r[2:4] + r[4] with life at or below
+        // r[6:8] if r[5] bit 0, otherwise at or above it: SIN tires at 165
+        // (PC 16), checked again each pass of his stance (PC 20).
+        if (this.life === undefined)
+          throw new Error(`Op 0x11 at PC ${pc} needs the fighter's life`);
+        const value = u16(r, 6);
+        if (r[5] & 1 ? this.life <= value : this.life >= value && u16(r, 2)) {
+          this.target(u16(r, 2), r[4]);
+          continue;
+        }
       } else if (op === 25) {
         if (r[9] >= 20) throw new Error('Collision slot out of range');
         this.collisionRecords[r[9]] = u16(r, 5) && u16(r, 7) ? pc : null;

@@ -1,7 +1,8 @@
 // Each player's exported container data: Ryuko's (01 RYUKO.PLAYER), Zoma's
 // (02 ZOMA.PLAYER), Kiki's (03 KIKI.PLAYER), Chung's (04 CHUNG.PLAYER),
 // Amiro's (05 AMIRO.PLAYER), ANMC P's (06 ANMC P.PLAYER), Giant's
-// (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER) and Yo's (09 YO.PLAYER);
+// (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER), Yo's (09 YO.PLAYER) and
+// SIN's (10 SIN.PLAYER);
 // and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
@@ -12,6 +13,7 @@ import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
 import suneo from './generated/suneo.json';
 import yo from './generated/yo.json';
+import sin from './generated/sin.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -23,7 +25,8 @@ export type Who =
   | 'anmc'
   | 'giant'
   | 'suneo'
-  | 'yo';
+  | 'yo'
+  | 'sin';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -34,6 +37,7 @@ export const CHARACTERS = {
   giant,
   suneo,
   yo,
+  sin,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -42,8 +46,8 @@ export type Container = Who | Stage;
 
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
-// Suneo's 500, Yo's 480. Each block puts the desperation threshold at 30% (+0x7ca6),
-// which 0x40e7c0 compares against.
+// Suneo's 500, Yo's 480, SIN's 550. Each block puts the desperation threshold
+// at 30% (+0x7ca6), which 0x40e7c0 compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
 export const desperationOf = (who: Who) => Math.trunc((lifeOf(who) * 30) / 100);
 
@@ -60,7 +64,17 @@ export const responseEffectsOf = (who: Who): readonly number[] =>
 // 127) also follow DOWN's and J Att's.
 const twins = Object.fromEntries(
   (
-    ['zoma', 'kiki', 'chung', 'amiro', 'anmc', 'giant', 'suneo', 'yo'] as const
+    [
+      'zoma',
+      'kiki',
+      'chung',
+      'amiro',
+      'anmc',
+      'giant',
+      'suneo',
+      'yo',
+      'sin',
+    ] as const
   ).map((who) => {
     const own = new Map(
       Object.entries(CHARACTERS[who].twins).map(([r, z]) => [Number(r), z]),

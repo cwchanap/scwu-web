@@ -14,6 +14,7 @@ import anmc from './generated/anmc.json';
 import giant from './generated/giant.json';
 import suneo from './generated/suneo.json';
 import yo from './generated/yo.json';
+import sin from './generated/sin.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -26,7 +27,8 @@ export interface CommandEntry {
   steps: number[];
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
-// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23)
+// Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
+// SIN's 25)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -40,6 +42,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     giant: giant.commands,
     suneo: suneo.commands,
     yo: yo.commands,
+    sin: sin.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -208,6 +211,22 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['axe', 9],
     ['dash', 13],
   ],
+  // SIN's supers BAKU (2), SUP RUN C (4), EN300 (1) and NOZAN (3) on 1-4;
+  // his specials S PUNCH (11), RUN CHUCK (6), Clack chuck (7) and low chuck
+  // (5) on Ryuko's special keys, --TYPE Change-- (12, TO EX) on EX, then
+  // Dash F (16) and Dash B (17). WOLF att (9) takes its command only.
+  sin: [
+    ['getterBeam', 2],
+    ['musashi', 4],
+    ['changeAttack', 1],
+    ['blackRush', 3],
+    ['drill', 11],
+    ['iori', 6],
+    ['dst', 7],
+    ['axe', 5],
+    ['ex', 12],
+    ['dash', 16],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -219,6 +238,7 @@ export const BACK_DASH: Record<Who, number> = {
   giant: 14,
   suneo: 14,
   yo: 14,
+  sin: 17,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

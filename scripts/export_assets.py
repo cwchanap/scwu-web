@@ -572,6 +572,12 @@ SUNEO_TWINS = {name: (r, r + next(d for top, d in ((73, 10), (77, 12), (89, 13),
 # Yo's sit two after Zoma's, three for Twis and Twis 2 (Yo's ★変なＴＥＣＨ, 89,
 # comes before them, Zoma's after), so Yo's KOs and lose action are Ryuko's.
 YO_TWINS = {name: (r, z + (3 if name in ("twisting", "twisting2") else 2)) for name, (r, z) in ZOMA_TWINS.items()}
+# SIN's sit three after Ryuko's KOs and lose action, four after Ryuko's other
+# reactions, five for the twists and the shock (SIN's ★変なＴＥＣＨ, 89, comes
+# before them, Ryuko's after) and from Clothes off 500 (SIN's clothes obj2,
+# 107, comes before it).
+SIN_TWINS = {name: (r, r + next(d for top, d in ((73, 3), (85, 4), (89, 5), (103, 4), (173, 5)) if r < top))
+             for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -963,6 +969,54 @@ FIGHTERS = {
         # 2001: the HUD face action 73 shows (PC 728); 390: *name (66, PC 688).
         image_ids={2001, 390},
     ),
+    "sin": dict(
+        source=("10 SIN", "59a429d7b8a621408c89f71314327bd5b87fb219be1a51a8fa3701169d32119f"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 71
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=SIN_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 1971), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20; TWIS
+            # SIDE FLY and the sweep roll it to skip their sound (PC 913), where
+            # Ryuko's have none.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "twistSideHit",
+            "sweep",
+            # Zoma's, rolling rand % 3 > 1.
+            "uppercut", "dragonFireball", "liftUp",
+            # Zoma's order of op 0x1a and op 0x15, and Kiki's raw vx −800 (PC 1638).
+            "launchDown",
+            # Op 0x01 before op 0x02 (PCs 1707–1708), as ANMC P's.
+            "grabbed",
+            # 5 and 5 ticks to Ryuko's 10.
+            "getUp",
+            # Zoma's KO tests (PC 635), landing wait and KO DOWN (PC 683), and
+            # Zoma's shock, which doesn't set variable 6.
+            "ko", "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "twistSide",
+            # Chung's: flySide rolls rand % 3 > 1 as well.
+            "flySide", "flySideWall",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+        },
+        # Results: 勝ち (60) calls STAND DEMO 2 (30) once (PC 612), spawns WIN
+        # RP (61, PC 616) and loops PCs 617–618 (PC 619); the draw calls 30
+        # once (PC 703). ponytail: STAND DEMO 2's STAND DEMO (29) for variable
+        # 0 = 10 (PC 324) isn't played; the clip takes the fall-through. The
+        # darkening panel, image 1009 (action 46). The Vs. intro: 開始時 (33)
+        # jumps to 開始時 BR (35) for global 3 = 0 (PC 349), past its display
+        # for global 14 = 0 (PC 388), then to Round 1 (36) + 2 (PC 393).
+        actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46, intro=(36, 2)),
+        # 2000–2002 and 2006: the HUD faces action 73 shows, cycling as G
+        # Suneo's in EX mode (PCs 756–774); 368: *name (70, PC 721).
+        image_ids={2000, 2001, 2002, 2006, 368},
+    ),
 }
 
 
@@ -1140,7 +1194,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo and {counts['yo']} Yo images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo and {counts['sin']} SIN images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

@@ -8,6 +8,7 @@ import {
   CHUNG_INTRO_EX_TICK,
   GIANT_INTRO_EX_TICK,
   SUNEO_INTRO_EX_TICK,
+  SIN_INTRO_EX_TICK,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
@@ -576,7 +577,10 @@ const timeline = (f: Fighter) => f.branch!;
 // PC 3421); his intro's (PC 328) enters Chung Style (37), which jumps back to
 // Round 1 (33 + 18). G Suneo's at 100, set by TO EX (235, PC 3491) and
 // cleared by TO NORMAL (236, PC 3504); her intro's (PC 403) enters change
-// character (41), which sets it and jumps back (35 + 13, PC 464).
+// character (41), which sets it and jumps back (35 + 13, PC 464). SIN's at
+// 10, set by TO EX (208) and cleared by TO NORMAL (209); his intro's (PC
+// 403) enters hanshin change (40), which sets it and jumps back (33 + 26, PC
+// 449).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -584,6 +588,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   anmc: { value: 100, intro: ANMC_INTRO_EX_TICK },
   giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
   suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
+  sin: { value: 10, intro: SIN_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -2797,8 +2802,9 @@ export class Match {
           f.power = 0;
         }
       // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
-      // Spark and G Suneo's hh enter their desperation forms only below it
-      // (op 0x11 at 153, 147 and 150 or more; the rest at it or below).
+      // Spark, G Suneo's hh, Yo's HIDDEN and SIN's NOZAN enter their
+      // desperation forms only below it (op 0x11 at 153, 147, 150, 144 and
+      // 165 or more; the rest at it or below).
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(
           this.fighters[0].hp,
