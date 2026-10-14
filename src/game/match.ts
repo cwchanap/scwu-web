@@ -132,6 +132,7 @@ const reactionSlides: Partial<
   hitHeavy: slide(9, -650, 10), // 75, PC 800
   jumpHit: slide(9, -250, 10), // 77, PC 845
   inatuma: slide(42, -650, 10), // 118, PC 1557
+  icePunch: slide(42, -650, 10), // 106, PC 1367
   hitPull: slide(9, 650, -10), // 121, PC 1602
   block: slide(8, -320), // 149, PC 2019
   crouchBlock: slide(8, -320), // 151, PC 2043
@@ -150,6 +151,7 @@ const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airHit: 74, // PCs 774/778: rise at raw 100, then −300/−650, ax 1, gravity 66
   airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
   airInatuma: 120, // PC 1579: hangs still, without gravity
+  airIcePunch: 107, // PC 1381: as 120
   airHitRapid: 84, // PCs 979/990: drift at −100, then −400/−830, gravity 80
   airBlock: 153, // PCs 2060/2063: −420, ax −15, gravity 70; vy 0 at age 3
   airBlockHeavy: 158, // PCs 2133/2136: −450 and vy 0 at age 6
@@ -308,6 +310,8 @@ for (const action of [
   'twistSide',
   'inatuma',
   'airInatuma',
+  'icePunch',
+  'airIcePunch',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as do 132 (PC 1783), 134 (PC 1818) and
@@ -392,6 +396,10 @@ const RESPONSE_REACTIONS: Record<
   77: { action: 'jumpHit', stop: 15 },
   // G Suneo's EX D Driver reaches 118 through response 68.
   118: { action: 'inatuma', stop: 15 },
+  // DIDO's >HEN300 Hit reaches 'ICE Punch' and its air form through
+  // responses 54 and 55; both play as ERUS INATUMA's do (PCs 1355–1367).
+  106: { action: 'icePunch', stop: 15 },
+  107: { action: 'airIcePunch', stop: 15 },
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
   96: { action: 'uppercut', stop: 13 },
@@ -662,7 +670,10 @@ function toNeutral(f: Fighter) {
 // A script step that starts a display first re-arms an object holding an
 // attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
 function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
-  const kinds = (actor.box?.kind ?? 0) | (actor.objectBox?.kind ?? 0);
+  const kinds = [actor.box, ...actor.boxes].reduce(
+    (kinds, box) => kinds | (box?.kind ?? 0),
+    0,
+  );
   if (
     kinds & 2 &&
     age > 0 &&
@@ -737,6 +748,8 @@ const reactions = new Set<Action>([
   'jumpHit',
   'inatuma',
   'airInatuma',
+  'icePunch',
+  'airIcePunch',
   'hitPull',
   'shock',
   'stun',
@@ -770,8 +783,9 @@ export interface Fighter {
   fired: number;
   ax: number;
   box: ScriptBox | null;
-  // Op 0x18 slot 1: the box repeated 2000 pixels down, for objects' bodies.
-  objectBox: ScriptBox | null;
+  // Op 0x18 slots 1–7, by slot: Ryuko's repeat a box 2000 pixels down, for
+  // objects' bodies.
+  boxes: (ScriptBox | null)[];
   responses: number[];
   onHit: ObjectKey;
   // Op 0x02 slots 3 (guard) and 1 (landing): each a jump target, 0 for none.
@@ -886,7 +900,7 @@ export interface Effect {
   // op's offset (+0x12d/+0x12f).
   follow: { parent: Spawner; x: number; y: number } | null;
   box: ScriptBox | null;
-  objectBox: ScriptBox | null;
+  boxes: (ScriptBox | null)[];
   responses: number[];
   connected: boolean;
   // Op 0x1a's stop ticks (+0x40) for an object following a stopped player.
@@ -1032,7 +1046,7 @@ const newEffect = (
   screen: false,
   follow: null,
   box: null,
-  objectBox: null,
+  boxes: [],
   responses: [],
   connected: false,
   hitStop: 0,
@@ -1062,7 +1076,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   fired: -1,
   ax: 0,
   box: null,
-  objectBox: null,
+  boxes: [],
   responses: [],
   onHit: 0,
   onGuard: 0,
@@ -1401,7 +1415,7 @@ export class Match {
     f.fired = -1;
     if (!flying) f.ax = 0;
     f.box = null;
-    f.objectBox = null;
+    f.boxes = [];
     f.responses = [];
     // 0x40e510 clears the handlers.
     f.onHit = f.onGuard = f.onLand = f.onWall = 0;
@@ -1633,8 +1647,16 @@ export class Match {
       (offset ? undefined : NEUTRAL[f.who][index]) ??
       (ryuko === KNOCKDOWN ? 'knockdown' : RESPONSE_REACTIONS[ryuko]?.action);
     if (named) return this.action(f, named, true);
+    const key = sourceKey(index, offset);
+    // A target one past its action's end runs out at once (0x4125ea): DIDO's
+    // >HE300 Hit5 lands in en300 hit + 28 (slot 1, PC 5047), so she stands.
+    // ponytail: a step early, where the engine's next step runs it out.
+    if (!animationDuration(key, f.who) && script(key, f.who).end === 'end') {
+      if (!this.runOut(f)) this.action(f, 'idle');
+      return;
+    }
     this.action(f, 'script', true);
-    f.branch = sourceKey(index, offset);
+    f.branch = key;
     this.fireEvents(f);
   }
 
@@ -1775,9 +1797,13 @@ export class Match {
                 kind: event.kind,
               }
             : null;
-        // Slot 1 boxes sit 2000 pixels down: they meet objects, not fighters.
-        if (event.slot !== 0) actor.objectBox = box;
-        else actor.box = box;
+        // 0x40f010 tries every slot against every body. Ryuko's slot 1 boxes
+        // sit 2000 pixels down, where only objects meet; DIDO's Raiden att
+        // handen (301) strikes with slots 0–7 (PCs 4146–4153).
+        if (event.slot) {
+          actor.boxes = [...actor.boxes];
+          actor.boxes[event.slot] = box;
+        } else actor.box = box;
         // Op 0x18 re-arms a player for a box of kind bit 1 (0x412d49), and
         // restarts its contact counter (0x412d2b). ponytail: a box without
         // kind bit 0 leaves the counter at 0, so no contact raises it; none of
@@ -2201,16 +2227,20 @@ export class Match {
       return true;
     // A last op 0x0a enters its target, the fall (7) among them.
     if (next !== null) this.enterSource(f, next, offset);
-    // Running out airborne, the free state falls.
-    else if (f.y < 0) {
+    else return this.runOut(f);
+    return true;
+  }
+
+  // Running out airborne, the free state falls; false on foot.
+  private runOut(f: Fighter) {
+    if (f.y < 0) {
       this.action(f, 'jump');
       f.gravity = JUMP_GRAVITY;
       f.moving = 'velocity';
-    } else {
-      f.vx = f.vy = 0;
-      return false;
+      return true;
     }
-    return true;
+    f.vx = f.vy = 0;
+    return false;
   }
 
   // Op 0x04 flag 0x40 objects sit in viewport coordinates.
@@ -2228,7 +2258,7 @@ export class Match {
     const attacker = this.fighters[owner];
     const target = this.fighters[1 - owner];
     if (source.connected) return [];
-    const box = [source.box, source.objectBox].find(
+    const box = [source.box, ...source.boxes].find(
       (box) =>
         box &&
         !skips(box, target) &&
@@ -2293,16 +2323,16 @@ export class Match {
   private objectHits(frozen: boolean[]) {
     type At = { x: number; y: number; facing: -1 | 1; owner: number };
     const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>][] = [];
-    const strikers: [At, ScriptBox, () => void][] = [];
+    const strikers: [At, (ScriptBox | null)[], () => void][] = [];
     // An object yet to step shows nothing.
     for (const e of this.effects.filter((e) => e.age >= 0)) {
       const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
       for (const body of animationFrame(e.clip, e.age, e.who).body ?? [])
         if (body.kind & 6) bodies.push([at, body]);
-      if (e.objectBox && !e.connected)
+      if (!e.connected)
         strikers.push([
           at,
-          e.objectBox,
+          e.boxes,
           () => {
             e.connected = true;
             this.handle(e, false);
@@ -2310,10 +2340,10 @@ export class Match {
         ]);
     }
     this.fighters.forEach((f, owner) => {
-      if (!f.objectBox || f.connected || frozen[owner]) return;
+      if (f.connected || frozen[owner]) return;
       strikers.push([
         { ...f, owner },
-        f.objectBox,
+        f.boxes,
         () => {
           f.connected = true;
           if (f.onHit && !f.pending) f.pending = { key: f.onHit };
@@ -2321,16 +2351,20 @@ export class Match {
       ]);
     });
     return strikers
-      .filter(([a, box]) =>
-        bodies.some(
-          ([b, body]) =>
-            a.owner !== b.owner &&
-            Math.abs(
-              a.x + a.facing * box.x * 1.5 - b.x - b.facing * body.x * 1.5,
-            ) <
-              (box.w + body.w) * 1.5 &&
-            Math.abs(a.y + box.y * 1.5 - b.y - body.y * 1.5) <
-              (box.h + body.h) * 1.5,
+      .filter(([a, boxes]) =>
+        boxes.some(
+          (box) =>
+            box &&
+            bodies.some(
+              ([b, body]) =>
+                a.owner !== b.owner &&
+                Math.abs(
+                  a.x + a.facing * box.x * 1.5 - b.x - b.facing * body.x * 1.5,
+                ) <
+                  (box.w + body.w) * 1.5 &&
+                Math.abs(a.y + box.y * 1.5 - b.y - body.y * 1.5) <
+                  (box.h + body.h) * 1.5,
+            ),
         ),
       )
       .map(([, , fire]) => fire);
@@ -2513,11 +2547,12 @@ export class Match {
     if (this.gonMiss(f, other)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
-    // ERUS INATUMA AIR runs out into heavy air hit + 19 (PC 1582), its launch
-    // at age 6 (PC 823; export_fighter checks every player's), past its roll.
+    // ERUS INATUMA AIR and ICE Punch Air run out into heavy air hit + 19 (PCs
+    // 1582, 1390), its launch at age 6 (PC 823; export_fighter checks every
+    // player's), past its roll.
     if (
-      f.action === 'airInatuma' &&
-      f.age >= animationDuration('airInatuma', f.who)
+      (f.action === 'airInatuma' || f.action === 'airIcePunch') &&
+      f.age >= animationDuration(f.action, f.who)
     ) {
       this.action(f, 'airHitHeavy', true, null);
       f.age = 6;
@@ -2737,7 +2772,7 @@ export class Match {
         const key = e.pending;
         Object.assign(e, {
           box: null,
-          objectBox: null,
+          boxes: [],
           responses: [],
           pending: undefined,
         });
@@ -2756,7 +2791,7 @@ export class Match {
         Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
         const land = e.onLand;
         if (land !== undefined) {
-          Object.assign(e, { box: null, objectBox: null, onLand: undefined });
+          Object.assign(e, { box: null, boxes: [], onLand: undefined });
           this.branchTo(e, land);
           continue;
         }

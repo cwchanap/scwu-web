@@ -103,7 +103,7 @@ const object = (
   screen: false,
   follow: null,
   box: null,
-  objectBox: null,
+  boxes: [],
   responses: [],
   connected: false,
   hitStop: 0,
@@ -4785,7 +4785,7 @@ describe('prototype training rules', () => {
       match.effects = [beam];
       const flying = axe(match, 0, 1100);
       match.step();
-      expect(beam.objectBox).toMatchObject({ y: 1995, w: 644 });
+      expect(beam.boxes[1]).toMatchObject({ y: 1995, w: 644 });
       expect(beam.connected).toBe(true);
       expect(flying.clip).toBe(227);
     });

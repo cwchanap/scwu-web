@@ -86,9 +86,10 @@ def decode_event(record):
         return dict(op="command", action=u16(record, 1), offset=record[3], window=record[4], steps=steps[:last + 1])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 4 (Kiki's
-    # K' follow-up), 6 (an IORI cancel) and 12 (EX Fire 2) and global 6 (the freeze);
-    # other tests keep their fall-through path.
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x44, 0x46, 0x4c, 0x86):
+    # K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe) and 12 (EX Fire 2) and
+    # global 6 (the freeze); other tests keep their fall-through path.
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x44, 0x46, 0x47, 0x4c,
+                                                                              0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
@@ -530,6 +531,9 @@ ZOMA_TWINS = {
     # G Suneo's EX D Driver's: 'ヒット ERUS INATUMA' (118), its rp (119) and
     # ERUS INATUMA AIR (120).
     "inatuma": (118, 119), "inatumaRp": (119, 120), "airInatuma": (120, 121),
+    # 'ヒット ICE Punch' (106) and its air form (107), which play as ERUS
+    # INATUMA's do.
+    "icePunch": (106, 107), "airIcePunch": (107, 108),
     # Yo's GIGA PRESS's: 'Chuck Yo' (140).
     "chuckYo": (140, 140),
 }
@@ -590,6 +594,11 @@ LIZARD_TWINS = {name: (r, r + next(d for top, d in ((86, 3), (89, 4), (139, 3), 
 # and 125, come before it).
 KAY_TWINS = {name: (r, r + next(d for top, d in ((73, 0), (86, 3), (89, 4), (105, 3), (110, 6), (113, -2), (121, 3),
                                                   (173, 5)) if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
+# DIDO's sit three after Ryuko's KOs and lose action, six after her other
+# reactions and seven from BEAM Stand to SHOCK INFINITY (his ★変なＴＥＣＨ,
+# 89, comes before them).
+DIDO_TWINS = {name: (r, r + next(d for top, d in ((73, 3), (83, 6), (89, 7), (173, 6)) if r < top))
+              for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -598,7 +607,7 @@ TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", 
 # plays, the lose action that opens every KO and the air guards.
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
-            "airBlockRapid", "airTimeStopGuard", "lose", "musicAttack", "airInatuma"]
+            "airBlockRapid", "airTimeStopGuard", "lose", "musicAttack", "airInatuma", "airIcePunch"]
 
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
@@ -741,7 +750,7 @@ FIGHTERS = {
             # her NT field's (op 0x1f selector 0x47, PCs 658, 817, ...).
             "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "launchUp", "grabbed",
             "lose", "fireLaunch", "gonMiss", "chuckUp", "fly", "airHitHeavy", "hitHeavy", "tatumakiIn",
-            "twistSideHit", "musicAttack", "vanish",
+            "twistSideHit", "musicAttack", "vanish", "icePunch", "airIcePunch",
             # Chung's rand % 3 > 1, beside that.
             "launchAway", "chuckToss", "uppercut", "dragonFireball", "liftUp",
             # Rand % 4 > 2 to Ryuko's rand % 3 > 1, and airStun's two waits
@@ -890,7 +899,7 @@ FIGHTERS = {
             # *-*-*-sc super (279) sets (PCs 4186–4196) and nothing tests; most
             # wait 1005 or 1030 ticks for landing, or hold (0), to Ryuko's 1205.
             "hit", "airHit", "dstToss", "twist", "hitPull", "grabbed", "fly", "gonMiss", "twistSideHit", "sweep",
-            "fireLaunch", "launchUp",
+            "fireLaunch", "launchUp", "icePunch", "airIcePunch",
             # With Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20;
             # J Att rolls it to skip its sound (PC 971), where hers has none.
             "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "tatumakiIn", "tatumakiOut", "chuckToss",
@@ -1137,6 +1146,52 @@ FIGHTERS = {
         # 727–745), as Ryuko's; 464: *name (66, PC 688).
         image_ids={2000, 2001, 2002, 464},
     ),
+    "dido": dict(
+        source=("13 DIDO", "08129bdd2501e0172c1ee54f389237132e41834ea3efb1954ffc22b24c2bf0d2"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 42
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=DIDO_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2183), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT. Stop Stand, time
+            # stand and time stop stand hold their slide 23 ticks to his 10
+            # (PCs 2320, 2381, 2446), which their clips give the match.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySide", "flySideWall",
+            # Kiki's raw vx −800.
+            "launchDown",
+            # Op 0x01 before op 0x02, as ANMC P's.
+            "grabbed",
+            # Zoma's KO tests and KO DOWN, but for their op 0x1f's r[6:9],
+            # which a test doesn't read (0x4138d1); Zoma's shock, which
+            # doesn't set variable 6.
+            "ko", "down", "shock",
+            # Kiki's: doesn't clear variable 6.
+            "lose",
+            # Zoma's.
+            "rushAirHit", "airStun", "chuckToss", "uppercut", "dragonFireball", "liftUp", "twistSide",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+        },
+        # Results: 勝ち (61) calls Demo Stand (29) once (PC 681), cues its
+        # sound (PC 685) and holds image 330 (PC 688). The draw calls 29 once
+        # (PC 769) and holds image 382 (PC 773). The darkening panel, image
+        # 1009 (action 41). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33)
+        # for global 3 = 0 (PC 324), which rolls rand % 3 > 1 (PC 360), then
+        # skips its display for global 14 = 0 (PC 361), spawns OP super
+        # Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC 366); both
+        # play flattened. ponytail: the roll's other third, which hops
+        # through op2 (44, PC 372), isn't played.
+        actions=dict(win=61, winStand=29, draw=68, black=41, intro=(33, 4)),
+        flat={"win", "intro"},
+        # 2001: the HUD face action 76 shows (PC 817); 258: *name (69, PC 777).
+        image_ids={2001, 258},
+    ),
 }
 
 
@@ -1200,14 +1255,16 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
     # Drop P lend enters TWIS HIT + 12 (PC 5137).
-    # ERUS INATUMA AIR runs out into the heavy air hit's launch (PC 1582: 76 +
-    # 19, PC 823), which the match enters at its age 6.
-    jump = p.records[p.action(twins["airInatuma"][1]).end - 1]
-    launch = p.action(u16(jump, 1)).start + jump[3]
-    if jump[0] != 0x0a or u16(jump, 1) != twins["airHitHeavy"][1] or p.records[launch][0] != 0x01 or sum(
-            display_record(p, pc)["duration"] for pc in range(p.action(u16(jump, 1)).start, launch)
-            if p.records[pc][0] == 0x0c) != 6:
-        sys.exit(f"{source[0]}'s ERUS INATUMA AIR no longer enters its heavy air hit's launch; refusing to export.")
+    # ERUS INATUMA AIR and ICE Punch Air run out into the heavy air hit's
+    # launch (PCs 1582, 1390: 76 + 19, PC 823), which the match enters at its
+    # age 6.
+    for name in ("airInatuma", "airIcePunch"):
+        jump = p.records[p.action(twins[name][1]).end - 1]
+        launch = p.action(u16(jump, 1)).start + jump[3]
+        if jump[0] != 0x0a or u16(jump, 1) != twins["airHitHeavy"][1] or p.records[launch][0] != 0x01 or sum(
+                display_record(p, pc)["duration"] for pc in range(p.action(u16(jump, 1)).start, launch)
+                if p.records[pc][0] == 0x0c) != 6:
+            sys.exit(f"{source[0]}'s {name} no longer enters its heavy air hit's launch; refusing to export.")
     reactions = set(pairs.values()) | set(aliases)
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids, reactions)
     for name, script in scripts.items():
@@ -1271,8 +1328,9 @@ def main():
         # 'GIANT!! MUSIC ATTACK', a looped daze; 'Chuck 消える', vanished into
         # a fight cloud.
         "musicAttack": 133, "vanish": 143,
-        # 'ヒット ERUS INATUMA', which calls its rp (119) seven times (PC 1554).
-        "inatuma": 118, "inatumaRp": 119,
+        # 'ヒット ERUS INATUMA', which calls its rp (119) seven times (PC 1554);
+        # 'ヒット ICE Punch' and its air form, the same 42 ticks frozen blue.
+        "inatuma": 118, "inatumaRp": 119, "icePunch": 106, "airIcePunch": 107,
         # 'Chuck Yo', flying flat out to the wall its slot 4 handler hits, 95.
         "chuckYo": 140,
         "grabbed": 128,
@@ -1320,7 +1378,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD and {counts['kay']} KAY images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY and {counts['dido']} DIDO images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

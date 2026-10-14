@@ -194,6 +194,17 @@
         iori: 'Counter',
         dst: 'Comment Chuck',
       },
+      dido: {
+        getterBeam: 'Hidden EN300',
+        musashi: 'Temjin Fly',
+        changeAttack: 'Dragon',
+        blackRush: 'Raiden',
+        megaBeam: 'EN300',
+        drill: 'Slide',
+        axe: 'Fire',
+        iori: 'RAiden',
+        dst: 'Dodge',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -411,6 +422,7 @@
             <option value="sin">SIN</option>
             <option value="lizard">LIZARD</option>
             <option value="kay">KAY</option>
+            <option value="dido">DIDO</option>
           </select></label
         >
         <label
@@ -432,6 +444,7 @@
             <option value="sin">SIN</option>
             <option value="lizard">LIZARD</option>
             <option value="kay">KAY</option>
+            <option value="dido">DIDO</option>
           </select></label
         >
         <label
@@ -932,9 +945,38 @@
           figure's slashes, a blue crystal's beam and the mecha's claw wave.
         </p>
         <p>
+          Choose DIDO to play her, a blonde girl in a black dress who dresses up
+          as a different armored figure or mecha for most moves.
+          <kbd>J</kbd> chains an axe's swing, a red-armored figure's flying kick
+          and a blue mecha's lance lunge, <kbd>K</kbd> a kick, a blue hover
+          scooter's ram and an orange-armored figure's trident, and down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a sheep costume's crawl or a blue
+          tail's low sweep; → with <kbd>K</kbd> is a tiger-striped figure's
+          dashing strike, and ↑ during a forward dash a long jump.
+          <kbd>H</kbd> is her Hit Up, a maid's swing, <kbd>O</kbd> her chuck: a
+          green arm cannon's grab. Blocking with a stock, <kbd>H</kbd> spends it
+          on COUNTER HIT. Her specials: <kbd>U</kbd> or ↓→ <kbd>K</kbd> slid, a
+          low dive on a white jet sled, <kbd>I</kbd> or ↓→ <kbd>J</kbd> fire, a
+          gold-winged figure's blue flames (in the air a purple winged figure's,
+          harder below 30% health), <kbd>F</kbd> or ↓←
+          <kbd>K</kbd> RAiden, a grey mecha's claw strike that <kbd>K</kbd>
+          keeps striking, and <kbd>G</kbd> or ↓← <kbd>J</kbd> doge, a pink
+          heart-armored figure's dash, low enough to pass under most strikes.
+          Her supers, for a stock each: <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> Temjin
+          fly, a white-suited girl surfing a giant blade (also in the air),
+          <kbd>3</kbd> or ↓←↓← <kbd>K</kbd> dragon super, a hooded figure's blue
+          lightning dragon coiling around her, and <kbd>4</kbd> or ↓→↓→
+          <kbd>J</kbd> Raiden, a red mecha's barrage fired diagonally up the
+          screen; for three, <kbd>5</kbd> or ↓←↓→ <kbd>J</kbd> EN300, a purple
+          winged mecha's dash whose catch sends giant hands sweeping across the
+          stage behind her, and, below 30% health, <kbd>1</kbd> or ↓←↓→
+          <kbd>K</kbd> Hidden En300, a white-robed girl's magic circle whose catch
+          plays a long scene of wings and water (slid otherwise).
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD or KAY,
-          and one of eighteen stages, in either mode. Free practice has no
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY or
+          DIDO, and one of eighteen stages, in either mode. Free practice has no
           timer, and you also choose how the partner behaves: standing, guarding
           high or low, guarding in the air, attacking in range, jumping in, or
           playing as the original CPU. Max stock refills your supers whenever

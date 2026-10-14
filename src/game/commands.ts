@@ -17,6 +17,7 @@ import yo from './generated/yo.json';
 import sin from './generated/sin.json';
 import lizard from './generated/lizard.json';
 import kay from './generated/kay.json';
+import dido from './generated/dido.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -30,7 +31,7 @@ export interface CommandEntry {
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
-// SIN's 25, LIZARD's 21, KAY's 22)
+// SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -47,6 +48,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     sin: sin.commands,
     lizard: lizard.commands,
     kay: kay.commands,
+    dido: dido.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -259,6 +261,21 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 11],
     ['dash', 15],
   ],
+  // DIDO's supers Hidden300, Temjin fly, dragon super, Raiden and EN300 on
+  // 1-5; his specials slid (9), RAiden (6), doge (7) and fire (8) on Ryuko's
+  // special keys, then Dash F (14) and Dash B (15).
+  dido: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['blackRush', 4],
+    ['megaBeam', 5],
+    ['drill', 9],
+    ['iori', 6],
+    ['dst', 7],
+    ['axe', 8],
+    ['dash', 14],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -273,6 +290,7 @@ export const BACK_DASH: Record<Who, number> = {
   sin: 17,
   lizard: 13,
   kay: 16,
+  dido: 15,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

@@ -477,6 +477,8 @@ export const animations = {
   // (PC 1580), then runs out into 76's launch (PC 1582).
   inatuma: clip([...Array(7).fill(clips.inatumaRp).flat(), ...clips.inatuma]),
   airInatuma: clip(Array(7).fill(clips.inatumaRp).flat()),
+  icePunch: clip(clips.icePunch),
+  airIcePunch: clip(clips.airIcePunch),
   // Op 0x20 in 83/84 picks which of two pose orders plays (PCs 957, 982); the
   // match rolls it and draws branch 83/84 + 18.
   hitRapid: scriptClip(83),
@@ -590,6 +592,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     airHitHeavy: clip(z.airHitHeavy),
     inatuma: clip([...Array(7).fill(z.inatumaRp).flat(), ...z.inatuma]),
     airInatuma: clip(Array(7).fill(z.inatumaRp).flat()),
+    icePunch: clip(z.icePunch),
+    airIcePunch: clip(z.airIcePunch),
     jumpHit: clip(z.jumpHit),
     hitPull: clip(z.hitPull),
     hitRapid: timeline(83),
@@ -634,7 +638,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 560 (winLoop, PC 564) and SIN's from PC 617 (PC 619), past the records
     // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
-    // flattened (export_fighter), calls and all, holding image 409 (PC 638).
+    // flattened (export_fighter), calls and all, holding image 409 (PC 638),
+    // as DIDO's 勝ち (61) does image 330 (PC 688).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -648,7 +653,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             ),
           )
         : clip(
-            who === 'lizard'
+            who === 'lizard' || who === 'dido'
               ? z.win
               : z.winRp
                 ? [
@@ -685,6 +690,7 @@ const TWIN_ANIMATIONS = {
   sin: twinAnimations('sin'),
   lizard: twinAnimations('lizard'),
   kay: twinAnimations('kay'),
+  dido: twinAnimations('dido'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

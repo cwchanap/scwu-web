@@ -2,7 +2,8 @@
 // (02 ZOMA.PLAYER), Kiki's (03 KIKI.PLAYER), Chung's (04 CHUNG.PLAYER),
 // Amiro's (05 AMIRO.PLAYER), ANMC P's (06 ANMC P.PLAYER), Giant's
 // (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER), Yo's (09 YO.PLAYER),
-// SIN's (10 SIN.PLAYER), LIZARD's (11 LIZARD.PLAYER) and KAY's (12 KAY.PLAYER);
+// SIN's (10 SIN.PLAYER), LIZARD's (11 LIZARD.PLAYER), KAY's (12 KAY.PLAYER)
+// and DIDO's (13 DIDO.PLAYER);
 // and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
@@ -16,6 +17,7 @@ import yo from './generated/yo.json';
 import sin from './generated/sin.json';
 import lizard from './generated/lizard.json';
 import kay from './generated/kay.json';
+import dido from './generated/dido.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -30,7 +32,8 @@ export type Who =
   | 'yo'
   | 'sin'
   | 'lizard'
-  | 'kay';
+  | 'kay'
+  | 'dido';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -44,6 +47,7 @@ export const CHARACTERS = {
   sin,
   lizard,
   kay,
+  dido,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -52,9 +56,9 @@ export type Container = Who | Stage;
 
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
-// Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500. Each block puts
-// the desperation threshold at 30% (+0x7ca6), which 0x40e7c0 compares
-// against.
+// Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490.
+// Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
+// compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
 export const desperationOf = (who: Who) => Math.trunc((lifeOf(who) * 30) / 100);
 
@@ -83,6 +87,7 @@ const twins = Object.fromEntries(
       'sin',
       'lizard',
       'kay',
+      'dido',
     ] as const
   ).map((who) => {
     const own = new Map(
