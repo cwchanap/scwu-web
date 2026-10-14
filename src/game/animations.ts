@@ -349,6 +349,19 @@ export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
 export const SUNEO_INTRO_EX_TICK = ticksBefore(fighterClips.suneo.intro, 403);
 export const SIN_INTRO_EX_TICK = ticksBefore(fighterClips.sin.intro, 403);
 
+// The age LIZARD's intro lands at: the step after his fall passes the floor
+// (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
+export const LIZARD_LANDING = 166;
+// A flight's displays until `age`, then its landing action's.
+function landed(flight: Pose[], landing: Pose[], age: number) {
+  const ticks = flight.map((f) => f.duration);
+  ticks[ticks.length - 1] -= ticks.reduce((a, b) => a + b) - age;
+  return clip([...flight, ...landing], false, [
+    ...ticks,
+    ...landing.map((f) => f.duration),
+  ]);
+}
+
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
@@ -544,13 +557,19 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
-    intro: clip(
-      who === 'yo'
-        ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
-        : who === 'sin'
-          ? [...z.intro, ...z.winStand]
-          : z.intro,
-    ),
+    // LIZARD's 開始時 BR (33) from PC 367 leaps in (introMotion) and lands at
+    // LIZARD_LANDING into OP lend (36, slot 1 at PC 383), cutting the
+    // display at PC 385 short and the wait at PC 386 out.
+    intro:
+      who === 'lizard'
+        ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
+        : clip(
+            who === 'yo'
+              ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
+              : who === 'sin'
+                ? [...z.intro, ...z.winStand]
+                : z.intro,
+          ),
     ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
@@ -601,18 +620,21 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
     // 560 (winLoop, PC 564) and SIN's from PC 617 (PC 619), past the records
     // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
-    // SIN's draw holds its last display (PC 714).
+    // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
+    // flattened (export_fighter), calls and all, holding image 409 (PC 638).
     win: clip(
-      z.winRp
-        ? [
-            ...z.winStand,
-            ...z.win.slice(0, -1),
-            ...Array(who === 'kiki' ? 3 : 7)
-              .fill(z.winRp)
-              .flat(),
-            ...z.win.slice(-1),
-          ]
-        : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
+      who === 'lizard'
+        ? z.win
+        : z.winRp
+          ? [
+              ...z.winStand,
+              ...z.win.slice(0, -1),
+              ...Array(who === 'kiki' ? 3 : 7)
+                .fill(z.winRp)
+                .flat(),
+              ...z.win.slice(-1),
+            ]
+          : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
       z.winLoop ? z.winStand.length + z.win.length : false,
     ),
     draw: clip(
@@ -636,6 +658,7 @@ const TWIN_ANIMATIONS = {
   suneo: twinAnimations('suneo'),
   yo: twinAnimations('yo'),
   sin: twinAnimations('sin'),
+  lizard: twinAnimations('lizard'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

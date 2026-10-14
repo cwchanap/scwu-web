@@ -176,6 +176,15 @@
         iori: 'Run Chuck',
         dst: 'Clack Chuck',
       },
+      lizard: {
+        getterBeam: 'Hidden',
+        musashi: 'Chuck Sup',
+        changeAttack: 'Dragon SP',
+        blackRush: 'EN300',
+        drill: 'Cross',
+        axe: 'Fire',
+        iori: 'Jump Att',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -391,6 +400,7 @@
             <option value="suneo">G Suneo</option>
             <option value="yo">Yo</option>
             <option value="sin">SIN</option>
+            <option value="lizard">LIZARD</option>
           </select></label
         >
         <label
@@ -410,6 +420,7 @@
             <option value="suneo">G Suneo</option>
             <option value="yo">Yo</option>
             <option value="sin">SIN</option>
+            <option value="lizard">LIZARD</option>
           </select></label
         >
         <label
@@ -849,16 +860,45 @@
           a long beating out of sight, for three.
         </p>
         <p>
+          Choose LIZARD to play him, a man in a yellow suit who becomes a
+          different mecha or armor for most moves. <kbd>J</kbd> and
+          <kbd>K</kbd> chain as Chung's do: his second punch is a purple mecha's
+          blade slash, his third an orange-armored shield bash, his second kick
+          a red mecha's spinning kick and his third a winged white mecha's
+          blade, and down with <kbd>J</kbd> or <kbd>K</kbd> is a prone rifle
+          shot or a low swipe into a knockdown. <kbd>H</kbd> is his Hit Up, a
+          black mecha's rising lance, <kbd>O</kbd> his chuck: a blue-armored
+          grab that spins the opponent away. Blocking with a stock, <kbd>H</kbd>
+          spends it on COUNTER HIT. He has no EX mode. His specials:
+          <kbd>U</kbd>
+          or →↓↘ <kbd>J</kbd> Cross, a red mecha raising a pillar of red light,
+          <kbd>I</kbd> or ↓→ <kbd>J</kbd> FIRE, a blast of red lightning, and
+          <kbd>F</kbd> or ↓← <kbd>K</kbd> jump att, a purple mecha's leaping
+          grab and throw (also in the air). His supers: <kbd>2</kbd> or ↓→↓←
+          <kbd>J</kbd>
+          chuck sup, a leap that catches an opponent in the air, swallows them in
+          a giant striped sphere and drops them, <kbd>3</kbd> or ↓→↓→
+          <kbd>K</kbd>
+          dragon sp, a leap in a black slab's disguise whose hit calls a flight of
+          white winged beasts down on the opponent, and, below 30% health,
+          <kbd>1</kbd>
+          or ↓←↓→
+          <kbd>J</kbd> HIDDEN, a rush into a fanged maw's bite, for a stock
+          each, and <kbd>4</kbd> or ↓←↓← <kbd>J</kbd> en300, a pale spirit's orb that
+          bursts into a dome of light, for three.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo or SIN, and one of
-          eighteen stages, in either mode. Free practice has no timer, and you
-          also choose how the partner behaves: standing, guarding high or low,
-          guarding in the air, attacking in range, jumping in, or playing as the
-          original CPU. Max stock refills your supers whenever you stand idle,
-          and Low health keeps you just under 30% for desperation moves. Vs. CPU
-          is the original game's CPU, playing the opponent's own moves, specials
-          and supers. Reduce their health to zero, or lead on health when time
-          runs out. Changing modes, fighters or the stage starts a fresh match.
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN or LIZARD, and one
+          of eighteen stages, in either mode. Free practice has no timer, and
+          you also choose how the partner behaves: standing, guarding high or
+          low, guarding in the air, attacking in range, jumping in, or playing
+          as the original CPU. Max stock refills your supers whenever you stand
+          idle, and Low health keeps you just under 30% for desperation moves.
+          Vs. CPU is the original game's CPU, playing the opponent's own moves,
+          specials and supers. Reduce their health to zero, or lead on health
+          when time runs out. Changing modes, fighters or the stage starts a
+          fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

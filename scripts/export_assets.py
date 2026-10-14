@@ -578,6 +578,11 @@ YO_TWINS = {name: (r, z + (3 if name in ("twisting", "twisting2") else 2)) for n
 # 107, comes before it).
 SIN_TWINS = {name: (r, r + next(d for top, d in ((73, 3), (85, 4), (89, 5), (103, 4), (173, 5)) if r < top))
              for name, (r, _) in ZOMA_TWINS.items()}
+# LIZARD's sit three after Ryuko's, four for the twists and the shock (his
+# ★変なＴＥＣＨ, 89, comes before them, Ryuko's after) and two past Ryuko's
+# Chuck Hiso (139), which he lacks.
+LIZARD_TWINS = {name: (r, r + next(d for top, d in ((86, 3), (89, 4), (139, 3), (173, 2)) if r < top))
+                for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -1017,10 +1022,55 @@ FIGHTERS = {
         # Suneo's in EX mode (PCs 756–774); 368: *name (70, PC 721).
         image_ids={2000, 2001, 2002, 2006, 368},
     ),
+    "lizard": dict(
+        source=("11 LIZARD", "cf0db727644d3ca90e1bc19ff61b2c6f58cc5fae5bd9c154f0af147757e48e4e"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 52
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=LIZARD_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 1956), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Zoma's op 0x20 that rolls which displays play (PC 866).
+            "jumpHit",
+            # Zoma's order of op 0x1a and op 0x15, and Kiki's raw vx −800 (PC 1623).
+            "launchDown",
+            # Chung's: no op 0x20.
+            "launchAway",
+            # Op 0x01 before op 0x02 (PCs 1692–1693), as ANMC P's.
+            "grabbed",
+            # Zoma's KO tests (PC 651) and KO DOWN (PC 699: its op 0x1f's
+            # r[6:9], which a test doesn't read, 0x4138d1), and Zoma's shock,
+            # which doesn't set variable 6.
+            "ko", "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "flySide", "twistSide",
+            # Chung's.
+            "flySideWall",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+        },
+        # Results: 勝ち (60) cues its sound (PC 628) and calls 'win RP' (61)
+        # ten times (PC 629) before its displays, so it plays flattened with
+        # its call of DEMO STAND (29, PC 627); it holds image 409 (PC 638).
+        # The draw calls 29 once (PC 719). The darkening panel, image 1009
+        # (action 46). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for
+        # global 3 = 0 (PC 329), past its display for global 14 = 0 (PC 365);
+        # it leaps in and lands into OP lend (36, slot 1 at PC 383).
+        actions=dict(win=60, winStand=29, draw=68, black=46, intro=(33, 3), introLand=36),
+        flat={"win"},
+        # 2001: the HUD face action 73 shows (PC 764); 217: *name (69, PC 727).
+        image_ids={2001, 217},
+    ),
 }
 
 
-def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, actions, image_ids, aliases={}):
+def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, actions, image_ids, aliases={},
+                   flat=()):
     data, c, p = player(*source)
     image_ids = set(image_ids)
     tables = player_tables(data, c, image_ids)
@@ -1059,6 +1109,10 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         if test:
             actions[name + "Ex"] = u16(test, 1)
     clips = pose_clips(p, c, actions, image_ids)
+    # Clips that play their action's flattened timeline, calls inlined.
+    for name in flat:
+        clips[name] = flatten(p, c, actions[name])["frames"]
+        image_ids.update(f["image"] for f in clips[name] if f["image"] not in (0, 8191))
     # The moves play from their timelines: the actions of the command entries,
     # each with its level (header r[2]), which a cancel window compares.
     entries = tables["commands"]["entries"]
@@ -1194,7 +1248,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo and {counts['sin']} SIN images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN and {counts['lizard']} LIZARD images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

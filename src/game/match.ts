@@ -9,6 +9,7 @@ import {
   GIANT_INTRO_EX_TICK,
   SUNEO_INTRO_EX_TICK,
   SIN_INTRO_EX_TICK,
+  LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
@@ -323,26 +324,41 @@ const OWN_REACTION_POWER: Partial<
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
-// The intros' op 0x01 runs, as [ticks, raw vx] from the clip's start: action
-// 33 walks at 200 until PC 339, after its first 50 ticks; Amiro's Round BR
-// (33) drives in at 600 after its first display (PC 367), then at 60 (PC
-// 372); Yo's Round 1 (35) rides in at 110 from PC 378 until PC 385. The
-// others' have no op 0x01, so they start where these end.
-const INTRO_MOTION: Partial<Record<Who, [number, number][]>> = {
-  ryuko: [[50, 200]],
-  amiro: [
-    [2, 0],
-    [32, 600],
-    [15, 60],
-  ],
-  yo: [[90, 110]],
-};
-const introVx = (who: Who, age: number) => {
-  for (const [ticks, vx] of INTRO_MOTION[who] ?? []) {
-    if (age < ticks) return vx;
+// The intros' op 0x01 runs, as [ticks, raw vx, vy, gravity] from the clip's
+// start: action 33 walks at 200 until PC 339, after its first 50 ticks;
+// Amiro's Round BR (33) drives in at 600 after its first display (PC 367),
+// then at 60 (PC 372); Yo's Round 1 (35) rides in at 110 from PC 378 until
+// PC 385. LIZARD's 開始時 BR (33) rises at −4000 for two ticks (PC 372),
+// stops (PC 374), then leaps at 400/−1000 with gravity 60 (PC 377) until he
+// lands (LIZARD_LANDING). The others' have no op 0x01, so they start where
+// these end.
+const INTRO_MOTION: Partial<Record<Who, [number, number, number?, number?][]>> =
+  {
+    ryuko: [[50, 200]],
+    amiro: [
+      [2, 0],
+      [32, 600],
+      [15, 60],
+    ],
+    yo: [[90, 110]],
+    lizard: [
+      [2, 0],
+      [2, 0, -4000],
+      [100, 0],
+      [LIZARD_LANDING - 104, 400, -1000, 60],
+    ],
+  };
+// An intro's velocity at `age`, its run's gravity added before each move.
+const introVelocity = (who: Who, age: number) => {
+  for (const [ticks, vx, vy = 0, ay = 0] of INTRO_MOTION[who] ?? []) {
+    if (age < ticks)
+      return [
+        vx * SOURCE_VELOCITY_SCALE,
+        vy * SOURCE_VELOCITY_SCALE + (age + 1) * ay * SOURCE_ACCELERATION_SCALE,
+      ];
     age -= ticks;
   }
-  return 0;
+  return [0, 0];
 };
 const introWalk = (who: Who) =>
   (INTRO_MOTION[who] ?? []).reduce((x, [ticks, vx]) => x + ticks * vx, 0) *
@@ -1763,6 +1779,8 @@ export class Match {
       // ponytail: slot 5 (+0x74) takes a struck object to its action
       // (0x40edde), as Kiki's potatoes (189, 190) enter POTETO HIT (194);
       // the port strikes only fighters, so it never fires.
+      // Action 0 clears the slot (0x40f6e6 tests it): LIZARD's SHOOT OBJ
+      // EXPLO (290) clears its own (PCs 3940–3942) before it strikes.
       case 'handler':
         if (!('clip' in actor)) {
           const key = event.action && sourceKey(event.action, event.offset);
@@ -1772,7 +1790,7 @@ export class Match {
           else if (event.slot === 4) actor.onWall = key;
         } else if (event.slot >= 1 && event.slot <= 3)
           actor[(['onLand', 'onHit', 'onGuard'] as const)[event.slot - 1]] =
-            sourceKey(event.action, event.offset);
+            event.action ? sourceKey(event.action, event.offset) : undefined;
         break;
       case 'call':
         this.runCall(actor, owner, event.action);
@@ -2209,8 +2227,12 @@ export class Match {
     const own = responsesOf(target.who)[response];
     const victim = ryukoTwin(target.who, own);
     const reaction = RESPONSE_REACTIONS[victim];
-    if (!reaction) return [];
-    const blocked = blocks.has(reaction.action);
+    // 0x40f527: response 0 names no reaction, but a box without damage
+    // still meets the victim, turning it and taking the striker's handler
+    // (0x40f73c, 0x40f6e6, 0x40f885): LIZARD's dragon up handen (247) so
+    // finds whom his birds strike.
+    if (!reaction && (response || box.damage)) return [];
+    const blocked = reaction ? blocks.has(reaction.action) : guarding;
     return [
       {
         f: attacker,
@@ -2218,11 +2240,11 @@ export class Match {
         damage: boxDamage(box, body.taken, blocked),
         damaging: box.damage > 0,
         effect: box.damage ? responseEffectsOf(attacker.who)[response] : 0,
-        hitStop: reaction.stop,
+        hitStop: reaction?.stop ?? 0,
         // The reaction's other stop (0x4136ae) reaches the striker's owner
         // whether its body or one of its objects struck.
-        attackerStop: reaction.attackerStop ?? reaction.stop,
-        reaction: reaction.action as AnimatedAction,
+        attackerStop: reaction?.attackerStop ?? reaction?.stop ?? 0,
+        reaction: reaction?.action as AnimatedAction | undefined,
         facing: source.facing,
         x: body.x,
         y: body.y,
@@ -2589,8 +2611,11 @@ export class Match {
     // 76 and 80, PCs 795, 820, 910). A KO (+0x75a0, 0x40e83e) enters the
     // lose action 59 first: it deletes objects 7–9 and clears variables 6, 8
     // and 14, then jumps to KO Normal (PC 591). With global 0 at 10 it would
-    // enter 'make hikari' (63) instead (PC 590), but only the title menu
-    // writes global 0, to 1 (KGT 78, PC 497).
+    // enter 'make hikari' (63) instead (PC 590). The title menu writes
+    // global 0 only to 1 (KGT 78, PC 497). ponytail: LIZARD's chuck hit
+    // lend writes 10 for its strike's tick (PCs 3703, 3712), so as player 2
+    // his lethal strike would send the victim there; the port keeps KO
+    // Normal.
     const roll = f.branch && rolls(f.who)[f.action];
     const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered
@@ -2710,12 +2735,15 @@ export class Match {
       // its first step (anime beam 296 only spawns 297 and 299).
       if (++e.age === 0 || e.age < animationDuration(e.clip, e.who) || loops(e))
         this.fireEffect(e);
-      // A stage object that runs out after a display runs its last records,
-      // then restarts its first action (+0x34, 0x4127b7).
+      // A script that runs out after a display runs its last records first
+      // (0x4125ea): LIZARD's dragon up handen (247) spawns call bird (249,
+      // PC 3409). A stage object then restarts its first action (+0x34,
+      // 0x4127b7).
       else if (
+        e.age === animationDuration(e.clip, e.who) &&
+        !this.fireEffect(e) &&
         e.stage &&
-        script(e.clip, e.who).end === 'end' &&
-        !this.fireEffect(e)
+        script(e.clip, e.who).end === 'end'
       )
         this.branchTo(e, e.stage.home);
     }
@@ -2779,9 +2807,10 @@ export class Match {
         const ex = EX_MODE[f.who];
         if (f.age === ex?.intro && [player, opponent][i]?.crouch)
           f.variables[0] = ex.value;
-        f.x = clampX(
-          f.x + f.facing * introVx(f.who, f.age - 1) * SOURCE_VELOCITY_SCALE,
-        );
+        const [vx, vy] = introVelocity(f.who, f.age - 1);
+        f.x = clampX(f.x + f.facing * vx);
+        // Past the floor, the fall lands (0x41187f).
+        f.y = Math.min(0, f.y + vy);
         this.enter(f, i);
         if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }
@@ -2865,6 +2894,10 @@ export class Match {
       own,
     } of contacts) {
       source.connected = true;
+      if (!reaction) {
+        target.facing = facing === 1 ? -1 : 1;
+        continue;
+      }
       // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = source === f;
       if (body) f.contact = true;
