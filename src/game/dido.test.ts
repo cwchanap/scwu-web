@@ -51,7 +51,7 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('dido')[id]]] : [],
     );
-    expect(paired).toHaveLength(71);
+    expect(paired).toHaveLength(72);
     expect(paired.filter(([twin, own]) => twin !== own)).toEqual([]);
     // Three after Ryuko's KOs, six after her hits, seven from BEAM Stand to
     // SHOCK INFINITY (her ★変なＴＥＣＨ, 89, comes before them).

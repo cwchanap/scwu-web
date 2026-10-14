@@ -45,7 +45,7 @@ describe('G Suneo (08 G SUNEO.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('suneo')[id]]] : [],
     );
-    expect(paired).toHaveLength(71);
+    expect(paired).toHaveLength(72);
     expect(paired.filter(([twin, own]) => twin !== own)).toEqual([]);
     // KO NORMAL ten after Ryuko's, her light hit twelve, J Att thirteen
     // and Chuck 消える eleven.

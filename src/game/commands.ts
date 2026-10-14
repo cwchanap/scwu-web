@@ -18,6 +18,7 @@ import sin from './generated/sin.json';
 import lizard from './generated/lizard.json';
 import kay from './generated/kay.json';
 import dido from './generated/dido.json';
+import sakuya from './generated/sakuya.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -31,7 +32,7 @@ export interface CommandEntry {
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
-// SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24)
+// SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -49,6 +50,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     lizard: lizard.commands,
     kay: kay.commands,
     dido: dido.commands,
+    sakuya: sakuya.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -262,7 +264,7 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dash', 15],
   ],
   // DIDO's supers Hidden300, Temjin fly, dragon super, Raiden and EN300 on
-  // 1-5; his specials slid (9), RAiden (6), doge (7) and fire (8) on Ryuko's
+  // 1-5; her specials slid (9), RAiden (6), doge (7) and fire (8) on Ryuko's
   // special keys, then Dash F (14) and Dash B (15).
   dido: [
     ['getterBeam', 1],
@@ -275,6 +277,23 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dst', 7],
     ['axe', 8],
     ['dash', 14],
+  ],
+  // SAKUYA's supers en300, super HIT UP and SPARK on 1-3, her specials DRAGON
+  // KICK (8) and LOW FIRE (11) on 4-5, Dragon punch (9), iori (10), counter
+  // (7) and FIRE (12) on Ryuko's special keys, --TYPE-- (13, TO EX) on EX,
+  // then Dash F (17) and Dash B (18). C C (6) takes its command only.
+  sakuya: [
+    ['getterBeam', 2],
+    ['musashi', 3],
+    ['changeAttack', 4],
+    ['blackRush', 8],
+    ['megaBeam', 11],
+    ['drill', 9],
+    ['iori', 10],
+    ['dst', 7],
+    ['axe', 12],
+    ['ex', 13],
+    ['dash', 17],
   ],
 };
 export const BACK_DASH: Record<Who, number> = {
@@ -291,6 +310,7 @@ export const BACK_DASH: Record<Who, number> = {
   lizard: 13,
   kay: 16,
   dido: 15,
+  sakuya: 18,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

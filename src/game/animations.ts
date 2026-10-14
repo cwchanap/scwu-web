@@ -336,8 +336,9 @@ export function heldFrame(
 // Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
 // ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
 // from PC 313, G Suneo's Round 1 at PC 403, from PC 393, SIN's Round 1 at
-// PC 403, from PC 396, and KAY's Round 1 at PC 367, from PC 357, before his
-// flattened intro's calls of Demo stand (PCs 286–293).
+// PC 403, from PC 396, KAY's Round 1 at PC 367, from PC 357, before his
+// flattened intro's calls of Demo stand (PCs 286–293), and SAKUYA's Round 1
+// at PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303).
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -352,6 +353,10 @@ export const SIN_INTRO_EX_TICK = ticksBefore(fighterClips.sin.intro, 403);
 export const KAY_INTRO_EX_TICK = ticksBefore(
   fighterClips.kay.intro.filter((frame) => frame.pc > 293),
   367,
+);
+export const SAKUYA_INTRO_EX_TICK = ticksBefore(
+  fighterClips.sakuya.intro.filter((frame) => frame.pc > 303),
+  413,
 );
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
@@ -404,6 +409,8 @@ export const animations = {
   // The long final displays wait for landing, rather than ending the reaction.
   launchUp: clip(clips.launchUp, false, [25, 30, 10, 1]),
   launchAway: clip(clips.launchAway, false, [2, 2, 2, 25, 1]),
+  // Response 53 (SAKUYA's K3 Hit New) → action 105, waiting for its landing.
+  chainPull: clip(clips.chainPull, false, [2, 2, 2, 25, 1]),
   sweep: clip(clips.sweep, false, [2, 2, 2, 25, 1]),
   // Response 41 (a chuck's toss) → action 132, waiting for its landing.
   chuckToss: clip(clips.chuckToss, false, [2, 2, 2, 25, 1]),
@@ -604,6 +611,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     bounceDown: clip(z.bounceDown),
     launchUp: clip(z.launchUp, false, waits(z.launchUp)),
     launchAway: clip(z.launchAway, false, waits(z.launchAway)),
+    chainPull: clip(z.chainPull, false, waits(z.chainPull)),
     sweep: clip(z.sweep, false, waits(z.sweep)),
     chuckToss: clip(z.chuckToss, false, waits(z.chuckToss)),
     uppercut: clip(z.uppercut, false, waits(z.uppercut)),
@@ -639,7 +647,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
-    // as DIDO's 勝ち (61) does image 330 (PC 688).
+    // as DIDO's 勝ち (61) does image 330 (PC 688) and SAKUYA's 勝ち (69)
+    // image 436 (PC 692).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -653,7 +662,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             ),
           )
         : clip(
-            who === 'lizard' || who === 'dido'
+            who === 'lizard' || who === 'dido' || who === 'sakuya'
               ? z.win
               : z.winRp
                 ? [
@@ -691,6 +700,7 @@ const TWIN_ANIMATIONS = {
   lizard: twinAnimations('lizard'),
   kay: twinAnimations('kay'),
   dido: twinAnimations('dido'),
+  sakuya: twinAnimations('sakuya'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

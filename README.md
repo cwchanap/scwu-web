@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY or DIDO on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO or SAKUYA on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -331,7 +331,32 @@ And DIDO's, dressed as a different armored figure or mecha for most moves:
 | 4, or ↓→↓→ J                   | Raiden: a red mecha's black wings fire a barrage diagonally up the screen, 1 stock                                                          |
 | 5, or ↓←↓→ J                   | EN300: a purple winged mecha's dash; a catch sends giant hands sweeping across the stage behind her, 3 stocks                               |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY or DIDO), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And SAKUYA's, dressed as a different swordswoman, armored figure or mecha for most moves:
+
+| Input                          | SAKUYA's move                                                                                                                                                                             |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: her sword's slash / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                            |
+| P2 / P3                        | A pink-kimono swordswoman's slash / a silver-armored figure's red blades (in EX mode a blue-striped swordswoman's thrust / a red-armored figure's strike)                                 |
+| K2 / K3                        | A red-dressed girl's crossbow / a red-armored figure's chain claw, which catches the opponent far out and pulls them back up (in EX mode a black-robed archer's bow / a bazooka)          |
+| Down + J / K                   | A red-clad girl's jab / a purple maid's scythe sweep (in EX mode a swordswoman's low slash / a masked swordsman's cut)                                                                    |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                        |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                     |
+| H                              | Hit Up: a yellow-dressed girl's giant teddy bear                                                                                                                                          |
+| O                              | Chuck: a scythe's grab                                                                                                                                                                    |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                                                               |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): most of her moves take other forms                                                                                                                 |
+| U, or →↓↘ J                    | Dragon punch: a red-dressed girl rises on white wings (in EX mode a cat-eared fighter's flipping kicks)                                                                                   |
+| I, or ↓→ J                     | FIRE: a pink-kimono swordswoman's fireball, also in the air (in EX mode a slow one)                                                                                                       |
+| F, or ↓← J                     | iori: an orange-coated figure's dashing slash; ↓← J twice more for two follow-ups (in EX mode a green-armored figure's clawed shield)                                                     |
+| G, or →↓← K                    | counter: a cat-eared fighter's stance; struck in it, she grabs and throws for 40 (in EX mode a pinstripe-suited figure's gatling gun, from range)                                         |
+| 4, or →↓↘ K                    | DRAGON KICK: a silver-armored figure's dashing red blades (in EX mode a flurry of them)                                                                                                   |
+| 5, or ↓→ K                     | LOW FIRE: a pink-dressed girl's low staff sweep (in EX mode a slow fireball)                                                                                                              |
+| ←↓→ K                          | C C: a hatted figure's blade rush; then ↓→ K or ↓→ J for a mounted rider's charge                                                                                                         |
+| 1, or ↓←↓→ J                   | en300: a white-coated swordswoman's dash; a catch turns into a horned mecha girl's blade combo, 3 stocks                                                                                  |
+| 2, or ↓→↓→ K                   | super HIT UP: a green-uniformed girl's swing that calls an airship, 1 stock; in the air a mecha's diving dash (in EX mode a cat-eared fighter's flurry; in the air a red-winged figure's) |
+| 3, or ↓→↓→ J                   | SPARK: a horned mecha girl's blade dash, 1 stock (in EX mode a maid calls a gate cannon whose ray rises diagonally from range)                                                            |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO or SAKUYA), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -347,7 +372,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** thirteen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** fourteen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -359,7 +384,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's and DIDO's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's and SAKUYA's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

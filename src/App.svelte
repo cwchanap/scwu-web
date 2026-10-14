@@ -205,6 +205,17 @@
         iori: 'RAiden',
         dst: 'Dodge',
       },
+      sakuya: {
+        getterBeam: 'EN300',
+        musashi: 'Super Hit Up',
+        changeAttack: 'Spark',
+        blackRush: 'Dragon Kick',
+        megaBeam: 'Low Fire',
+        drill: 'Dragon Punch',
+        axe: 'Fire',
+        iori: 'Iori',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -423,6 +434,7 @@
             <option value="lizard">LIZARD</option>
             <option value="kay">KAY</option>
             <option value="dido">DIDO</option>
+            <option value="sakuya">SAKUYA</option>
           </select></label
         >
         <label
@@ -445,6 +457,7 @@
             <option value="lizard">LIZARD</option>
             <option value="kay">KAY</option>
             <option value="dido">DIDO</option>
+            <option value="sakuya">SAKUYA</option>
           </select></label
         >
         <label
@@ -974,13 +987,43 @@
           plays a long scene of wings and water (slid otherwise).
         </p>
         <p>
+          Choose SAKUYA to play her, a brown-haired girl in purple who dresses
+          up as a different swordswoman, armored figure or mecha for most moves.
+          <kbd>J</kbd> chains her sword's slash, a pink-kimono swordswoman's
+          slash and a silver-armored figure's red blades, <kbd>K</kbd> a kick, a
+          red-dressed girl's crossbow and a red-armored figure's chain claw that
+          catches the opponent far out and pulls them back up; down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a red-clad girl's jab or a purple
+          maid's scythe sweep. <kbd>H</kbd> is her Hit Up, a giant teddy bear,
+          <kbd>O</kbd> her chuck, a scythe's grab. Blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd> enters or leaves EX mode for half a stock, where most of
+          her moves take other forms. Her specials: <kbd>U</kbd> or →↓↘
+          <kbd>J</kbd> Dragon punch, rising on white wings, <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> FIRE, a fireball (also in the air), <kbd>F</kbd> or ↓←
+          <kbd>J</kbd> iori, a dashing slash with two follow-ups on ↓←
+          <kbd>J</kbd>, <kbd>G</kbd> or →↓← <kbd>K</kbd> counter, a stance that
+          grabs and throws whoever strikes her, <kbd>4</kbd> or →↓↘
+          <kbd>K</kbd> DRAGON KICK, a dash with red blades, <kbd>5</kbd> or ↓→
+          <kbd>K</kbd>
+          LOW FIRE, a low staff sweep, and ←↓→ <kbd>K</kbd> C C, a blade rush
+          that ↓→ <kbd>K</kbd> or <kbd>J</kbd> turns into a mounted rider's
+          charge. Her supers, for a stock each: <kbd>2</kbd> or ↓→↓→
+          <kbd>K</kbd>
+          super HIT UP, a swing that calls an airship (in the air a mecha's diving
+          dash), and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd>
+          SPARK, a horned mecha girl's blade dash; for three, <kbd>1</kbd> or
+          ↓←↓→ <kbd>J</kbd> en300, a swordswoman's dash whose catch turns into a mecha
+          girl's blade combo.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY or
-          DIDO, and one of eighteen stages, in either mode. Free practice has no
-          timer, and you also choose how the partner behaves: standing, guarding
-          high or low, guarding in the air, attacking in range, jumping in, or
-          playing as the original CPU. Max stock refills your supers whenever
-          you stand idle, and Low health keeps you just under 30% for
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO
+          or SAKUYA, and one of eighteen stages, in either mode. Free practice
+          has no timer, and you also choose how the partner behaves: standing,
+          guarding high or low, guarding in the air, attacking in range, jumping
+          in, or playing as the original CPU. Max stock refills your supers
+          whenever you stand idle, and Low health keeps you just under 30% for
           desperation moves. Vs. CPU is the original game's CPU, playing the
           opponent's own moves, specials and supers. Reduce their health to
           zero, or lead on health when time runs out. Changing modes, fighters

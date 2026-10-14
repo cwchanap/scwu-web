@@ -50,7 +50,7 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('lizard')[id]]] : [],
     );
-    expect(paired).toHaveLength(71);
+    expect(paired).toHaveLength(72);
     expect(paired.filter(([twin, own]) => twin !== own)).toEqual([]);
     // Three after Ryuko's, four for the twists and the shock, three from
     // Shock rp and two past Ryuko's Chuck Hiso (139).

@@ -10,6 +10,7 @@ import {
   SUNEO_INTRO_EX_TICK,
   SIN_INTRO_EX_TICK,
   KAY_INTRO_EX_TICK,
+  SAKUYA_INTRO_EX_TICK,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
@@ -230,6 +231,10 @@ const launchMotion: Partial<
   // 1434 drops it into 146 (PC 1433).
   airStun: { tick: 9, vx: 0, vy: -830, gravity: 80, land: 'knockdown' },
   launchAway: { tick: 6, vx: -600, vy: -1220, gravity: 90, land: 'knockdown' },
+  // Response 53 (SAKUYA's K3 Hit New, op 0x14) → action 105: pulled up
+  // toward the striker from its first tick (PC 1337), landing into 146 (PC
+  // 1341).
+  chainPull: { tick: 0, vx: 500, vy: -1520, gravity: 90, land: 'knockdown' },
   // A chuck's response 41 → action 132 (PC 1793), landing into 146 (PC 1792).
   chuckToss: { tick: 6, vx: -600, vy: -1920, gravity: 90, land: 'knockdown' },
   // Crouching kick response 7 selects action 79: a lower pop into knockdown.
@@ -291,6 +296,7 @@ const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
   // PCs 1212, 1235.
   tatumakiIn: [3, 0],
   tatumakiOut: [3, 0],
+  chainPull: [3, 0], // PC 1332
 };
 for (const action of [
   'hitHeavy',
@@ -402,6 +408,8 @@ const RESPONSE_REACTIONS: Record<
   107: { action: 'airIcePunch', stop: 15 },
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
+  // SAKUYA's K3 Hit New reaches 105 through response 53, with no op 0x1a.
+  105: { action: 'chainPull', stop: 0 },
   96: { action: 'uppercut', stop: 13 },
   // Kiki's ranbu reaches 'DRAGON Fireball' through response 63, which plays
   // as 96 does, and her EN3 'DRAGON Yinan' through 82.
@@ -541,10 +549,12 @@ function struck(
 }
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
-// The twins whose op 0x01 flies at another raw vx: Kiki's, Chung's, Amiro's,
-// ANMC P's, Giant's, G Suneo's and Yo's HISA Down (124, 127, 128, 125, 130,
-// 135, 126) at −800 (PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582), and
-// Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// The twins whose op 0x01 flies at another raw vx: every HISA Down but
+// Ryuko's and Zoma's at −800 (Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G
+// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's and SAKUYA's 124, 127, 128,
+// 125, 130, 135, 126, 128, 126, 128, 129 and 143, PCs 1522, 1582, 1883,
+// 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818 and 1938), and Amiro's
+// Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -553,6 +563,11 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   giant: { launchDown: -800 },
   suneo: { launchDown: -800 },
   yo: { launchDown: -800 },
+  sin: { launchDown: -800 },
+  lizard: { launchDown: -800 },
+  kay: { launchDown: -800 },
+  dido: { launchDown: -800 },
+  sakuya: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -571,6 +586,7 @@ const ROLLED: Partial<Record<Action, number>> = {
   hitHeavy: 75,
   airHitHeavy: 76,
   launchAway: 80,
+  chainPull: 105,
   chuckToss: 132,
   hitRapid: 83,
   airHitRapid: 84,
@@ -623,7 +639,12 @@ const timeline = (f: Fighter) => f.branch!;
 // 403) enters hanshin change (40), which sets it and jumps back (33 + 26, PC
 // 449). KAY's at 100, set by EX (227, PC 3453) and cleared by NOR (228, PC
 // 3467); his intro's (PC 367) enters EX CH (36), which sets it (PC 407) and
-// jumps to the same calls of Demo stand (30 + 25, PC 408).
+// jumps to the same calls of Demo stand (30 + 25, PC 408). SAKUYA's at 100,
+// set by TO EX (256, PC 3692) and cleared by TO NOR (257, PC 3705); her
+// intro's (PC 413) enters ex change (49), which sets it (PC 521) and jumps
+// to the same call of STAND DEMO (37 + 24, PC 522). ponytail: there STAND
+// DEMO jumps to Skill1 (32, PC 296), the same 80 ticks in her EX stance,
+// which the flattened intro doesn't follow.
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -633,6 +654,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
   sin: { value: 10, intro: SIN_INTRO_EX_TICK },
   kay: { value: 100, intro: KAY_INTRO_EX_TICK },
+  sakuya: { value: 100, intro: SAKUYA_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
