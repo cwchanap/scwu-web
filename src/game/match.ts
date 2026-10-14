@@ -9,6 +9,8 @@ import {
   GIANT_INTRO_EX_TICK,
   SUNEO_INTRO_EX_TICK,
   SIN_INTRO_EX_TICK,
+  KAY_INTRO_EX_TICK,
+  KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
@@ -315,12 +317,14 @@ REACTION_POWER.chuckToss = [8, 0];
 REACTION_POWER.chuckUp = [5, 0];
 REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929); ANMC P's
-// Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229).
+// Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
+// Fire HISA (107) the attacker 13 (PC 1324).
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
   zoma: { crouchBlock: [3, 0] },
   anmc: { tatumakiOut: [5, 3] },
+  kay: { fireLaunch: [5, 13] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -330,27 +334,35 @@ const reactionPower = (f: Fighter): [number, number] =>
 // then at 60 (PC 372); Yo's Round 1 (35) rides in at 110 from PC 378 until
 // PC 385. LIZARD's 開始時 BR (33) rises at −4000 for two ticks (PC 372),
 // stops (PC 374), then leaps at 400/−1000 with gravity 60 (PC 377) until he
-// lands (LIZARD_LANDING). The others' have no op 0x01, so they start where
-// these end.
-const INTRO_MOTION: Partial<Record<Who, [number, number, number?, number?][]>> =
-  {
-    ryuko: [[50, 200]],
-    amiro: [
-      [2, 0],
-      [32, 600],
-      [15, 60],
-    ],
-    yo: [[90, 110]],
-    lizard: [
-      [2, 0],
-      [2, 0, -4000],
-      [100, 0],
-      [LIZARD_LANDING - 104, 400, -1000, 60],
-    ],
-  };
-// An intro's velocity at `age`, its run's gravity added before each move.
-const introVelocity = (who: Who, age: number) => {
-  for (const [ticks, vx, vy = 0, ay = 0] of INTRO_MOTION[who] ?? []) {
+// lands (LIZARD_LANDING). KAY's Round 1 (33) walks at 200 from PC 356 to PC
+// 365. The others' have no op 0x01, so they start where these end.
+type Runs = [number, number, number?, number?][];
+const INTRO_MOTION: Partial<Record<Who, Runs>> = {
+  ryuko: [[50, 200]],
+  amiro: [
+    [2, 0],
+    [32, 600],
+    [15, 60],
+  ],
+  yo: [[90, 110]],
+  lizard: [
+    [2, 0],
+    [2, 0, -4000],
+    [100, 0],
+    [LIZARD_LANDING - 104, 400, -1000, 60],
+  ],
+  kay: [[56, 200]],
+};
+// The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP).
+const WIN_MOTION: Partial<Record<Who, Runs>> = {
+  kay: [
+    [KAY_WIN_HOP.at, 0],
+    [KAY_WIN_HOP.ticks, 0, -1000, 70],
+  ],
+};
+// A run's velocity at `age`, its gravity added before each move.
+const runVelocity = (runs: Runs = [], age: number) => {
+  for (const [ticks, vx, vy = 0, ay = 0] of runs) {
     if (age < ticks)
       return [
         vx * SOURCE_VELOCITY_SCALE,
@@ -365,6 +377,8 @@ const introWalk = (who: Who) =>
   SOURCE_VELOCITY_SCALE;
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
+// Ryuko's knockdown, 'DOWN normal'.
+const KNOCKDOWN = 146;
 // Victim actions reached through the response table, with their op 0x1a stops
 // for the victim and, where they differ, the attacker.
 const RESPONSE_REACTIONS: Record<
@@ -448,8 +462,11 @@ const RESPONSE_REACTIONS: Record<
   170: { action: 'crouchTimeStopGuard', stop: 0 },
   172: { action: 'airTimeStopGuard', stop: 0 },
 };
-// Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker.
+// Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker. KAY's
+// FBH (110), a bare copy of HISA, gives only HISA's 3 (PC 1408).
 const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
+const OWN_STRIKER_POWER: Partial<Record<Who, Partial<Record<number, number>>>> =
+  { kay: { 112: 0 } };
 // A loss that empties life sets the lose action 59 (0x40e83e), which enters
 // KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
 // (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
@@ -596,7 +613,9 @@ const timeline = (f: Fighter) => f.branch!;
 // character (41), which sets it and jumps back (35 + 13, PC 464). SIN's at
 // 10, set by TO EX (208) and cleared by TO NORMAL (209); his intro's (PC
 // 403) enters hanshin change (40), which sets it and jumps back (33 + 26, PC
-// 449).
+// 449). KAY's at 100, set by EX (227, PC 3453) and cleared by NOR (228, PC
+// 3467); his intro's (PC 367) enters EX CH (36), which sets it (PC 407) and
+// jumps to the same calls of Demo stand (30 + 25, PC 408).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -605,6 +624,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
   suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
   sin: { value: 10, intro: SIN_INTRO_EX_TICK },
+  kay: { value: 100, intro: KAY_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -1601,15 +1621,17 @@ export class Match {
 
   // An action change (0x410cf0) by number: the engine states and a player's
   // own victim reactions (Ryuko's Musashi finish ends in FLY NO HIT, 97;
-  // Giant's chuck in his, 101) play as the port's actions, and any other
+  // Giant's chuck in his, 101; KAY's Matriel hit Down lands, slot 1 at PC
+  // 4637, in his knockdown, 151) play as the port's actions, and any other
   // source action runs its timeline. ponytail: a reaction entered so skips
   // its op 0x15 power and op 0x1a stops; a jump past them (Giant's Drop P
   // lend enters TWIS HIT + 12) skips them in the source too, and
   // export_fighter checks none goes further, past a display.
   private enterSource(f: Fighter, index: number, offset = 0) {
+    const ryuko = twinOf(f.who, index) ?? 0;
     const named =
       (offset ? undefined : NEUTRAL[f.who][index]) ??
-      RESPONSE_REACTIONS[twinOf(f.who, index) ?? 0]?.action;
+      (ryuko === KNOCKDOWN ? 'knockdown' : RESPONSE_REACTIONS[ryuko]?.action);
     if (named) return this.action(f, named, true);
     this.action(f, 'script', true);
     f.branch = sourceKey(index, offset);
@@ -1774,7 +1796,7 @@ export class Match {
         if (actor === self) this.pause(self, event.self);
         break;
       case 'freeze':
-        this.freeze += event.add;
+        this.freeze = (event.set ? 0 : this.freeze) + event.add;
         break;
       // ponytail: slot 5 (+0x74) takes a struck object to its action
       // (0x40edde), as Kiki's potatoes (189, 190) enter POTETO HIT (194);
@@ -2250,7 +2272,8 @@ export class Match {
         y: body.y,
         blocked,
         source,
-        bonus: STRIKER_POWER[victim] ?? 0,
+        bonus:
+          OWN_STRIKER_POWER[target.who]?.[victim] ?? STRIKER_POWER[victim] ?? 0,
         own,
       },
     ];
@@ -2476,6 +2499,13 @@ export class Match {
       }
     }
     if (f.action === 'superHeld' || f.action === 'shock') return;
+    // A winner holds its result (0x410ff1), moving only by its own runs from
+    // the tick their op 0x01 runs, and lands as the source's step does
+    // (0x41187f).
+    if (f.action === 'win') {
+      f.y = Math.min(0, f.y + runVelocity(WIN_MOTION[f.who], f.age)[1]);
+      return;
+    }
     if (this.musicAttack(f) || this.vanish(f, other)) return;
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
@@ -2807,7 +2837,7 @@ export class Match {
         const ex = EX_MODE[f.who];
         if (f.age === ex?.intro && [player, opponent][i]?.crouch)
           f.variables[0] = ex.value;
-        const [vx, vy] = introVelocity(f.who, f.age - 1);
+        const [vx, vy] = runVelocity(INTRO_MOTION[f.who], f.age - 1);
         f.x = clampX(f.x + f.facing * vx);
         // Past the floor, the fall lands (0x41187f).
         f.y = Math.min(0, f.y + vy);

@@ -91,8 +91,8 @@ def decode_event(record):
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x44, 0x46, 0x4c, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
-    if op == 0x1f and record[4] == 0x86 and record[5] == 2:  # global 6 (0x4456bc) += r[7:9], the freeze timer
-        return dict(op="freeze", add=s16(record, 7))
+    if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
+        return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
     if op == 0x1f and record[4] >> 6 == 1 and record[5] == 1:  # player variable r[4] & 0x3f = r[7:9]
         return dict(op="variable", index=record[4] & 0x3f, value=s16(record, 7))
     if op == 0x1f and record[4] >> 6 == 1 and record[5] == 2:  # player variable r[4] & 0x3f += r[7:9]
@@ -583,6 +583,13 @@ SIN_TWINS = {name: (r, r + next(d for top, d in ((73, 3), (85, 4), (89, 5), (103
 # Chuck Hiso (139), which he lacks.
 LIZARD_TWINS = {name: (r, r + next(d for top, d in ((86, 3), (89, 4), (139, 3), (173, 2)) if r < top))
                 for name, (r, _) in ZOMA_TWINS.items()}
+# KAY's sit as Ryuko's KOs and lose action, three after her other reactions,
+# four for the twists and the shock (his ★変なＴＥＣＨ, 89, comes before them),
+# six from Chain pull back (his own FB, FBB and FBH, 108–110, come before it,
+# two before Ryuko's) and five from Pull Back (his UNCOUNTER reactions, 124
+# and 125, come before it).
+KAY_TWINS = {name: (r, r + next(d for top, d in ((73, 0), (86, 3), (89, 4), (105, 3), (110, 6), (113, -2), (121, 3),
+                                                  (173, 5)) if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -1066,6 +1073,70 @@ FIGHTERS = {
         # 2001: the HUD face action 73 shows (PC 764); 217: *name (69, PC 727).
         image_ids={2001, 217},
     ),
+    "kay": dict(
+        source=("12 KAY", "03fc1e8d1ca8b145efbeb7dbd50c58c4a1b1fd1e9175d8e9efd0ddb15c29403b"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 47
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=KAY_TWINS,
+        # Beside the op 0x1f on his counter's variable 4 each opens with
+        # (counter_record), which the match plays:
+        differ={
+            # Giant's, without his clearing of variable 14 (PC 2157): Kiki's
+            # Hit Up within 10 ticks (PC 2146), and no op 0x1e window where
+            # Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Ryuko's, without clearing variable 14, and their last display
+            # lasts 3 ticks to her 20 (PC 2195), so each air guard frees him
+            # 6 ticks in, which their clips give the match.
+            "airGuard", "airBlockHeavy", "airBlockRapid", "airTimeStopGuard",
+            # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySide", "flySideWall",
+            # Variable 5 tests (> 4, not > 7), which the match doesn't read.
+            "jumpHit",
+            # A roll that skips its sound (PC 1735), which the clip doesn't play.
+            "hitPull",
+            # Kiki's raw vx −800.
+            "launchDown",
+            # Op 0x01 before op 0x02, as ANMC P's.
+            "grabbed",
+            # Zoma's KO tests (PC 613) and KO DOWN (PC 661), but for their
+            # op 0x1f's r[6:9], which a test doesn't read (0x4138d1); Zoma's
+            # shock, which doesn't set variable 6.
+            "ko", "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "chuckToss", "uppercut", "dragonFireball", "liftUp", "twistSide", "inatuma",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # His own copies of hit heavy, BEAM Stand and HISA, as Giant's.
+            # FB's op 0x0a (PC 1363) passes three of its six displays, as
+            # Ryuko's hit heavy shows; FBB rolls rand % 3 > 1, as Ryuko's
+            # BEAM Stand does; FBH credits the striker HISA's 3 power (PC
+            # 1408), not 13, and Fire HISA 13 (PC 1324), not 3, which the
+            # match keeps per fighter.
+            "fb", "fbb", "fbh", "fireLaunch",
+        },
+        # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (124,
+        # 125), copies of DOWN and J Att that clear variable 4 where those
+        # test it, as Giant's (126, 127). ponytail: Air Fire's op 0x01 sets
+        # vx −250 where J Att's adds it, and it counts no variable 5; it
+        # plays as J Att.
+        aliases={124: 79, 125: 77},
+        # Results: 勝ち (57) calls Demo stand (28) once (PC 574), hops (PC
+        # 579) and, landing into 57 + 10 (slot 1, PC 578), loops WIN RP (58,
+        # PC 602) after a roll that picks its sound (PCs 588–596). The draw
+        # calls 28 once (PC 681) and holds image 201 (PC 684). The darkening
+        # panel, image 1013 (action 43). The Vs. intro: 開始時 (30) jumps to
+        # 開始時 BR (32) for global 3 = 0 (PC 307), past its display for
+        # global 14 = 0 (PC 345), spawns OP super Charge (39, PC 348) and
+        # jumps to Round 1 (33) + 5 (PC 350), which walks in (PC 356) and
+        # calls Demo stand twice (PC 368); both play flattened.
+        actions=dict(win=57, winStand=28, winLand=(57, 10), winLoop=(58, 0), draw=65, black=43, intro=(32, 3)),
+        flat={"win", "intro"},
+        # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
+        # 727–745), as Ryuko's; 464: *name (66, PC 688).
+        image_ids={2000, 2001, 2002, 464},
+    ),
 }
 
 
@@ -1111,7 +1182,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     clips = pose_clips(p, c, actions, image_ids)
     # Clips that play their action's flattened timeline, calls inlined.
     for name in flat:
-        clips[name] = flatten(p, c, actions[name])["frames"]
+        index, offset = actions[name] if isinstance(actions[name], tuple) else (actions[name], 0)
+        clips[name] = flatten(p, c, index, offset=offset)["frames"]
         image_ids.update(f["image"] for f in clips[name] if f["image"] not in (0, 8191))
     # The moves play from their timelines: the actions of the command entries,
     # each with its level (header r[2]), which a cancel window compares.
@@ -1248,7 +1320,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN and {counts['lizard']} LIZARD images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD and {counts['kay']} KAY images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

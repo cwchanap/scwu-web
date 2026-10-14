@@ -114,10 +114,10 @@ export function gaugeImage(tick: number) {
 
 // Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
 // for 40 ticks each (PCs 712–730), as Chung's 73 (PCs 675–692), Amiro's 75
-// (PCs 786–803), ANMC P's 72 (PCs 717–735) and Giant's 74 (PCs 690–707);
-// G Suneo's 81 shows 2006 for 2001's turns (PCs 845–863), as SIN's 73 does
-// (PCs 756–774). Zoma's and Kiki's action 71 shows 2001 (PCs 677, 666), and
-// Yo's and LIZARD's 73 (PCs 728, 764).
+// (PCs 786–803), ANMC P's 72 (PCs 717–735), Giant's 74 (PCs 690–707) and
+// KAY's 73 (PCs 727–745); G Suneo's 81 shows 2006 for 2001's turns (PCs
+// 845–863), as SIN's 73 does (PCs 756–774). Zoma's and Kiki's action 71
+// shows 2001 (PCs 677, 666), and Yo's and LIZARD's 73 (PCs 728, 764).
 export const faceImage = (face: number, who?: Who) => {
   const side = who === 'suneo' || who === 'sin' ? 2006 : 2001;
   return face < 0 ? 2001 : [2002, side, 2000, side][Math.floor(face / 40) % 4];
@@ -125,8 +125,8 @@ export const faceImage = (face: number, who?: Who) => {
 // The *NAME action's image: Ryuko's 66 shows 464 (PC 675), Zoma's 64 340
 // (PC 637), Kiki's 65 217 (PC 627), Chung's 65 375 (PC 635), Amiro's 67
 // 427 (PC 746), ANMC P's 69 183 (PC 682), Giant's 68 349 (PC 652), G
-// Suneo's 76 601 (PC 808), Yo's 66 390 (PC 688), SIN's 70 368 (PC 721) and
-// LIZARD's 69 217 (PC 727).
+// Suneo's 76 601 (PC 808), Yo's 66 390 (PC 688), SIN's 70 368 (PC 721),
+// LIZARD's 69 217 (PC 727) and KAY's 66 464 (PC 688).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -139,6 +139,7 @@ const NAMES: Record<Who, number> = {
   yo: 390,
   sin: 368,
   lizard: 217,
+  kay: 464,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

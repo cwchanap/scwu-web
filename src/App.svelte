@@ -185,6 +185,15 @@
         axe: 'Fire',
         iori: 'Jump Att',
       },
+      kay: {
+        getterBeam: 'EN300',
+        musashi: 'Kaoru',
+        changeAttack: 'Super P',
+        drill: 'Air Chuck',
+        axe: 'Fire',
+        iori: 'Counter',
+        dst: 'Comment Chuck',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -401,6 +410,7 @@
             <option value="yo">Yo</option>
             <option value="sin">SIN</option>
             <option value="lizard">LIZARD</option>
+            <option value="kay">KAY</option>
           </select></label
         >
         <label
@@ -421,6 +431,7 @@
             <option value="yo">Yo</option>
             <option value="sin">SIN</option>
             <option value="lizard">LIZARD</option>
+            <option value="kay">KAY</option>
           </select></label
         >
         <label
@@ -888,17 +899,50 @@
           bursts into a dome of light, for three.
         </p>
         <p>
+          Choose KAY to play him, a monkey-faced boy who dresses up as a
+          different angel or mecha for most moves. <kbd>J</kbd> chains a swipe
+          of his curl, a pink-haired figure's ribbon lashes and a gold-collared
+          figure's paper blades (in EX mode a lance thrown from a red cross),
+          <kbd>K</kbd> a kick, a striped sphere's swallow and a gold-masked
+          figure's strike (in EX mode a stretching punch), and down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a blue crystal's jab or a black
+          figure's low sweep. <kbd>H</kbd> is his Hit Up, a fishing rod's cast,
+          <kbd>O</kbd> his chuck: a nurse's syringe. Blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT, and his air guards free him
+          after 6 ticks. <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> switches to EX mode
+          for half a stock, and back, which swaps most of his moves for other
+          forms. His specials: <kbd>U</kbd> or →↓↘ <kbd>J</kbd> air chuck, a
+          spider's leap that catches only an airborne opponent and crashes down
+          with them, knocking him down too (also in the air), <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> Fire, a spinning red lance thrown from a cross (in EX
+          mode a stance, which <kbd>O</kbd> turns into a dashing grab and
+          <kbd>H</kbd> a claw's beam), <kbd>F</kbd> or →↓← <kbd>K</kbd> Counter,
+          a twin-colored stance that splits in two and slashes whoever strikes
+          it, <kbd>G</kbd> or ←↓→ <kbd>K</kbd> Comment chuck, a clawed black
+          figure's grab (harder below 30% health; in EX mode a pink figure's
+          whips), and ↓← <kbd>J</kbd> or <kbd>K</kbd> 12P and 12K, black arms
+          bursting from the ground at two distances (in EX mode a pillar of
+          light at one, a decoy at the other). His supers: <kbd>2</kbd> or ↓→↓→
+          <kbd>K</kbd>
+          KAORU, a silver-haired boy's low grab into a long scene with a giant purple
+          hand, and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd> SUPER P, a wound-up
+          stretching punch, for a stock each (after Counter's slash either
+          cancels for two), and <kbd>1</kbd> or ↓←↓← <kbd>J</kbd> en300, a purple
+          mecha's grab and berserk mauling, for three; in EX mode they become a ribbon-armed
+          figure's slashes, a blue crystal's beam and the mecha's claw wave.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN or LIZARD, and one
-          of eighteen stages, in either mode. Free practice has no timer, and
-          you also choose how the partner behaves: standing, guarding high or
-          low, guarding in the air, attacking in range, jumping in, or playing
-          as the original CPU. Max stock refills your supers whenever you stand
-          idle, and Low health keeps you just under 30% for desperation moves.
-          Vs. CPU is the original game's CPU, playing the opponent's own moves,
-          specials and supers. Reduce their health to zero, or lead on health
-          when time runs out. Changing modes, fighters or the stage starts a
-          fresh match.
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD or KAY,
+          and one of eighteen stages, in either mode. Free practice has no
+          timer, and you also choose how the partner behaves: standing, guarding
+          high or low, guarding in the air, attacking in range, jumping in, or
+          playing as the original CPU. Max stock refills your supers whenever
+          you stand idle, and Low health keeps you just under 30% for
+          desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

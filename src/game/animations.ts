@@ -205,7 +205,7 @@ export type SourceEvent =
       window: number;
       steps: number[];
     }
-  | { op: 'freeze'; add: number }
+  | { op: 'freeze'; add: number; set?: boolean }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
   | { op: 'variable'; index: number; value: number }
@@ -335,8 +335,9 @@ export function heldFrame(
 // Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
 // Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
 // ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
-// from PC 313, G Suneo's Round 1 at PC 403, from PC 393, and SIN's Round 1
-// at PC 403, from PC 396.
+// from PC 313, G Suneo's Round 1 at PC 403, from PC 393, SIN's Round 1 at
+// PC 403, from PC 396, and KAY's Round 1 at PC 367, from PC 357, before his
+// flattened intro's calls of Demo stand (PCs 286–293).
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -348,10 +349,22 @@ export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
 export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
 export const SUNEO_INTRO_EX_TICK = ticksBefore(fighterClips.suneo.intro, 403);
 export const SIN_INTRO_EX_TICK = ticksBefore(fighterClips.sin.intro, 403);
+export const KAY_INTRO_EX_TICK = ticksBefore(
+  fighterClips.kay.intro.filter((frame) => frame.pc > 293),
+  367,
+);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
 export const LIZARD_LANDING = 166;
+// KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
+// display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
+// step after his 47th move passes the floor (0x41187f), 114 source pixels
+// up at the peak.
+export const KAY_WIN_HOP = {
+  at: fighterClips.kay.win.reduce((ticks, frame) => ticks + frame.duration, 0),
+  ticks: 47,
+};
 // A flight's displays until `age`, then its landing action's.
 function landed(flight: Pose[], landing: Pose[], age: number) {
   const ticks = flight.map((f) => f.duration);
@@ -622,21 +635,33 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638).
-    win: clip(
-      who === 'lizard'
-        ? z.win
-        : z.winRp
-          ? [
-              ...z.winStand,
-              ...z.win.slice(0, -1),
-              ...Array(who === 'kiki' ? 3 : 7)
-                .fill(z.winRp)
-                .flat(),
-              ...z.win.slice(-1),
-            ]
-          : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
-      z.winLoop ? z.winStand.length + z.win.length : false,
-    ),
+    // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
+    // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
+    // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
+    win:
+      who === 'kay'
+        ? clip(
+            [...z.win, ...z.winLand, ...z.winLoop],
+            z.win.length + z.winLand.length,
+            [...z.win, ...z.winLand, ...z.winLoop].map(
+              (frame) => frame.duration || KAY_WIN_HOP.ticks,
+            ),
+          )
+        : clip(
+            who === 'lizard'
+              ? z.win
+              : z.winRp
+                ? [
+                    ...z.winStand,
+                    ...z.win.slice(0, -1),
+                    ...Array(who === 'kiki' ? 3 : 7)
+                      .fill(z.winRp)
+                      .flat(),
+                    ...z.win.slice(-1),
+                  ]
+                : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
+            z.winLoop ? z.winStand.length + z.win.length : false,
+          ),
     draw: clip(
       [...z.winStand, ...z.draw],
       false,
@@ -659,6 +684,7 @@ const TWIN_ANIMATIONS = {
   yo: twinAnimations('yo'),
   sin: twinAnimations('sin'),
   lizard: twinAnimations('lizard'),
+  kay: twinAnimations('kay'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
