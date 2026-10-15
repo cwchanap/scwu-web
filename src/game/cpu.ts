@@ -18,6 +18,7 @@ import kay from './generated/kay.json';
 import dido from './generated/dido.json';
 import sakuya from './generated/sakuya.json';
 import alex from './generated/alex.json';
+import sou from './generated/sou.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -36,7 +37,7 @@ export interface CpuEntry {
 // Ryuko's table: 100 slots of 111 bytes after the held-pose table, 43 used;
 // Zoma's uses 44, Kiki's 43, Chung's 40, Amiro's 37, ANMC P's 45, Giant's 43,
 // G Suneo's 41, Yo's 41, SIN's 42, LIZARD's 42, KAY's 38,
-// DIDO's 48, SAKUYA's 42, ALEX's 40.
+// DIDO's 48, SAKUYA's 42, ALEX's 40, SOU's 45.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
@@ -54,6 +55,7 @@ export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   dido: dido.cpu,
   sakuya: sakuya.cpu,
   alex: alex.cpu,
+  sou: sou.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
@@ -77,6 +79,7 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   dido: {},
   sakuya: {},
   alex: {},
+  sou: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;

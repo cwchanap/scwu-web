@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA or ALEX on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX or SOU on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -379,7 +379,33 @@ And ALEX's, a boy in a cap dressed as a different armored hero or mecha for most
 | 2, or ↓→↓→ K                   | GYSA: a red-horned mecha's three sword strikes, 1 stock (in EX mode a drill-lanced mecha's grab up close)                           |
 | 3, or ↓→↓→ J                   | super fire: a red dinosaur tank's cannon, 1 stock (in EX mode a red-horned mecha's sword dash)                                      |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA or ALEX), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And SOU's, a boy in a white headband dressed as a black-armored mecha or a helmeted pilot for most moves, who calls beast mechas in EX mode:
+
+| Input                          | SOU's move                                                                                                                                                                                                     |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a short sword's slash; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                                              |
+| P2 / P3                        | A soldier's punch / the mecha's arm punch (in EX mode a gunman's pistol shot)                                                                                                                                  |
+| K2 / K3                        | The mecha's scythe sweep / a gunman's pistol shot (in EX mode a yellow-helmed figure's punch)                                                                                                                  |
+| Down + J / K                   | A red-helmed figure's punch / a yellow-helmed figure's (in EX mode a long-haired girl's low kick)                                                                                                              |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                                             |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                                          |
+| H                              | Hit Up: the pilot's uppercut                                                                                                                                                                                   |
+| O                              | Chuck: the mecha's grab                                                                                                                                                                                        |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                                                                                    |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): most of his moves take other forms                                                                                                                                      |
+| U, or →↓↘ K                    | AKUMA jump: a leap; J or K turns it into a diving punch or a flying kick (in EX mode the mecha's rising uppercut)                                                                                              |
+| I, or ↓→ K                     | Fire Kick: the mecha's low rifle shot; in the air a flying kick (in EX mode he calls a black panther mecha)                                                                                                    |
+| F, or ↓← J                     | IORI: the mecha's sword slash; ↓← J chains two more (in EX mode a heavy gun's shot)                                                                                                                            |
+| G, or ↓→ J                     | BK: the mecha's dashing punch, also in the air (in EX mode he calls a yellow lion mecha; in the air he hangs from an eagle jet, steered with the directions for up to five seconds and dropped with J, K or O) |
+| ↓← K                           | MID SLASS: the mecha's sword slash (in EX mode a leaping ground slam)                                                                                                                                          |
+| ↓→ H                           | HIDDEN A: a quick step (in EX mode he calls a white mammoth mecha)                                                                                                                                             |
+| 2, or ↓→↓← K                   | Command 1: the mecha's punch rush, 1 stock (in EX mode its sword combo)                                                                                                                                        |
+| 4, or ↓→↓→ K                   | SPARK: a dive as a black jet, also in the air, 1 stock (in EX mode the mecha's shoulder cannons fire a beam)                                                                                                   |
+| 5, or ↓→↓→ J                   | DANKU SHOT: the mecha's shoulder cannons, 1 stock (in EX mode a sword combo; below 30% health a stronger shot)                                                                                                 |
+| 3, or ↓←↓← J                   | Beast att: the lion, panther and mammoth charge in turn, 3 stocks (in EX mode a winged mecha's green beam)                                                                                                     |
+| 1, or O J ← K H                | KOKAKEN: the pilot's sword dash, 3 stocks, only below 30% health                                                                                                                                               |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX or SOU), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -395,7 +421,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** fifteen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** sixteen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -407,7 +433,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's and ALEX's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's and SOU's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

@@ -338,8 +338,9 @@ export function heldFrame(
 // from PC 313, G Suneo's Round 1 at PC 403, from PC 393, SIN's Round 1 at
 // PC 403, from PC 396, KAY's Round 1 at PC 367, from PC 357, before his
 // flattened intro's calls of Demo stand (PCs 286–293), SAKUYA's Round 1 at
-// PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303), and
-// ALEX's Round 1 at PC 356, from PC 333.
+// PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303),
+// ALEX's Round 1 at PC 356, from PC 333, and SOU's at PC 415, as he lands
+// (SOU_LANDING).
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -364,6 +365,11 @@ export const ALEX_INTRO_EX_TICK = ticksBefore(fighterClips.alex.intro, 356);
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
 export const LIZARD_LANDING = 166;
+// SOU's, 2 ticks rising at raw vy −7000, gravity −10000 (PC 401), then 107
+// falling at 300 (PC 410) until the fall passes the floor 319 source pixels
+// down, into Round 1 + 10 (slot 1, PC 409).
+export const SOU_LANDING = 109;
+export const SOU_INTRO_EX_TICK = SOU_LANDING;
 // KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
 // display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
 // step after his 47th move passes the floor (0x41187f), 114 source pixels
@@ -583,17 +589,22 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
     // LIZARD's 開始時 BR (33) from PC 367 leaps in (introMotion) and lands at
     // LIZARD_LANDING into OP lend (36, slot 1 at PC 383), cutting the
-    // display at PC 385 short and the wait at PC 386 out.
+    // display at PC 385 short and the wait at PC 386 out. SOU's 開始時 BR
+    // (36) from PC 401 rises and falls (introMotion), landing out of the wait
+    // at PC 413 at SOU_LANDING into Round 1 + 10, which calls DEMO stand once
+    // (PC 420).
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
-        : clip(
-            who === 'yo'
-              ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
-              : who === 'sin'
-                ? [...z.intro, ...z.winStand]
-                : z.intro,
-          ),
+        : who === 'sou'
+          ? landed(z.intro, z.introLand, SOU_LANDING)
+          : clip(
+              who === 'yo'
+                ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
+                : who === 'sin'
+                  ? [...z.intro, ...z.winStand]
+                  : z.intro,
+            ),
     ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
@@ -650,7 +661,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
-    // 436 (PC 692) and ALEX's 勝ち (59) image 330 (PC 593).
+    // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593) and SOU's 勝ち (62)
+    // image 310 (PC 650).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -667,7 +679,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             who === 'lizard' ||
               who === 'dido' ||
               who === 'sakuya' ||
-              who === 'alex'
+              who === 'alex' ||
+              who === 'sou'
               ? z.win
               : z.winRp
                 ? [
@@ -707,6 +720,7 @@ const TWIN_ANIMATIONS = {
   dido: twinAnimations('dido'),
   sakuya: twinAnimations('sakuya'),
   alex: twinAnimations('alex'),
+  sou: twinAnimations('sou'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

@@ -100,11 +100,14 @@ const keyMap: Record<string, Control> = {
 };
 
 // The free state's program (action 1), which reads the fighter's variable 0
-// (EX mode) and, for SIN, its life.
+// (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
 const idleVM = (f: Fighter, seed?: number) =>
-  new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
-    0x40: f.variables[0] ?? 0,
-  });
+  Object.assign(
+    new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
+      0x40: f.variables[0] ?? 0,
+    }),
+    { life: f.hp },
+  );
 
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';

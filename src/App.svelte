@@ -226,6 +226,17 @@
         iori: 'Reflect',
         dst: 'Counter',
       },
+      sou: {
+        getterBeam: 'Kokaken',
+        musashi: 'Rengeki',
+        changeAttack: 'Beast Attack',
+        blackRush: 'Spark',
+        megaBeam: 'Danku Shot',
+        drill: 'Akuma Jump',
+        axe: 'Fire Kick',
+        iori: 'Iori',
+        dst: 'BK',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -446,6 +457,7 @@
             <option value="dido">DIDO</option>
             <option value="sakuya">SAKUYA</option>
             <option value="alex">ALEX</option>
+            <option value="sou">SOU</option>
           </select></label
         >
         <label
@@ -470,6 +482,7 @@
             <option value="dido">DIDO</option>
             <option value="sakuya">SAKUYA</option>
             <option value="alex">ALEX</option>
+            <option value="sou">SOU</option>
           </select></label
         >
         <label
@@ -1053,17 +1066,49 @@
           <kbd>K</kbd> en300, which summons a white mecha dragon.
         </p>
         <p>
+          Choose SOU to play him, a boy in a white headband who dresses up as a
+          black-armored mecha or a helmeted pilot for most moves. <kbd>J</kbd>
+          chains a jab, a soldier's punch and the mecha's arm punch,
+          <kbd>K</kbd> a short sword's slash, the mecha's scythe sweep and a
+          gunman's pistol shot; down with <kbd>J</kbd> or <kbd>K</kbd> is a
+          red-helmed figure's punch or a yellow-helmed one's. <kbd>H</kbd> is
+          his Hit Up, the pilot's uppercut, <kbd>O</kbd> his chuck, the mecha's
+          grab. Blocking with a stock, <kbd>H</kbd> spends it on COUNTER HIT.
+          <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> enters or leaves EX mode for half a
+          stock, where most of his moves take other forms, calling beast mechas
+          among them. His specials: <kbd>U</kbd> or →↓↘ <kbd>K</kbd> AKUMA jump,
+          a leap that <kbd>J</kbd> or <kbd>K</kbd> turns into a diving punch or
+          a flying kick (in EX mode the mecha's rising uppercut),
+          <kbd>I</kbd> or ↓→ <kbd>K</kbd> Fire Kick, the mecha's low rifle shot
+          (in the air a flying kick; in EX mode it calls a black panther),
+          <kbd>F</kbd> or ↓← <kbd>J</kbd> IORI, the mecha's sword slashes,
+          chained on ↓← <kbd>J</kbd>, <kbd>G</kbd> or ↓→ <kbd>J</kbd> BK, the
+          mecha's dashing punch (in EX mode it calls a yellow lion, or in the
+          air an eagle jet the pilot hangs from, steered with the directions for
+          up to five seconds and dropped with <kbd>J</kbd>, <kbd>K</kbd> or
+          <kbd>O</kbd>), ↓← <kbd>K</kbd> MID SLASS, the mecha's sword slash (in
+          EX mode a leaping ground slam), and ↓→ <kbd>H</kbd> HIDDEN A, a quick
+          step (in EX mode it calls a white mammoth). His supers, for a stock
+          each: <kbd>2</kbd> or ↓→↓← <kbd>K</kbd> Command 1, the mecha's punch
+          rush, <kbd>4</kbd> or ↓→↓→ <kbd>K</kbd> SPARK, a dive as a black jet
+          (also in the air), and <kbd>5</kbd> or ↓→↓→ <kbd>J</kbd>
+          DANKU SHOT, the mecha's shoulder cannons; for three, <kbd>3</kbd> or
+          ↓←↓← <kbd>J</kbd> Beast att, the lion, panther and mammoth charging in
+          turn, and, below 30% health, <kbd>1</kbd> or <kbd>O</kbd>
+          <kbd>J</kbd> ← <kbd>K</kbd> <kbd>H</kbd> KOKAKEN, the pilot's sword dash.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA or ALEX, and one of eighteen stages, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you just
-          under 30% for desperation moves. Vs. CPU is the original game's CPU,
-          playing the opponent's own moves, specials and supers. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes,
-          fighters or the stage starts a fresh match.
+          DIDO, SAKUYA, ALEX or SOU, and one of eighteen stages, in either mode.
+          Free practice has no timer, and you also choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you just under 30% for desperation moves. Vs. CPU is the
+          original game's CPU, playing the opponent's own moves, specials and
+          supers. Reduce their health to zero, or lead on health when time runs
+          out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

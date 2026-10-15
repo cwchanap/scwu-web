@@ -12,6 +12,8 @@ import {
   KAY_INTRO_EX_TICK,
   SAKUYA_INTRO_EX_TICK,
   ALEX_INTRO_EX_TICK,
+  SOU_INTRO_EX_TICK,
+  SOU_LANDING,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
@@ -348,7 +350,9 @@ const reactionPower = (f: Fighter): [number, number] =>
 // PC 385. LIZARD's 開始時 BR (33) rises at −4000 for two ticks (PC 372),
 // stops (PC 374), then leaps at 400/−1000 with gravity 60 (PC 377) until he
 // lands (LIZARD_LANDING). KAY's Round 1 (33) walks at 200 from PC 356 to PC
-// 365. The others' have no op 0x01, so they start where these end.
+// 365. SOU's 開始時 BR (36) rises at −7000 with gravity −10000 for two ticks
+// (PC 401), then falls at 300 (PC 410) until he lands (SOU_LANDING). The
+// others' have no op 0x01, so they start where these end.
 type Runs = [number, number, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -365,6 +369,10 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [LIZARD_LANDING - 104, 400, -1000, 60],
   ],
   kay: [[56, 200]],
+  sou: [
+    [2, 0, -7000, -10000],
+    [SOU_LANDING - 2, 0, 300],
+  ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP).
 const WIN_MOTION: Partial<Record<Who, Runs>> = {
@@ -554,10 +562,10 @@ function struck(
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
 // Ryuko's and Zoma's at −800 (Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G
-// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's and ALEX's 124,
-// 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143 and 132, PCs 1522,
-// 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818, 1938 and
-// 1848), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's and SOU's
+// 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132 and 133,
+// PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818,
+// 1938, 1848 and 1725), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -572,6 +580,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   dido: { launchDown: -800 },
   sakuya: { launchDown: -800 },
   alex: { launchDown: -800 },
+  sou: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -651,7 +660,10 @@ const timeline = (f: Fighter) => f.branch!;
 // which the flattened intro doesn't follow. ALEX's at 100, set by TO EX (225,
 // PC 3315) and cleared by TO NORMAL (226, PC 3328); his intro's (PC 356)
 // enters EX change (39), which sets it (PC 412) and jumps back (33 + 18, PC
-// 413).
+// 413). SOU's at 10, set by TYPE CHANGE to EX (222, PC 3006) and cleared by
+// TYPE CHANGE to NOR (223, PC 3019), which the first enters while it is set
+// (PC 3003); his intro's (PC 415) enters Change Character (41), which sets
+// it (PC 464) and jumps back (37 + 12, PC 465).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -663,6 +675,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   kay: { value: 100, intro: KAY_INTRO_EX_TICK },
   sakuya: { value: 100, intro: SAKUYA_INTRO_EX_TICK },
   alex: { value: 100, intro: ALEX_INTRO_EX_TICK },
+  sou: { value: 10, intro: SOU_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
