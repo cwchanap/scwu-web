@@ -87,10 +87,10 @@ def decode_event(record):
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
     # hit effect, ALEX's reflect), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's
-    # en300 probe) and 12 (EX Fire 2) and global 6 (the freeze); other tests keep their
-    # fall-through path.
+    # en300 probe), 12 (EX Fire 2) and 13 (ERUS's coins and hounds) and global 6 (the
+    # freeze); other tests keep their fall-through path.
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x44, 0x46, 0x47,
-                                                                              0x4c, 0x86):
+                                                                              0x4c, 0x4d, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
@@ -444,17 +444,18 @@ def write_json(path, value):
     write_if_changed(path, (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf8"))
 
 
-def counter_record(p, index):
-    """The PC of the op 0x1f on variable 4 that opens one of Giant's
-    reactions, before its first display (PCs 723, 744, ...), or None."""
-    action = p.action(index)
+def counter_records(p, index):
+    """The PCs of the op 0x1f records on variables 2 and 4 that open one of
+    Giant's or ERUS's reactions, before its first display (PCs 723, 744,
+    ...; ERUS's 787, 789, ...)."""
+    action, pcs = p.action(index), []
     for pc in range(action.start + 1, action.end):
         record = p.records[pc]
         if record[0] == 0x0c:
-            return None
-        if record[0] == 0x1f and record[4] == 0x44:
-            return pc
-    return None
+            break
+        if record[0] == 0x1f and record[4] in (0x42, 0x44):
+            pcs.append(pc)
+    return pcs
 
 
 def player(name, sha256):
@@ -473,14 +474,14 @@ ACTION_REFERENCES = {0x02: (2, 4, 4), 0x09: (2, 4, None), 0x0a: (1, 3, 3), 0x10:
                      0x11: (2, 4, None), 0x16: (2, 4, 4), 0x1f: (1, 3, 3), 0x20: (6, 8, 8), 0x24: (1, 3, None)}
 
 
-def gameplay(p, index, skip=None):
+def gameplay(p, index, skip=()):
     """An action's display lengths and gameplay records, without the action
     numbers and record offsets they name, which each container lays out its
     own way (an op 0x1e of type 1 names one), a header's level, an op 0x1e of
-    mode 0 (no window), a set's unused compare value or the record at `skip`."""
+    mode 0 (no window), a set's unused compare value or the records at `skip`."""
     action, out = p.action(index), []
     for pc in range(action.start + 1, action.end):
-        if pc == skip:
+        if pc in skip:
             continue
         record = bytearray(p.records[pc])
         op = record[0]
@@ -634,6 +635,14 @@ SOU_TWINS = {name: (r, r + next(d for top, d in ((73, 5), (79, 10), (89, 11), (1
 # (118, 117), and eight from Pull Back (his UNCOUNTER reactions, 127 and 128,
 # come before it).
 HISO_TWINS = {name: (r, r + next(d for top, d in ((73, 0), (83, 6), (89, 7), (111, 6), (112, 7), (113, 5), (121, 6),
+                                                   (173, 8)) if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
+# ERUS's sit two after Ryuko's KOs and lose action, seven after her other
+# reactions, eight from BEAM Stand to SHOCK INFINITY (her ★変なＴＥＣＨ, 89,
+# comes before them, Ryuko's after), seven from Shock, fifteen for FB, FBB and
+# FBH, which come after her DRAGON Yinan (125–127), four from HISO stop, nine
+# from Pull Back (her FB, FBB and FBH and her UNCOUNTER reactions, 128 and
+# 129, come before it) and eight past Ryuko's Chuck Hiso (139), which she lacks.
+ERUS_TWINS = {name: (r, r + next(d for top, d in ((73, 2), (83, 7), (89, 8), (110, 7), (113, 15), (121, 4), (139, 9),
                                                    (173, 8)) if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
@@ -876,7 +885,7 @@ FIGHTERS = {
                  "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
         twins=GIANT_TWINS,
         # Beside the op 0x1f on his counter's variable 4 each opens with
-        # (counter_record), which the match plays:
+        # (counter_records), which the match plays:
         differ={
             # Kiki's Hit Up within 10 ticks (PC 2164), and no op 0x1e window
             # (PC 2160) where Ryuko's opens one for COUNTER HIT (PC 2012).
@@ -1132,7 +1141,7 @@ FIGHTERS = {
                  "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
         twins=KAY_TWINS,
         # Beside the op 0x1f on his counter's variable 4 each opens with
-        # (counter_record), which the match plays:
+        # (counter_records), which the match plays:
         differ={
             # Giant's, without his clearing of variable 14 (PC 2157): Kiki's
             # Hit Up within 10 ticks (PC 2146), and no op 0x1e window where
@@ -1244,7 +1253,7 @@ FIGHTERS = {
                  "crouchEnter": 21, "crouch": 22, "stand": 23, "turn": 26, "crouchTurn": 27},
         twins=SAKUYA_TWINS,
         # Beside the op 0x1f on her counter's variable 4 each opens with
-        # (counter_record), which the match plays:
+        # (counter_records), which the match plays:
         differ={
             # KAY's: Kiki's Hit Up within 10 ticks (PC 2330), no op 0x1e
             # window where Ryuko's opens one for COUNTER HIT, and no clearing
@@ -1313,7 +1322,7 @@ FIGHTERS = {
                  "crouchEnter": 17, "crouch": 18, "stand": 19, "turn": 22, "crouchTurn": 23},
         twins=ALEX_TWINS,
         # Beside the op 0x1f on his counter's variable 4 each opens with
-        # (counter_record), which the match plays:
+        # (counter_records), which the match plays:
         differ={
             # Giant's: Kiki's Hit Up within 10 ticks (PC 2223), and no op 0x1e
             # window where Ryuko's opens one for COUNTER HIT.
@@ -1433,7 +1442,7 @@ FIGHTERS = {
                  "crouchEnter": 17, "crouch": 18, "stand": 19, "turn": 22, "crouchTurn": 23},
         twins=HISO_TWINS,
         # Beside the op 0x1f on his counter's variable 4 each opens with
-        # (counter_record), which the match plays:
+        # (counter_records), which the match plays:
         differ={
             # Giant's, but one 20-tick display (PC 2208) for his two tens, so
             # the last Hit Up check comes at 28 (PC 2209), not 18.
@@ -1502,6 +1511,75 @@ FIGHTERS = {
         # (66, PC 693).
         image_ids={2001, 445},
     ),
+    "erus": dict(
+        source=("18 ERUS", "4f1bbeaa88b1e94504bbeb655ddf06f122959b04fe0da0f59964cf4529d6b071"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 49
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=ERUS_TWINS,
+        # Beside the op 0x1f records on her counter's variable 4 and her Book's
+        # variable 2 each opens with (counter_records), which the match plays:
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2169), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockRapid", "crouchBlockRapid",
+            "timeStopGuard", "crouchTimeStopGuard",
+            # Giant's, but with no op 0x15, so they add her no power
+            # (OWN_REACTION_POWER).
+            "blockStop", "crouchBlockStop",
+            # No op 0x20 where Ryuko's rolls rand % 6 > 2: Chung's HISA, Zoma's
+            # chuck toss, SIN's Chain pull back, and a hit heavy no one else's
+            # lacks it in.
+            "hitHeavy", "launchAway", "chuckToss", "chainPull",
+            # SAKUYA's rand % 4 > 1 (PCs 860, 882); the sweep's (PC 923) skips
+            # its sound and first two displays; the Tatumakis roll after their
+            # op 0x01 (PCs 1261, 1284), which the match's launch doesn't read,
+            # as HISO's.
+            "airHitHeavy", "jumpHit", "sweep", "tatumakiIn", "tatumakiOut",
+            # Zoma's rand % 3 > 1 (PCs 1203, 1836, 1860).
+            "uppercut", "dragonFireball", "liftUp",
+            # Chung's 1002-tick wait (PC 1186).
+            "flySideWall",
+            # Kiki's raw vx −800 (PC 1804).
+            "launchDown",
+            # Its op 0x1f's r[7:9] (PC 962), which a test doesn't read
+            # (0x4138d1), as SAKUYA's.
+            "launchUp",
+            # ANMC P's op 0x01 before op 0x02, but clearing variable 14 first
+            # (PC 1872).
+            "grabbed",
+            # Zoma's, but for the KO's op 0x1f adds' r[9:11] (PCs 635, 639),
+            # which an add without a compare doesn't read (0x413921).
+            "ko",
+            # Zoma's.
+            "down", "shock", "airStun", "flySide", "twistSide", "inatuma", "airInatuma",
+            # Zoma's, but one 25-tick display (PC 1779) where his has 20.
+            "rushAirHit",
+            # Ryuko's, also clearing variable 7 (PC 618).
+            "lose",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # HISO's and ALEX's: copies of hit heavy, BEAM Stand and HISA.
+            "fb", "fbb", "fbh",
+        },
+        # Responses 69 and 70 enter her UNCOUNTER DOWN and Air Fire (128,
+        # 129), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        aliases={128: 79, 129: 77},
+        # Results: 勝ち (60) calls stand demo (28) once (PC 603) and holds
+        # image 350 (PCs 612–613), spawning SMOKE DASH >> (558, PC 609). The
+        # draw calls 28 once (PC 694). Each first enters DEMO air (29) while
+        # airborne (op 0x16, PCs 602, 693). The darkening panel, image 1009
+        # (action 45). The Vs. intro: 開始時 (31) jumps to 開始時 BR (34) for
+        # global 3 = 0 (PC 294), which for global 14 = 0 (PC 336) jumps past
+        # its display (PC 344) to spawn Black (45) and OP super Charge (41,
+        # PCs 340–341), then to Round 1 (35) + 3 (PC 343); both play
+        # flattened. ponytail: the win's roll, to Random WIN (46, PC 604), and
+        # the draw's hop (PCs 701–707) aren't played.
+        actions=dict(win=60, winStand=28, draw=67, black=45, intro=(34, 9)),
+        flat={"win", "intro"},
+        # 2000–2002: the HUD faces action 77 shows, cycling in EX mode (PCs
+        # 757–773), as SOU's; 366: *name (68, PC 714).
+        image_ids={2000, 2001, 2002, 366},
+    ),
 }
 
 
@@ -1513,21 +1591,21 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # Giant's reactions open by testing his counter's variable 4 (op 0x1f ==
     # 100, PCs 723, 763, ...), which counter start (278) holds at 100 for its
     # window (PCs 4271–4282), to enter counter hit (279); most others clear it
-    # (PCs 744, 788, ...). Each reaction maps to its test's target, or 0.
+    # (PCs 744, 788, ...). ERUS's also clear her Book's variable 2 or test it
+    # at 10 (PCs 787, 1254, ...). Each reaction maps to these records in
+    # order: [variable, value, the test's target or 0 for a set].
     counters = {}
     for own in set(tables["responses"]) - {0}:
-        pc = counter_record(p, own)
-        if pc is None:
-            continue
-        record = p.records[pc]
-        if record[5] == 4 and u16(record, 9) == 100:
-            counters[own] = u16(record, 1)
-        elif record[5] == 1 and u16(record, 7) == 0:
-            counters[own] = 0
-        else:
-            sys.exit(f"Unexpected counter record at {source[0]}'s PC {pc}; refusing to export.")
+        for pc in counter_records(p, own):
+            record = p.records[pc]
+            if record[5] == 4 and u16(record, 9) == (100 if record[4] == 0x44 else 10):
+                counters.setdefault(own, []).append([record[4] & 0x3f, u16(record, 9), u16(record, 1)])
+            elif record[5] == 1 and u16(record, 7) == 0:
+                counters.setdefault(own, []).append([record[4] & 0x3f, 0, 0])
+            else:
+                sys.exit(f"Unexpected counter record at {source[0]}'s PC {pc}; refusing to export.")
     for name, (r, z) in twins.items():
-        if (gameplay(ryuko, r) == gameplay(p, z, counter_record(p, z))) == (name in differ):
+        if (gameplay(ryuko, r) == gameplay(p, z, counter_records(p, z))) == (name in differ):
             sys.exit(f"{source[0]}'s {name} ({z}) no longer matches the recorded comparison with Ryuko's {r}; "
                      "refusing to export.")
     # Own reactions a response names where Ryuko's names a twin's other half.
@@ -1560,7 +1638,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # enters COUNTER HIT.
     guards = [name for name in GUARDS if not name.startswith("air")]
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
-                              *filter(None, tables["response_effects"]), *moves, *filter(None, counters.values())]]
+                              *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t)]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -1694,7 +1772,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU and {counts['hiso']} HISO images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO and {counts['erus']} ERUS images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

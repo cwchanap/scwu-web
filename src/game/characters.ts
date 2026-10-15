@@ -4,8 +4,8 @@
 // (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER), Yo's (09 YO.PLAYER),
 // SIN's (10 SIN.PLAYER), LIZARD's (11 LIZARD.PLAYER), KAY's (12 KAY.PLAYER),
 // DIDO's (13 DIDO.PLAYER), SAKUYA's (14 SAKUYA.PLAYER), ALEX's
-// (15 ALEX.PLAYER), SOU's (16 SOU.PLAYER) and HISO's (17 HISO.PLAYER);
-// and each stage's objects, images and track.
+// (15 ALEX.PLAYER), SOU's (16 SOU.PLAYER), HISO's (17 HISO.PLAYER) and
+// ERUS's (18 ERUS.PLAYER); and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -23,6 +23,7 @@ import sakuya from './generated/sakuya.json';
 import alex from './generated/alex.json';
 import sou from './generated/sou.json';
 import hiso from './generated/hiso.json';
+import erus from './generated/erus.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -42,7 +43,8 @@ export type Who =
   | 'sakuya'
   | 'alex'
   | 'sou'
-  | 'hiso';
+  | 'hiso'
+  | 'erus';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -61,6 +63,7 @@ export const CHARACTERS = {
   alex,
   sou,
   hiso,
+  erus,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -70,7 +73,7 @@ export type Container = Who | Stage;
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
 // Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490,
-// SAKUYA's 470, ALEX's 450, SOU's and HISO's 480.
+// SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -106,6 +109,7 @@ const twins = Object.fromEntries(
       'alex',
       'sou',
       'hiso',
+      'erus',
     ] as const
   ).map((who) => {
     const own = new Map(
@@ -124,10 +128,14 @@ const twins = Object.fromEntries(
     ];
   }),
 );
-// Giant's reactions that open by testing his counter's variable 4, with the
-// action it enters at 100, or 0 for those that clear it (export_fighter).
-export const countersOf = (who: Who): Record<string, number> =>
-  (CHARACTERS[who] as { counters?: Record<string, number> }).counters ?? {};
+// The op 0x1f records on variables 2 and 4 that open Giant's and ERUS's
+// reactions, in order: [variable, value, the action a test enters at that
+// value, or 0 for a set] (export_fighter).
+export const countersOf = (
+  who: Who,
+): Record<string, [number, number, number][]> =>
+  (CHARACTERS[who] as { counters?: Record<string, [number, number, number][]> })
+    .counters ?? {};
 const named = (who: Who) => who[0].toUpperCase() + who.slice(1);
 // Ryuko's source action `index` in the player's own container.
 export function twin(who: Who, index: number) {

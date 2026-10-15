@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU or HISO on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO or ERUS on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -428,7 +428,32 @@ And HISO's, a boy in a red sleeveless top dressed as a different character for m
 | 3, or ↓←↓← J                   | fly arm: the clown-faced boy's flying fists up close, 1 stock                                 |
 | 4, or ↓→↓→ J                   | S Shoot: a blue-coated boy's palm blast, 1 stock                                              |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU or HISO), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And ERUS's, a blond figure in a black coat and white bandeau dressed as a different character for most moves, who calls helpers in EX mode:
+
+| Input                          | ERUS's move                                                                                                                                                                 |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a chain swing / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                  |
+| P2 / P3                        | A blue-robed figure's chain whip / a suited man's knife thrust                                                                                                              |
+| K2 / K3                        | A spiky-haired boy's sliding kick / the suited man's briefcase swing                                                                                                        |
+| Down + J / K                   | A green-clad boy's slab strike / a cap-wearing figure's sword slash                                                                                                         |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                          |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                       |
+| H                              | Hit Up: a girl in a red dress's rising punch                                                                                                                                |
+| O                              | Chuck: the blue-robed figure's chains                                                                                                                                       |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                                                 |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (a stock): most of her moves take other forms                                                                                                        |
+| U, or →↓↘ J                    | INATUMA: the spiky-haired boy's electric strike (in EX mode his claw rush)                                                                                                  |
+| I, or ↓→ J                     | VO5: the green-clad boy's punch; in the air he hurls a boulder (in EX mode she calls two headbanded boys who drop in and charge; in the air the blue-robed figure's chains) |
+| F, or ↓→ K                     | Coin: the suited man flicks a coin, seven in all, then every other press fails (in EX mode she calls a white-haired scythe fighter from a portal)                           |
+| G, or →↓← K                    | COUNTER: the girl's stance; struck in it, she hits back (in EX mode a book that also answers specials)                                                                      |
+| ↓← J / K / J+K                 | TELP P / K / PK: the spiky-haired boy's blur step (in EX mode his lunging strikes)                                                                                          |
+| 2, or ↓→↓← J                   | lizard fly: the spiky-haired boy's flying grab, which catches only an opponent in the air, 1 stock (in EX mode a blur-step rush)                                            |
+| 3, or ↓←↓← K                   | SCC: the spiky-haired boy's rush up close, 1 stock; in the air the blue-robed figure's (in EX mode the suited man's coin barrage, or in the air the green-clad boy's)       |
+| 5, or ↓→↓→ J                   | Super slash: the cap-wearing figure's scythe slash, 1 stock (in EX mode the spiky-haired boy's rising strikes)                                                              |
+| 4, or ↓→↓→ K                   | EN300: a headbanded boy's punch rush, 3 stocks (in EX mode the girl swells into a brawler)                                                                                  |
+| 1, or ↓→↓← K                   | コマンド 3: she draws a card that heals her or drops planks on the opponent, 3 stocks, only below 30% health                                                                |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO or ERUS), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -444,7 +469,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** seventeen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** eighteen fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -456,7 +481,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's and HISO's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's and ERUS's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

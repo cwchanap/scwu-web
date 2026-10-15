@@ -248,6 +248,17 @@
         iori: 'Bannaku',
         dst: 'Counter',
       },
+      erus: {
+        getterBeam: 'Hidden EN3',
+        musashi: 'Lizard Fly',
+        changeAttack: 'SCC',
+        blackRush: 'EN300',
+        megaBeam: 'Super Slash',
+        drill: 'Inatuma',
+        axe: 'VO5',
+        iori: 'Coin',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -470,6 +481,7 @@
             <option value="alex">ALEX</option>
             <option value="sou">SOU</option>
             <option value="hiso">HISO</option>
+            <option value="erus">ERUS</option>
           </select></label
         >
         <label
@@ -496,6 +508,7 @@
             <option value="alex">ALEX</option>
             <option value="sou">SOU</option>
             <option value="hiso">HISO</option>
+            <option value="erus">ERUS</option>
           </select></label
         >
         <label
@@ -1139,11 +1152,44 @@
           a dark giant.
         </p>
         <p>
+          Choose ERUS to play her, a blond figure in a black coat and white
+          bandeau who dresses up as a different character for most moves.
+          <kbd>J</kbd> chains a chain swing, a blue-robed figure's chain whip
+          and a suited man's knife thrust, <kbd>K</kbd> a kick, a spiky-haired
+          boy's sliding kick and the suited man's briefcase swing; down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a green-clad boy's slab strike or a
+          cap-wearing figure's sword slash. <kbd>H</kbd> is her Hit Up, a girl
+          in a red dress's rising punch, <kbd>O</kbd> her chuck, the blue-robed
+          figure's chains. Blocking with a stock, <kbd>H</kbd> spends it on
+          COUNTER HIT. <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> enters or leaves EX mode
+          for a stock, where most of her moves take other forms. Her specials:
+          <kbd>U</kbd>
+          or →↓↘ <kbd>J</kbd> INATUMA, the spiky-haired boy's electric strike,
+          <kbd>I</kbd>
+          or ↓→ <kbd>J</kbd> VO5, the green-clad boy's punch (in the air he
+          hurls a boulder; in EX mode she calls two headbanded boys who drop in
+          and charge), <kbd>F</kbd> or ↓→ <kbd>K</kbd> Coin, the suited man's
+          flicked coin, seven in all before every other press fails (in EX mode
+          she calls a white-haired scythe fighter from a portal), <kbd>G</kbd>
+          or →↓← <kbd>K</kbd>
+          COUNTER, the girl's stance: struck in it, she hits back (in EX mode a book
+          that also answers specials), and ↓← <kbd>J</kbd>,
+          <kbd>K</kbd> or both TELP, the spiky-haired boy's blur step. Her
+          supers, for a stock each: <kbd>2</kbd> or ↓→↓← <kbd>J</kbd> lizard
+          fly, the spiky-haired boy's flying grab, which catches only an
+          opponent in the air, <kbd>3</kbd> or ↓←↓← <kbd>K</kbd> SCC, his rush
+          up close, and <kbd>5</kbd> or ↓→↓→ <kbd>J</kbd> Super slash, the
+          cap-wearing figure's scythe slash; for three, <kbd>4</kbd> or ↓→↓→
+          <kbd>K</kbd> EN300, a headbanded boy's punch rush, and, below 30%
+          health, <kbd>1</kbd> or ↓→↓← <kbd>K</kbd> コマンド 3, a card that heals
+          her or drops planks on the opponent.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU or HISO, and one of eighteen stages, in either
-          mode. Free practice has no timer, and you also choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
+          DIDO, SAKUYA, ALEX, SOU, HISO or ERUS, and one of eighteen stages, in
+          either mode. Free practice has no timer, and you also choose how the
+          partner behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health
           keeps you just under 30% for desperation moves. Vs. CPU is the

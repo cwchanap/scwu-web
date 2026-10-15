@@ -257,6 +257,18 @@ const scriptEvents = new Map<string, Map<number, ScriptEvent[]>>();
 // Events that run when a scripted action or object reaches the given age. A
 // looping timeline repeats: each time it wraps, the records after its last
 // display run, then those from the loop's target on.
+// A timeline's tick at `age`: a looping one wraps past its end to its loop.
+export function scriptTick(
+  index: ObjectKey,
+  age: number,
+  who: Container = 'ryuko',
+) {
+  const found = script(index, who);
+  const duration = animationDuration(index, who);
+  if (found.end !== 'loop' || age < duration) return age;
+  const start = found.frames[found.loop].t;
+  return start + ((age - start) % (duration - start));
+}
 export function eventsAt(
   index: ObjectKey,
   age: number,
@@ -270,13 +282,12 @@ export function eventsAt(
       byTick.set(event.t, [...(byTick.get(event.t) ?? []), event]);
     scriptEvents.set(`${who}:${index}`, byTick);
   }
-  const duration = animationDuration(index, who);
-  if (found.end !== 'loop' || age < duration) return byTick.get(age) ?? [];
+  const t = scriptTick(index, age, who);
+  if (t === age) return byTick.get(age) ?? [];
   const start = found.frames[found.loop].t;
-  const t = start + ((age - start) % (duration - start));
   if (t !== start) return byTick.get(t) ?? [];
   return [
-    ...(byTick.get(duration) ?? []),
+    ...(byTick.get(animationDuration(index, who)) ?? []),
     ...found.events.filter((e, i) => i >= found.loopEvent! && e.t === start),
   ];
 }
@@ -339,8 +350,9 @@ export function heldFrame(
 // PC 403, from PC 396, KAY's Round 1 at PC 367, from PC 357, before his
 // flattened intro's calls of Demo stand (PCs 286–293), SAKUYA's Round 1 at
 // PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303),
-// ALEX's Round 1 at PC 356, from PC 333, and SOU's at PC 415, as he lands
-// (SOU_LANDING).
+// ALEX's Round 1 at PC 356, from PC 333, SOU's at PC 415, as he lands
+// (SOU_LANDING), and ERUS's Round 1 at PC 357, from PC 344, before her call
+// of stand demo (PCs 265–268).
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -361,6 +373,10 @@ export const SAKUYA_INTRO_EX_TICK = ticksBefore(
   413,
 );
 export const ALEX_INTRO_EX_TICK = ticksBefore(fighterClips.alex.intro, 356);
+export const ERUS_INTRO_EX_TICK = ticksBefore(
+  fighterClips.erus.intro.filter((frame) => frame.pc > 268),
+  357,
+);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
@@ -585,8 +601,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
     // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
     // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
-    // and HISO's 開始時 BR (32) from PC 332: no op 0x01, so each stands where
-    // they start. Amiro's Round BR (33)
+    // HISO's 開始時 BR (32) from PC 332 and ERUS's 開始時 BR (34) from PC
+    // 344: no op 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
@@ -667,7 +683,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
     // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593), SOU's 勝ち (62)
-    // image 310 (PC 650) and HISO's 勝ち (58) image 436 (PC 603).
+    // image 310 (PC 650), HISO's 勝ち (58) image 436 (PC 603) and ERUS's 勝ち
+    // (60) image 350 (PC 612).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -686,7 +703,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               who === 'sakuya' ||
               who === 'alex' ||
               who === 'sou' ||
-              who === 'hiso'
+              who === 'hiso' ||
+              who === 'erus'
               ? z.win
               : z.winRp
                 ? [
@@ -728,6 +746,7 @@ const TWIN_ANIMATIONS = {
   alex: twinAnimations('alex'),
   sou: twinAnimations('sou'),
   hiso: twinAnimations('hiso'),
+  erus: twinAnimations('erus'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

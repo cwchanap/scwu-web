@@ -13,12 +13,14 @@ import {
   SAKUYA_INTRO_EX_TICK,
   ALEX_INTRO_EX_TICK,
   SOU_INTRO_EX_TICK,
+  ERUS_INTRO_EX_TICK,
   SOU_LANDING,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
   eventsAt,
+  scriptTick,
   heldFrame,
   hurtboxes,
   pushboxes,
@@ -345,7 +347,7 @@ REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929); ANMC P's
 // Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
 // Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
-// 181) have no op 0x15, so add him none.
+// 181) and ERUS's stop guards (167, 169) have no op 0x15, so add them none.
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
@@ -353,6 +355,7 @@ const OWN_REACTION_POWER: Partial<
   anmc: { tatumakiOut: [5, 3] },
   kay: { fireLaunch: [5, 13] },
   alex: { airBlockRapid: [0, 0], airTimeStopGuard: [0, 0] },
+  erus: { blockStop: [0, 0], crouchBlockStop: [0, 0] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -599,6 +602,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   alex: { launchDown: -800 },
   sou: { launchDown: -800 },
   hiso: { launchDown: -800 },
+  erus: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -694,6 +698,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   sakuya: { value: 100, intro: SAKUYA_INTRO_EX_TICK },
   alex: { value: 100, intro: ALEX_INTRO_EX_TICK },
   sou: { value: 10, intro: SOU_INTRO_EX_TICK },
+  erus: { value: 10, intro: ERUS_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -729,17 +734,16 @@ function toNeutral(f: Fighter) {
   f.window = null;
 }
 // A script step that starts a display first re-arms an object holding an
-// attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d).
+// attack box of kind bit 1 (clears +0x15e bit 0x10, 0x41257d), its first
+// display and each pass of a loop too: ERUS's Cerb Att (243) strikes again
+// from its hit handler (PC 3573).
 function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
   const kinds = [actor.box, ...actor.boxes].reduce(
     (kinds, box) => kinds | (box?.kind ?? 0),
     0,
   );
-  if (
-    kinds & 2 &&
-    age > 0 &&
-    script(index, actor.who).frames.some((f) => f.t === age)
-  )
+  const t = scriptTick(index, age, actor.who);
+  if (kinds & 2 && script(index, actor.who).frames.some((f) => f.t === t))
     actor.connected = false;
 }
 // 0x40f010 skips a player victim by the box's kind (0x40f12d–0x40f18e): 0x10
@@ -2553,10 +2557,14 @@ export class Match {
     // Giant's reactions open by testing his counter's variable 4 (PCs 723,
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.
-    // Most others clear it (PCs 744, 788, ...).
-    const counter = own === undefined ? undefined : countersOf(f.who)[own];
-    if (counter && f.variables[4] === 100) return this.enterSource(f, counter);
-    if (counter === 0) f.variables[4] = 0;
+    // Most others clear it (PCs 744, 788, ...). ERUS's also clear her Book's
+    // variable 2 or test it at 10 (PCs 787, 1254, ...).
+    for (const [index, value, target] of own === undefined
+      ? []
+      : (countersOf(f.who)[own] ?? [])) {
+      if (!target) f.variables[index] = value;
+      else if (f.variables[index] === value) return this.enterSource(f, target);
+    }
     // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor, as
     // HISO stop's does (PC 1455).
     this.action(f, (f.y < 0 && AIR_FORMS[action]) || action, true);
