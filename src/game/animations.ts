@@ -391,6 +391,10 @@ export const SOU_INTRO_EX_TICK = SOU_LANDING;
 // at 500 (PC 391) until the fall reaches the floor 800 source pixels down,
 // into Round 1 + 15 (slot 1, PC 390).
 export const SEAN_LANDING = 164;
+// GON's, 103 ticks standing, then leaping at raw vy −1400, gravity 60 (PC
+// 452) until the fall passes the floor on his 77th move, into Round 1 + 25
+// (slot 1, PC 451).
+export const GON_LANDING = 180;
 // KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
 // display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
 // step after his 47th move passes the floor (0x41187f), 114 source pixels
@@ -619,12 +623,18 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // (PC 420). SEAN's 開始時 BR (35) rises unseen (PC 368), skips its
     // display at PC 371 for global 14 = 0 (PC 369), then falls through four
     // 40-tick loops of PCs 393–396 (PC 397) into Round 1 + 15 at
-    // SEAN_LANDING; the loop's spawns run once.
+    // SEAN_LANDING; the loop's spawns run once. GON's Round 1 (39) from PC
+    // 441 leaps (introMotion) and lands out of the wait at PC 462 at
+    // GON_LANDING into Round 1 + 25.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
-        : who === 'sou'
-          ? landed(z.intro, z.introLand, SOU_LANDING)
+        : who === 'sou' || who === 'gon'
+          ? landed(
+              z.intro,
+              z.introLand,
+              who === 'sou' ? SOU_LANDING : GON_LANDING,
+            )
           : who === 'sean'
             ? landed(
                 [
@@ -697,9 +707,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
     // 'win rp' (57) three times before its last display (PC 536) and G
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
-    // 560 (winLoop, PC 564), SIN's from PC 617 (PC 619) and SEAN's from PC
-    // 621 (PC 623), past the records before them: Giant's sound (PC 559),
-    // SIN's sound and WIN RP (PC 616), SEAN's sound (PC 620).
+    // 560 (winLoop, PC 564), SIN's from PC 617 (PC 619), SEAN's from PC 621
+    // (PC 623) and GON's from PC 699 (PC 707), past the records before them:
+    // Giant's sound (PC 559), SIN's sound and WIN RP (PC 616), SEAN's sound
+    // (PC 620), GON's sound and *eff WIN (PCs 697–698).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -774,6 +785,7 @@ const TWIN_ANIMATIONS = {
   erus: twinAnimations('erus'),
   feng: twinAnimations('feng'),
   sean: twinAnimations('sean'),
+  gon: twinAnimations('gon'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

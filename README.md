@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG or SEAN on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -501,7 +501,33 @@ And SEAN's, a bald old monk in green robes and prayer beads who calls up a diffe
 | 3, or ↓→↓→ J                   | S Shoot: the dark-clad swordsman's crescent wave, 1 stock (at 150 life or less, a stronger one)                 |
 | 1, or ↓→↓→ K                   | en300: a rider on a yellow beast calls down lightning, 3 stocks                                                 |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG or SEAN), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And GON's, a brown-haired boy with goggles on his head, an orange shirt and a blue vest who puts on a different creature's costume for most moves:
+
+| Input                          | GON's move                                                                                                                                                                                            |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                                                    |
+| P2 / P3                        | A yellow armoured beast's claw charge / a green robot's low grab that blasts the opponent away                                                                                                        |
+| K2 / K3                        | A yellow fox's spinning tail (at 141 life or less, a white-robed figure's sweep) / a blue dinosaur's dashing punch                                                                                    |
+| Down + J / K                   | A blue wolf's spinning uppercut / a blue-hooded dragon's low kick                                                                                                                                     |
+| In the air: J / K              | The blue dinosaur's diving claw / a green insect's kick                                                                                                                                               |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                                    |
+| ↑ while dashing forward        | High Jump                                                                                                                                                                                             |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                                 |
+| H                              | Hit Up: a dark winged demon's claws rise from the floor                                                                                                                                               |
+| O                              | Chuck: a blue metal dinosaur's jaws                                                                                                                                                                   |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                                                                           |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): his P2, P3, K1, crouching and air punches, Hit Up, specials and supers take other forms                                                                        |
+| U, or →↓↘ J                    | DRAGON: a lion-maned figure's rising sword; →↓↘ J again during it, or a quick miss, rises again with Evil Dragon                                                                                      |
+| I, or ↓→ J                     | fire ball: an orange armoured dragon's dark crescent; in the air a winged gunner's lightning ball (in EX mode a caped lancer's dash, with ↓→ J twice more for two more, or ↓← J for a counter stance) |
+| F, or ↓← J                     | DRILL: the yellow beast's spinning drill dive, also in the air; Super heart or KURENCOUNTER cancels it for two stocks (in EX mode a short counter stance)                                             |
+| G, or →↓← K                    | COUNTER: a 0.4-second stance with a little bear: struck in it, he takes double damage, then kicks the opponent and strikes in three costumes (in EX mode a moving grab)                               |
+| ↓→ K                           | dash move: the yellow beast's charging claw                                                                                                                                                           |
+| 2, or ↓←↓← J                   | KURENCOUNTER: the caped lancer's stance, which counters a hit for 140 and otherwise strikes (in EX mode a dashing barrage), 1 stock                                                                   |
+| 3, or ↓→↓→ J                   | Super heart: a yellow teddy bear's breaking heart, 1 stock (in EX mode three hearts that fly out before they strike)                                                                                  |
+| 1, or ↓→↓→ K                   | EN300: a golden armoured beast's exploding sun, 3 stocks (in EX mode the winged gunner's barrage)                                                                                                     |
+| 4, or H ↓ ↓ J O                | Hidden en300: only at 140 life or less (a Chuck above it), an orange-haired girl joins hands with him to call a white-caped knight, 3 stocks                                                          |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -517,7 +543,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** twenty fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** twenty-one fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -529,7 +555,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's and SEAN's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's and GON's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

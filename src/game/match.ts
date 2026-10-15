@@ -17,6 +17,7 @@ import {
   FENG_INTRO_EX_TICK,
   SOU_LANDING,
   SEAN_LANDING,
+  GON_LANDING,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
@@ -371,8 +372,9 @@ const reactionPower = (f: Fighter): [number, number] =>
 // 365. SOU's 開始時 BR (36) rises at −7000 with gravity −10000 for two ticks
 // (PC 401), then falls at 300 (PC 410) until he lands (SOU_LANDING).
 // SEAN's 開始時 BR (35) rises at −20000 for four ticks (PC 367), then falls
-// at 500 (PC 391) until he lands (SEAN_LANDING). The others' have no op
-// 0x01, so they start where these end.
+// at 500 (PC 391) until he lands (SEAN_LANDING). GON's Round 1 (39) leaps
+// at −1400 with gravity 60 (PC 452) after its first 103 ticks until he lands
+// (GON_LANDING). The others' have no op 0x01, so they start where these end.
 type Runs = [number, number, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -396,6 +398,10 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   sean: [
     [4, 0, -20000],
     [SEAN_LANDING - 4, 0, 500],
+  ],
+  gon: [
+    [103, 0],
+    [GON_LANDING - 103, 0, -1400, 60],
   ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP).
@@ -613,6 +619,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   erus: { launchDown: -800 },
   feng: { launchDown: -800 },
   sean: { launchDown: -800 },
+  gon: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -699,7 +706,10 @@ const timeline = (f: Fighter) => f.branch!;
 // Type to EX (240, PC 3264) and cleared by Typpe to Normal (241, PC 3277),
 // which the first enters while it is set (PC 3261); his intro's (PC 393)
 // enters OP TYPE CHANGE (52), which sets it (PC 582) and jumps back (35 +
-// 19, PC 583).
+// 19, PC 583). GON's at 100, set by Type to EX (247, PC 3701) and cleared
+// by Type to Normal (248, PC 3714), which the first enters while it is set
+// (PC 3698); his intro's (PC 466), as he lands (GON_LANDING), enters TYPE
+// CHANGE (49), which sets it (PC 542) and jumps back (39 + 28, PC 543).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -714,6 +724,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   sou: { value: 10, intro: SOU_INTRO_EX_TICK },
   erus: { value: 10, intro: ERUS_INTRO_EX_TICK },
   feng: { value: 100, intro: FENG_INTRO_EX_TICK },
+  gon: { value: 100, intro: GON_LANDING },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -2984,9 +2995,9 @@ export class Match {
           f.power = 0;
         }
       // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
-      // Spark, G Suneo's hh, Yo's HIDDEN and SIN's NOZAN enter their
-      // desperation forms only below it (op 0x11 at 153, 147, 150, 144 and
-      // 165 or more; the rest at it or below).
+      // Spark, G Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300
+      // enter their desperation forms only below it (op 0x11 at 153, 147,
+      // 150, 144, 165 and 141 or more; the rest at it or below).
       if (this.practice.lowHealth)
         this.fighters[0].hp = Math.min(
           this.fighters[0].hp,

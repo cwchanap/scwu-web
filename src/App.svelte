@@ -278,6 +278,16 @@
         iori: 'Whip K',
         dst: 'CC',
       },
+      gon: {
+        getterBeam: 'EN300',
+        musashi: 'Kuren',
+        changeAttack: 'Heart',
+        blackRush: 'Hidden',
+        drill: 'Dragon',
+        axe: 'Fire Ball',
+        iori: 'Drill',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -503,6 +513,7 @@
             <option value="erus">ERUS</option>
             <option value="feng">OS FENG</option>
             <option value="sean">SEAN</option>
+            <option value="gon">GON</option>
           </select></label
         >
         <label
@@ -532,6 +543,7 @@
             <option value="erus">ERUS</option>
             <option value="feng">OS FENG</option>
             <option value="sean">SEAN</option>
+            <option value="gon">GON</option>
           </select></label
         >
         <label
@@ -1266,9 +1278,43 @@
           beast who calls down lightning. A super cancels Dragon for two stocks.
         </p>
         <p>
+          Choose GON to play him, a brown-haired boy with goggles on his head
+          who puts on a different creature's costume for most moves.
+          <kbd>J</kbd> chains a jab, a yellow armoured beast's claw charge and a
+          green robot's low grab, <kbd>K</kbd> a kick, a yellow fox's spinning
+          tail and a blue dinosaur's dashing punch; down with <kbd>J</kbd> or
+          <kbd>K</kbd> is a blue wolf's spinning uppercut or a blue-hooded
+          dragon's low kick. In the air <kbd>J</kbd> is the blue dinosaur's
+          diving claw and <kbd>K</kbd> a green insect's kick. <kbd>H</kbd> is
+          his Hit Up, a dark winged demon's claws, <kbd>O</kbd> his chuck, a
+          blue metal dinosaur's jaws. Blocking with a stock, <kbd>H</kbd> spends
+          it on COUNTER HIT. ↑ during a forward dash is a High Jump.
+          <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> enters or leaves EX mode for half a
+          stock, where his P2, P3, K1, crouching and air punches, Hit Up,
+          specials and supers take other forms. His specials: <kbd>U</kbd> or
+          →↓↘ <kbd>J</kbd> DRAGON, a lion-maned figure's rising sword, which →↓↘
+          <kbd>J</kbd>
+          again takes on to Evil Dragon, <kbd>I</kbd> or ↓→ <kbd>J</kbd> fire
+          ball, an orange armoured dragon's dark crescent (in the air a winged
+          gunner's lightning ball), <kbd>F</kbd> or ↓← <kbd>J</kbd> DRILL, the
+          yellow beast's spinning dive, also in the air,
+          <kbd>G</kbd> or →↓← <kbd>K</kbd> COUNTER, a 0.4-second stance: struck
+          in it, he takes double damage, then strikes back in three costumes,
+          and ↓→ <kbd>K</kbd> dash move, the yellow beast's charge. Below 30%
+          health K2 takes its Evil form. His supers, for a stock each:
+          <kbd>2</kbd> or ↓←↓← <kbd>J</kbd> KURENCOUNTER, a caped lancer's
+          stance that counters a hit, and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd>
+          Super heart, a yellow teddy bear's breaking heart; for three,
+          <kbd>1</kbd> or ↓→↓→ <kbd>K</kbd> EN300, a golden armoured beast's
+          exploding sun, and, only below 30% health, <kbd>4</kbd> or
+          <kbd>H</kbd> ↓ ↓ <kbd>J</kbd> <kbd>O</kbd> Hidden en300, an orange-haired
+          girl who calls a white-caped knight with him. Super heart or KURENCOUNTER
+          cancels DRILL for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG or SEAN, and one of
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON, and one of
           eighteen stages, in either mode. Free practice has no timer, and you
           also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the

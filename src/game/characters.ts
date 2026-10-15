@@ -5,8 +5,9 @@
 // SIN's (10 SIN.PLAYER), LIZARD's (11 LIZARD.PLAYER), KAY's (12 KAY.PLAYER),
 // DIDO's (13 DIDO.PLAYER), SAKUYA's (14 SAKUYA.PLAYER), ALEX's
 // (15 ALEX.PLAYER), SOU's (16 SOU.PLAYER), HISO's (17 HISO.PLAYER),
-// ERUS's (18 ERUS.PLAYER), OS FENG's (19 OS FENG.PLAYER) and SEAN's
-// (20 SEAN.PLAYER); and each stage's objects, images and track.
+// ERUS's (18 ERUS.PLAYER), OS FENG's (19 OS FENG.PLAYER), SEAN's
+// (20 SEAN.PLAYER) and GON's (21 GON.PLAYER); and each stage's objects,
+// images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -27,6 +28,7 @@ import hiso from './generated/hiso.json';
 import erus from './generated/erus.json';
 import feng from './generated/feng.json';
 import sean from './generated/sean.json';
+import gon from './generated/gon.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -49,7 +51,8 @@ export type Who =
   | 'hiso'
   | 'erus'
   | 'feng'
-  | 'sean';
+  | 'sean'
+  | 'gon';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -71,6 +74,7 @@ export const CHARACTERS = {
   erus,
   feng,
   sean,
+  gon,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -81,7 +85,7 @@ export type Container = Who | Stage;
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
 // Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490,
 // SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450, OS FENG's 470,
-// SEAN's 500.
+// SEAN's 500, GON's 470.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -120,6 +124,7 @@ const twins = Object.fromEntries(
       'erus',
       'feng',
       'sean',
+      'gon',
     ] as const
   ).map((who) => {
     const own = new Map(

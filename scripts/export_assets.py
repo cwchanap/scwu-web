@@ -661,6 +661,14 @@ FENG_TWINS = {name: (r, r + next(d for top, d in ((73, 9), (89, 17), (103, 16), 
 # them).
 SEAN_TWINS = {name: (r, r + next(d for top, d in ((73, 1), (84, 5), (89, 6), (103, 5), (140, 7), (149, 6), (173, 7))
                                  if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
+# GON's sit ten after Ryuko's KOs and lose action, thirteen after her light
+# hits and her heavy standing one (his ★変なＴＥＣＨ, 89, comes after them),
+# fourteen from the heavy air hit to SHOCK INFINITY (Ryuko's ★ comes after
+# it), thirteen from Shock, fifteen from Pull Back (his UNCOUNTER DOWN and Air
+# Fire, 134 and 135, come before it) and fourteen past Ryuko's Chuck Hiso
+# (139), which he lacks.
+GON_TWINS = {name: (r, r + next(d for top, d in ((73, 10), (76, 13), (89, 14), (121, 13), (139, 15), (173, 14))
+                                if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -1720,6 +1728,79 @@ FIGHTERS = {
         # 2001: the HUD face action 75 shows (PC 756); 247: *name (67, PC 715).
         image_ids={2001, 247},
     ),
+    "gon": dict(
+        source=("21 GON", "9bf383984a5a242cad631ddabd87bd6afe76590105f3cfa8baa911bf60f20126"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 6, "land": 12,  # PC 80
+                 "crouchEnter": 21, "crouch": 22, "stand": 23, "turn": 26, "crouchTurn": 27},
+        twins=GON_TWINS,
+        # Beside the op 0x1f records on his counters' variable 4 each opens
+        # with (counter_records), which the match plays:
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2275), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # SAKUYA's: Ryuko's, without clearing variable 14.
+            "airBlockHeavy",
+            # SAKUYA's rand % 4 > 1 (PCs 964, 989, 1338, 1958, 1981) to
+            # Ryuko's rand % 6 > 2; the sweep's (PC 1054), where Ryuko's has
+            # none, as ERUS's.
+            "hitHeavy", "airHitHeavy", "uppercut", "dragonFireball", "liftUp", "sweep",
+            # Rand % 4 > 1 (PC 1012), where Ryuko's has none, to 91 + 19, past
+            # its voice; it clears variable 14 before 8 (PC 1001), not after.
+            "jumpHit",
+            # No op 0x20 where Ryuko's rolls rand % 6 > 2: Chung's HISA, Zoma's
+            # chuck toss, SIN's Chain pull back and OS FENG's Tatumakis.
+            "launchAway", "chuckToss", "chainPull", "tatumakiIn", "tatumakiOut",
+            # Chung's 1002-tick wait (PC 1320).
+            "flySideWall",
+            # Kiki's raw vx −800 (PC 1927).
+            "launchDown",
+            # Its op 0x1f's r[7:9] (PC 1095), which a test doesn't read
+            # (0x4138d1), as SAKUYA's.
+            "launchUp",
+            # Op 0x01 before op 0x02 (PC 1999), as ANMC P's.
+            "grabbed",
+            # 5, 15 and 10 ticks (PCs 2229–2231) to Ryuko's three tens.
+            "getUp",
+            # KAY's: Zoma's KO tests (PC 749) and KO DOWN (PC 797), but for
+            # their op 0x1f's r[6:9], which a test doesn't read (0x4138d1);
+            # Zoma's shock.
+            "ko", "down", "shock",
+            # Clears variable 6 before 14 (PC 740), not after.
+            "lose",
+            # Zoma's.
+            "rushAirHit", "airStun", "flySide", "twistSide",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # HISO's and ALEX's: copies of hit heavy, BEAM Stand and HISA.
+            "fb", "fbb", "fbh",
+        },
+        # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (134,
+        # 135), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        aliases={134: 79, 135: 77},
+        # Results: 勝ち (65) calls Stand DEMO (31) once (PC 694), shows image
+        # 619 and loops images 620–623 (PCs 699–707), spawning win word (51,
+        # PC 695) and *eff WIN (50, PC 698). The draw calls 31 once (PC 817)
+        # and holds image 653 (PCs 837–838). Each first enters DEMO air (33)
+        # while airborne (op 0x16, PCs 692, 816). The darkening panel, Black
+        # (48). The Vs. intro: 開始時 (36) jumps to 開始時 BR (38) for global
+        # 3 = 0 (PC 395), which skips its display for global 14 = 0 (PC 433),
+        # spawns Black (48) and OP super Charge (44, PCs 435–436) and jumps
+        # to Round 1 (39) + 2 (PC 438), which leaps (PC 452) and lands into
+        # 39 + 25 (slot 1, PC 451); both play flattened. ponytail: the win's
+        # roll, to RANDOM WIN (68, PC 693), isn't played; the intro's (PC
+        # 456) only picks its voice.
+        actions=dict(win=65, winStand=31, winLoop=(65, 8), draw=75, black=48, intro=(38, 3),
+                     introLand=(39, 25)),
+        flat={"intro", "introLand"},
+        # 2000–2002 and 2006: the HUD faces action 82 shows, cycling in EX
+        # mode (PCs 884–897), as OS FENG's; 654: *name (76, PC 842).
+        image_ids={2000, 2001, 2002, 2006, 654},
+    ),
 }
 
 
@@ -1732,16 +1813,20 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # 100, PCs 723, 763, ...), which counter start (278) holds at 100 for its
     # window (PCs 4271–4282), to enter counter hit (279); most others clear it
     # (PCs 744, 788, ...). ERUS's also clear her Book's variable 2 or test it
-    # at 10 (PCs 787, 1254, ...). Each reaction maps to these records in
+    # at 10 (PCs 787, 1254, ...). GON's test it at 300, 200 and 100 (PCs 914–
+    # 916, ...), one value for each of his counters; his BEAM Air adds 0 to it
+    # (PC 1146), which changes nothing. Each reaction maps to these records in
     # order: [variable, value, the test's target or 0 for a set].
     counters = {}
     for own in set(tables["responses"]) - {0}:
         for pc in counter_records(p, own):
             record = p.records[pc]
-            if record[5] == 4 and u16(record, 9) == (100 if record[4] == 0x44 else 10):
+            if record[5] == 4 and u16(record, 9) in ((100, 200, 300) if record[4] == 0x44 else (10,)):
                 counters.setdefault(own, []).append([record[4] & 0x3f, u16(record, 9), u16(record, 1)])
             elif record[5] == 1 and u16(record, 7) == 0:
                 counters.setdefault(own, []).append([record[4] & 0x3f, 0, 0])
+            elif record[5] == 2 and u16(record, 7) == 0:
+                continue
             else:
                 sys.exit(f"Unexpected counter record at {source[0]}'s PC {pc}; refusing to export.")
     for name, (r, z) in twins.items():
@@ -1912,7 +1997,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG and {counts['sean']} SEAN images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN and {counts['gon']} GON images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 
