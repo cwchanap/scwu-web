@@ -644,6 +644,13 @@ HISO_TWINS = {name: (r, r + next(d for top, d in ((73, 0), (83, 6), (89, 7), (11
 # 129, come before it) and eight past Ryuko's Chuck Hiso (139), which she lacks.
 ERUS_TWINS = {name: (r, r + next(d for top, d in ((73, 2), (83, 7), (89, 8), (110, 7), (113, 15), (121, 4), (139, 9),
                                                    (173, 8)) if r < top)) for name, (r, _) in ZOMA_TWINS.items()}
+# OS FENG's sit nine after Ryuko's KOs and lose action, seventeen after her
+# other reactions up to SHOCK INFINITY (his ★変なＴＥＣＨ, 89, comes before
+# them, Ryuko's after), sixteen from Shock, seventeen from Clothes off 500
+# (his second clothes obj, 119, comes before it) and sixteen past Ryuko's
+# Chuck Hiso (139), which he lacks.
+FENG_TWINS = {name: (r, r + next(d for top, d in ((73, 9), (89, 17), (103, 16), (140, 17), (173, 16)) if r < top))
+              for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -1580,6 +1587,64 @@ FIGHTERS = {
         # 757–773), as SOU's; 366: *name (68, PC 714).
         image_ids={2000, 2001, 2002, 366},
     ),
+    "feng": dict(
+        source=("19 OS FENG", "04612f2ce70fdfd030c85024cc5aa1946c5e78e5e40b6a41b4bbe57c08f6fc0f"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 66
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=FENG_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2139) for COUNTER HIT
+            # (190), and no op 0x1e window where Ryuko's opens one.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockRapid", "crouchBlockRapid",
+            "timeStopGuard", "crouchTimeStopGuard", "crouchBlockStop",
+            # Giant's, but no Hit Up check before its last display (PC 2277).
+            "blockStop",
+            # rand % 6 > 1 (PCs 965, 989, 1048), where Ryuko's rolls rand % 6
+            # > 2 or her sweep has no roll; each skips the voice.
+            "hitHeavy", "airHitHeavy", "sweep",
+            # No op 0x20 where Ryuko's rolls rand % 6 > 2: Chung's HISA,
+            # Kiki's uppercut family, SIN's Chain pull back, and Tatumakis no
+            # one else's lacks it in.
+            "launchAway", "uppercut", "dragonFireball", "liftUp", "chainPull", "tatumakiIn", "tatumakiOut",
+            # Chung's 1002-tick wait (PC 1301).
+            "flySideWall",
+            # Kiki's raw vx −800 (PC 1794).
+            "launchDown",
+            # Its op 0x1f's r[7:9] (PC 1085), which a test doesn't read
+            # (0x4138d1), as SAKUYA's.
+            "launchUp",
+            # Op 0x01 before op 0x02 (PC 1864), as ANMC P's.
+            "grabbed",
+            # KAY's: Zoma's KO tests and KO DOWN, but for their op 0x1f's
+            # r[6:9], which a test doesn't read (0x4138d1); Zoma's shock.
+            "ko", "down", "shock",
+            # Kiki's, but its test of global 0 for make hikari (72) reads > 9
+            # (PC 740) for Ryuko's == 10.
+            "lose",
+            # Zoma's.
+            "rushAirHit", "airStun", "chuckToss", "flySide", "twistSide",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma", "airInatuma",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+        },
+        # Results: 勝ち (67) calls Demo stand (28) once (PC 724) and holds
+        # image 431 (PC 734), spawning WIn obj (53, PC 728). The draw calls 28
+        # once (PC 821) and fades out to the blank 8191 (PCs 831–839). Each
+        # first enters DEMO air (30) while airborne (op 0x16, PCs 723, 820).
+        # The darkening panel, image 1009 (action 51). The Vs. intro: 開始時
+        # (32) jumps to 開始時 BR (34) for global 3 = 0 (PC 322), which rolls
+        # rand % 3 > 1 (PC 360), then skips its display for global 14 = 0 (PC
+        # 361), spawns Black (51) and OP super Charge (47, PCs 363–364) and
+        # jumps to Round 1 (35) + 3 (PC 366); both play flattened. ponytail:
+        # the roll's other third, through OP2 (43, PC 372), isn't played.
+        actions=dict(win=67, winStand=28, draw=75, black=51, intro=(34, 4)),
+        flat={"win", "intro"},
+        # 2000–2002 and 2006: the HUD faces action 85 shows, cycling in EX
+        # mode (PCs 884–901), as G Suneo's; 449: *name (76, PC 843).
+        image_ids={2000, 2001, 2002, 2006, 449},
+    ),
 }
 
 
@@ -1772,7 +1837,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO and {counts['erus']} ERUS images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS and {counts['feng']} OS FENG images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

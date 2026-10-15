@@ -351,8 +351,8 @@ export function heldFrame(
 // flattened intro's calls of Demo stand (PCs 286–293), SAKUYA's Round 1 at
 // PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303),
 // ALEX's Round 1 at PC 356, from PC 333, SOU's at PC 415, as he lands
-// (SOU_LANDING), and ERUS's Round 1 at PC 357, from PC 344, before her call
-// of stand demo (PCs 265–268).
+// (SOU_LANDING), ERUS's Round 1 at PC 357, from PC 344, before her call of
+// stand demo (PCs 265–268), and OS FENG's Round 1 at PC 393, from PC 363.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -377,6 +377,7 @@ export const ERUS_INTRO_EX_TICK = ticksBefore(
   fighterClips.erus.intro.filter((frame) => frame.pc > 268),
   357,
 );
+export const FENG_INTRO_EX_TICK = ticksBefore(fighterClips.feng.intro, 393);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
@@ -601,8 +602,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
     // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
     // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
-    // HISO's 開始時 BR (32) from PC 332 and ERUS's 開始時 BR (34) from PC
-    // 344: no op 0x01, so each stands where they start. Amiro's Round BR (33)
+    // HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344
+    // and OS FENG's 開始時 BR (34) from PC 363: no op 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
@@ -683,8 +684,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
     // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593), SOU's 勝ち (62)
-    // image 310 (PC 650), HISO's 勝ち (58) image 436 (PC 603) and ERUS's 勝ち
-    // (60) image 350 (PC 612).
+    // image 310 (PC 650), HISO's 勝ち (58) image 436 (PC 603), ERUS's 勝ち
+    // (60) image 350 (PC 612) and OS FENG's 勝ち (67) image 431 (PC 734).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -704,7 +705,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               who === 'alex' ||
               who === 'sou' ||
               who === 'hiso' ||
-              who === 'erus'
+              who === 'erus' ||
+              who === 'feng'
               ? z.win
               : z.winRp
                 ? [
@@ -717,6 +719,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                   ]
                 : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
             z.winLoop ? z.winStand.length + z.win.length : false,
+            // OS FENG's holds its last pose with a zero-length display (PC
+            // 734).
+            who === 'feng' ? waits(z.win) : undefined,
           ),
     draw: clip(
       [...z.winStand, ...z.draw],
@@ -747,6 +752,7 @@ const TWIN_ANIMATIONS = {
   sou: twinAnimations('sou'),
   hiso: twinAnimations('hiso'),
   erus: twinAnimations('erus'),
+  feng: twinAnimations('feng'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

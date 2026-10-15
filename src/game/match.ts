@@ -14,6 +14,7 @@ import {
   ALEX_INTRO_EX_TICK,
   SOU_INTRO_EX_TICK,
   ERUS_INTRO_EX_TICK,
+  FENG_INTRO_EX_TICK,
   SOU_LANDING,
   KAY_WIN_HOP,
   LIZARD_LANDING,
@@ -603,6 +604,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   sou: { launchDown: -800 },
   hiso: { launchDown: -800 },
   erus: { launchDown: -800 },
+  feng: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -685,7 +687,11 @@ const timeline = (f: Fighter) => f.branch!;
 // 413). SOU's at 10, set by TYPE CHANGE to EX (222, PC 3006) and cleared by
 // TYPE CHANGE to NOR (223, PC 3019), which the first enters while it is set
 // (PC 3003); his intro's (PC 415) enters Change Character (41), which sets
-// it (PC 464) and jumps back (37 + 12, PC 465).
+// it (PC 464) and jumps back (37 + 12, PC 465). OS FENG's at 100, set by
+// Type to EX (240, PC 3264) and cleared by Typpe to Normal (241, PC 3277),
+// which the first enters while it is set (PC 3261); his intro's (PC 393)
+// enters OP TYPE CHANGE (52), which sets it (PC 582) and jumps back (35 +
+// 19, PC 583).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -699,6 +705,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   alex: { value: 100, intro: ALEX_INTRO_EX_TICK },
   sou: { value: 10, intro: SOU_INTRO_EX_TICK },
   erus: { value: 10, intro: ERUS_INTRO_EX_TICK },
+  feng: { value: 100, intro: FENG_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {

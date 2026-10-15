@@ -4,8 +4,9 @@
 // (07 GIANT.PLAYER), G Suneo's (08 G SUNEO.PLAYER), Yo's (09 YO.PLAYER),
 // SIN's (10 SIN.PLAYER), LIZARD's (11 LIZARD.PLAYER), KAY's (12 KAY.PLAYER),
 // DIDO's (13 DIDO.PLAYER), SAKUYA's (14 SAKUYA.PLAYER), ALEX's
-// (15 ALEX.PLAYER), SOU's (16 SOU.PLAYER), HISO's (17 HISO.PLAYER) and
-// ERUS's (18 ERUS.PLAYER); and each stage's objects, images and track.
+// (15 ALEX.PLAYER), SOU's (16 SOU.PLAYER), HISO's (17 HISO.PLAYER),
+// ERUS's (18 ERUS.PLAYER) and OS FENG's (19 OS FENG.PLAYER); and each stage's
+// objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -24,6 +25,7 @@ import alex from './generated/alex.json';
 import sou from './generated/sou.json';
 import hiso from './generated/hiso.json';
 import erus from './generated/erus.json';
+import feng from './generated/feng.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -44,7 +46,8 @@ export type Who =
   | 'alex'
   | 'sou'
   | 'hiso'
-  | 'erus';
+  | 'erus'
+  | 'feng';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -64,6 +67,7 @@ export const CHARACTERS = {
   sou,
   hiso,
   erus,
+  feng,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -73,7 +77,7 @@ export type Container = Who | Stage;
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G
 // Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490,
-// SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450.
+// SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450, OS FENG's 470.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -110,6 +114,7 @@ const twins = Object.fromEntries(
       'sou',
       'hiso',
       'erus',
+      'feng',
     ] as const
   ).map((who) => {
     const own = new Map(

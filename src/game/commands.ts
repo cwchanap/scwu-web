@@ -23,6 +23,7 @@ import alex from './generated/alex.json';
 import sou from './generated/sou.json';
 import hiso from './generated/hiso.json';
 import erus from './generated/erus.json';
+import feng from './generated/feng.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -37,7 +38,7 @@ export interface CommandEntry {
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
-// 31, HISO's 25, ERUS's 29) and the distance in source pixels that splits their near
+// 31, HISO's 25, ERUS's 29, OS FENG's 26) and the distance in source pixels that splits their near
 // and far actions (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
@@ -59,6 +60,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     sou: sou.commands,
     hiso: hiso.commands,
     erus: erus.commands,
+    feng: feng.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -369,6 +371,21 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 16],
     ['dash', 20],
   ],
+  // OS FENG's supers EN300, ICE punch and sshoot on 1-3, his special SUCK (6)
+  // on 4, dragon (7), iori (8), bp (9) and Fire (11) on Ryuko's special keys,
+  // TYPE Change (12) on EX, then Dash F (16) and Dash B (17).
+  feng: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['blackRush', 6],
+    ['drill', 7],
+    ['iori', 8],
+    ['dst', 9],
+    ['axe', 11],
+    ['ex', 12],
+    ['dash', 16],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -389,6 +406,7 @@ export const BACK_DASH: Record<Who, number> = {
   sou: 21,
   hiso: 21,
   erus: 21,
+  feng: 17,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

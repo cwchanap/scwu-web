@@ -259,6 +259,16 @@
         iori: 'Coin',
         dst: 'Counter',
       },
+      feng: {
+        getterBeam: 'EN300',
+        musashi: 'ICE Punch',
+        changeAttack: 'S Shoot',
+        blackRush: 'Suck',
+        drill: 'Dragon',
+        axe: 'Fire',
+        iori: 'Iori',
+        dst: 'BP',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -482,6 +492,7 @@
             <option value="sou">SOU</option>
             <option value="hiso">HISO</option>
             <option value="erus">ERUS</option>
+            <option value="feng">OS FENG</option>
           </select></label
         >
         <label
@@ -509,6 +520,7 @@
             <option value="sou">SOU</option>
             <option value="hiso">HISO</option>
             <option value="erus">ERUS</option>
+            <option value="feng">OS FENG</option>
           </select></label
         >
         <label
@@ -1185,17 +1197,47 @@
           her or drops planks on the opponent.
         </p>
         <p>
+          Choose OS FENG to play him, a blue-haired boy in glasses and a red
+          vest who dresses up as a different character for most moves.
+          <kbd>J</kbd> chains a jab, a white-shirted fighter's crescent slash
+          and a white-coated man's pistol shot, <kbd>K</kbd> a kick, a
+          green-capped figure's high kick and a red-bandannaed fighter's kicks;
+          down with <kbd>J</kbd> or <kbd>K</kbd> is a headbanded figure's double
+          stab or a white-clad figure's slide with a black hound.
+          <kbd>H</kbd> is his Hit Up, a blond girl in a white kimono's rising
+          punch, <kbd>O</kbd> his chuck, a shirtless man in sunglasses who turns
+          the opponent into a strawberry shortcake. Blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. ↑ during a forward dash is a
+          High Jump. <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> enters or leaves EX mode
+          for half a stock, where dragon, ICE punch, sshoot and the chuck take
+          other forms. His specials: <kbd>U</kbd> or →↓↘ <kbd>K</kbd> dragon, a
+          black-pompadoured man's punch, <kbd>I</kbd> or ↓→ <kbd>J</kbd> Fire, a
+          winged girl's arrow (in the air an orange-headbanded boy throws a
+          yellow spirit), <kbd>F</kbd> or ↓← <kbd>J</kbd> iori, a black-clad
+          fighter's spear thrust, which ↓← <kbd>J</kbd> again takes on to a
+          hooked blade and a sword, <kbd>G</kbd> or ↓← <kbd>K</kbd> bp, the
+          sunglassed man's clawed lunge, and <kbd>4</kbd> or ←↓→ <kbd>K</kbd>
+          SUCK, a white-robed archer's line that reels the opponent in. Below 30%
+          health his crouching punch, iori's sword and bp take their Evil forms. His
+          supers, for a stock each: <kbd>2</kbd> or ↓←↓→
+          <kbd>K</kbd> ICE punch, a black-robed fighter's dashing punch that
+          looses an ice wolf, and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd> sshoot, a
+          blond-pigtailed girl's cannon; for three, <kbd>1</kbd> or ↓→↓→
+          <kbd>K</kbd> EN300, an orange-haired swordsman in red armour. A super cancels
+          iori for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO or ERUS, and one of eighteen stages, in
-          either mode. Free practice has no timer, and you also choose how the
-          partner behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, jumping in, or playing as the original CPU. Max
-          stock refills your supers whenever you stand idle, and Low health
-          keeps you just under 30% for desperation moves. Vs. CPU is the
-          original game's CPU, playing the opponent's own moves, specials and
-          supers. Reduce their health to zero, or lead on health when time runs
-          out. Changing modes, fighters or the stage starts a fresh match.
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS or OS FENG, and one of eighteen
+          stages, in either mode. Free practice has no timer, and you also
+          choose how the partner behaves: standing, guarding high or low,
+          guarding in the air, attacking in range, jumping in, or playing as the
+          original CPU. Max stock refills your supers whenever you stand idle,
+          and Low health keeps you just under 30% for desperation moves. Vs. CPU
+          is the original game's CPU, playing the opponent's own moves, specials
+          and supers. Reduce their health to zero, or lead on health when time
+          runs out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
