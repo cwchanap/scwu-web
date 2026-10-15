@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE or REMU on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -550,7 +550,31 @@ And KATE's, a blue-haired girl in a pink top and a blue skirt who, like GON, put
 | 3, or ↓→↓→ J                   | BEAM: a red-clad fighter's long beam, 1 stock                                                                                                                                                              |
 | 1, or ↓→↓→ K                   | en300: a goggled sorcerer's yellow spirits, 3 stocks                                                                                                                                                       |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And REMU's, a long-haired blond fighter in a teal jacket who, like GON and KATE, puts on a different costume for most moves:
+
+| Input                          | REMU's move                                                                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                   |
+| P2 / P3                        | A blue-helmeted hero's lunging punch in red and white armour / his leaping grab, which beats the opponent                                            |
+| K2 / K3                        | The hero's two kicks / his flying kick                                                                                                               |
+| Down + J / K                   | A blue-armoured swordsman's low cut / the hero's sliding kick                                                                                        |
+| In the air: J / K              | The swordsman's cut / the hero's kick                                                                                                                |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                   |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                |
+| H                              | Hit Up: the hero's uppercut; on a hit, ↑ chases into the air                                                                                         |
+| O                              | Chuck: a white and red horned robot's punches                                                                                                        |
+| Blocking with a stock: H       | Counter Hit                                                                                                                                          |
+| U, or →↓↘ J                    | tatsumaki: the swordsman's swing that calls a grey whirlwind; Thander p, Phsy driver or MINAMI cancels it for two stocks                             |
+| I, or ↓→ J                     | slash: the swordsman's dashing cut; in the air a diving one, which slash again on landing after a hit follows with a quicker cut                     |
+| F, or ↓← J                     | JET: the hero calls a jet-backed robot, which charges with a blade                                                                                   |
+| G, or ↓← K                     | Drill: the hero calls a drill that bursts from the ground                                                                                            |
+| 3, or ↓←↓← J                   | BAKURETU: the swordsman's thrust that fires a yellow beam                                                                                            |
+| 5, or ↓→↓→ J                   | Thander p: the robot's lightning-charged dashing punch, 1 stock                                                                                      |
+| 4, or ↓→↓→ K                   | Phsy driver: the robot's leaping kick into a piledriver, 1 stock                                                                                     |
+| 2, or ↓←↓← K                   | MINAMI: only at 155 life or less (Drill above it), a 1-second stance as the hero: struck in it, he takes 30% of the damage and strikes back, 1 stock |
+| 1, or ↓←↓→ K                   | GOLD HAND: the robot climbs and dives with a golden hand, landing well ahead of him, into a long beating, 3 stocks                                   |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE or REMU), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -566,7 +590,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** twenty-two fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** twenty-three fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -578,7 +602,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's and KATE's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's and REMU's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

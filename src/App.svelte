@@ -297,6 +297,17 @@
         iori: 'Dash Att',
         dst: 'Counter',
       },
+      remu: {
+        getterBeam: 'Gold Hand',
+        musashi: 'Minami',
+        changeAttack: 'Bakuretu',
+        blackRush: 'Phsy',
+        megaBeam: 'Thander',
+        drill: 'Tatsumaki',
+        axe: 'Slash',
+        iori: 'Jet',
+        dst: 'Drill',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -524,6 +535,7 @@
             <option value="sean">SEAN</option>
             <option value="gon">GON</option>
             <option value="kate">KATE</option>
+            <option value="remu">REMU</option>
           </select></label
         >
         <label
@@ -555,6 +567,7 @@
             <option value="sean">SEAN</option>
             <option value="gon">GON</option>
             <option value="kate">KATE</option>
+            <option value="remu">REMU</option>
           </select></label
         >
         <label
@@ -1355,12 +1368,43 @@
           yellow spirits. BEAM or SLASH SUPER cancels af add for two stocks.
         </p>
         <p>
+          Choose REMU to play him, a long-haired blond fighter in a teal jacket
+          who, like GON and KATE, puts on a different costume for most moves.
+          <kbd>J</kbd> chains a jab, a blue-helmeted hero's lunging punch in red
+          and white armour and his leaping grab, which beats the opponent,
+          <kbd>K</kbd> a kick, the hero's two kicks and his flying kick; down
+          with <kbd>J</kbd> or <kbd>K</kbd> is a blue-armoured swordsman's low
+          cut or the hero's sliding kick. In the air <kbd>J</kbd> is the
+          swordsman's cut and <kbd>K</kbd> the hero's kick. <kbd>H</kbd> is his
+          Hit Up, the hero's uppercut, which ↑ chases into the air after a hit,
+          <kbd>O</kbd> his chuck, a white and red horned robot's punches.
+          Blocking with a stock, <kbd>H</kbd> spends it on Counter Hit. His
+          specials: <kbd>U</kbd> or →↓↘ <kbd>J</kbd> tatsumaki, the swordsman's
+          swing that calls a grey whirlwind, <kbd>I</kbd> or ↓→ <kbd>J</kbd>
+          slash, the swordsman's dashing cut (in the air a diving one, which slash
+          again on landing after a hit follows with a quicker cut),
+          <kbd>F</kbd> or ↓← <kbd>J</kbd> JET, the hero's call for a jet-backed
+          robot's charging blade, <kbd>G</kbd> or ↓← <kbd>K</kbd> Drill, his
+          call for a drill that bursts from the ground, and <kbd>3</kbd> or ↓←↓←
+          <kbd>J</kbd>
+          BAKURETU, the swordsman's thrust that fires a yellow beam. His supers, for
+          a stock each: <kbd>5</kbd> or ↓→↓→
+          <kbd>J</kbd> Thander p, the robot's lightning-charged dashing punch,
+          <kbd>4</kbd> or ↓→↓→ <kbd>K</kbd> Phsy driver, the robot's leaping
+          kick into a piledriver, and, only at 155 health or less (else it is
+          Drill), <kbd>2</kbd> or ↓←↓← <kbd>K</kbd> MINAMI, a 1-second stance as
+          the hero: struck in it, he takes 30% of the damage and strikes back;
+          for three, <kbd>1</kbd> or ↓←↓→ <kbd>K</kbd> GOLD HAND, the robot's climb
+          and dive with a golden hand, which lands well ahead of him, into a long
+          beating. Thander p, Phsy driver or MINAMI cancels tatsumaki for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE, and
-          one of eighteen stages, in either mode. Free practice has no timer,
-          and you also choose how the partner behaves: standing, guarding high
-          or low, guarding in the air, attacking in range, jumping in, or
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE or REMU,
+          and one of eighteen stages, in either mode. Free practice has no
+          timer, and you also choose how the partner behaves: standing, guarding
+          high or low, guarding in the air, attacking in range, jumping in, or
           playing as the original CPU. Max stock refills your supers whenever
           you stand idle, and Low health keeps you just under 30% for
           desperation moves. Vs. CPU is the original game's CPU, playing the

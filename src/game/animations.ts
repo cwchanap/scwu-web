@@ -395,6 +395,12 @@ export const SEAN_LANDING = 164;
 // 452) until the fall passes the floor on his 77th move, into Round 1 + 25
 // (slot 1, PC 451).
 export const GON_LANDING = 180;
+// REMU's, 2 ticks rising at raw vy −6000, gravity −10000 (PC 388), 70
+// sinking at 400 (PC 403), 93 still (PC 405), 10 rising under gravity −3000
+// (PC 425) and 10 still (PC 428), then falling under gravity 90 (PC 431)
+// until the fall passes the floor on his 61st move, into Round 1 + 44
+// (slot 1, PC 430).
+export const REMU_LANDING = 246;
 // KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
 // display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
 // step after his 47th move passes the floor (0x41187f), 114 source pixels
@@ -403,6 +409,15 @@ export const KAY_WIN_HOP = {
   at: fighterClips.kay.win.reduce((ticks, frame) => ticks + frame.duration, 0),
   ticks: 47,
 };
+// REMU's 勝ち (60) flies up at raw vy −1450 (PC 651) after two calls of
+// stand demo (30) and its first display, and never stops.
+export const REMU_WIN_FLIGHT =
+  2 *
+    fighterClips.remu.winStand.reduce(
+      (ticks, frame) => ticks + frame.duration,
+      0,
+    ) +
+  fighterClips.remu.win[0].duration;
 // A flight's displays until `age`, then its landing action's.
 function landed(flight: Pose[], landing: Pose[], age: number) {
   const ticks = flight.map((f) => f.duration);
@@ -627,15 +642,19 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 40-tick loops of PCs 393–396 (PC 397) into Round 1 + 15 at
     // SEAN_LANDING; the loop's spawns run once. GON's Round 1 (39) from PC
     // 441 leaps (introMotion) and lands out of the wait at PC 462 at
-    // GON_LANDING into Round 1 + 25.
+    // GON_LANDING into Round 1 + 25. REMU's 開始時 BR (35) from PC 388, past
+    // its global 14 = 0 test (PC 379), rises, sinks through ten calls of OP
+    // movie rp (40) and five more (PCs 404–406), soars and falls
+    // (introMotion), landing out of the wait at PC 433 at REMU_LANDING into
+    // Round 1 + 44.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
-        : who === 'sou' || who === 'gon'
+        : who === 'sou' || who === 'gon' || who === 'remu'
           ? landed(
               z.intro,
               z.introLand,
-              who === 'sou' ? SOU_LANDING : GON_LANDING,
+              { sou: SOU_LANDING, gon: GON_LANDING, remu: REMU_LANDING }[who],
             )
           : who === 'sean'
             ? landed(
@@ -714,7 +733,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // past the records before them: Giant's sound (PC 559), SIN's sound and
     // WIN RP (PC 616), SEAN's sound (PC 620), GON's sound and *eff WIN (PCs
     // 697–698), KATE's sound (PC 616). KATE's 勝ち (58) calls sTAND demo
-    // twice (PC 602).
+    // twice (PC 602), as REMU's (60) does stand demo (30, PC 647); his
+    // loops image 138 from PC 652 (PC 653), past his sound (PC 650) and
+    // flight (REMU_WIN_FLIGHT).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -754,12 +775,13 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                   ]
                 : [
                     ...z.winStand,
-                    ...(who === 'kate' ? z.winStand : []),
+                    ...(who === 'kate' || who === 'remu' ? z.winStand : []),
                     ...z.win,
                     ...(z.winLoop ?? []),
                   ],
             z.winLoop
-              ? z.winStand.length * (who === 'kate' ? 2 : 1) + z.win.length
+              ? z.winStand.length * (who === 'kate' || who === 'remu' ? 2 : 1) +
+                  z.win.length
               : false,
             // OS FENG's holds its last pose with a zero-length display (PC
             // 734).
@@ -798,6 +820,7 @@ const TWIN_ANIMATIONS = {
   sean: twinAnimations('sean'),
   gon: twinAnimations('gon'),
   kate: twinAnimations('kate'),
+  remu: twinAnimations('remu'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
