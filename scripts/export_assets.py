@@ -85,11 +85,12 @@ def decode_event(record):
         last = max((k for k, step in enumerate(steps) if step & 0x2000), default=-1)
         return dict(op="command", action=u16(record, 1), offset=record[3], window=record[4], steps=steps[:last + 1])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
-    # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 4 (Kiki's
-    # K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe) and 12 (EX Fire 2) and
-    # global 6 (the freeze); other tests keep their fall-through path.
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x44, 0x46, 0x47, 0x4c,
-                                                                              0x86):
+    # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
+    # hit effect, ALEX's reflect), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's
+    # en300 probe) and 12 (EX Fire 2) and global 6 (the freeze); other tests keep their
+    # fall-through path.
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x44, 0x46, 0x47,
+                                                                              0x4c, 0x86):
         return dict(op="test", selector=record[4], compare=record[5] >> 2 & 3, value=s16(record, 9),
                     action=u16(record, 1), offset=record[3])
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
@@ -610,6 +611,15 @@ DIDO_TWINS = {name: (r, r + next(d for top, d in ((73, 3), (83, 6), (89, 7), (17
 SAKUYA_TWINS = {name: (r, r + next(d for top, d in ((73, 13), (89, 19), (110, 18), (111, 19), (112, 17), (121, 18),
                                                      (139, 20), (148, 19), (173, 20)) if r < top))
                 for name, (r, _) in ZOMA_TWINS.items()}
+# ALEX's sit two after Ryuko's KOs and lose action, six after her other
+# reactions, seven from BEAM Stand to SHOCK INFINITY (his ★変なＴＥＣＨ, 89,
+# comes before them), six from Shock, seven from Clothes off 500 (his clothes
+# obj2, 109, comes before it), ten from Chain pull back (his own FB, FBB and
+# FBH, 112–114, come before it, two after Ryuko's), seven from HISO stop and
+# nine from Pull Back (his UNCOUNTER reactions, 128 and 129, come before it).
+ALEX_TWINS = {name: (r, r + next(d for top, d in ((73, 2), (83, 6), (89, 7), (103, 6), (105, 7), (110, 10), (113, 2),
+                                                   (121, 7), (173, 9)) if r < top))
+              for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -1273,6 +1283,72 @@ FIGHTERS = {
         # mode (PCs 847–861), as G Suneo's; 445: *name (79, PC 805).
         image_ids={2000, 2001, 2002, 2006, 445},
     ),
+    "alex": dict(
+        source=("15 ALEX", "25e528f608bc1d1bfcc735ff4536c21e1fca67473c27d5ef9e3c4642792341ec"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 59
+                 "crouchEnter": 17, "crouch": 18, "stand": 19, "turn": 22, "crouchTurn": 23},
+        twins=ALEX_TWINS,
+        # Beside the op 0x1f on his counter's variable 4 each opens with
+        # (counter_record), which the match plays:
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2223), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Ryuko's, without her op 0x15 adding 2 power (176 and 181 have
+            # none), which the match keeps per fighter.
+            "airBlockRapid", "airTimeStopGuard",
+            # Chung's rand % 3 > 1 (PC 819) to Ryuko's rand % 6 > 2, or no op
+            # 0x20; the heavy air hit also clears variable 5 (PC 851).
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySideWall", "chainPull",
+            # Clears variable 14 and 8 before 6, not after, with Chung's
+            # variable 5 tests (> 7, then > 4), which the match doesn't read.
+            "jumpHit",
+            # Kiki's raw vx −800 (PC 1848).
+            "launchDown",
+            # Op 0x01 before op 0x02, as ANMC P's.
+            "grabbed",
+            # KAY's: Zoma's KO tests (PC 619) and KO DOWN (PC 667), but for
+            # their op 0x1f's r[6:9], which a test doesn't read (0x4138d1);
+            # Zoma's shock, which doesn't set variable 6.
+            "ko", "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "chuckToss", "uppercut", "dragonFireball", "liftUp", "flySide", "twistSide",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead (PCs 1541, 1568–1571).
+            "inatuma",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # His own copies of hit heavy, BEAM Stand and HISA (81, 90, 86),
+            # clearing variable 4, where Ryuko's jump to hers. FB gives the
+            # striker 10 power (PC 1384) and FBH 13 (PC 1447), as Ryuko's 10
+            # and HISA's 3 do; FBB rolls rand % 3 > 1 (PC 1424), as BEAM Stand
+            # does. ponytail: FB has no roll and cues sound 33 (PC 1400), FBH
+            # 33 to HISA's 30 (PC 1452), and their smoke spawns name the empty
+            # ----smoke---- (399, PCs 1404, 1423, 1432), where the port plays
+            # hit heavy's, BEAM Stand's and HISA's, with SMOKE >> (400).
+            "fb", "fbb", "fbh",
+        },
+        # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (128,
+        # 129), copies of DOWN and J Att that clear variable 4 where those
+        # test it, as Giant's (126, 127). ponytail: as his, Air Fire plays as
+        # J Att.
+        aliases={128: 79, 129: 77},
+        # Results: 勝ち (59) calls DEMO stand (27) once (PC 576), rolls rand %
+        # 3 > 1 for its sound (PC 589) and holds image 330 (PC 593). The draw
+        # calls 27 once (PC 687) and holds image 332 (PC 689). The darkening
+        # panel, image 1009 (action 45). The Vs. intro: 開始時 (30) jumps to
+        # 開始時 BR (32) for global 3 = 0 (PC 287), which skips its display
+        # for global 14 = 0 (PC 325), spawns chicken (37), Black (45) and OP
+        # super Charge (41, PCs 334–336) and jumps to Round 1 (33) + 4 (PC
+        # 338); both play flattened. ponytail: the win's roll picks a sound,
+        # which isn't played.
+        actions=dict(win=59, winStand=27, draw=67, black=45, intro=(32, 9)),
+        flat={"win", "intro"},
+        # 2000–2002 and 2006: the HUD faces action 75 shows, cycling in EX
+        # mode (PCs 737–750), as G Suneo's; 362: *name (68, PC 694).
+        image_ids={2000, 2001, 2002, 2006, 362},
+    ),
 }
 
 
@@ -1462,7 +1538,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO and {counts['sakuya']} SAKUYA images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA and {counts['alex']} ALEX images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

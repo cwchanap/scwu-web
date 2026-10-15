@@ -19,6 +19,7 @@ import lizard from './generated/lizard.json';
 import kay from './generated/kay.json';
 import dido from './generated/dido.json';
 import sakuya from './generated/sakuya.json';
+import alex from './generated/alex.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -32,7 +33,7 @@ export interface CommandEntry {
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
-// SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26)
+// SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28)
 // and the distance in source pixels that splits their near and far actions
 // (+0x7ca3).
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
@@ -51,6 +52,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     kay: kay.commands,
     dido: dido.commands,
     sakuya: sakuya.commands,
+    alex: alex.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -295,6 +297,22 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 13],
     ['dash', 17],
   ],
+  // ALEX's supers en300, GYSA, super fire and haou on 1-4, his specials
+  // dragon (15), fire (17, in the air only), reflect (16) and counter (12) on
+  // Ryuko's special keys, --TYPE CHANGE-- (18, TO EX) on EX, then Dash F (22)
+  // and Dash B (23).
+  alex: [
+    ['getterBeam', 1],
+    ['musashi', 3],
+    ['changeAttack', 5],
+    ['blackRush', 7],
+    ['drill', 15],
+    ['axe', 17],
+    ['iori', 16],
+    ['dst', 12],
+    ['ex', 18],
+    ['dash', 22],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -311,6 +329,7 @@ export const BACK_DASH: Record<Who, number> = {
   kay: 16,
   dido: 15,
   sakuya: 18,
+  alex: 23,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

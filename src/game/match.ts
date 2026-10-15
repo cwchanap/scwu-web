@@ -11,6 +11,7 @@ import {
   SIN_INTRO_EX_TICK,
   KAY_INTRO_EX_TICK,
   SAKUYA_INTRO_EX_TICK,
+  ALEX_INTRO_EX_TICK,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
@@ -328,13 +329,15 @@ REACTION_POWER.chuckUp = [5, 0];
 REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Zoma's crouching guard (151) adds 2 more to him (PC 1929); ANMC P's
 // Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
-// Fire HISA (107) the attacker 13 (PC 1324).
+// Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
+// 181) have no op 0x15, so add him none.
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
   zoma: { crouchBlock: [3, 0] },
   anmc: { tatumakiOut: [5, 3] },
   kay: { fireLaunch: [5, 13] },
+  alex: { airBlockRapid: [0, 0], airTimeStopGuard: [0, 0] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -551,10 +554,10 @@ function struck(
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
 // Ryuko's and Zoma's at −800 (Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G
-// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's and SAKUYA's 124, 127, 128,
-// 125, 130, 135, 126, 128, 126, 128, 129 and 143, PCs 1522, 1582, 1883,
-// 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818 and 1938), and Amiro's
-// Tatumaki >> (105) at −300 (PC 1398).
+// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's and ALEX's 124,
+// 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143 and 132, PCs 1522,
+// 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818, 1938 and
+// 1848), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -568,6 +571,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kay: { launchDown: -800 },
   dido: { launchDown: -800 },
   sakuya: { launchDown: -800 },
+  alex: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -644,7 +648,10 @@ const timeline = (f: Fighter) => f.branch!;
 // intro's (PC 413) enters ex change (49), which sets it (PC 521) and jumps
 // to the same call of STAND DEMO (37 + 24, PC 522). ponytail: there STAND
 // DEMO jumps to Skill1 (32, PC 296), the same 80 ticks in her EX stance,
-// which the flattened intro doesn't follow.
+// which the flattened intro doesn't follow. ALEX's at 100, set by TO EX (225,
+// PC 3315) and cleared by TO NORMAL (226, PC 3328); his intro's (PC 356)
+// enters EX change (39), which sets it (PC 412) and jumps back (33 + 18, PC
+// 413).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -655,6 +662,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   sin: { value: 10, intro: SIN_INTRO_EX_TICK },
   kay: { value: 100, intro: KAY_INTRO_EX_TICK },
   sakuya: { value: 100, intro: SAKUYA_INTRO_EX_TICK },
+  alex: { value: 100, intro: ALEX_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -2351,10 +2359,12 @@ export class Match {
       const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
       for (const body of animationFrame(e.clip, e.age, e.who).body ?? [])
         if (body.kind & 6) bodies.push([at, body]);
+      // Every slot: ALEX's REF OBJ (265) strikes 2000 pixels down from slot
+      // 0 (PC 3842).
       if (!e.connected)
         strikers.push([
           at,
-          e.boxes,
+          [e.box, ...e.boxes],
           () => {
             e.connected = true;
             this.handle(e, false);

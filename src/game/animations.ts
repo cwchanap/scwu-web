@@ -337,8 +337,9 @@ export function heldFrame(
 // ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
 // from PC 313, G Suneo's Round 1 at PC 403, from PC 393, SIN's Round 1 at
 // PC 403, from PC 396, KAY's Round 1 at PC 367, from PC 357, before his
-// flattened intro's calls of Demo stand (PCs 286–293), and SAKUYA's Round 1
-// at PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303).
+// flattened intro's calls of Demo stand (PCs 286–293), SAKUYA's Round 1 at
+// PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303), and
+// ALEX's Round 1 at PC 356, from PC 333.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -358,6 +359,7 @@ export const SAKUYA_INTRO_EX_TICK = ticksBefore(
   fighterClips.sakuya.intro.filter((frame) => frame.pc > 303),
   413,
 );
+export const ALEX_INTRO_EX_TICK = ticksBefore(fighterClips.alex.intro, 356);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
@@ -647,8 +649,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
-    // as DIDO's 勝ち (61) does image 330 (PC 688) and SAKUYA's 勝ち (69)
-    // image 436 (PC 692).
+    // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
+    // 436 (PC 692) and ALEX's 勝ち (59) image 330 (PC 593).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -662,7 +664,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             ),
           )
         : clip(
-            who === 'lizard' || who === 'dido' || who === 'sakuya'
+            who === 'lizard' ||
+              who === 'dido' ||
+              who === 'sakuya' ||
+              who === 'alex'
               ? z.win
               : z.winRp
                 ? [
@@ -701,6 +706,7 @@ const TWIN_ANIMATIONS = {
   kay: twinAnimations('kay'),
   dido: twinAnimations('dido'),
   sakuya: twinAnimations('sakuya'),
+  alex: twinAnimations('alex'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

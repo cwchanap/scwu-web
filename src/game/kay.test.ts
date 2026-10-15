@@ -203,6 +203,23 @@ describe('KAY (12 KAY.PLAYER)', () => {
     expect([fire('ryuko'), fire('kay')]).toEqual([5 + 3, 5 + 13]);
   });
 
+  it("shows H SLASH (387) for P3's hits, which set his variable 2 to 5 (PC 2615)", () => {
+    // HP hit (385), spawned from his container, tests his variable 2 (PC
+    // 6520): the runner reads an object's player variables from its
+    // player's struct (0x411c12).
+    const { match, kay, steps } = kayPlayer();
+    steps({}, 2);
+    const effects = new Set<unknown>();
+    const mine: unknown[] = [];
+    for (let t = 0; t < 300; t++) {
+      steps(t % 6 === 0 && t < 200 ? { punch: true } : {});
+      if (mine.at(-1) !== now(kay)) mine.push(now(kay));
+      for (const e of match.effects) if (e.owner === 0) effects.add(e.clip);
+    }
+    expect(mine.slice(0, 4)).toEqual([183, 184, 185, 189]);
+    expect([...effects]).toEqual(expect.arrayContaining([385, 387]));
+  });
+
   it('frees him 6 ticks into an air guard, where Ryuko’s holds 23 (PC 2195)', () => {
     expect(
       (['ryuko', 'kay'] as const).map((who) =>

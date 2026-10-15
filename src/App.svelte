@@ -216,6 +216,16 @@
         iori: 'Iori',
         dst: 'Counter',
       },
+      alex: {
+        getterBeam: 'EN300',
+        musashi: 'Gysa',
+        changeAttack: 'Super Fire',
+        blackRush: 'Haou',
+        drill: 'Dragon',
+        axe: 'Air Fire',
+        iori: 'Reflect',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -435,6 +445,7 @@
             <option value="kay">KAY</option>
             <option value="dido">DIDO</option>
             <option value="sakuya">SAKUYA</option>
+            <option value="alex">ALEX</option>
           </select></label
         >
         <label
@@ -458,6 +469,7 @@
             <option value="kay">KAY</option>
             <option value="dido">DIDO</option>
             <option value="sakuya">SAKUYA</option>
+            <option value="alex">ALEX</option>
           </select></label
         >
         <label
@@ -1017,17 +1029,41 @@
           girl's blade combo.
         </p>
         <p>
+          Choose ALEX to play him, a boy in a cap who dresses up as a different
+          armored hero or mecha for most moves. <kbd>J</kbd> chains a jab, a
+          red-armored figure's sword sweep and a grey-armored figure's lance
+          gun,
+          <kbd>K</kbd> a kick, a yellow-armored figure's twin daggers and a
+          blue-armored figure's bow; down with <kbd>J</kbd> or <kbd>K</kbd> is a
+          red lance's jab or sweep. <kbd>H</kbd> is his Hit Up, an uppercut,
+          <kbd>O</kbd> his chuck, a drill lance's grab. Blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd> enters or leaves EX mode for half a stock, where most of
+          his moves take other forms. His specials: <kbd>U</kbd> or →↓↘
+          <kbd>J</kbd> dragon, a rising drill lance, <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> in the air, a pink-armored archer's arrow, <kbd>F</kbd>
+          or ↓→ <kbd>K</kbd> REFLACT, an arm shield that turns an incoming
+          projectile back, <kbd>G</kbd> or →↓← <kbd>K</kbd> counter, a stance
+          that slashes back at whoever strikes him, and <kbd>4</kbd> or →←↓→
+          <kbd>J</kbd>
+          HAOU, a combined blaster's shot. His supers, for a stock each:
+          <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> GYSA, a red-horned mecha's three
+          sword strikes, and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd> super fire, a red
+          dinosaur tank's cannon; for three, <kbd>1</kbd> or ↓←↓←
+          <kbd>K</kbd> en300, which summons a white mecha dragon.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO
-          or SAKUYA, and one of eighteen stages, in either mode. Free practice
-          has no timer, and you also choose how the partner behaves: standing,
-          guarding high or low, guarding in the air, attacking in range, jumping
-          in, or playing as the original CPU. Max stock refills your supers
-          whenever you stand idle, and Low health keeps you just under 30% for
-          desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
+          DIDO, SAKUYA or ALEX, and one of eighteen stages, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you just
+          under 30% for desperation moves. Vs. CPU is the original game's CPU,
+          playing the opponent's own moves, specials and supers. Reduce their
+          health to zero, or lead on health when time runs out. Changing modes,
+          fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
