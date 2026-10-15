@@ -548,8 +548,9 @@ export const animations = {
   shock: scriptClip(88),
   // Response 76 in the air → action 122; its op 0x20 reorders poses (+18).
   rushAirHit: scriptClip(122),
-  // Response 30 (action 128); op 0x07 then replaces the pose from the held table.
-  superHeld: clip(clips.grabbed.slice(0, 1)),
+  // Response 30 (action 128); op 0x07 then replaces the pose from the held
+  // table, or its two displays run out (holdVictims).
+  superHeld: clip(clips.grabbed),
 };
 export type AnimatedAction = keyof typeof animations;
 // 'script' runs the source action in the fighter's `branch` from its own
@@ -610,8 +611,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
     // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
     // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
-    // HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344
-    // and OS FENG's 開始時 BR (34) from PC 363: no op 0x01, so each stands where they start. Amiro's Round BR (33)
+    // HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344,
+    // OS FENG's 開始時 BR (34) from PC 363 and KATE's 開始時 BR (32) from PC
+    // 335: no op 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
@@ -698,7 +700,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     tossBounce: clip([...z.dstToss.slice(1), ...z.dstTossSpin2], 2),
     twist: clip([z.twist[0], ...z.twisting], 1),
     twistBounce: clip([z.twist[1], ...z.twisting2], 1),
-    superHeld: clip(z.grabbed.slice(0, 1)),
+    superHeld: clip(z.grabbed),
     knockdown: clip(z.knockdown),
     getUp: clip(z.getUp),
     down: clip(z.ko, false, waits(z.ko)),
@@ -708,9 +710,11 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 'win rp' (57) three times before its last display (PC 536) and G
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
     // 560 (winLoop, PC 564), SIN's from PC 617 (PC 619), SEAN's from PC 621
-    // (PC 623) and GON's from PC 699 (PC 707), past the records before them:
-    // Giant's sound (PC 559), SIN's sound and WIN RP (PC 616), SEAN's sound
-    // (PC 620), GON's sound and *eff WIN (PCs 697–698).
+    // (PC 623), GON's from PC 699 (PC 707) and KATE's from PC 618 (PC 620),
+    // past the records before them: Giant's sound (PC 559), SIN's sound and
+    // WIN RP (PC 616), SEAN's sound (PC 620), GON's sound and *eff WIN (PCs
+    // 697–698), KATE's sound (PC 616). KATE's 勝ち (58) calls sTAND demo
+    // twice (PC 602).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -748,8 +752,15 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                       .flat(),
                     ...z.win.slice(-1),
                   ]
-                : [...z.winStand, ...z.win, ...(z.winLoop ?? [])],
-            z.winLoop ? z.winStand.length + z.win.length : false,
+                : [
+                    ...z.winStand,
+                    ...(who === 'kate' ? z.winStand : []),
+                    ...z.win,
+                    ...(z.winLoop ?? []),
+                  ],
+            z.winLoop
+              ? z.winStand.length * (who === 'kate' ? 2 : 1) + z.win.length
+              : false,
             // OS FENG's holds its last pose with a zero-length display (PC
             // 734).
             who === 'feng' ? waits(z.win) : undefined,
@@ -786,6 +797,7 @@ const TWIN_ANIMATIONS = {
   feng: twinAnimations('feng'),
   sean: twinAnimations('sean'),
   gon: twinAnimations('gon'),
+  kate: twinAnimations('kate'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

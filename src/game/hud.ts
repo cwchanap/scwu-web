@@ -121,7 +121,7 @@ export function gaugeImage(tick: number) {
 // 87 (PCs 847–861), ALEX's 75 (PCs 737–750), OS FENG's 85 (PCs 884–901)
 // and GON's 82 do (PCs 884–897). Zoma's and Kiki's action 71 shows 2001 (PCs 677,
 // 666), Yo's and LIZARD's 73 (PCs 728, 764), DIDO's 76 (PC 817), HISO's
-// 76 (PC 736) and SEAN's 75 (PC 756).
+// and KATE's 76 (PCs 736, 754) and SEAN's 75 (PC 756).
 export const faceImage = (face: number, who?: Who) => {
   const side =
     who === 'suneo' ||
@@ -141,7 +141,8 @@ export const faceImage = (face: number, who?: Who) => {
 // LIZARD's 69 217 (PC 727), KAY's 66 464 (PC 688), DIDO's 69 258 (PC 777),
 // SAKUYA's 79 445 (PC 805), ALEX's 68 362 (PC 694), SOU's 71 329 (PC 748),
 // HISO's 66 445 (PC 693), ERUS's 68 366 (PC 714), OS FENG's 76 449
-// (PC 843), SEAN's 67 247 (PC 715) and GON's 76 654 (PC 842).
+// (PC 843), SEAN's 67 247 (PC 715), GON's 76 654 (PC 842) and KATE's 66
+// 276 (PC 711).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -164,6 +165,7 @@ const NAMES: Record<Who, number> = {
   feng: 449,
   sean: 247,
   gon: 654,
+  kate: 276,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

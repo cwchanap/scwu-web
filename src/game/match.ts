@@ -620,6 +620,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   feng: { launchDown: -800 },
   sean: { launchDown: -800 },
   gon: { launchDown: -800 },
+  kate: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -1686,6 +1687,17 @@ export class Match {
         target.y = Math.min(0, target.y);
         this.action(target, target.y < 0 ? 'airHit' : 'hit');
       }
+      // No op 0x07 holding it, CHUCK HIT runs its 10- and 30-tick displays
+      // (Ryuko's PCs 1733, 1737; every twin's alike) out into neutral
+      // (0x4126de): KATE's Dash att Hit (245) never holds its victim.
+      // ponytail: one in the air takes airHit, not CHUCK HIT's fall (PC
+      // 1730) and landing displays.
+      else if (
+        target.action === 'superHeld' &&
+        !target.held &&
+        target.age >= animationDuration('superHeld', target.who)
+      )
+        this.action(target, target.y < 0 ? 'airHit' : 'idle');
     });
   }
 

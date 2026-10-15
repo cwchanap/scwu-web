@@ -288,6 +288,15 @@
         iori: 'Drill',
         dst: 'Counter',
       },
+      kate: {
+        getterBeam: 'en300',
+        musashi: 'Slash',
+        changeAttack: 'Beam',
+        drill: 'Neko',
+        axe: 'Air Fire',
+        iori: 'Dash Att',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -514,6 +523,7 @@
             <option value="feng">OS FENG</option>
             <option value="sean">SEAN</option>
             <option value="gon">GON</option>
+            <option value="kate">KATE</option>
           </select></label
         >
         <label
@@ -544,6 +554,7 @@
             <option value="feng">OS FENG</option>
             <option value="sean">SEAN</option>
             <option value="gon">GON</option>
+            <option value="kate">KATE</option>
           </select></label
         >
         <label
@@ -1312,17 +1323,50 @@
           cancels DRILL for two stocks.
         </p>
         <p>
+          Choose KATE to play her, a blue-haired girl in a pink top who, like
+          GON, puts on a different costume for most moves. <kbd>J</kbd> chains a
+          jab, a blue-robed priest's staff thrust and a purple-eared
+          swordswoman's crescent cut, <kbd>K</kbd> a kick, a green-masked
+          swordsman's slash and a white-winged knight's low lance thrust that
+          pins the opponent; down with <kbd>J</kbd> or <kbd>K</kbd> is a
+          pink-helmeted girl's spitting pet or a green-robed lancer's low
+          thrust. In the air <kbd>J</kbd> is a broadsword's downward cut and
+          <kbd>K</kbd> a red-clad fighter's kick. <kbd>H</kbd> is her Hit Up, a
+          white-robed figure's trident, which ↑ chases into the air after a hit,
+          <kbd>O</kbd>
+          her chuck, a white-suited figure's red crosshairs. Blocking with a stock,
+          <kbd>H</kbd>
+          spends it on COUNTER ATT. Her specials:
+          <kbd>U</kbd>
+          or →↓↘ <kbd>J</kbd> neko punch, a cat girl's rising paw, <kbd>I</kbd>
+          or ↓→ <kbd>J</kbd> Air fire: in the air a turquoise mage leaves a blue
+          star hovering for 6 seconds, and on the ground her af add strikes and
+          drops it onto whoever is below (↓→
+          <kbd>K</kbd> sends it down at a slant), <kbd>F</kbd> or ↓←
+          <kbd>J</kbd> DASH ATTACK, a ninja's dagger dash through the opponent,
+          who is struck five more times behind her (in the air a diving kick),
+          and <kbd>G</kbd> or →↓← <kbd>K</kbd> Counter, a 0.3-second stance with
+          a winged girl's axe: struck in it, she takes 30% of the damage and
+          swings it. Her supers, for a stock each: <kbd>2</kbd> or ↓←↓←
+          <kbd>J</kbd> SLASH SUPER, an archer's arrow that brings her lunging in
+          with a halberd when it strikes (below 30% health its Evil form), and
+          <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd> BEAM, a red-clad fighter's long
+          beam; for three, <kbd>1</kbd> or ↓→↓→ <kbd>K</kbd> en300, a goggled sorcerer's
+          yellow spirits. BEAM or SLASH SUPER cancels af add for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON, and one of
-          eighteen stages, in either mode. Free practice has no timer, and you
-          also choose how the partner behaves: standing, guarding high or low,
-          guarding in the air, attacking in range, jumping in, or playing as the
-          original CPU. Max stock refills your supers whenever you stand idle,
-          and Low health keeps you just under 30% for desperation moves. Vs. CPU
-          is the original game's CPU, playing the opponent's own moves, specials
-          and supers. Reduce their health to zero, or lead on health when time
-          runs out. Changing modes, fighters or the stage starts a fresh match.
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE, and
+          one of eighteen stages, in either mode. Free practice has no timer,
+          and you also choose how the partner behaves: standing, guarding high
+          or low, guarding in the air, attacking in range, jumping in, or
+          playing as the original CPU. Max stock refills your supers whenever
+          you stand idle, and Low health keeps you just under 30% for
+          desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -527,7 +527,30 @@ And GON's, a brown-haired boy with goggles on his head, an orange shirt and a bl
 | 1, or ↓→↓→ K                   | EN300: a golden armoured beast's exploding sun, 3 stocks (in EX mode the winged gunner's barrage)                                                                                                     |
 | 4, or H ↓ ↓ J O                | Hidden en300: only at 140 life or less (a Chuck above it), an orange-haired girl joins hands with him to call a white-caped knight, 3 stocks                                                          |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN or GON), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And KATE's, a blue-haired girl in a pink top and a blue skirt who, like GON, puts on a different costume for most moves:
+
+| Input                          | KATE's move                                                                                                                                                                                                |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                                                         |
+| P2 / P3                        | A blue-robed priest's staff thrust / a purple-eared swordswoman's crescent cut                                                                                                                             |
+| K2 / K3                        | A green-masked swordsman's slash / a white-winged knight's low lance thrust that pins the opponent, then drives through them                                                                               |
+| Down + J / K                   | A pink-helmeted girl's pet spitting a blob / a green-robed lancer's low thrust                                                                                                                             |
+| In the air: J / K              | A broadsword's downward cut / a red-clad fighter's kick                                                                                                                                                    |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                                         |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                                      |
+| H                              | Hit Up: a white-robed figure's trident; on a hit, ↑ chases into the air                                                                                                                                    |
+| O                              | Chuck: a white-suited figure's red crosshairs                                                                                                                                                              |
+| Blocking with a stock: H       | COUNTER ATT                                                                                                                                                                                                |
+| U, or →↓↘ J                    | neko punch: a cat girl's rising paw                                                                                                                                                                        |
+| I, or ↓→ J                     | Air fire: in the air, a turquoise mage leaves a blue star hovering for 6 seconds; on the ground, af add, her strike that drops it onto whoever is below; BEAM or SLASH SUPER cancels af add for two stocks |
+| ↓→ K                           | AIR FIRE K: as Air fire, but on the ground af add K sends the star down at a slant                                                                                                                         |
+| F, or ↓← J                     | DASH ATTACK: a ninja's dagger dash through the opponent, who is struck five more times behind her; in the air a diving kick                                                                                |
+| G, or →↓← K                    | Counter: a 0.3-second stance with a winged girl's axe: struck in it, she takes 30% of the damage and swings it                                                                                             |
+| 2, or ↓←↓← J                   | SLASH SUPER: an archer's arrow; if it strikes, she lunges in with a halberd (at 129 life or less, a red orb, then a halberd lunge there and back), 1 stock                                                 |
+| 3, or ↓→↓→ J                   | BEAM: a red-clad fighter's long beam, 1 stock                                                                                                                                                              |
+| 1, or ↓→↓→ K                   | en300: a goggled sorcerer's yellow spirits, 3 stocks                                                                                                                                                       |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON or KATE), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -543,7 +566,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** twenty-one fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** twenty-two fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -555,7 +578,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's and GON's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's and KATE's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.
