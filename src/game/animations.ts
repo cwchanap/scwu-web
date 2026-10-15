@@ -387,6 +387,10 @@ export const LIZARD_LANDING = 166;
 // down, into Round 1 + 10 (slot 1, PC 409).
 export const SOU_LANDING = 109;
 export const SOU_INTRO_EX_TICK = SOU_LANDING;
+// SEAN's, 4 ticks rising unseen at raw vy −20000 (PC 367), then 160 falling
+// at 500 (PC 391) until the fall reaches the floor 800 source pixels down,
+// into Round 1 + 15 (slot 1, PC 390).
+export const SEAN_LANDING = 164;
 // KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
 // display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
 // step after his 47th move passes the floor (0x41187f), 114 source pixels
@@ -612,19 +616,34 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // display at PC 385 short and the wait at PC 386 out. SOU's 開始時 BR
     // (36) from PC 401 rises and falls (introMotion), landing out of the wait
     // at PC 413 at SOU_LANDING into Round 1 + 10, which calls DEMO stand once
-    // (PC 420).
+    // (PC 420). SEAN's 開始時 BR (35) rises unseen (PC 368), skips its
+    // display at PC 371 for global 14 = 0 (PC 369), then falls through four
+    // 40-tick loops of PCs 393–396 (PC 397) into Round 1 + 15 at
+    // SEAN_LANDING; the loop's spawns run once.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
         : who === 'sou'
           ? landed(z.intro, z.introLand, SOU_LANDING)
-          : clip(
-              who === 'yo'
-                ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
-                : who === 'sin'
-                  ? [...z.intro, ...z.winStand]
-                  : z.intro,
-            ),
+          : who === 'sean'
+            ? landed(
+                [
+                  z.intro[0],
+                  ...z.intro.slice(2),
+                  ...Array<Pose[]>(3)
+                    .fill(z.intro.slice(2).map((f) => ({ ...f, events: [] })))
+                    .flat(),
+                ],
+                z.introLand,
+                SEAN_LANDING,
+              )
+            : clip(
+                who === 'yo'
+                  ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
+                  : who === 'sin'
+                    ? [...z.intro, ...z.winStand]
+                    : z.intro,
+              ),
     ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
@@ -678,8 +697,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
     // 'win rp' (57) three times before its last display (PC 536) and G
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
-    // 560 (winLoop, PC 564) and SIN's from PC 617 (PC 619), past the records
-    // before them: Giant's sound (PC 559), SIN's sound and WIN RP (PC 616).
+    // 560 (winLoop, PC 564), SIN's from PC 617 (PC 619) and SEAN's from PC
+    // 621 (PC 623), past the records before them: Giant's sound (PC 559),
+    // SIN's sound and WIN RP (PC 616), SEAN's sound (PC 620).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -753,6 +773,7 @@ const TWIN_ANIMATIONS = {
   hiso: twinAnimations('hiso'),
   erus: twinAnimations('erus'),
   feng: twinAnimations('feng'),
+  sean: twinAnimations('sean'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

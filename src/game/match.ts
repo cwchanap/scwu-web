@@ -16,6 +16,7 @@ import {
   ERUS_INTRO_EX_TICK,
   FENG_INTRO_EX_TICK,
   SOU_LANDING,
+  SEAN_LANDING,
   KAY_WIN_HOP,
   LIZARD_LANDING,
   INTRO_EX_TICK,
@@ -368,8 +369,10 @@ const reactionPower = (f: Fighter): [number, number] =>
 // stops (PC 374), then leaps at 400/−1000 with gravity 60 (PC 377) until he
 // lands (LIZARD_LANDING). KAY's Round 1 (33) walks at 200 from PC 356 to PC
 // 365. SOU's 開始時 BR (36) rises at −7000 with gravity −10000 for two ticks
-// (PC 401), then falls at 300 (PC 410) until he lands (SOU_LANDING). The
-// others' have no op 0x01, so they start where these end.
+// (PC 401), then falls at 300 (PC 410) until he lands (SOU_LANDING).
+// SEAN's 開始時 BR (35) rises at −20000 for four ticks (PC 367), then falls
+// at 500 (PC 391) until he lands (SEAN_LANDING). The others' have no op
+// 0x01, so they start where these end.
 type Runs = [number, number, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -389,6 +392,10 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   sou: [
     [2, 0, -7000, -10000],
     [SOU_LANDING - 2, 0, 300],
+  ],
+  sean: [
+    [4, 0, -20000],
+    [SEAN_LANDING - 4, 0, 500],
   ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP).
@@ -605,6 +612,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   hiso: { launchDown: -800 },
   erus: { launchDown: -800 },
   feng: { launchDown: -800 },
+  sean: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,

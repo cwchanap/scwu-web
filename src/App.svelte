@@ -269,6 +269,15 @@
         iori: 'Iori',
         dst: 'BP',
       },
+      sean: {
+        getterBeam: 'EN300',
+        musashi: 'SCC',
+        changeAttack: 'S Shoot',
+        drill: 'Dragon',
+        axe: 'Whip',
+        iori: 'Whip K',
+        dst: 'CC',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -493,6 +502,7 @@
             <option value="hiso">HISO</option>
             <option value="erus">ERUS</option>
             <option value="feng">OS FENG</option>
+            <option value="sean">SEAN</option>
           </select></label
         >
         <label
@@ -521,6 +531,7 @@
             <option value="hiso">HISO</option>
             <option value="erus">ERUS</option>
             <option value="feng">OS FENG</option>
+            <option value="sean">SEAN</option>
           </select></label
         >
         <label
@@ -1227,11 +1238,39 @@
           iori for two stocks.
         </p>
         <p>
+          Choose SEAN to play him, a bald old monk in green robes and prayer
+          beads who calls up a different character for most moves.
+          <kbd>J</kbd> chains a jab, a blue-haired girl's triple strike and a
+          red-haired fighter's dive, <kbd>K</kbd> a kick, a white-armoured
+          figure's exploding seal and a dark-clad swordsman's vortex dash; down
+          with <kbd>J</kbd> or <kbd>K</kbd> is a cloaked figure's sweep or a
+          horned figure's low kick. In the air <kbd>J</kbd> is a spiky-haired
+          swordsman's dive and <kbd>K</kbd> a kick from a figure in a white
+          hood. <kbd>H</kbd> is his Hit Up, <kbd>O</kbd> his chuck, a chubby
+          pigtailed figure's long tongue. Blocking with a stock, <kbd>H</kbd>
+          spends it on COUNTER HIT. ↑ during a forward dash is a High Jump. His specials:
+          <kbd>U</kbd>
+          or →↓↘ <kbd>J</kbd> Dragon, a small red-robed man's crescent,
+          <kbd>I</kbd>
+          or ↓→ <kbd>J</kbd> whip attack, an eye-patched man's five whips (<kbd
+            >F</kbd
+          >
+          or ↓→
+          <kbd>K</kbd> lashes farther off), and <kbd>G</kbd> or ↓←
+          <kbd>K</kbd> CC, an elf-eared hooded figure's red card, a grab that
+          also works in the air. His supers, for a stock each: <kbd>2</kbd> or
+          ↓←↓← <kbd>J</kbd> SCC, an old man in yellow robes whose grab reaches
+          across the screen, and <kbd>3</kbd> or ↓→↓→ <kbd>J</kbd> S Shoot, the
+          swordsman's crescent wave, which below 30% health takes its Evil form;
+          for three, <kbd>1</kbd> or ↓→↓→ <kbd>K</kbd> EN300, a rider on a yellow
+          beast who calls down lightning. A super cancels Dragon for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS or OS FENG, and one of eighteen
-          stages, in either mode. Free practice has no timer, and you also
-          choose how the partner behaves: standing, guarding high or low,
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG or SEAN, and one of
+          eighteen stages, in either mode. Free practice has no timer, and you
+          also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the
           original CPU. Max stock refills your supers whenever you stand idle,
           and Low health keeps you just under 30% for desperation moves. Vs. CPU
