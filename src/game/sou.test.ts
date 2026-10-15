@@ -65,7 +65,7 @@ describe('SOU (16 SOU.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[ryuko, twins[ryuko], responsesOf('sou')[id]]] : [],
     );
-    expect(paired).toHaveLength(72);
+    expect(paired).toHaveLength(73);
     expect(paired.filter(([, twin, own]) => twin !== own)).toEqual([]);
     expect(CHARACTERS.sou.aliases).toEqual({});
     // Five after Ryuko's KOs, ten after her hits, eleven from DOWN to SHOCK

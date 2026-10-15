@@ -57,7 +57,7 @@ describe('SIN (10 SIN.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('sin')[id]]] : [],
     );
-    expect(paired).toHaveLength(72);
+    expect(paired).toHaveLength(73);
     expect(paired.filter(([twin, own]) => twin !== own)).toEqual([]);
     // His KOs three after Ryuko's, the hits four, the twists and the shock
     // five, Shock rp four and the reactions from Clothes off 500 five.

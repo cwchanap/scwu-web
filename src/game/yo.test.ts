@@ -52,7 +52,7 @@ describe('Yo (09 YO.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('yo')[id]]] : [],
     );
-    expect(paired).toHaveLength(72);
+    expect(paired).toHaveLength(73);
     expect(paired.filter(([twin, own]) => twin !== own)).toEqual([]);
     // Her KOs at Ryuko's numbers, her reactions two after Zoma's, the twists
     // three, and Chuck Yo two.

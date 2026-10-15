@@ -63,7 +63,7 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[twins[ryuko], responsesOf('anmc')[id]]] : [],
     );
-    expect(paired).toHaveLength(72);
+    expect(paired).toHaveLength(73);
     for (const [twin, own] of paired) expect(twin).toBe(own);
   });
 

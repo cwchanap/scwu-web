@@ -237,6 +237,17 @@
         iori: 'Iori',
         dst: 'BK',
       },
+      hiso: {
+        getterBeam: 'Fish',
+        musashi: 'EN300',
+        changeAttack: 'Fly Arm',
+        blackRush: 'S Shoot',
+        megaBeam: 'Striker',
+        drill: 'Dragon',
+        axe: 'Fire',
+        iori: 'Bannaku',
+        dst: 'Counter',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -458,6 +469,7 @@
             <option value="sakuya">SAKUYA</option>
             <option value="alex">ALEX</option>
             <option value="sou">SOU</option>
+            <option value="hiso">HISO</option>
           </select></label
         >
         <label
@@ -483,6 +495,7 @@
             <option value="sakuya">SAKUYA</option>
             <option value="alex">ALEX</option>
             <option value="sou">SOU</option>
+            <option value="hiso">HISO</option>
           </select></label
         >
         <label
@@ -1098,10 +1111,38 @@
           <kbd>J</kbd> ← <kbd>K</kbd> <kbd>H</kbd> KOKAKEN, the pilot's sword dash.
         </p>
         <p>
+          Choose HISO to play him, a boy in a red sleeveless top who dresses up
+          as a different character for most moves. <kbd>J</kbd> chains a jab, a
+          suited man's pointing jab and a girl in glasses swinging a vacuum
+          cleaner's toothed hose, <kbd>K</kbd> a kick, a clown-faced boy's
+          thrown rock and a muscled brawler's punch; down with <kbd>J</kbd> or
+          <kbd>K</kbd> is a samurai's sword slash or the brawler's punch.
+          <kbd>H</kbd> is his Hit Up, an uppercut, <kbd>O</kbd> his chuck, the
+          clown-faced boy's grab and sliding kick. Blocking with a stock,
+          <kbd>H</kbd> spends it on COUNTER HIT. He has no EX mode. His
+          specials:
+          <kbd>U</kbd> or →↓↘ <kbd>J</kbd> Dragon p, a samurai's rising sword
+          slashes (also in the air), <kbd>I</kbd> or ↓→ <kbd>J</kbd> FIRE, the
+          clown-faced boy's thrown card, <kbd>F</kbd> or ↓← <kbd>J</kbd>
+          bannaku, a headbanded knife fighter's dashing slash, which a super cancels
+          for two stocks, <kbd>G</kbd> or →↓← <kbd>K</kbd> counter, a stance
+          with a phone: struck in it, a machine-gun man fires back, and
+          <kbd>5</kbd>
+          or ↓→ <kbd>K</kbd> striker, a gunwoman behind him whose shot holds
+          whoever it meets still. His supers, for a stock each: <kbd>1</kbd> or
+          ↓←↓←
+          <kbd>K</kbd> FISH, a suited man's red book whose fish spirit seizes
+          the opponent up close, <kbd>3</kbd> or ↓←↓← <kbd>J</kbd> fly arm, the
+          clown-faced boy's flying fists up close, and <kbd>4</kbd> or ↓→↓→
+          <kbd>J</kbd> S Shoot, a blue-coated boy's palm blast; for three,
+          <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> en300, a shirtless, tattooed man who calls
+          a dark giant.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX or SOU, and one of eighteen stages, in either mode.
-          Free practice has no timer, and you also choose how the partner
+          DIDO, SAKUYA, ALEX, SOU or HISO, and one of eighteen stages, in either
+          mode. Free practice has no timer, and you also choose how the partner
           behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health

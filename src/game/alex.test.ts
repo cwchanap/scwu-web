@@ -62,7 +62,7 @@ describe('ALEX (15 ALEX.PLAYER)', () => {
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>
       ryuko in twins ? [[ryuko, twins[ryuko], responsesOf('alex')[id]]] : [],
     );
-    expect(paired).toHaveLength(72);
+    expect(paired).toHaveLength(73);
     // Responses 69 and 70 enter UNCOUNTER DOWN and Air Fire (128, 129)
     // where Ryuko's name DOWN and J atttack.
     expect(paired.filter(([, twin, own]) => twin !== own)).toEqual([

@@ -494,6 +494,8 @@ export const animations = {
   airInatuma: clip(Array(7).fill(clips.inatumaRp).flat()),
   icePunch: clip(clips.icePunch),
   airIcePunch: clip(clips.airIcePunch),
+  hisoStop: clip(clips.hisoStop),
+  airHisoStop: clip(clips.airHisoStop),
   // Op 0x20 in 83/84 picks which of two pose orders plays (PCs 957, 982); the
   // match rolls it and draws branch 83/84 + 18.
   hitRapid: scriptClip(83),
@@ -582,8 +584,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     crouchTurn: clip(z.crouchTurn),
     // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
     // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
-    // Giant's Round 1 (33) from PC 313 and G Suneo's Round 1 (35) from PC
-    // 393: no op 0x01, so each stands where they start. Amiro's Round BR (33)
+    // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
+    // and HISO's 開始時 BR (32) from PC 332: no op 0x01, so each stands where
+    // they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
     // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
@@ -614,6 +617,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     airInatuma: clip(Array(7).fill(z.inatumaRp).flat()),
     icePunch: clip(z.icePunch),
     airIcePunch: clip(z.airIcePunch),
+    hisoStop: clip(z.hisoStop),
+    airHisoStop: clip(z.airHisoStop),
     jumpHit: clip(z.jumpHit),
     hitPull: clip(z.hitPull),
     hitRapid: timeline(83),
@@ -661,8 +666,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
-    // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593) and SOU's 勝ち (62)
-    // image 310 (PC 650).
+    // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593), SOU's 勝ち (62)
+    // image 310 (PC 650) and HISO's 勝ち (58) image 436 (PC 603).
     // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
     // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
     // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
@@ -680,7 +685,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               who === 'dido' ||
               who === 'sakuya' ||
               who === 'alex' ||
-              who === 'sou'
+              who === 'sou' ||
+              who === 'hiso'
               ? z.win
               : z.winRp
                 ? [
@@ -721,6 +727,7 @@ const TWIN_ANIMATIONS = {
   sakuya: twinAnimations('sakuya'),
   alex: twinAnimations('alex'),
   sou: twinAnimations('sou'),
+  hiso: twinAnimations('hiso'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

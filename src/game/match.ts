@@ -137,6 +137,7 @@ const reactionSlides: Partial<
   jumpHit: slide(9, -250, 10), // 77, PC 845
   inatuma: slide(42, -650, 10), // 118, PC 1557
   icePunch: slide(42, -650, 10), // 106, PC 1367
+  hisoStop: slide(42, -650, 10), // 113, PC 1470
   hitPull: slide(9, 650, -10), // 121, PC 1602
   block: slide(8, -320), // 149, PC 2019
   crouchBlock: slide(8, -320), // 151, PC 2043
@@ -149,6 +150,15 @@ const reactionSlides: Partial<
   // Unclamped: the beam hit stops at its 25th moving tick, then drifts back in.
   hitRapid: slide(0, -150, 10), // 83, PC 954
 };
+// KAY's HISO stop holds 33 ticks (116, PC 1559) to Ryuko's 36.
+const OWN_SLIDES: Partial<Record<Who, typeof reactionSlides>> = {
+  kay: { hisoStop: slide(39, -650, 10) },
+};
+// Reactions whose op 0x16 enters their air form off the floor.
+const AIR_FORMS: Partial<Record<Action, Action>> = {
+  inatuma: 'airInatuma',
+  hisoStop: 'airHisoStop',
+};
 // Air reactions without a landing handler play the op 0x01 commands of their
 // flattened scripts; land() ends them (0x411810).
 const AIR_REACTIONS: Partial<Record<Action, number>> = {
@@ -156,6 +166,7 @@ const AIR_REACTIONS: Partial<Record<Action, number>> = {
   airHitHeavy: 76, // PCs 816/823: the same, then −300/−850 at age 6
   airInatuma: 120, // PC 1579: hangs still, without gravity
   airIcePunch: 107, // PC 1381: as 120
+  airHisoStop: 114, // PC 1482: as 120
   airHitRapid: 84, // PCs 979/990: drift at −100, then −400/−830, gravity 80
   airBlock: 153, // PCs 2060/2063: −420, ax −15, gravity 70; vy 0 at age 3
   airBlockHeavy: 158, // PCs 2133/2136: −450 and vy 0 at age 6
@@ -321,6 +332,8 @@ for (const action of [
   'airInatuma',
   'icePunch',
   'airIcePunch',
+  'hisoStop',
+  'airHisoStop',
 ] as const)
   REACTION_POWER[action] = [5, 3];
 // Action 135 credits only the victim, as do 132 (PC 1783), 134 (PC 1818) and
@@ -417,6 +430,10 @@ const RESPONSE_REACTIONS: Record<
   // responses 54 and 55; both play as ERUS INATUMA's do (PCs 1355–1367).
   106: { action: 'icePunch', stop: 15 },
   107: { action: 'airIcePunch', stop: 15 },
+  // HISO's GUN SHOT reaches 'HISO stop' through response 64, whose op 0x16
+  // enters its air form off the floor (PC 1455); both play as ICE Punch's do.
+  113: { action: 'hisoStop', stop: 15 },
+  114: { action: 'airHisoStop', stop: 15 },
   79: { action: 'sweep', stop: 13 },
   80: { action: 'launchAway', stop: 13 },
   // SAKUYA's K3 Hit New reaches 105 through response 53, with no op 0x1a.
@@ -562,10 +579,10 @@ function struck(
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
 // Ryuko's and Zoma's at −800 (Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G
-// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's and SOU's
-// 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132 and 133,
-// PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795, 1818,
-// 1938, 1848 and 1725), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's and
+// HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
+// and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
+// 1818, 1938, 1848, 1725 and 1814), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -581,6 +598,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   sakuya: { launchDown: -800 },
   alex: { launchDown: -800 },
   sou: { launchDown: -800 },
+  hiso: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -793,6 +811,8 @@ const reactions = new Set<Action>([
   'airInatuma',
   'icePunch',
   'airIcePunch',
+  'hisoStop',
+  'airHisoStop',
   'hitPull',
   'shock',
   'stun',
@@ -1598,7 +1618,7 @@ export class Match {
   }
 
   private slideReaction(f: Fighter) {
-    const slide = reactionSlides[f.action];
+    const slide = OWN_SLIDES[f.who]?.[f.action] ?? reactionSlides[f.action];
     if (slide) {
       if (
         f.age >=
@@ -2537,12 +2557,9 @@ export class Match {
     const counter = own === undefined ? undefined : countersOf(f.who)[own];
     if (counter && f.variables[4] === 100) return this.enterSource(f, counter);
     if (counter === 0) f.variables[4] = 0;
-    // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor.
-    this.action(
-      f,
-      action === 'inatuma' && f.y < 0 ? 'airInatuma' : action,
-      true,
-    );
+    // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor, as
+    // HISO stop's does (PC 1455).
+    this.action(f, (f.y < 0 && AIR_FORMS[action]) || action, true);
     f.vx = f.vy = 0;
     f.moving = 0;
     this.pause(f, stop);
@@ -2592,11 +2609,13 @@ export class Match {
     if (this.gonMiss(f, other)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
-    // ERUS INATUMA AIR and ICE Punch Air run out into heavy air hit + 19 (PCs
-    // 1582, 1390), its launch at age 6 (PC 823; export_fighter checks every
-    // player's), past its roll.
+    // ERUS INATUMA AIR, ICE Punch Air and HISO stop air run out into heavy
+    // air hit + 19 (PCs 1582, 1390, 1488), its launch at age 6 (PC 823;
+    // export_fighter checks every player's), past its roll.
     if (
-      (f.action === 'airInatuma' || f.action === 'airIcePunch') &&
+      (f.action === 'airInatuma' ||
+        f.action === 'airIcePunch' ||
+        f.action === 'airHisoStop') &&
       f.age >= animationDuration(f.action, f.who)
     ) {
       this.action(f, 'airHitHeavy', true, null);
@@ -2723,8 +2742,9 @@ export class Match {
     // and 14, then jumps to KO Normal (PC 591). With global 0 at 10 it would
     // enter 'make hikari' (63) instead (PC 590). The title menu writes
     // global 0 only to 1 (KGT 78, PC 497). ponytail: LIZARD's chuck hit
-    // lend writes 10 for its strike's tick (PCs 3703, 3712), so as player 2
-    // his lethal strike would send the victim there; the port keeps KO
+    // lend writes 10 for its strike's tick (PCs 3703, 3712), as HISO's Fish
+    // hit and FISH HIT BIG do (PCs 4483–4488, 4557–4562), so as player 2
+    // their lethal strikes would send the victim there; the port keeps KO
     // Normal.
     const roll = f.branch && rolls(f.who)[f.action];
     const rolled = roll ? script(roll, f.who).events : [];
