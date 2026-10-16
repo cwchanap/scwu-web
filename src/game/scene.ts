@@ -505,6 +505,8 @@ export class TrainingScene extends Phaser.Scene {
             this.idling[i] = true;
             this.idle[i].life = f.hp;
             this.idle[i].tick();
+            for (const index of this.idle[i].sounds.splice(0))
+              this.play(`${f.who}-sound-${index}`, i);
           });
         });
       for (const axis of ['x', 'y'] as const) {

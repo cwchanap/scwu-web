@@ -255,8 +255,13 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
         else:
             event = decode_event(record)
             # A branch can't return to a caller, so a call keeps its checks' fall-through path,
-            # but for an op 0x1f test of a player variable that jumps out of the call into an
-            # action looping back into itself, which never runs out into the call (0x4125ea):
+            # but for an op 0x24 in its caller's last call, whose return runs the caller out as
+            # the branch's end does (0x4125ea): GIGI's Ranbu start calls Ranbu start Fin (297)
+            # last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. ponytail: other checks
+            # there keep their fall-through, Zoma's, Yo's, SOU's, HISO's, ERUS's, OS FENG's,
+            # REMU's and REAR's freeze waits (op 0x1f on global 6) among them. It also keeps an
+            # op 0x1f test of a player variable that jumps out of the call into an action
+            # looping back into itself, which never runs out into the call (0x4125ea):
             # KATE's air fire tests variable 8 in each of its 60 hovers (PCs 3179–3180), and its
             # drops loop until landing enters their handler (0x410d50), which ends the call (+0x7c).
             # ponytail: a 0-tick hold never runs out either, but ERUS's Cerb2 (PC 3420) keeps its
@@ -264,7 +269,9 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             if stack and op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] >> 6 == 1 and loops(
                     p, u16(record, 1)) and u16(record, 1) not in {action, *(s[1] for s in stack)}:
                 event = test_event(record)
-            elif event and stack and event["op"] in ("input", "test", "command"):
+            elif event and stack and event["op"] in ("input", "test", "command") and not (
+                    event["op"] == "command" and len(stack) == 1 and stack[0][2] == 1
+                    and stack[0][0] >= p.action(stack[0][3]).end):
                 event = None
             # Its rolls jump within the called action, rejoining the
             # fall-through at its next display (flatten_queue checks): Giant's
@@ -714,6 +721,16 @@ REMU_TWINS = {name: (r, r + next(d for top, d in ((73, 2), (83, 6), (89, 7), (10
 # (143), four from Chuck Yo, past Ryuko's Chuck Hiso (139), which he lacks,
 # and five from the guards (his *gard eff, 153, comes before them).
 REAR_TWINS = {name: (r, r + next(d for top, d in ((73, 1), (84, 5), (89, 6), (139, 5), (149, 4), (173, 5)) if r < top))
+              for name, (r, _) in ZOMA_TWINS.items()}
+# GIGI's sit two before Ryuko's KOs and lose action, two after his other
+# reactions, three for Twis 2 and SHOCK INFINITY (his ★変なＴＥＣＨ, 89, comes
+# between Twis and Twis 2), two from Shock, three from Clothes off500 (his
+# Clothes obj 2, 105, comes before it), six from Chain pull back (his own FB,
+# FBB and FBH, 108–110, come before it, two before Ryuko's), three from HISO
+# stop, five from Pull Back (his UNCOUNTER reactions, 124 and 125, come
+# before it) and four past Ryuko's Chuck Hiso (139), which he lacks.
+GIGI_TWINS = {name: (r, r + next(d for top, d in ((73, -2), (87, 2), (89, 3), (103, 2), (105, 3), (110, 6), (113, -2),
+                                                   (121, 3), (139, 5), (173, 4)) if r < top))
               for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
@@ -2083,6 +2100,66 @@ FIGHTERS = {
         # 685).
         image_ids={2001, 387},
     ),
+    "gigi": dict(
+        source=("25 GIGI", "32e47f30a981c71639c9b4e0e8590049ccd80ddd95bbf5918763d86904169856"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 70
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=GIGI_TWINS,
+        # Giant's, beside the op 0x1f on his counter's variable 4 each opens
+        # with (counter_records, PCs 763, 783, ...), which Counter (321)
+        # holds at 100 for 100 ticks (PCs 4995–5008) to enter Counter!!
+        # (322):
+        differ={
+            # Kiki's Hit Up within 10 ticks (PC 2156), and no op 0x1e window
+            # where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockStop", "crouchBlockStop", "blockRapid", "timeStopGuard",
+            "crouchTimeStopGuard",
+            # Giant's, but its last check takes J and K together (PC 2222).
+            "blockHeavy",
+            # Giant's, but sliding at raw −320 unslowed (PC 2251) or −250
+            # (PC 2382) to his −650.
+            "crouchBlockHeavy", "crouchBlockRapid",
+            # Chung's rand % 3 > 1 (PC 812) to Ryuko's rand % 6 > 2, or no op
+            # 0x20.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "chainPull",
+            # Kiki's raw vx −800 (PC 1794).
+            "launchDown",
+            # Zoma's KO tests (PC 591) and landing wait (PC 614).
+            "ko",
+            # KAY's: Zoma's KO DOWN (PC 639) and shock.
+            "down", "shock",
+            # Zoma's.
+            "rushAirHit", "airStun", "uppercut", "dragonFireball", "liftUp", "flySide", "flySideWall", "twistSide",
+            # Op 0x01 before op 0x02 (PC 1869), as ANMC P's.
+            "grabbed",
+            # Yo's: clears variable 14 before 8 and 5 (PC 2092), not after.
+            "vanish",
+            # Giant's own copies of hit heavy and HISA, clearing variable 4
+            # (PCs 1356, 1406); FBB is KAY's, rolling rand % 3 > 1 (PC
+            # 1391), as Ryuko's BEAM Stand does.
+            "fb", "fbb", "fbh",
+            # Op 0x16 after clearing the variables (PC 1643), which Ryuko's
+            # ERUS INATUMA AIR clears instead.
+            "inatuma", "airInatuma",
+        },
+        # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (124,
+        # 125), as Giant's. ponytail: as his, Air Fire plays as J Att.
+        aliases={124: 79, 125: 77},
+        # Results: 勝ち (56) calls Demo stand (28) once (PC 572) and loops
+        # image 211 (PC 578); the draw calls 28 twice (PC 659), spawns TIME
+        # UP RUN (64, PC 661) and holds image 2000 (PC 663). Each first enters
+        # DEMO air (29) while airborne (op 0x16, PCs 571, 658). The darkening
+        # panel, Black (42). The Vs. intro: 開始時 (30) jumps to 開始時 BR (32)
+        # for global 3 = 0 (PC 308), past its display for global 14 = 0 (PC
+        # 348), spawns Black and OP super Charge (38, PCs 350–351), then jumps
+        # to Round 1 (33) + 2 (PC 353), which calls Demo stand once (PC 362);
+        # it plays flattened.
+        actions=dict(win=56, winStand=28, winLoop=(56, 7), draw=63, black=42, intro=(32, 3)),
+        flat={"intro"},
+        # 2000–2002: the HUD faces action 72 shows, cycling in his Change form
+        # (PCs 730–746), as Ryuko's in EX mode; 328: *name (68, PC 694).
+        image_ids={2000, 2001, 2002, 328},
+    ),
 }
 
 
@@ -2167,9 +2244,11 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
             target = p.action(script["next"])
             if any(p.records[pc][0] == 0x0c for pc in range(target.start, target.start + script["offset"])):
                 sys.exit(f"{source[0]}'s {name} enters a reaction past a display; refusing to export.")
-    sounds = export_sounds(c, key, cued(clips, scripts))
-    images = export_images(c, key, image_ids)
+    # The idle program's cues too: GIGI's sound 8 (PC 24).
     idle = p.action(1)
+    sounds = export_sounds(c, key, cued(clips, scripts) | {u16(r, 2) for r in p.records[idle.start:idle.end]
+                                                         if r[0] == 0x03})
+    images = export_images(c, key, image_ids)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins=pairs, aliases=aliases, counters=counters,
         neutral={i: name for name, i in neutral.items()}, levels=levels,
@@ -2279,7 +2358,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU and {counts['rear']} REAR images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR and {counts['gigi']} GIGI images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

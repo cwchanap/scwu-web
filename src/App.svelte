@@ -318,6 +318,18 @@
         iori: 'Down Att',
         dst: 'Viper',
       },
+      gigi: {
+        getterBeam: 'Ranbu',
+        musashi: 'S Chuck',
+        changeAttack: 'EN3',
+        blackRush: 'Bike K',
+        megaBeam: 'Bike PK',
+        drill: 'Dragon',
+        axe: "K'",
+        iori: 'Dive',
+        dst: 'Bike P',
+        ex: 'Change',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -547,6 +559,7 @@
             <option value="kate">KATE</option>
             <option value="remu">REMU</option>
             <option value="rear">REAR</option>
+            <option value="gigi">GIGI</option>
           </select></label
         >
         <label
@@ -580,6 +593,7 @@
             <option value="kate">KATE</option>
             <option value="remu">REMU</option>
             <option value="rear">REAR</option>
+            <option value="gigi">GIGI</option>
           </select></label
         >
         <label
@@ -1440,18 +1454,52 @@
           ball cancels into GYSA or VIPER FINAL for two stocks.
         </p>
         <p>
+          Choose GIGI to play him, a big-headed grunt in a black mask with an FK
+          crest and a skeleton-striped suit. <kbd>J</kbd> chains a jab, a
+          lunging punch and a dash past the opponent that grabs them from behind
+          and flips them over, <kbd>K</kbd> a kick, a high kick and a hopping
+          kick; down with <kbd>J</kbd> or <kbd>K</kbd> is a leaping punch or a
+          low drop kick. <kbd>H</kbd> is his Hit Up, a rolling headbutt, which ↑
+          chases into the air after a hit, <kbd>O</kbd> his chuck, a grab that
+          leaps up with the opponent and slams them down. Blocking with a stock,
+          <kbd>H</kbd> spends it on Counter Hit (after a heavy standing block,
+          <kbd>J</kbd> and <kbd>K</kbd> together). <kbd>E</kbd> or ↓ ↓
+          <kbd>H</kbd> enters or leaves his Change form for half a stock, which
+          swaps his specials and two supers. His specials: <kbd>U</kbd> or →↓↘
+          <kbd>J</kbd> Dragon, a rising spin, also in the air (Change: Jump att,
+          a leap that grabs the opponent's head), <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> K', a rifle butt that → <kbd>J</kbd> follows with a shot
+          or → <kbd>K</kbd> with a swing (Change: Chuck ECC, a tumbling toy
+          robot that bursts), <kbd>F</kbd> or ↓← <kbd>J</kbd> DIVE, sinking into
+          the floor, where ← and → move him and <kbd>J</kbd> or <kbd>K</kbd>
+          comes up striking (Change: GIGI P, a rushing punch that ↓←
+          <kbd>J</kbd> or <kbd>K</kbd> chains on), and <kbd>G</kbd>,
+          <kbd>4</kbd>
+          or <kbd>5</kbd>, or ↓ ↓ <kbd>J</kbd>, <kbd>K</kbd> or both, Bike Doge
+          D, a charge or a leap on an orange motorbike, also in the air (Change:
+          Doge D, sinking into the floor to come up ahead or where he stands).
+          His supers, for a stock each: <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> Ranbu,
+          a punch flurry whose last blow ↑ or ↓ turns into a rising or a low
+          strike (Change: Bean, a ray gun's beam across the screen, which misses
+          an opponent standing close), and <kbd>2</kbd> or ↓→↓← <kbd>K</kbd> S
+          chuck, a grab and a beating (Change: Counter, a stance: struck in it,
+          he kicks back); for three, <kbd>3</kbd> or ↓→↓→ <kbd>K</kbd> EN3, a stampede
+          of GIGIs led by a blonde masked woman. Bike Doge D P cancels into Ranbu
+          or S chuck, and GIGI P into Bean or Counter, for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU or
-          REAR, and one of eighteen stages, in either mode. Free practice has no
-          timer, and you also choose how the partner behaves: standing, guarding
-          high or low, guarding in the air, attacking in range, jumping in, or
-          playing as the original CPU. Max stock refills your supers whenever
-          you stand idle, and Low health keeps you just under 30% for
-          desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
+          REAR or GIGI, and one of eighteen stages, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you just
+          under 30% for desperation moves. Vs. CPU is the original game's CPU,
+          playing the opponent's own moves, specials and supers. Reduce their
+          health to zero, or lead on health when time runs out. Changing modes,
+          fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

@@ -115,8 +115,8 @@ export function gaugeImage(tick: number) {
 // Action 70's HUD face: image 2001, or in EX mode 2002, 2001, 2000 and 2001
 // for 40 ticks each (PCs 712–730), as Chung's 73 (PCs 675–692), Amiro's 75
 // (PCs 786–803), ANMC P's 72 (PCs 717–735), Giant's 74 (PCs 690–707),
-// KAY's 73 (PCs 727–745), SOU's 79 (PCs 792–806) and ERUS's 77 (PCs
-// 757–773); G Suneo's 81 shows
+// KAY's 73 (PCs 727–745), SOU's 79 (PCs 792–806), ERUS's 77 (PCs
+// 757–773) and GIGI's 72 in his Change form (PCs 730–746); G Suneo's 81 shows
 // 2006 for 2001's turns (PCs 845–863), as SIN's 73 (PCs 756–774), SAKUYA's
 // 87 (PCs 847–861), ALEX's 75 (PCs 737–750), OS FENG's 85 (PCs 884–901)
 // and GON's 82 do (PCs 884–897). Zoma's and Kiki's action 71 shows 2001 (PCs 677,
@@ -143,7 +143,8 @@ export const faceImage = (face: number, who?: Who) => {
 // SAKUYA's 79 445 (PC 805), ALEX's 68 362 (PC 694), SOU's 71 329 (PC 748),
 // HISO's 66 445 (PC 693), ERUS's 68 366 (PC 714), OS FENG's 76 449
 // (PC 843), SEAN's 67 247 (PC 715), GON's 76 654 (PC 842), KATE's 66 276
-// (PC 711), REMU's 69 428 (PC 752) and REAR's 67 387 (PC 685).
+// (PC 711), REMU's 69 428 (PC 752), REAR's 67 387 (PC 685) and GIGI's 68
+// 328 (PC 694).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -169,6 +170,7 @@ const NAMES: Record<Who, number> = {
   kate: 276,
   remu: 428,
   rear: 387,
+  gigi: 328,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

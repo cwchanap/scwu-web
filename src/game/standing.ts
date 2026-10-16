@@ -86,6 +86,9 @@ export class StandingVM {
   life?: number;
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
+  // Op 0x03 cues (0x4132c8) since the scene last played them: GIGI's idle
+  // sounds its sound 8 in the half its roll picks (PC 24).
+  sounds: number[] = [];
   // Op 0x09 calls: where each returns, its repeats left and its entry.
   calls: { ret: number; remaining: number; entry: number }[] = [];
   events: (Frame & { tick: number; action: number })[] = [];
@@ -256,6 +259,8 @@ export class StandingVM {
           this.target(u16(r, 2), r[4]);
           continue;
         }
+      } else if (op === 3) {
+        this.sounds.push(u16(r, 2));
       } else if (op === 25) {
         if (r[9] >= 20) throw new Error('Collision slot out of range');
         this.collisionRecords[r[9]] = u16(r, 5) && u16(r, 7) ? pc : null;

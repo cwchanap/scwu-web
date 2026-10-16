@@ -29,6 +29,7 @@ import gon from './generated/gon.json';
 import kate from './generated/kate.json';
 import remu from './generated/remu.json';
 import rear from './generated/rear.json';
+import gigi from './generated/gigi.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -44,8 +45,9 @@ export interface CommandEntry {
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
-// REMU's 26, REAR's 30) and the distance in source pixels that splits their
-// near and far actions (+0x7ca3).
+// REMU's 26, REAR's 30, GIGI's 28) and the distance in source pixels that
+// splits their near and far actions (+0x7ca3): GIGI's 130, though each of
+// his entries names the same action for both.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -72,6 +74,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     kate: kate.commands,
     remu: remu.commands,
     rear: rear.commands,
+    gigi: gigi.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -472,6 +475,23 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dst', 14],
     ['dash', 21],
   ],
+  // GIGI's supers Rambu Beam, S chuck and EN3 (2, 1, 3) on 1-3 and his
+  // specials Bike Doge D K and D PK (11, 9) on 4 and 5; Dragon (5), K' (7),
+  // DIVE GIGI P (6) and Bike Doge D P (10) on Ryuko's drill, axe, iori and
+  // DST keys, his Change (12) on EX, then Dash F (16) and Dash B (17).
+  gigi: [
+    ['getterBeam', 2],
+    ['musashi', 1],
+    ['changeAttack', 3],
+    ['blackRush', 11],
+    ['megaBeam', 9],
+    ['drill', 5],
+    ['axe', 7],
+    ['iori', 6],
+    ['dst', 10],
+    ['ex', 12],
+    ['dash', 16],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -498,6 +518,7 @@ export const BACK_DASH: Record<Who, number> = {
   kate: 20,
   remu: 20,
   rear: 22,
+  gigi: 17,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

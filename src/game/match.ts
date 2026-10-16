@@ -15,6 +15,7 @@ import {
   SOU_INTRO_EX_TICK,
   ERUS_INTRO_EX_TICK,
   FENG_INTRO_EX_TICK,
+  GIGI_INTRO_EX_TICK,
   SOU_LANDING,
   SEAN_LANDING,
   GON_LANDING,
@@ -158,9 +159,15 @@ const reactionSlides: Partial<
   // Unclamped: the beam hit stops at its 25th moving tick, then drifts back in.
   hitRapid: slide(0, -150, 10), // 83, PC 954
 };
-// KAY's HISO stop holds 33 ticks (116, PC 1559) to Ryuko's 36.
+// KAY's HISO stop holds 33 ticks (116, PC 1559) to Ryuko's 36; GIGI's
+// heavy and rapid crouching guards slide at raw −320 unslowed (160, PC 2251)
+// and −250 (169, PC 2382).
 const OWN_SLIDES: Partial<Record<Who, typeof reactionSlides>> = {
   kay: { hisoStop: slide(39, -650, 10) },
+  gigi: {
+    crouchBlockHeavy: slide(9, -320),
+    crouchBlockRapid: slide(9, -250, 8),
+  },
 };
 // Reactions whose op 0x16 enters their air form off the floor.
 const AIR_FORMS: Partial<Record<Action, Action>> = {
@@ -658,6 +665,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kate: { launchDown: -800 },
   remu: { launchDown: -800 },
   rear: { launchDown: -800 },
+  gigi: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -748,6 +756,10 @@ const timeline = (f: Fighter) => f.branch!;
 // by Type to Normal (248, PC 3714), which the first enters while it is set
 // (PC 3698); his intro's (PC 466), as he lands (GON_LANDING), enters TYPE
 // CHANGE (49), which sets it (PC 542) and jumps back (39 + 28, PC 543).
+// GIGI's Change form at 100, set by Change (216, PC 3125) and cleared by
+// Change ex (217, PC 3137), which the first enters while it is set (PC
+// 3122); his intro's (PC 361) jumps to 開始時 2P (31) + 13, which sets it
+// (PC 345) before the same call of Demo stand (PC 346).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -763,6 +775,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   erus: { value: 10, intro: ERUS_INTRO_EX_TICK },
   feng: { value: 100, intro: FENG_INTRO_EX_TICK },
   gon: { value: 100, intro: GON_LANDING },
+  gigi: { value: 100, intro: GIGI_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -1800,6 +1813,18 @@ export class Match {
     this.action(f, 'script', true);
     f.branch = key;
     this.fireEvents(f);
+    // One with no display runs on through its last op 0x0a in the same step:
+    // GIGI's 技名11 (285), his Air Bike K's landing (slot 1, PC 4353), spawns
+    // Fly bike (284, PC 4517) and enters Dragon lend (240, PC 4518).
+    const { end, next, offset: at = 0 } = script(key, f.who);
+    if (
+      f.action === 'script' &&
+      f.branch === key &&
+      end === 'jump' &&
+      next !== null &&
+      !animationDuration(key, f.who)
+    )
+      this.enterSource(f, next, at);
   }
 
   // A handler's target, "action+offset" entering mid-action.

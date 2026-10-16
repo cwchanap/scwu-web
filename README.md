@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU or REAR on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR or GIGI on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -597,7 +597,34 @@ And REAR's, a masked blond fighter in a grey gi who, like GON, KATE and REMU, pu
 | 3, or ↓→↓→ K                   | en300: a giant sword's slashes, which miss an opponent standing close, 3 stocks                                                                                |
 | 4, or H K → J O                | evil en3: only below 30% life with three stocks, a green clock shot for 1; when it strikes, he spends the other two, takes a winged form and fires seven beams |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU or REAR), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And GIGI's, a big-headed grunt in a black mask with an FK crest and a skeleton-striped suit:
+
+| Input                          | GIGI's move                                                                                                                                                                                                                |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                                                                         |
+| P2 / P3                        | A lunging punch / a dash past the opponent that grabs them from behind and flips them over                                                                                                                                 |
+| K2 / K3                        | A high kick / a hopping kick                                                                                                                                                                                               |
+| Down + J / K                   | A leaping punch / a low drop kick                                                                                                                                                                                          |
+| In the air: J / K              | A punch / a kick                                                                                                                                                                                                           |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                                                         |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                                                      |
+| H                              | Hit Up: a rolling headbutt; on a hit, ↑ chases into the air                                                                                                                                                                |
+| O                              | Chuck: a grab that leaps up with the opponent and slams them down                                                                                                                                                          |
+| Blocking with a stock: H       | Counter Hit (after a heavy standing block, J and K together)                                                                                                                                                               |
+| E, or ↓ ↓ H                    | Enter or leave his Change form (half a stock): other forms of his specials and two supers                                                                                                                                  |
+| U, or →↓↘ J                    | Dragon: a rising spin, also in the air (in his Change form Jump att, a leap that grabs the opponent's head and flips them)                                                                                                 |
+| I, or ↓→ J                     | K': a rifle butt; → J follows with a shot, → K with an upward swing (in his Change form Chuck ECC, a tumbling blue toy robot that bursts)                                                                                  |
+| F, or ↓← J                     | DIVE: he sinks into the floor for up to 3 seconds, where ← and → move him and J or K comes up striking (in his Change form GIGI P, a rushing punch that ↓← J chains into two more, or ↓← K into a slide)                   |
+| G, or ↓ ↓ J                    | Bike Doge D P: a charge on an orange motorbike, also in the air; Ranbu or S chuck cancels it for two stocks (in his Change form Doge D, sinking into the floor to come up 150 source pixels on, or where he stands with K) |
+| 4, or ↓ ↓ K                    | Bike Doge D K: a motorbike leap, also in the air (in his Change form Doge D, coming up 300 source pixels on)                                                                                                               |
+| 5, or ↓ ↓ J K                  | Bike Doge D PK: Bike Doge D P (in his Change form Doge D, coming up where he stands)                                                                                                                                       |
+| 1, or ↓→↓→ J                   | Ranbu: a punch flurry whose last blow ↑ turns into a rising strike and ↓ into a low one, 1 stock (in his Change form Bean, a ray gun's beam across the screen, which misses an opponent standing close)                    |
+| 2, or ↓→↓← K                   | S chuck: a grab and a beating, 1 stock (in his Change form Counter, a 1-second stance: struck in it, he kicks back)                                                                                                        |
+| 3, or ↓→↓→ K                   | EN3: a stampede of GIGIs led by a blonde masked woman, 3 stocks                                                                                                                                                            |
+
+In his Change form GIGI P cancels into Bean, or into SC COUNTER, a stance that catches the opponent itself, for two stocks.
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR or GIGI), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -613,7 +640,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** twenty-four fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** twenty-five fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -625,7 +652,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's and REAR's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's and GIGI's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.
