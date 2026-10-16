@@ -9,7 +9,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "bun run assets && bun run check && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "check": "svelte-check --tsconfig ./tsconfig.json && tsc --noEmit",
+    "check": "NODE_OPTIONS=--max-old-space-size=8192 svelte-check --tsconfig ./tsconfig.json && NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",

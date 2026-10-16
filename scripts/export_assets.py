@@ -742,6 +742,14 @@ GIGI_TWINS = {name: (r, r + next(d for top, d in ((73, -2), (87, 2), (89, 3), (1
 SWW_TWINS = {name: (r, r + next(d for top, d in ((73, -1), (87, 2), (89, 3), (108, 2), (110, 5), (113, 0), (121, 2),
                                                   (139, 4), (173, 3)) if r < top))
              for name, (r, _) in ZOMA_TWINS.items()}
+# OGI's sit four after Ryuko's KOs and lose action, seven after his other
+# reactions up to HIT UP, eight from Hit Up Shack to SHOCK INFINITY (his ★変な
+# ＴＥＣＨ, 89, comes before them, Ryuko's after), seven from Shock to Hisa
+# side wall (102), eight from Clothes off500 (his CLOTHES OBJ1, 109, comes
+# before his clothes obj) and seven past Ryuko's Chuck Hiso (139), which he
+# lacks.
+OGI_TWINS = {name: (r, r + next(d for top, d in ((73, 4), (82, 7), (89, 8), (102, 7), (139, 8), (173, 7)) if r < top))
+             for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2242,6 +2250,65 @@ FIGHTERS = {
         # 690–705), as GIGI's; 399: *name (65, PC 649).
         image_ids={2000, 2001, 2002, 399},
     ),
+    "ogi": dict(
+        source=("27 OGI", "7a2fb88da89c82aeb63768958f367746dcaf858af9eab03f173f8f1ead0eae2a"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 58
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=OGI_TWINS,
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2028), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "blockStop", "crouchBlockStop", "blockRapid", "crouchBlockRapid",
+            "timeStopGuard", "crouchTimeStopGuard",
+            # Giant's, but with no check in its last 13 ticks (PC 2125).
+            "crouchBlockHeavy",
+            # Chung's rand % 3 > 1 (PCs 851, 875, 1262) to Ryuko's rand % 6 >
+            # 2, or no op 0x20.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "chainPull",
+            # SAKUYA's rand % 4 > 1 (PCs 1206, 1709, 1732).
+            "uppercut", "dragonFireball", "liftUp",
+            # SIN's: the sweep rolls rand % 3 > 1 to skip its sound (PC 935).
+            "sweep",
+            # Kiki's raw vx −800 (PC 1678).
+            "launchDown",
+            # Zoma's KO tests (PC 673) and landing wait.
+            "ko",
+            # KAY's: Zoma's KO DOWN (PC 721).
+            "down",
+            # GON's, clearing variable 6 before 14, but first clearing
+            # variable 7 (PC 664), which his program only ever clears.
+            "lose",
+            # Zoma's.
+            "shock", "rushAirHit", "airStun", "flySide", "twistSide",
+            # Chung's 1002-tick wait (PC 1190).
+            "flySideWall",
+            # Op 0x01 before op 0x02 (PC 1750), as ANMC P's.
+            "grabbed",
+            # Ryuko's, but clearing variable 14 before 5 (PC 1817), not after.
+            "musicAttack",
+            # Yo's: clears variable 14 before 8 and 5 (PC 1966), not after.
+            "vanish",
+            # Op 0x16 after clearing the variables (PC 1580), which Ryuko's
+            # ERUS INATUMA AIR clears instead.
+            "inatuma", "airInatuma",
+        },
+        # Results: 勝ち (62) calls demo act (29) once (PC 638) and loops image
+        # 642 (PCs 659–660); the draw calls 29 once (PC 741) and holds image
+        # 142 (PC 745). Each first enters DEMO air (30) while airborne (op
+        # 0x16, PCs 637, 740). The darkening panel, Black (47). The Vs.
+        # intro: 開始時 (34) jumps to 開始時 BR (36) for global 3 = 0 (PC 345),
+        # which rolls rand % 4 > 1 (PC 381), then skips its display for global
+        # 14 = 0 (PC 382), spawns Black and OP super Charge (43, PCs 384–385)
+        # and jumps to Round 1 (37) + 4 (PC 387), which spawns *OP obj (33)
+        # twice (PCs 401–402) and calls OP motion RP (41) 14 times (PC 403);
+        # it plays flattened. ponytail: the roll's other half, which jumps to
+        # RANDON OP1 (31) + 2 (PC 393), as long, isn't played.
+        actions=dict(win=62, winStand=29, winLoop=(62, 23), draw=69, black=47, intro=(36, 4)),
+        flat={"intro"},
+        # 2001: the HUD face action 77 shows (PC 789); 648: *name (70, PC
+        # 749).
+        image_ids={2001, 648},
+    ),
 }
 
 
@@ -2442,7 +2509,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI and {counts['sww']} SWW images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW and {counts['ogi']} OGI images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

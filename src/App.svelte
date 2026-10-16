@@ -342,6 +342,17 @@
         dst: 'Ryuseiken',
         ex: 'Chan',
       },
+      ogi: {
+        getterBeam: 's shoot',
+        musashi: 'SCC',
+        changeAttack: 'S Crush',
+        blackRush: 'EN300',
+        megaBeam: 'Fire K',
+        drill: 'Dragon',
+        axe: 'Crush',
+        iori: 'Rose',
+        dst: 'Fire P',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -573,6 +584,7 @@
             <option value="rear">REAR</option>
             <option value="gigi">GIGI</option>
             <option value="sww">SWW</option>
+            <option value="ogi">OGI</option>
           </select></label
         >
         <label
@@ -608,6 +620,7 @@
             <option value="rear">REAR</option>
             <option value="gigi">GIGI</option>
             <option value="sww">SWW</option>
+            <option value="ogi">OGI</option>
           </select></label
         >
         <label
@@ -1535,18 +1548,45 @@
           RSK, GOD DRAGON or COUNTER CHAIN for two stocks.
         </p>
         <p>
+          Choose OGI to play him, a white-haired, green-armed strongman who
+          suits up in a different robot armour, or a caped red coat, for most
+          moves.
+          <kbd>J</kbd> chains three punches, a thrown hook and a dash with a
+          chain whip, <kbd>K</kbd> a kick, a dashing slash and a grab into a
+          beating (at 30% life or less a longer one); down with <kbd>J</kbd> or
+          <kbd>K</kbd> is a long shield thrust or a burst of blasts.
+          <kbd>H</kbd> is his Hit Up, a rapier lunge, which ↑ chases into the
+          air after a hit, <kbd>O</kbd> his chuck, a grab and a throw. Blocking
+          with a stock, <kbd>H</kbd> spends it on Counter Hit. He has no EX
+          mode. His specials: <kbd>U</kbd> or →↓↘ <kbd>J</kbd> Dragon, a rising
+          claw, <kbd>I</kbd> or ↓← <kbd>J</kbd> Crush attack, a shield-bash dash
+          (in the air a dive), <kbd>F</kbd> or ↓← <kbd>K</kbd> Rose attack, a
+          rose tossed in a high arc that lands far off, taking 35 power,
+          <kbd>G</kbd> or ↓→ <kbd>J</kbd> fire p, a straight cannon shot, and
+          <kbd>5</kbd> or ↓→ <kbd>K</kbd> FIRE K, a cannon shell that bounces
+          along. His supers, for a stock each: <kbd>1</kbd> or ↓→↓→
+          <kbd>J</kbd> s shoot, a giant cannon blast, also in the air,
+          <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> SCC, close a grab and a beam-saber
+          stab, which ↓→ <kbd>K</kbd> follows with an uppercut and → ↓ ←
+          <kbd>K</kbd> with a throw, farther a leap into a beating, and
+          <kbd>3</kbd> or ↓←↓← <kbd>J</kbd> S Crush, a shield-bash dash and four
+          more; for three, <kbd>4</kbd> or ↓←↓→ <kbd>J</kbd> EN300, a blast thrown
+          in a high arc that flies over a close opponent but drops short near a wall.
+          fire p cancels into s shoot, SCC or S Crush for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI or SWW, and one of eighteen stages, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you just
-          under 30% for desperation moves. Vs. CPU is the original game's CPU,
-          playing the opponent's own moves, specials and supers. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes,
-          fighters or the stage starts a fresh match.
+          REAR, GIGI, SWW or OGI, and one of eighteen stages, in either mode.
+          Free practice has no timer, and you also choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you just under 30% for desperation moves. Vs. CPU is the
+          original game's CPU, playing the opponent's own moves, specials and
+          supers. Reduce their health to zero, or lead on health when time runs
+          out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

@@ -650,7 +650,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // OS FENG's 開始時 BR (34) from PC 363, KATE's 開始時 BR (32) from PC
     // 335, GIGI's 開始時 BR (32) from PC 350 and SWW's from PC 319, past
     // their global 14 = 0 tests (PCs 348, 317), into Round 1 + 2 and its call
-    // of Demo stand (PCs 362, 334): no op
+    // of Demo stand (PCs 362, 334), and OGI's 開始時 BR (36) from PC 384, past
+    // its (PC 382), into Round 1 (37) + 4 and its 14 calls of OP motion RP
+    // (41, PC 403): no op
     // 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
@@ -773,7 +775,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 211 from PC 577 (PC 578), past his sounds (PCs 574, 576). SWW's 勝ち
     // (57) loops from PC 542 (PC 560), past his sound and trail (PCs
     // 540–541), and his draw (64) from PC 644 (PC 646), past his sound (PC
-    // 643).
+    // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
+    // sound and *ef win (PCs 657–658).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -861,6 +864,7 @@ const TWIN_ANIMATIONS = {
   rear: twinAnimations('rear'),
   gigi: twinAnimations('gigi'),
   sww: twinAnimations('sww'),
+  ogi: twinAnimations('ogi'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
