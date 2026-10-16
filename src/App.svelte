@@ -353,6 +353,18 @@
         iori: 'Rose',
         dst: 'Fire P',
       },
+      ziro: {
+        getterBeam: 'Miss All',
+        musashi: 'Rambu',
+        changeAttack: 'EN300',
+        blackRush: 'Twin Shot',
+        megaBeam: 'CC',
+        drill: 'Fire Ball',
+        axe: 'Nataku',
+        iori: 'Telepot',
+        dst: 'Iori',
+        ex: 'Type',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -585,6 +597,7 @@
             <option value="gigi">GIGI</option>
             <option value="sww">SWW</option>
             <option value="ogi">OGI</option>
+            <option value="ziro">ZIRO</option>
           </select></label
         >
         <label
@@ -621,6 +634,7 @@
             <option value="gigi">GIGI</option>
             <option value="sww">SWW</option>
             <option value="ogi">OGI</option>
+            <option value="ziro">ZIRO</option>
           </select></label
         >
         <label
@@ -1575,11 +1589,44 @@
           fire p cancels into s shoot, SCC or S Crush for two stocks.
         </p>
         <p>
+          Choose ZIRO to play him, a teal-haired young man who calls up a
+          different robot suit, winged, caped, horned or heavily armed, for most
+          moves. <kbd>J</kbd> chains a punch, a caped robot's scythe swing and a
+          dragon-armed robot's trident flurry, <kbd>K</kbd> a kick, a gunner
+          robot's spinning volley and a horned robot's whip; down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a gatling volley or a low whip.
+          <kbd>H</kbd> is his Hit Up, a girl's rising kick, which ↑ chases into
+          the air after a hit, <kbd>O</kbd> his chuck, a grab and a throw.
+          Blocking with a stock, <kbd>H</kbd> spends it on Counter Hit.
+          <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> enters or leaves EX mode for half a
+          stock, which swaps his specials and supers. His specials:
+          <kbd>U</kbd> or →↓↘ <kbd>K</kbd> Fire Ball, a shell that speeds up as
+          it flies, two at 30% life or less (EX: a winged robot's rising slash),
+          <kbd>I</kbd> or ←↓↙ <kbd>J</kbd> nataku p, a dragon arm thrust up and
+          out, or ←↓↙ <kbd>K</kbd> straight out (EX: a cloaked robot's charge),
+          <kbd>F</kbd>
+          or ↓← <kbd>K</kbd> telepot, vanishing under a dark cloak to come out
+          past the opponent, or with ↓← <kbd>J</kbd> into the air,
+          <kbd>G</kbd> or ↓→ <kbd>J</kbd> IORI3HIT, a winged robot's dashing
+          slash that ↓→ <kbd>J</kbd> follows twice more, in the air a shot down
+          at the floor (EX: a fire ball; in the air a spin), and <kbd>5</kbd> or
+          ←↓→ <kbd>K</kbd> CC, a grab into blows and a leaping slam (EX: a
+          trident flurry). His supers, for a stock each: <kbd>1</kbd> or ↓→↓→
+          <kbd>K</kbd> MISS ALL, a gunner robot's barrage of bullets and
+          missiles (EX: a winged robot's beam), and <kbd>2</kbd> or ↓→↓←
+          <kbd>J</kbd> RAMBU, a dash into a rush of blows from each robot (EX: a
+          grab into one); for three, <kbd>3</kbd> or ↓←↓→ <kbd>J</kbd> EN300, a
+          winged robot rising to rain beams down, also in the air (EX: a diving
+          slash), and below 30% life <kbd>4</kbd> or a full turn of the stick
+          and <kbd>J</kbd> TWIN SHOT, twin beams swept round the whole screen (otherwise
+          the CC). nataku cancels into MISS ALL or RAMBU for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW or OGI, and one of eighteen stages, in either mode.
-          Free practice has no timer, and you also choose how the partner
+          REAR, GIGI, SWW, OGI or ZIRO, and one of eighteen stages, in either
+          mode. Free practice has no timer, and you also choose how the partner
           behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health

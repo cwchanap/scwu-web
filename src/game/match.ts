@@ -24,6 +24,9 @@ import {
   REMU_LANDING,
   REMU_WIN_FLIGHT,
   REAR_LANDING,
+  ZIRO_KO,
+  ZIRO_LANDING,
+  ZIRO_INTRO_EX_TICK,
   LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
@@ -394,7 +397,10 @@ const reactionPower = (f: Fighter): [number, number] =>
 // (REAR_LANDING); ponytail: his glide is longer than the camera's window
 // allows from where it would have to start, so its left bound (clampX) moves
 // him 30 source pixels on at the first step, and he lands that much nearer
-// the middle. The others' have no op 0x01, so they start where these end.
+// the middle. ZIRO's 開始時 BR (38) rises at −20000 for eight ticks (PC 445),
+// waits 48, then falls at 2000 under gravity 30 (PC 459) until he lands
+// (ZIRO_LANDING). The others' have no op 0x01, so they start where these
+// end.
 type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -436,6 +442,11 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [27, 1000, 200],
     [REAR_LANDING - 34, 800, 200, 60, -50],
   ],
+  ziro: [
+    [8, 0, -20000],
+    [48, 0],
+    [ZIRO_LANDING - 56, 0, 2000, 30],
+  ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP) and REMU's flight
 // (REMU_WIN_FLIGHT).
@@ -449,6 +460,14 @@ const WIN_MOTION: Partial<Record<Who, Runs>> = {
     [Infinity, 0, -1450],
   ],
 };
+// ZIRO's KO down slides at raw −200 for ten ticks (PCs 822–824), then
+// ZIRO_KO: ko DOWN2's flight and ko DOWN3's slide forward.
+const ZIRO_KO_MOTION: Runs = [
+  [10, -200],
+  [ZIRO_KO.launch - 10, 0],
+  [ZIRO_KO.flight, 200, -2400, 90],
+  [10, 200],
+];
 // A run's velocity at `age`, its accelerations added before each move.
 const runVelocity = (runs: Runs = [], age: number) => {
   for (const [ticks, vx, vy = 0, ay = 0, ax = 0] of runs) {
@@ -669,6 +688,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   gigi: { launchDown: -800 },
   sww: { launchDown: -800 },
   ogi: { launchDown: -800 },
+  ziro: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -766,6 +786,10 @@ const timeline = (f: Fighter) => f.branch!;
 // by Chan (211, PC 3031) and cleared by EX Chan (212, PC 3043), which the
 // first enters while it is set (PC 3028); his intro's (PC 330) enters EX
 // CHANGE (37), which sets it (PC 374) and jumps back (33 + 8, PC 375).
+// ZIRO's at 100, set by TO EX (251, PC 3757) and cleared by TO NOR (252, PC
+// 3770), which the first enters while it is set (PC 3754); his intro's (PC
+// 486), 68 ticks after he lands, enters Change EX (43), which sets it (PC
+// 548) and jumps back (39 + 35, PC 549).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -783,6 +807,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   gon: { value: 100, intro: GON_LANDING },
   gigi: { value: 100, intro: GIGI_INTRO_EX_TICK },
   sww: { value: 100, intro: SWW_INTRO_EX_TICK },
+  ziro: { value: 100, intro: ZIRO_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -1508,12 +1533,19 @@ export class Match {
 
   get resultReady() {
     // Authored: after the lettering, wait for each fighter to take its result
-    // or lie KO'd, as moves now run on past the round's end.
+    // or lie KO'd, as moves now run on past the round's end; ZIRO lies once
+    // his KO's flight lands (ZIRO_KO).
     return (
       this.winner !== null &&
       this.matchOver &&
       this.endingTicks >= this.roundEnd &&
-      this.fighters.every((f) => ['win', 'draw', 'koLand'].includes(f.action))
+      this.fighters.every(
+        (f) =>
+          f.action === 'win' ||
+          f.action === 'draw' ||
+          (f.action === 'koLand' &&
+            (f.who !== 'ziro' || f.age >= ZIRO_KO.launch + ZIRO_KO.flight)),
+      )
     );
   }
 
@@ -1610,6 +1642,14 @@ export class Match {
   // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
   // is over (PC 645).
   private moveKO(f: Fighter) {
+    if (f.action === 'koLand' && f.who === 'ziro') {
+      if (f.age === ZIRO_KO.burst)
+        for (const g of this.fighters) this.pause(g, 13);
+      const [vx, vy] = runVelocity(ZIRO_KO_MOTION, f.age - 1);
+      f.moving = f.facing * vx;
+      f.y = Math.min(0, f.y + vy);
+      return true;
+    }
     if (f.action === 'koLand') {
       if (f.age <= (f.who === 'amiro' ? 12 : 10))
         f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;

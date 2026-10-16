@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW or OGI on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI or ZIRO on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -674,7 +674,32 @@ And OGI's, a white-haired, green-armed strongman who suits up in a different rob
 | 3, or ↓←↓← J                   | S Crush: a shield-bash dash and four more, 1 stock                                                                                              |
 | 4, or ↓←↓→ J                   | EN300: a blast thrown in a high arc that bursts on the floor, 3 stocks; it flies over a close opponent but drops short near a wall              |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW or OGI), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And ZIRO's, a teal-haired young man who calls up a different robot suit, winged, caped, horned or heavily armed, for most moves:
+
+| Input                             | ZIRO's move                                                                                                                                         |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                             | P1 / K1: a punch / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                |
+| P2 / P3                           | A caped robot's scythe swing / a dragon-armed robot's trident flurry                                                                                |
+| K2 / K3                           | A gunner robot's spinning volley / a horned robot's whip                                                                                            |
+| Down + J / K                      | A gatling volley / a low whip                                                                                                                       |
+| In the air: J / K                 | A punch / a kick                                                                                                                                    |
+| Shift or → →; Shift + ← or ← ←    | Dash forward; back                                                                                                                                  |
+| ↑ in the air, or → → / ← ←        | Double jump; air dash                                                                                                                               |
+| H                                 | Hit Up: a girl's rising kick; on a hit, ↑ chases into the air                                                                                       |
+| O                                 | Chuck: a grab and a throw                                                                                                                           |
+| Blocking with a stock: H          | Counter Hit                                                                                                                                         |
+| E, or ↓ ↓ H                       | --TYPE--: EX mode on or off, half a stock; it swaps his specials and supers                                                                         |
+| U, or →↓↘ K                       | Fire Ball: a shell that speeds up as it flies, two at 30% life or less (EX: a winged robot's rising slash)                                          |
+| I, or ←↓↙ J / K                   | nataku: a dragon arm thrust up and out / straight out (EX: a cloaked robot's charge); MISS ALL or RAMBU cancels it for two stocks                   |
+| F, or ↓← K / J                    | telepot: vanishing under a dark cloak to come out past the opponent / into the air                                                                  |
+| G, or ↓→ J                        | IORI3HIT: a winged robot's dashing slash, which ↓→ J follows twice more; in the air, a shot down at the floor (EX: a fire ball; in the air, a spin) |
+| 5, or ←↓→ K                       | CC: a grab into blows and a leaping slam (EX: a trident flurry)                                                                                     |
+| 1, or ↓→↓→ K                      | MISS ALL: a gunner robot's barrage of bullets and missiles, 1 stock (EX: a winged robot's beam)                                                     |
+| 2, or ↓→↓← J                      | RAMBU: a dash into a rush of blows from each robot, 1 stock (EX: a grab into one)                                                                   |
+| 3, or ↓←↓→ J                      | EN300: a winged robot rising to rain beams down, 3 stocks (also in the air; EX: a diving slash)                                                     |
+| 4, or a full turn of the stick, J | TWIN SHOT: below 30% life, twin beams swept round the whole screen, 3 stocks; otherwise the CC                                                      |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI or ZIRO), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -690,7 +715,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** twenty-seven fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** twenty-eight fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -702,7 +727,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's and OGI's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's and ZIRO's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

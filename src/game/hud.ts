@@ -119,11 +119,11 @@ export function gaugeImage(tick: number) {
 // 757–773), GIGI's 72 in his Change form (PCs 730–746) and SWW's 72 (PCs
 // 690–705); G Suneo's 81 shows
 // 2006 for 2001's turns (PCs 845–863), as SIN's 73 (PCs 756–774), SAKUYA's
-// 87 (PCs 847–861), ALEX's 75 (PCs 737–750), OS FENG's 85 (PCs 884–901)
-// and GON's 82 do (PCs 884–897). Zoma's and Kiki's action 71 shows 2001 (PCs 677,
+// 87 (PCs 847–861), ALEX's 75 (PCs 737–750), OS FENG's 85 (PCs 884–901),
+// GON's 82 (PCs 884–897) and ZIRO's 87 do (PCs 999–1008). Zoma's and Kiki's action 71 shows 2001 (PCs 677,
 // 666), Yo's and LIZARD's 73 (PCs 728, 764), DIDO's 76 (PC 817), HISO's
 // KATE's and REMU's 76 (PCs 736, 754, 792), SEAN's and REAR's 75 (PCs
-// 756, 726) and OGI's 77 (PC 789).
+// 756, 726), OGI's 77 (PC 789) and ZIRO's 87 (PC 994).
 export const faceImage = (face: number, who?: Who) => {
   const side =
     who === 'suneo' ||
@@ -131,7 +131,8 @@ export const faceImage = (face: number, who?: Who) => {
     who === 'sakuya' ||
     who === 'alex' ||
     who === 'feng' ||
-    who === 'gon'
+    who === 'gon' ||
+    who === 'ziro'
       ? 2006
       : 2001;
   return face < 0 ? 2001 : [2002, side, 2000, side][Math.floor(face / 40) % 4];
@@ -145,7 +146,8 @@ export const faceImage = (face: number, who?: Who) => {
 // HISO's 66 445 (PC 693), ERUS's 68 366 (PC 714), OS FENG's 76 449
 // (PC 843), SEAN's 67 247 (PC 715), GON's 76 654 (PC 842), KATE's 66 276
 // (PC 711), REMU's 69 428 (PC 752), REAR's 67 387 (PC 685), GIGI's 68
-// 328 (PC 694), SWW's 65 399 (PC 649) and OGI's 70 648 (PC 749).
+// 328 (PC 694), SWW's 65 399 (PC 649), OGI's 70 648 (PC 749) and ZIRO's
+// 79 478 (PC 952).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -174,6 +176,7 @@ const NAMES: Record<Who, number> = {
   gigi: 328,
   sww: 399,
   ogi: 648,
+  ziro: 478,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

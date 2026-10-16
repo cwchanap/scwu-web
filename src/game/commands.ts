@@ -32,6 +32,7 @@ import rear from './generated/rear.json';
 import gigi from './generated/gigi.json';
 import sww from './generated/sww.json';
 import ogi from './generated/ogi.json';
+import ziro from './generated/ziro.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -42,15 +43,18 @@ export interface CommandEntry {
   far: number;
   crouch: number;
   steps: number[];
+  // Each step's u16 (+0x3e), exported where a step is typed.
+  params?: number[];
 }
 // Each player's entries (player +0x4da2: Ryuko's 23, Zoma's 25, Kiki's 20,
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
-// REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30) and the distance in
-// source pixels that splits their near and far actions (+0x7ca3): GIGI's
-// 130, though each of his entries names the same action for both, and OGI's
-// 140, which picks SCC's near or far start.
+// REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30) and the
+// distance in source pixels that splits their near and far actions
+// (+0x7ca3): GIGI's 130, though each of his entries names the same action
+// for both, OGI's 140, which picks SCC's near or far start, and ZIRO's 130,
+// RAMBU's and the telepots'.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -80,6 +84,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     gigi: gigi.commands,
     sww: sww.commands,
     ogi: ogi.commands,
+    ziro: ziro.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -531,6 +536,23 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dst', 16],
     ['dash', 21],
   ],
+  // ZIRO's supers MISS ALL, RAMBU, EN300 and TWIN SHOT (4, 3, 2, 1) on 1-4
+  // and his special CC (8) on 5; Fire Ball (10), nataku p (12), telepot (13)
+  // and IORI3HIT (15) on Ryuko's drill, axe, iori and DST keys, --TYPE-- (16)
+  // on her EX key, then Dash F (20) and Dash B (21).
+  ziro: [
+    ['getterBeam', 4],
+    ['musashi', 3],
+    ['changeAttack', 2],
+    ['blackRush', 1],
+    ['megaBeam', 8],
+    ['drill', 10],
+    ['axe', 12],
+    ['iori', 13],
+    ['dst', 15],
+    ['ex', 16],
+    ['dash', 20],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -560,6 +582,7 @@ export const BACK_DASH: Record<Who, number> = {
   gigi: 17,
   sww: 19,
   ogi: 22,
+  ziro: 21,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
@@ -580,8 +603,9 @@ const DIRECTIONS = [0, 0, 2, 10, 8, 9, 1, 5, 4, 6, 1, 4, 2, 8, 0, 0];
 // 0x410acf–0x410c24 (and the scan's 0x4101a7–0x4102e8): nibble 0 takes any
 // direction, 1–9 exactly theirs (1 none), 10–13 any that has their bit. The
 // buttons, bits 4–9, must all be held, and none of them the tick before.
-// ponytail: both fighters' steps are all type 0 (bits 14–15 clear); the
-// scan's held types 1–3 (0x4102ed–0x41061a) aren't ported.
+// Only ZIRO's TWIN SHOT has a typed step (bits 14–15), the turn (type 3,
+// below); ponytail: the scan's types 1 and 2 (0x4102ed, 0x410473) aren't
+// ported.
 function stepMatches(step: number, word: number, before: number) {
   const nibble = step & 15;
   const direction = word & 15;
@@ -597,6 +621,23 @@ function stepMatches(step: number, word: number, before: number) {
   );
 }
 
+// 0x41061a–0x410714: a turn step's first F, D, B or U scanned back (table
+// 0x410a00: DF counts as F, DB as D, UF as U, UB as B) starts two counts at
+// its u16 × 4 (0x41062a). One drops at each earlier exact F, D, B, U in turn
+// (0x410a28), the other each the other way round (0x410a38), and the step
+// matches once either falls below 2: a whole turn, either way.
+const TURN_START: Partial<Record<number, number>> = {
+  1: 3,
+  2: 1,
+  4: 0,
+  5: 3,
+  6: 0,
+  8: 2,
+  9: 2,
+  10: 1,
+};
+const TURN = [2, 8, 1, 4];
+
 // The last step marked 0x2000 matches first, then each earlier step on an
 // earlier tick, all within the last `window` ticks (op 0x24's 0x410a50 and
 // the scan's 0x410171–0x410878).
@@ -604,14 +645,39 @@ export function commanded(
   history: readonly number[],
   steps: readonly number[],
   window: number,
+  params: readonly number[] = [],
 ) {
   let k = steps.length - 1;
   while (k >= 0 && !(steps[k] & 0x2000)) k--;
   if (k < 0) return false;
   const now = history.length - 1;
-  for (let t = now; t > now - window; t--)
-    if (stepMatches(steps[k], history[t] ?? 0, history[t - 1] ?? 0) && --k < 0)
-      return true;
+  // The turn's states and counts, one each way round.
+  let ahead = -1;
+  let back = -1;
+  let aheadLeft = 0;
+  let backLeft = 0;
+  for (let t = now; t > now - window; t--) {
+    const word = history[t] ?? 0;
+    let matched: boolean;
+    if (steps[k] >> 14 !== 3)
+      matched = stepMatches(steps[k], word, history[t - 1] ?? 0);
+    else if (ahead < 0) {
+      ahead = back = TURN_START[word & 15] ?? -1;
+      aheadLeft = backLeft = (params[k] ?? 0) * 4;
+      matched = false;
+    } else {
+      if ((word & 15) === TURN[ahead & 3]) {
+        ahead++;
+        aheadLeft--;
+      }
+      if ((word & 15) === TURN[(back + 2) & 3]) {
+        back += 3;
+        backLeft--;
+      }
+      matched = aheadLeft < 2 || backLeft < 2;
+    }
+    if (matched && --k < 0) return true;
+  }
   return false;
 }
 
@@ -632,7 +698,7 @@ export function scan(
     if (!entry.window) continue;
     // An entry without steps ends the scan (0x410141).
     if (!entry.steps.length) return null;
-    if (!commanded(history, entry.steps, entry.window)) continue;
+    if (!commanded(history, entry.steps, entry.window, entry.params)) continue;
     // 0x41073e: matching a command whose window exceeds 29 clears all but
     // the last 20 ticks, whether or not it has an action.
     if (entry.window > 29) history.fill(0, 0, history.length - 20);
@@ -662,7 +728,13 @@ export function inject(
 ) {
   const words = entriesOf(who)
     [entry - 1].steps.filter((step) => step & 0x2000)
-    .map((step) => DIRECTIONS[step & 15] | (step & 0x3f0) | direction)
+    .flatMap((step) =>
+      // A turn step writes nothing the scan reads, which no CPU table enters.
+      // Authored: a key writes ZIRO's TWIN SHOT turn as F, D, B and U.
+      spaced && step >> 14 === 3
+        ? [2, 8, 1, 4]
+        : [DIRECTIONS[step & 15] | (step & 0x3f0) | direction],
+    )
     // Authored: a key puts a blank tick before a button its last step held,
     // the fresh press each step needs (G Suneo's hh: K, K, ←, J, K).
     .flatMap((word, k, words) =>

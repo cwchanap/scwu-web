@@ -89,7 +89,8 @@ describe('selected core animation assets', () => {
         ).toMatchObject({ width: frame.width, height: frame.height });
       }
     }
-  });
+    // Every fighter's exported PNGs: past the 5 s default under the full suite.
+  }, 30_000);
 
   it('plays the selected mobility and special poses across authored transitions', () => {
     expect(animationFrame(10, 0).image).toBe(29);

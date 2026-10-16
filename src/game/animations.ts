@@ -417,6 +417,14 @@ export const REMU_LANDING = 246;
 // fall passes the floor on his 17th move, into Round BR + 9 (slot 1, PC
 // 374).
 export const REAR_LANDING = 51;
+// ZIRO's, 8 ticks rising unseen at raw vy −20000 (PC 445), 48 still (PCs
+// 447–437), then falling at 2000 under gravity 30 (PC 459) until the fall
+// passes the floor 1599 source pixels down on his 63rd move, into Round 1 +
+// 11 (slot 1, PC 458).
+export const ZIRO_LANDING = 119;
+// His Round 1 checks down at PC 486, 68 ticks after he lands.
+export const ZIRO_INTRO_EX_TICK =
+  ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
 // KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
 // display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
 // step after his 47th move passes the floor (0x41187f), 114 source pixels
@@ -434,6 +442,21 @@ export const REMU_WIN_FLIGHT =
       0,
     ) +
   fighterClips.remu.win[0].duration;
+// ZIRO's KO down (70) lies 60 ticks, gets up and flashes red (PCs
+// 832–850): 228 in all. Then ko DOWN2 (71) stops both players 13 ticks (PC
+// 858), bursts for 6 and launches at raw 200/−2400 under gravity 90 (PC
+// 867) into ko down 2 fly (72), which spins until its 88th move passes the
+// floor, into ko DOWN3 (73, slot 1, PC 871), which slides at 200 for 10
+// (PC 890) and lies.
+export const ZIRO_KO = { burst: 228, launch: 234, flight: 88 };
+// A looping action's poses for `ticks`, as a jump back to its start replays
+// them until a handler cuts in.
+const repeated = (frames: Pose[], ticks: number) => {
+  const out: Pose[] = [];
+  for (let t = 0; t < ticks; t += out[out.length - 1].duration)
+    out.push(frames[out.length % frames.length]);
+  return out;
+};
 // Whose wins call their stand demo twice.
 const twiceWon = (who: Who) =>
   who === 'kate' || who === 'remu' || who === 'rear';
@@ -674,11 +697,19 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Round 1 + 44. REAR's 開始時 BR (33) from PC 345, past its global 14
     // = 0 test (PC 336), rises unseen and glides in (introMotion), landing
     // out of the wait at PC 381 at REAR_LANDING into Round BR + 9, which
-    // calls STAND DEMO twice (PC 386).
+    // calls STAND DEMO twice (PC 386). ZIRO's 開始時 BR (38) from PC 445,
+    // past its roll (PC 428) and global 14 = 0 test (PC 429), rises unseen
+    // and falls into Round 1 + 6 (introMotion), landing out of the wait at PC
+    // 461 at ZIRO_LANDING into Round 1 + 11. ponytail: the roll's other half,
+    // through RANDOM OP1 (31) + 2 (PC 444), isn't played.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
-        : who === 'sou' || who === 'gon' || who === 'remu' || who === 'rear'
+        : who === 'sou' ||
+            who === 'gon' ||
+            who === 'remu' ||
+            who === 'rear' ||
+            who === 'ziro'
           ? landed(
               z.intro,
               z.introLand,
@@ -687,6 +718,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                 gon: GON_LANDING,
                 remu: REMU_LANDING,
                 rear: REAR_LANDING,
+                ziro: ZIRO_LANDING,
               }[who],
             )
           : who === 'sean'
@@ -757,7 +789,19 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     getUp: clip(z.getUp),
     down: clip(z.ko, false, waits(z.ko)),
     koAgain: clip(z.koAgain),
-    koLand: clip(z.down),
+    // ZIRO_KO. ponytail: KO down's rand % 3 > 1 (PC 828) only picks its
+    // sound, and its rand % 4 > 2 (PC 834) into Random lose (75), which
+    // stands until struck, isn't played; the port always bursts.
+    koLand: clip(
+      who === 'ziro'
+        ? [
+            ...z.down,
+            ...z.koBurst,
+            ...repeated(z.koFly, ZIRO_KO.flight),
+            ...z.koRest,
+          ]
+        : z.down,
+    ),
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
     // 'win rp' (57) three times before its last display (PC 536) and G
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
@@ -776,7 +820,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // (57) loops from PC 542 (PC 560), past his sound and trail (PCs
     // 540–541), and his draw (64) from PC 644 (PC 646), past his sound (PC
     // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
-    // sound and *ef win (PCs 657–658).
+    // sound and *ef win (PCs 657–658), and ZIRO's 勝ち (66) image 142 from PC
+    // 765 (PC 766), past his sound (PC 764). ponytail: ZIRO's rand % 3 > 1
+    // (PC 758) into randon win1 (51) isn't played, nor demo act's EX stance,
+    // Demo act2 (29, PC 324).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -827,10 +874,26 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             // 734).
             who === 'feng' ? waits(z.win) : undefined,
           ),
+    // ZIRO's draw (78) then loops a call of Randon op rp (32, PCs 947–948).
+    // ponytail: its step back at raw −200 (PC 944) isn't played.
     draw: clip(
-      [...z.winStand, ...(twiceDrawn(who) ? z.winStand : []), ...z.draw],
-      who === 'sww' ? z.winStand.length : false,
-      waits([...z.winStand, ...(twiceDrawn(who) ? z.winStand : []), ...z.draw]),
+      [
+        ...z.winStand,
+        ...(twiceDrawn(who) ? z.winStand : []),
+        ...z.draw,
+        ...(z.drawLoop ?? []),
+      ],
+      who === 'sww'
+        ? z.winStand.length
+        : z.drawLoop
+          ? z.winStand.length + z.draw.length
+          : false,
+      waits([
+        ...z.winStand,
+        ...(twiceDrawn(who) ? z.winStand : []),
+        ...z.draw,
+        ...(z.drawLoop ?? []),
+      ]),
     ),
     fly: timeline(97),
     shock: timeline(88),
@@ -865,6 +928,7 @@ const TWIN_ANIMATIONS = {
   gigi: twinAnimations('gigi'),
   sww: twinAnimations('sww'),
   ogi: twinAnimations('ogi'),
+  ziro: twinAnimations('ziro'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

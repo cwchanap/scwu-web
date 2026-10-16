@@ -8,8 +8,8 @@
 // ERUS's (18 ERUS.PLAYER), OS FENG's (19 OS FENG.PLAYER), SEAN's
 // (20 SEAN.PLAYER), GON's (21 GON.PLAYER), KATE's (22 KATE.PLAYER),
 // REMU's (23 REMU.PLAYER), REAR's (24 REAR.PLAYER), GIGI's
-// (25 GIGI.PLAYER), SWW's (26 SWW.PLAYER) and OGI's (27 OGI.PLAYER); and
-// each stage's objects, images and track.
+// (25 GIGI.PLAYER), SWW's (26 SWW.PLAYER), OGI's (27 OGI.PLAYER) and
+// ZIRO's (28 ZIRO.PLAYER); and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -37,6 +37,7 @@ import rear from './generated/rear.json';
 import gigi from './generated/gigi.json';
 import sww from './generated/sww.json';
 import ogi from './generated/ogi.json';
+import ziro from './generated/ziro.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -66,7 +67,8 @@ export type Who =
   | 'rear'
   | 'gigi'
   | 'sww'
-  | 'ogi';
+  | 'ogi'
+  | 'ziro';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -95,6 +97,7 @@ export const CHARACTERS = {
   gigi,
   sww,
   ogi,
+  ziro,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -106,7 +109,7 @@ export type Container = Who | Stage;
 // Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490,
 // SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450, OS FENG's 470,
 // SEAN's 500, GON's 470, KATE's 430, REMU's 480, REAR's 470,
-// GIGI's 500, SWW's 460, OGI's 500.
+// GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -152,6 +155,7 @@ const twins = Object.fromEntries(
       'gigi',
       'sww',
       'ogi',
+      'ziro',
     ] as const
   ).map((who) => {
     const own = new Map(
