@@ -21,6 +21,7 @@ import {
   KAY_WIN_HOP,
   REMU_LANDING,
   REMU_WIN_FLIGHT,
+  REAR_LANDING,
   LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
@@ -379,9 +380,14 @@ const reactionPower = (f: Fighter): [number, number] =>
 // (GON_LANDING). REMU's 開始時 BR (35) rises at −6000 with gravity −10000
 // for two ticks (PC 388), sinks at 400 (PC 403) for 70, holds (PC 405),
 // soars under gravity −3000 (PC 425) for 10, holds 10 (PC 428) and falls
-// under gravity 90 (PC 431) until he lands (REMU_LANDING). The others' have
-// no op 0x01, so they start where these end.
-type Runs = [number, number, number?, number?][];
+// under gravity 90 (PC 431) until he lands (REMU_LANDING). REAR's 開始時 BR
+// (33) rises at −2000 for 7 ticks (PC 345), glides at 1000/200 for 27 (PC
+// 375), then slows by 50 under gravity 60 (PC 380) until he lands
+// (REAR_LANDING); ponytail: his glide is longer than the camera's window
+// allows from where it would have to start, so its left bound (clampX) moves
+// him 30 source pixels on at the first step, and he lands that much nearer
+// the middle. The others' have no op 0x01, so they start where these end.
+type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
   amiro: [
@@ -417,6 +423,11 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [10, 0],
     [REMU_LANDING - 185, 0, 0, 90],
   ],
+  rear: [
+    [7, 0, -2000],
+    [27, 1000, 200],
+    [REAR_LANDING - 34, 800, 200, 60, -50],
+  ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP) and REMU's flight
 // (REMU_WIN_FLIGHT).
@@ -430,12 +441,12 @@ const WIN_MOTION: Partial<Record<Who, Runs>> = {
     [Infinity, 0, -1450],
   ],
 };
-// A run's velocity at `age`, its gravity added before each move.
+// A run's velocity at `age`, its accelerations added before each move.
 const runVelocity = (runs: Runs = [], age: number) => {
-  for (const [ticks, vx, vy = 0, ay = 0] of runs) {
+  for (const [ticks, vx, vy = 0, ay = 0, ax = 0] of runs) {
     if (age < ticks)
       return [
-        vx * SOURCE_VELOCITY_SCALE,
+        vx * SOURCE_VELOCITY_SCALE + (age + 1) * ax * SOURCE_ACCELERATION_SCALE,
         vy * SOURCE_VELOCITY_SCALE + (age + 1) * ay * SOURCE_ACCELERATION_SCALE,
       ];
     age -= ticks;
@@ -443,8 +454,13 @@ const runVelocity = (runs: Runs = [], age: number) => {
   return [0, 0];
 };
 const introWalk = (who: Who) =>
-  (INTRO_MOTION[who] ?? []).reduce((x, [ticks, vx]) => x + ticks * vx, 0) *
-  SOURCE_VELOCITY_SCALE;
+  (INTRO_MOTION[who] ?? []).reduce(
+    (x, [ticks, vx, , , ax = 0]) =>
+      x +
+      ticks * vx * SOURCE_VELOCITY_SCALE +
+      ((ticks * (ticks + 1)) / 2) * ax * SOURCE_ACCELERATION_SCALE,
+    0,
+  );
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
 // Ryuko's knockdown, 'DOWN normal'.
@@ -641,6 +657,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   gon: { launchDown: -800 },
   kate: { launchDown: -800 },
   remu: { launchDown: -800 },
+  rear: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,

@@ -308,6 +308,16 @@
         iori: 'Jet',
         dst: 'Drill',
       },
+      rear: {
+        getterBeam: 'Gysa',
+        musashi: 'Viper F',
+        changeAttack: 'en300',
+        blackRush: 'Evil en3',
+        drill: 'Sama',
+        axe: 'Fire Ball',
+        iori: 'Down Att',
+        dst: 'Viper',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -536,6 +546,7 @@
             <option value="gon">GON</option>
             <option value="kate">KATE</option>
             <option value="remu">REMU</option>
+            <option value="rear">REAR</option>
           </select></label
         >
         <label
@@ -568,6 +579,7 @@
             <option value="gon">GON</option>
             <option value="kate">KATE</option>
             <option value="remu">REMU</option>
+            <option value="rear">REAR</option>
           </select></label
         >
         <label
@@ -1399,10 +1411,39 @@
           beating. Thander p, Phsy driver or MINAMI cancels tatsumaki for two stocks.
         </p>
         <p>
+          Choose REAR to play him, a masked blond fighter in a grey gi who, like
+          GON, KATE and REMU, puts on a different costume for most moves.
+          <kbd>J</kbd> chains a jab, a horned red robot's drill-armed thrust and
+          its spinning strikes, <kbd>K</kbd> a kick, a purple and blue robot's
+          low kicks and its kick that sends a green whirlwind along the floor;
+          down with <kbd>J</kbd> or <kbd>K</kbd> is the red robot's thrust or
+          the purple robot's beast-headed punch. In the air <kbd>J</kbd> is a
+          green-chested robot's punch and <kbd>K</kbd> the purple robot's kick.
+          <kbd>H</kbd> is his Hit Up, a blue horse's horn, which ↑ chases into
+          the air after a hit, <kbd>O</kbd> his chuck, a purple serpent's grab.
+          Blocking with a stock, <kbd>H</kbd> spends it on COUNTER ATT. His
+          specials: <kbd>U</kbd> or →↓↘ <kbd>K</kbd> SAMA, the purple robot's
+          rising shield punch (also in the air), <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> Fire ball, the red robot's fireball, <kbd>F</kbd> or ↓←
+          <kbd>K</kbd> DOWN ATTACK, a long leap that strikes as he lands, over a
+          near opponent's head, and <kbd>G</kbd> or ↓← <kbd>J</kbd> VIPER WHIP,
+          the red robot's whip. His supers, for a stock each: <kbd>1</kbd> or
+          ↓←↓→ <kbd>J</kbd> GYSA, the red robot's hammer that raises a pink
+          crystal ahead of him (below 30% health its Evil form, three crystals),
+          and <kbd>2</kbd> or ↓→↓→ <kbd>J</kbd> VIPER FINAL, a long whip that
+          catches the opponent for a purple blast; for three, <kbd>3</kbd> or
+          ↓→↓→ <kbd>K</kbd> en300, a giant sword's slashes, which miss an
+          opponent standing close. Only below 30% health and with three stocks,
+          <kbd>4</kbd> or <kbd>H</kbd> <kbd>K</kbd> → <kbd>J</kbd>
+          <kbd>O</kbd> evil en3 spends one on a green clock shot; when it strikes
+          he spends the other two, takes a winged form and fires seven beams. Fire
+          ball cancels into GYSA or VIPER FINAL for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE or REMU,
-          and one of eighteen stages, in either mode. Free practice has no
+          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU or
+          REAR, and one of eighteen stages, in either mode. Free practice has no
           timer, and you also choose how the partner behaves: standing, guarding
           high or low, guarding in the air, attacking in range, jumping in, or
           playing as the original CPU. Max stock refills your supers whenever
