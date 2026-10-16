@@ -365,6 +365,15 @@
         dst: 'Iori',
         ex: 'Type',
       },
+      masa: {
+        getterBeam: 'Rambu',
+        musashi: 'SCC',
+        changeAttack: 'Mesatsu',
+        drill: 'Shoryu',
+        axe: '3 Fire',
+        iori: '3 Hit',
+        dst: 'Bando',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -598,6 +607,7 @@
             <option value="sww">SWW</option>
             <option value="ogi">OGI</option>
             <option value="ziro">ZIRO</option>
+            <option value="masa">MASA</option>
           </select></label
         >
         <label
@@ -635,6 +645,7 @@
             <option value="sww">SWW</option>
             <option value="ogi">OGI</option>
             <option value="ziro">ZIRO</option>
+            <option value="masa">MASA</option>
           </select></label
         >
         <label
@@ -1622,12 +1633,38 @@
           the CC). nataku cancels into MISS ALL or RAMBU for two stocks.
         </p>
         <p>
+          Choose MASA to play him, a blond pilot in red armour who swings a
+          purple axe and swells into a bigger robot for his heaviest blows.
+          <kbd>J</kbd> or <kbd>K</kbd> swings the axe, which <kbd>J</kbd> or
+          <kbd>K</kbd> again at once swings twice, then <kbd>J</kbd> a third
+          time or <kbd>K</kbd> into a leaping chop; down with <kbd>J</kbd> or
+          <kbd>K</kbd> is a grenade that bounces along the floor or a low axe
+          sweep, and in the air <kbd>J</kbd> or <kbd>K</kbd> an axe swing or a
+          gun shot. <kbd>H</kbd> is his Hit Up, a rising axe slash, which ↑
+          chases into the air after a hit, <kbd>O</kbd> his chuck, a grab into
+          the big robot's blows. Blocking with a stock, <kbd>H</kbd> spends it
+          on Counter Attack. His specials: <kbd>U</kbd> or →↓↘ <kbd>J</kbd>
+          SHORYU, a rising uppercut that →↓↘ <kbd>J</kbd> follows twice more,
+          also in the air, <kbd>I</kbd> or ↓→ <kbd>K</kbd> 3Fire, a kick that
+          fires a missile, a second and third with → and <kbd>K</kbd>,
+          <kbd>F</kbd> or ↓← <kbd>J</kbd> 3HIT, an axe rush that ↓←
+          <kbd>J</kbd> follows twice more, and <kbd>G</kbd> or ↓← <kbd>K</kbd>
+          BANDO BOX, a bazooka's canister that arcs out and bursts, which ↓←
+          <kbd>K</kbd> fires twice more. His supers, for a stock each:
+          <kbd>1</kbd> or ↓→↓← <kbd>J</kbd> RAMBU SUP, a dash into a rush of
+          blows from the other fighters' shadows, and <kbd>2</kbd> or ←↓→←↓→
+          <kbd>K</kbd> SCC, a grab into the big robot's blows and a throw into
+          the wall; for three, <kbd>3</kbd> or <kbd>J</kbd> <kbd>J</kbd> →
+          <kbd>K</kbd> <kbd>J</kbd> MESATSU, a dash that grabs into a flurry of flashing
+          blows. 3HIT cancels into SCC or RAMBU SUP for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI or ZIRO, and one of eighteen stages, in either
-          mode. Free practice has no timer, and you also choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
+          REAR, GIGI, SWW, OGI, ZIRO or MASA, and one of eighteen stages, in
+          either mode. Free practice has no timer, and you also choose how the
+          partner behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health
           keeps you just under 30% for desperation moves. Vs. CPU is the

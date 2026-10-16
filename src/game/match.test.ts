@@ -2121,22 +2121,18 @@ describe('recovered supers', () => {
       match.step();
       return ryuko.black.shown;
     });
-    expect(shown).toEqual([
-      ...['opaque', 'half', 'half', 'half', 'half', 'half'],
-      ...['opaque', 'half', 'half', 'half', 'half', 'half'],
-      'opaque',
-    ]);
+    // It checks again after each opaque tick (PC 433), staying opaque.
+    expect(shown).toEqual(Array(13).fill('opaque'));
     expect(target.black.shown).toBe('none');
     until(match, () => ryuko.variables[14] === 0);
-    // PC 3990 clears it at age 80 (PC 3975 set it); the panel finishes its
-    // display.
-    expect(ryuko.age).toBe(80);
-    let left = 0;
-    while (ryuko.black.shown !== 'none') {
+    // PC 3990 clears it at age 80 (PC 3975 set it), after the panel's
+    // opaque tick; it then shows five at 50% (PCs 434–436).
+    expect([ryuko.age, ryuko.black.shown]).toEqual([80, 'opaque']);
+    const fade = Array.from({ length: 7 }, () => {
       match.step();
-      left++;
-    }
-    expect(left).toBeLessThanOrEqual(6);
+      return ryuko.black.shown;
+    });
+    expect(fade).toEqual([...Array(5).fill('half'), 'none', 'none']);
   });
 
   it("fades Musashi Hit's Ryuko to green and back through her fader", () => {

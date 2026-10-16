@@ -689,7 +689,11 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   sww: { launchDown: -800 },
   ogi: { launchDown: -800 },
   ziro: { launchDown: -800 },
+  masa: { launchDown: -800 },
 };
+// The darkening's variable: 14, or MASA's 13, which his Black (75) tests
+// (PCs 664, 669) and clears (PC 670) as Ryuko's does 14 (PCs 428–434).
+const darkening = (who: Who) => (who === 'masa' ? 13 : 14);
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
@@ -997,7 +1001,8 @@ export interface Fighter {
   // EX mode (exMode), 1 is 10 after a double jump and 20 in an air dash, 6 is
   // 100 through an IORI stage, 12 is 10 from EX Fire 2 (232, PC 3364) until
   // EX Fire (231, PC 3341) or its shot's hit (235, PC 3438) clears it, and
-  // 14 (selector 0x4e) is 100 through a super, which darkens the stage.
+  // 14 (selector 0x4e) is 100 through a super, which darkens the stage
+  // (MASA's 13, darkening).
   // Zoma's 0 counts his bombs, ten each, and 6 marks DRAGON.
   variables: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
@@ -2100,8 +2105,10 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
+        // Ryuko's Chuck OGI BALL (138), which REAR's 255 applies (response
+        // 62), has no rules, nor do the others' unpaired copies of it.
         const own = responsesOf(other.who)[event.response];
-        const reaction = RESPONSE_REACTIONS[ryukoTwin(other.who, own)];
+        const reaction = RESPONSE_REACTIONS[twinOf(other.who, own) ?? 0];
         if (!reaction || !this.struck(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
@@ -2953,17 +2960,18 @@ export class Match {
     // counts its cycle from the tick after the variable is set.
     for (const f of this.fighters) f.face = exMode(f) ? f.face + 1 : -1;
     // Action 43 runs in bucket 15, before the fighters' scripts (0x50): while
-    // variable 14 is 100 it shows its panel one tick opaque (PC 431), then
-    // five at 50% (PC 435), checking again after each (PCs 428, 433).
-    for (const { black, variables } of this.fighters) {
+    // variable 14 is 100 it shows its panel opaque a tick at a time (PCs
+    // 428–433); once it isn't, PC 434 sets it to 0 and the panel shows five
+    // ticks at 50% (PC 436).
+    for (const { black, variables, who } of this.fighters) {
+      const index = darkening(who);
       if (black.left > 1) black.left--;
-      else if (black.shown === 'opaque')
+      else if (variables[index] === 100)
+        Object.assign(black, { shown: 'opaque', left: 1 });
+      else if (black.shown === 'opaque') {
+        variables[index] = 0;
         Object.assign(black, { shown: 'half', left: 5 });
-      else
-        Object.assign(black, {
-          shown: variables[14] === 100 ? 'opaque' : 'none',
-          left: 1,
-        });
+      } else Object.assign(black, { shown: 'none', left: 1 });
     }
     this.run(player, opponent);
     this.fighters.forEach((f, index) => this.enter(f, index));

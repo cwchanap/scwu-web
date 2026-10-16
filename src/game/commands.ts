@@ -33,6 +33,7 @@ import gigi from './generated/gigi.json';
 import sww from './generated/sww.json';
 import ogi from './generated/ogi.json';
 import ziro from './generated/ziro.json';
+import masa from './generated/masa.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -50,11 +51,11 @@ export interface CommandEntry {
 // Chung's 22, Amiro's 20, ANMC P's 21, Giant's 18, G Suneo's 20, Yo's 23,
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
-// REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30) and the
-// distance in source pixels that splits their near and far actions
-// (+0x7ca3): GIGI's 130, though each of his entries names the same action
-// for both, OGI's 140, which picks SCC's near or far start, and ZIRO's 130,
-// RAMBU's and the telepots'.
+// REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
+// 21) and the distance in source pixels that splits their near and far
+// actions (+0x7ca3): GIGI's 130, though each of his entries names the same
+// action for both, OGI's 140, which picks SCC's near or far start, ZIRO's
+// 130, RAMBU's and the telepots', and MASA's 130, his SCC's.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -85,6 +86,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     sww: sww.commands,
     ogi: ogi.commands,
     ziro: ziro.commands,
+    masa: masa.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -553,6 +555,19 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 16],
     ['dash', 20],
   ],
+  // MASA's supers RAMBU SUP, SCC and MESATSU (3, 2, 1) on 1-3; his specials
+  // SHORYU (4), 3Fire (7), 3HIT (6) and BANDO BOX (5) on Ryuko's drill, axe,
+  // iori and DST keys, then Dash F (11) and Dash B (12).
+  masa: [
+    ['getterBeam', 3],
+    ['musashi', 2],
+    ['changeAttack', 1],
+    ['drill', 4],
+    ['axe', 7],
+    ['iori', 6],
+    ['dst', 5],
+    ['dash', 11],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -583,6 +598,7 @@ export const BACK_DASH: Record<Who, number> = {
   sww: 19,
   ogi: 22,
   ziro: 21,
+  masa: 12,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

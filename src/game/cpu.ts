@@ -31,6 +31,7 @@ import gigi from './generated/gigi.json';
 import sww from './generated/sww.json';
 import ogi from './generated/ogi.json';
 import ziro from './generated/ziro.json';
+import masa from './generated/masa.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -51,7 +52,7 @@ export interface CpuEntry {
 // G Suneo's 41, Yo's 41, SIN's 42, LIZARD's 42, KAY's 38,
 // DIDO's 48, SAKUYA's 42, ALEX's 40, SOU's 45, HISO's 43, ERUS's 52, OS FENG's 40,
 // SEAN's 41, GON's 45, KATE's 46, REMU's 49, REAR's 43,
-// GIGI's 42, SWW's 48, OGI's 48, ZIRO's 57.
+// GIGI's 42, SWW's 48, OGI's 48, ZIRO's 57, MASA's 38.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
@@ -82,6 +83,7 @@ export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   sww: sww.cpu,
   ogi: ogi.cpu,
   ziro: ziro.cpu,
+  masa: masa.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
@@ -118,6 +120,7 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   sww: {},
   ogi: {},
   ziro: {},
+  masa: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;
