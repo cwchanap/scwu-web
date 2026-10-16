@@ -732,6 +732,16 @@ REAR_TWINS = {name: (r, r + next(d for top, d in ((73, 1), (84, 5), (89, 6), (13
 GIGI_TWINS = {name: (r, r + next(d for top, d in ((73, -2), (87, 2), (89, 3), (103, 2), (105, 3), (110, 6), (113, -2),
                                                    (121, 3), (139, 5), (173, 4)) if r < top))
               for name, (r, _) in ZOMA_TWINS.items()}
+# SWW's sit one before Ryuko's KOs and lose action, two after his other
+# reactions, three for Twis 2 and SHOCK INFINITY (his ★変なＴＥＣＨ, 89, comes
+# between Twis and Twis 2), two from Shock to ICE Punch air, five for the
+# rambu stops (his own FB, FBB and FBH, 110–112, come before them, where
+# Ryuko's are), two from HISO stop, four from Pull Back (his UNCOUNTER
+# reactions, 123 and 124, come before it) and three past Ryuko's Chuck Hiso
+# (139), which he lacks.
+SWW_TWINS = {name: (r, r + next(d for top, d in ((73, -1), (87, 2), (89, 3), (108, 2), (110, 5), (113, 0), (121, 2),
+                                                  (139, 4), (173, 3)) if r < top))
+             for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2160,6 +2170,78 @@ FIGHTERS = {
         # (PCs 730–746), as Ryuko's in EX mode; 328: *name (68, PC 694).
         image_ids={2000, 2001, 2002, 328},
     ),
+    "sww": dict(
+        source=("26 SWW", "3d59b35b087fc4e294d4987dcd944d1f8b1e00ee32d69d62fbdbf57bec0dc881"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 55
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=SWW_TWINS,
+        # GIGI's, beside the op 0x1f on his counters' variable 4 each opens
+        # with (counter_records): 100 (PCs 856, 1752, ...), which COUNTER
+        # CHAIN's counter (319) holds for 70 ticks (PCs 4989–4994), enters
+        # CHAIN COOUNTER SUCCESS (325), or Chain Counter Fire (323) from the
+        # fire balls (PCs 1396, 1419); 200, which EX Chain (232) holds for 70
+        # ticks (PCs 3416–3431), enters EXC Att (233). Beside that:
+        differ={
+            # Giant's: Kiki's Hit Up within 10 ticks (PC 2187), and no op 0x1e
+            # window where Ryuko's opens one for COUNTER HIT.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy",
+            # DIDO's: Stop Stand, time stand and time stop stand hold their
+            # slide 23 ticks; so do his Stop Sit, time sit and time stop sit
+            # (PCs 2299, 2358, 2419), where hers hold 10.
+            "blockStop", "blockRapid", "timeStopGuard", "crouchBlockStop", "crouchBlockRapid", "crouchTimeStopGuard",
+            # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20.
+            "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "chainPull",
+            # SIN's: the sweep rolls rand % 3 > 1 to skip its sound (PC 869).
+            "sweep",
+            # Kiki's raw vx −800 (PC 1770).
+            "launchDown",
+            # Giant's: clear player variable 14, not 1 (PCs 2093, 2109).
+            "knockdown", "bounceDown",
+            # Zoma's KO tests (PC 574) and landing wait.
+            "ko",
+            # KAY's: Zoma's KO DOWN (PC 622).
+            "down",
+            # Zoma's, but setting variable 5 to 10 (PC 1043), which his J Att
+            # tests (PCs 814–815), where Zoma's clears it.
+            "shock",
+            # Zoma's.
+            "rushAirHit", "uppercut", "dragonFireball", "liftUp", "flySide", "twistSide",
+            # Chung's 1002-tick wait.
+            "flySideWall",
+            # Ryuko's, also clearing variable 8 after its test (PC 907).
+            "launchUp",
+            # Ryuko's and Zoma's, also clearing global 13 (PCs 1470, 1494),
+            # which neither the engine nor his program reads.
+            "stun", "airStun",
+            # Op 0x01 before op 0x02 (PC 1846), as ANMC P's.
+            "grabbed",
+            # Yo's: clears variable 14 before 8 and 5, not after.
+            "vanish",
+            # HISO's and ALEX's own copy of hit heavy, Giant's of HISA, and
+            # SAKUYA's BEAM Stand, rolling rand % 3 > 1 (PC 1432).
+            "fb", "fbb", "fbh",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead.
+            "inatuma", "airInatuma",
+        },
+        # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (123,
+        # 124), as Giant's. ponytail: as his, Air Fire plays as J Att.
+        aliases={123: 79, 124: 77},
+        # Results: 勝ち (57) calls Demo stand (28) once (PC 539) and loops
+        # PCs 542–559 (PC 560); the draw calls 28 once (PC 642) and loops
+        # images 288–289 (PC 646). Each first enters DEMO air (29) while
+        # airborne (op 0x16, PCs 538, 641). The darkening panel, Black (43).
+        # The Vs. intro, as GIGI's: 開始時 (30) jumps to 開始時 BR (32) for
+        # global 3 = 0 (PC 279), past its display for global 14 = 0 (PC 317),
+        # spawns Black and OP super Charge (39, PCs 319–320), then jumps to
+        # Round 1 (33) + 2 (PC 322), which calls Demo stand once (PC 334); it
+        # plays flattened.
+        actions=dict(win=57, winStand=28, winLoop=(57, 5), draw=64, black=43, intro=(32, 3)),
+        flat={"intro"},
+        # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
+        # 690–705), as GIGI's; 399: *name (65, PC 649).
+        image_ids={2000, 2001, 2002, 399},
+    ),
 }
 
 
@@ -2174,15 +2256,17 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # (PCs 744, 788, ...). ERUS's also clear her Book's variable 2 or test it
     # at 10 (PCs 787, 1254, ...). GON's test it at 300, 200 and 100 (PCs 914–
     # 916, ...), one value for each of his counters; his BEAM Air adds 0 to it
-    # (PC 1146), which changes nothing. Each reaction maps to these records in
-    # order: [variable, value, the test's target or 0 for a set].
+    # (PC 1146), which changes nothing. SWW's rambu AIR sets it to 0 and then
+    # tests it for 100 (PC 1722), which never passes, since the handler sets
+    # before it compares (0x4138df–0x413962). Each reaction maps to these
+    # records in order: [variable, value, the test's target or 0 for a set].
     counters = {}
     for own in set(tables["responses"]) - {0}:
         for pc in counter_records(p, own):
             record = p.records[pc]
             if record[5] == 4 and u16(record, 9) in ((100, 200, 300) if record[4] == 0x44 else (10,)):
                 counters.setdefault(own, []).append([record[4] & 0x3f, u16(record, 9), u16(record, 1)])
-            elif record[5] == 1 and u16(record, 7) == 0:
+            elif record[5] in (1, 5) and u16(record, 7) == 0 and (record[5] == 1 or u16(record, 9)):
                 counters.setdefault(own, []).append([record[4] & 0x3f, 0, 0])
             elif record[5] == 2 and u16(record, 7) == 0:
                 continue
@@ -2358,7 +2442,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR and {counts['gigi']} GIGI images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI and {counts['sww']} SWW images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

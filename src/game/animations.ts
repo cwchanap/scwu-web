@@ -352,9 +352,10 @@ export function heldFrame(
 // PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303),
 // ALEX's Round 1 at PC 356, from PC 333, SOU's at PC 415, as he lands
 // (SOU_LANDING), ERUS's Round 1 at PC 357, from PC 344, before her call of
-// stand demo (PCs 265–268), OS FENG's Round 1 at PC 393, from PC 363, and
+// stand demo (PCs 265–268), OS FENG's Round 1 at PC 393, from PC 363,
 // GIGI's Round 1 at PC 361, from PC 356, before his flattened intro's call of
-// Demo stand (PCs 288–295).
+// Demo stand (PCs 288–295), and SWW's Round 1 at PC 330, from PC 325, before
+// his (PCs 258–265).
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -383,6 +384,10 @@ export const FENG_INTRO_EX_TICK = ticksBefore(fighterClips.feng.intro, 393);
 export const GIGI_INTRO_EX_TICK = ticksBefore(
   fighterClips.gigi.intro.filter((frame) => frame.pc > 295),
   361,
+);
+export const SWW_INTRO_EX_TICK = ticksBefore(
+  fighterClips.sww.intro.filter((frame) => frame.pc > 265),
+  330,
 );
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
@@ -643,8 +648,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
     // HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344,
     // OS FENG's 開始時 BR (34) from PC 363, KATE's 開始時 BR (32) from PC
-    // 335 and GIGI's 開始時 BR (32) from PC 350, past its global 14 = 0 test
-    // (PC 348), into Round 1 + 2 and its call of Demo stand (PC 362): no op
+    // 335, GIGI's 開始時 BR (32) from PC 350 and SWW's from PC 319, past
+    // their global 14 = 0 tests (PCs 348, 317), into Round 1 + 2 and its call
+    // of Demo stand (PCs 362, 334): no op
     // 0x01, so each stands where they start. Amiro's Round BR (33)
     // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
     // her robot (introMotion), then calls Demo Stand three times (PC 392);
@@ -764,7 +770,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // image 384 from PC 595 (PC 596), past his sound and shake (PCs
     // 593–594). REAR's draw (66) calls STAND DEMO twice too (PC 678), as
     // GIGI's (63) does Demo stand (28, PC 659); GIGI's 勝ち (56) loops image
-    // 211 from PC 577 (PC 578), past his sounds (PCs 574, 576).
+    // 211 from PC 577 (PC 578), past his sounds (PCs 574, 576). SWW's 勝ち
+    // (57) loops from PC 542 (PC 560), past his sound and trail (PCs
+    // 540–541), and his draw (64) from PC 644 (PC 646), past his sound (PC
+    // 643).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -817,7 +826,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
           ),
     draw: clip(
       [...z.winStand, ...(twiceDrawn(who) ? z.winStand : []), ...z.draw],
-      false,
+      who === 'sww' ? z.winStand.length : false,
       waits([...z.winStand, ...(twiceDrawn(who) ? z.winStand : []), ...z.draw]),
     ),
     fly: timeline(97),
@@ -851,6 +860,7 @@ const TWIN_ANIMATIONS = {
   remu: twinAnimations('remu'),
   rear: twinAnimations('rear'),
   gigi: twinAnimations('gigi'),
+  sww: twinAnimations('sww'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

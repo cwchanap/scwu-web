@@ -330,6 +330,18 @@
         dst: 'Bike P',
         ex: 'Change',
       },
+      sww: {
+        getterBeam: 'Super RSK',
+        musashi: 'God Dragon',
+        changeAttack: 'C. Chain',
+        blackRush: 'EN300',
+        megaBeam: 'Healing',
+        drill: 'Dragon P',
+        axe: 'Ice Punch',
+        iori: 'Chain',
+        dst: 'Ryuseiken',
+        ex: 'Chan',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -560,6 +572,7 @@
             <option value="remu">REMU</option>
             <option value="rear">REAR</option>
             <option value="gigi">GIGI</option>
+            <option value="sww">SWW</option>
           </select></label
         >
         <label
@@ -594,6 +607,7 @@
             <option value="remu">REMU</option>
             <option value="rear">REAR</option>
             <option value="gigi">GIGI</option>
+            <option value="sww">SWW</option>
           </select></label
         >
         <label
@@ -1488,10 +1502,43 @@
           or S chuck, and GIGI P into Bean or Counter, for two stocks.
         </p>
         <p>
+          Choose SWW to play him, a red-haired boy in a red shirt who changes
+          into a different suit of armour for each move, and into gold armour at
+          30% life or less. <kbd>J</kbd> chains a jab, a lunging punch and a
+          dash through the opponent that leaves a flurry of blows behind them,
+          <kbd>K</kbd> a kick, a high kick and a long chain lash; down with
+          <kbd>J</kbd> or <kbd>K</kbd> is a flaming punch or a sliding sweep.
+          <kbd>H</kbd> is his Hit Up, a rising punch, which ↑ chases into the
+          air after a hit, <kbd>O</kbd> his chuck, a grab and a throw. Blocking
+          with a stock, <kbd>H</kbd> spends it on Counter Hit. <kbd>E</kbd> or ↓
+          ↓ <kbd>H</kbd> enters or leaves EX mode for half a stock, which swaps
+          his specials and three supers. His specials: <kbd>U</kbd> or →↓↘
+          <kbd>J</kbd> Dragon P, a rising uppercut (EX: a flying knee),
+          <kbd>I</kbd> or ↓← <kbd>J</kbd> ICE Punch, a punch with an ice spark
+          (EX: a dash through the opponent), <kbd>F</kbd> or ↓← <kbd>K</kbd>
+          Chain att, a chain lash across the screen, which again within a moment of
+          a hit lashes once more (EX: EX Chain, a spinning chain: struck in it, he
+          lashes back), and <kbd>G</kbd> or ↓→ <kbd>J</kbd> Ryuseiken, a punch
+          flurry that ↓→ <kbd>J</kbd> follows with a dashing one, in the air a
+          flaming bird (EX: fists of light flying across the screen). His
+          supers, for a stock each: <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> SUPER RSK,
+          a flurry under a winged horse (EX: Gysa, an ice blast that flies past
+          an opponent standing close), <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> GOD
+          DRAGON, charging uppercuts (EX: a rising dragon), and <kbd>3</kbd> or
+          ↓←↓← <kbd>J</kbd> COUNTER CHAIN, a stance: struck in it, he lashes
+          back (EX: a dashing chain lash); for three, <kbd>4</kbd> or ↓←↓→
+          <kbd>J</kbd> EN300, a winged charge across the whole screen, and at
+          30% life or less <kbd>5</kbd> or ↓←↓← <kbd>K</kbd> Healing, which
+          restores 160 life. Also at 30% or less, <kbd>J</kbd> <kbd>J</kbd> →
+          <kbd>K</kbd> <kbd>J</kbd> is ROLL CRASH, for two stocks: a grab that leaps
+          and crashes down, knocking out both fighters. Ryuseiken cancels into SUPER
+          RSK, GOD DRAGON or COUNTER CHAIN for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR or GIGI, and one of eighteen stages, in either mode. Free
+          REAR, GIGI or SWW, and one of eighteen stages, in either mode. Free
           practice has no timer, and you also choose how the partner behaves:
           standing, guarding high or low, guarding in the air, attacking in
           range, jumping in, or playing as the original CPU. Max stock refills

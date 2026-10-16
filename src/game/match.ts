@@ -16,6 +16,7 @@ import {
   ERUS_INTRO_EX_TICK,
   FENG_INTRO_EX_TICK,
   GIGI_INTRO_EX_TICK,
+  SWW_INTRO_EX_TICK,
   SOU_LANDING,
   SEAN_LANDING,
   GON_LANDING,
@@ -666,6 +667,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   remu: { launchDown: -800 },
   rear: { launchDown: -800 },
   gigi: { launchDown: -800 },
+  sww: { launchDown: -800 },
 };
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
@@ -759,7 +761,10 @@ const timeline = (f: Fighter) => f.branch!;
 // GIGI's Change form at 100, set by Change (216, PC 3125) and cleared by
 // Change ex (217, PC 3137), which the first enters while it is set (PC
 // 3122); his intro's (PC 361) jumps to 開始時 2P (31) + 13, which sets it
-// (PC 345) before the same call of Demo stand (PC 346).
+// (PC 345) before the same call of Demo stand (PC 346). SWW's at 100, set
+// by Chan (211, PC 3031) and cleared by EX Chan (212, PC 3043), which the
+// first enters while it is set (PC 3028); his intro's (PC 330) enters EX
+// CHANGE (37), which sets it (PC 374) and jumps back (33 + 8, PC 375).
 const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
@@ -776,6 +781,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   feng: { value: 100, intro: FENG_INTRO_EX_TICK },
   gon: { value: 100, intro: GON_LANDING },
   gigi: { value: 100, intro: GIGI_INTRO_EX_TICK },
+  sww: { value: 100, intro: SWW_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -2072,11 +2078,18 @@ export class Match {
         break;
       }
       case 'power':
-        // 0x40e7c0 adds a gain to the player's own life, up to full life
-        // (0x40ea9f): Yo's ZOMBI WALK bite, 2 a pass through ZOMBI RP (PC
-        // 3056), then 6 (PC 3011). No script lowers its own.
+        // 0x40e7c0 changes the player's own life as it does the opponent's
+        // (0x41323a, 0x413298), a gain up to full life (0x40ea9f): Yo's
+        // ZOMBI WALK bite, 2 a pass through ZOMBI RP (PC 3056), then 6 (PC
+        // 3011). SWW's Roll Crash hit takes 1000 from both (PC 5957), his
+        // own first: a double KO.
         if (event.selfLife > 0)
           self.hp = Math.min(lifeOf(self.who), self.hp + event.selfLife);
+        if (event.selfLife < 0) {
+          const wasOut = self.hp === 0;
+          loseLife(self, -event.selfLife);
+          if (self.hp === 0) this.queue(self, knockedOut(wasOut));
+        }
         if (event.otherLife < 0) {
           const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
