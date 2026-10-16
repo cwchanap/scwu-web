@@ -690,10 +690,12 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   ogi: { launchDown: -800 },
   ziro: { launchDown: -800 },
   masa: { launchDown: -800 },
+  times: { launchDown: -800 },
 };
-// The darkening's variable: 14, or MASA's 13, which his Black (75) tests
-// (PCs 664, 669) and clears (PC 670) as Ryuko's does 14 (PCs 428–434).
-const darkening = (who: Who) => (who === 'masa' ? 13 : 14);
+// The darkening's variable: 14, or MASA's and 3-TIMES's 13, which their
+// Black (75) tests (PCs 664, 669; 573, 578) and clears (PCs 670, 579) as
+// Ryuko's does 14 (PCs 428–434).
+const darkening = (who: Who) => (who === 'masa' || who === 'times' ? 13 : 14);
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
@@ -1002,7 +1004,7 @@ export interface Fighter {
   // 100 through an IORI stage, 12 is 10 from EX Fire 2 (232, PC 3364) until
   // EX Fire (231, PC 3341) or its shot's hit (235, PC 3438) clears it, and
   // 14 (selector 0x4e) is 100 through a super, which darkens the stage
-  // (MASA's 13, darkening).
+  // (MASA's and 3-TIMES's 13, darkening).
   // Zoma's 0 counts his bombs, ten each, and 6 marks DRAGON.
   variables: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a

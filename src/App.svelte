@@ -374,6 +374,14 @@
         iori: '3 Hit',
         dst: 'Bando',
       },
+      times: {
+        getterBeam: 'Rambu',
+        musashi: 'Super Boom',
+        changeAttack: 'Mesatsu',
+        drill: 'Shoryu',
+        axe: 'Fire',
+        iori: 'Dash P',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -608,6 +616,7 @@
             <option value="ogi">OGI</option>
             <option value="ziro">ZIRO</option>
             <option value="masa">MASA</option>
+            <option value="times">3-TIMES</option>
           </select></label
         >
         <label
@@ -646,6 +655,7 @@
             <option value="ogi">OGI</option>
             <option value="ziro">ZIRO</option>
             <option value="masa">MASA</option>
+            <option value="times">3-TIMES</option>
           </select></label
         >
         <label
@@ -1659,18 +1669,40 @@
           blows. 3HIT cancels into SCC or RAMBU SUP for two stocks.
         </p>
         <p>
+          Choose 3-TIMES to play him, a blond pilot in red armour like MASA's,
+          who swings a purple axe and dashes with two shadows of himself.
+          <kbd>J</kbd> is a dashing axe swing that strikes three times,
+          <kbd>K</kbd> a grenade lobbed to hop along the floor and <kbd>O</kbd>
+          a heavy axe swing that shakes the screen, standing or crouching; in the
+          air <kbd>J</kbd> or <kbd>O</kbd> swings the axe and <kbd>K</kbd>
+          fires two shots angled down. His dash is a run that goes on while → is held,
+          ↑ leaping into a high jump. He has no Hit Up, chuck, double jump, air dash
+          or Counter Attack. His specials: <kbd>U</kbd> or →↓↘
+          <kbd>J</kbd> SHORYU, a crescent slash that rises forward,
+          <kbd>I</kbd> or ↓→ <kbd>K</kbd> FIRE, a pink crescent that flies
+          across the screen, and <kbd>F</kbd> or ↓→ <kbd>J</kbd> DASH P, a
+          dashing swing with two shadows of himself. His supers, for a stock
+          each: <kbd>1</kbd> or ↓→↓← <kbd>J</kbd> Rambu, his armour bursting off
+          for a dash into a rush of the other fighters' shadows, and
+          <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> SB, fifteen grenades lobbed in a
+          spread; for three, <kbd>3</kbd> or <kbd>J</kbd> <kbd>J</kbd> →
+          <kbd>K</kbd> <kbd>J</kbd> MESATSU, a cut-in, then a dash that grabs
+          into a flurry. <kbd>J</kbd> cancels into <kbd>O</kbd> or a special,
+          <kbd>O</kbd> into a special, and DASH P into a super.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO or MASA, and one of eighteen stages, in
-          either mode. Free practice has no timer, and you also choose how the
-          partner behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, jumping in, or playing as the original CPU. Max
-          stock refills your supers whenever you stand idle, and Low health
-          keeps you just under 30% for desperation moves. Vs. CPU is the
-          original game's CPU, playing the opponent's own moves, specials and
-          supers. Reduce their health to zero, or lead on health when time runs
-          out. Changing modes, fighters or the stage starts a fresh match.
+          REAR, GIGI, SWW, OGI, ZIRO, MASA or 3-TIMES, and one of eighteen
+          stages, in either mode. Free practice has no timer, and you also
+          choose how the partner behaves: standing, guarding high or low,
+          guarding in the air, attacking in range, jumping in, or playing as the
+          original CPU. Max stock refills your supers whenever you stand idle,
+          and Low health keeps you just under 30% for desperation moves. Vs. CPU
+          is the original game's CPU, playing the opponent's own moves, specials
+          and supers. Reduce their health to zero, or lead on health when time
+          runs out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

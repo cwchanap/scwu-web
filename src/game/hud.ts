@@ -123,8 +123,8 @@ export function gaugeImage(tick: number) {
 // GON's 82 (PCs 884–897) and ZIRO's 87 do (PCs 999–1008). Zoma's and Kiki's action 71 shows 2001 (PCs 677,
 // 666), Yo's and LIZARD's 73 (PCs 728, 764), DIDO's 76 (PC 817), HISO's
 // KATE's and REMU's 76 (PCs 736, 754, 792), SEAN's and REAR's 75 (PCs
-// 756, 726), OGI's 77 (PC 789), ZIRO's 87 (PC 994) and MASA's 117 (PC
-// 1056).
+// 756, 726), OGI's 77 (PC 789), ZIRO's 87 (PC 994), MASA's 117 (PC
+// 1056) and 3-TIMES's 114 (PC 953).
 export const faceImage = (face: number, who?: Who) => {
   const side =
     who === 'suneo' ||
@@ -148,7 +148,7 @@ export const faceImage = (face: number, who?: Who) => {
 // (PC 843), SEAN's 67 247 (PC 715), GON's 76 654 (PC 842), KATE's 66 276
 // (PC 711), REMU's 69 428 (PC 752), REAR's 67 387 (PC 685), GIGI's 68
 // 328 (PC 694), SWW's 65 399 (PC 649), OGI's 70 648 (PC 749), ZIRO's 79
-// 478 (PC 952) and MASA's 106 139 (PC 1012).
+// 478 (PC 952), MASA's 106 139 (PC 1012) and 3-TIMES's 105 139 (PC 913).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -179,6 +179,7 @@ const NAMES: Record<Who, number> = {
   ogi: 648,
   ziro: 478,
   masa: 139,
+  times: 139,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

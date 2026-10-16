@@ -770,6 +770,15 @@ ZIRO_TWINS = {name: (r, r + next(d for top, d in ((73, 8), (89, 17), (103, 16), 
 # Ryuko's Chuck Hiso (139), which he lacks.
 MASA_TWINS = {name: (r, r + next(d for top, d in ((62, 37), (73, 39), (89, 47), (139, 46), (173, 45)) if r < top))
               for name, (r, _) in ZOMA_TWINS.items()}
+# 3-TIMES's sit thirty-six after Ryuko's KOs and lose action, thirty-eight
+# from KO DOWN (his KO 2 and KO 2 2nd, 98–99, come before his KO down),
+# forty-four after his other reactions up to SHOCK INFINITY, forty-three from
+# Shock (his ★変なＴＥＣＨ, 89, sits among his basic actions) and forty-two
+# past Ryuko's Chuck Hiso (139), which he lacks; his guards follow one another
+# from 191, without Ryuko's COUNTER NO forms between them.
+TIMES_TWINS = {name: (r, r + next(d for top, d in ((62, 36), (73, 38), (89, 44), (139, 43), (149, 42)) if r < top))
+               for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 191 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2489,6 +2498,96 @@ FIGHTERS = {
         # 1012).
         image_ids={2001, 139},
     ),
+    "times": dict(
+        source=("30 3-TIMES", "9193936fbd71a05971d7acb6038f0278464ca08fbb3b267f9675771c45cefb59"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 35
+                 "crouchEnter": 14, "crouch": 15, "stand": 16, "turn": 19, "crouchTurn": 20},
+        twins=TIMES_TWINS,
+        # His darkening is variable 13, as MASA's: his Black (75) tests it
+        # (PC 573) and his supers set it to 100 (PCs 2926, 3316, 3730), so
+        # his reactions clear 13 where Ryuko's clear 14, and never his unused
+        # 6, which hers clear too:
+        differ={
+            # Ryuko's, clearing 14, but gaining more power (op 0x15: 2, 5 and
+            # 3 to her 1, 3 and 2, PCs 2176, 2209, ...) without her op 0x10
+            # into its COUNTER NO form, op 0x1e or Hit Up checks into COUNTER
+            # HIT, so each holds one longer display (PCs 2182, 2218, ...).
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # Ryuko's, gaining more power (PCs 2198, ...).
+            "airGuard", "airBlockHeavy", "airBlockRapid", "airTimeStopGuard",
+            # Ryuko's, clearing only 13 (PCs 974, ...).
+            "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "sweep", "hitRapid",
+            "airHitRapid", "stun", "fireLaunch", "gonMiss", "chuckUp", "twistSideHit", "icePunch", "airIcePunch",
+            "hisoStop", "chuckYo",
+            # Chung's rand % 3 > 1 (PCs 1015, 1038) to Ryuko's rand % 6 > 2,
+            # or no op 0x20, clearing only 13.
+            "hitHeavy", "airHitHeavy", "launchAway", "chuckToss",
+            # Kiki's uppercut family, without Ryuko's rand % 6 > 2, clearing
+            # only 13 (PC 1348, ...).
+            "uppercut", "dragonFireball", "liftUp",
+            # OS FENG's Tatumakis, clearing only 13 (PC 1401, ...).
+            "tatumakiIn", "tatumakiOut",
+            # SAKUYA's, clearing only 13 (PC 1787).
+            "launchDown",
+            # Zoma's, clearing only 13 (PCs 1254, 1759, ...).
+            "shock", "airStun", "flySide", "twistSide", "inatuma", "rushAirHit",
+            # SWW's Hit UP, clearing only 13 (PC 1133).
+            "launchUp",
+            # ZIRO's FLY NO HIT, clearing only 13 (PC 1368).
+            "fly",
+            # SIN's Chain pull back, clearing only 13 (PC 1504).
+            "chainPull",
+            # ANMC P's op 0x01 before op 0x02, clearing only 13 (PC 1862).
+            "grabbed",
+            # Yo's: clears 13 before 8 and 5 (PC 2096), not after.
+            "vanish",
+            # MASA's: Ryuko's, clearing 13 (PCs 2142, 2158) where hers clear 6.
+            "knockdown", "bounceDown",
+            # MASA's: Ryuko's, then a voice from a chain of rolls, rand % 9 >
+            # 1 to rand % 3 > 1 (PCs 2114–2134).
+            "getUp",
+            # Giant's KO tests (PC 801), after jumping to KO 2 (98, PC 800)
+            # for variable 14 = 10, which only his 開始時 D50 and D10 (47–48,
+            # PCs 316, 325) set.
+            "ko",
+            # MASA's: Ryuko's, after jumping to KO 2 2nd (99, PC 826) for
+            # variable 14 = 10.
+            "koAgain",
+            # KAY's KO down.
+            "down",
+            # MASA's: Ryuko's, clearing only 13 (PC 794) where hers clears 14,
+            # 6 and 8.
+            "lose",
+            # MASA's, but clearing variables 8, 5 and 13 (PCs 1930–1932): it
+            # rolls rand % 3 > 1 (PC 1936) past a voice that a chain of rolls
+            # picks (PCs 1940–1961) to call its displays ten times (PC 1938);
+            # ponytail: the match runs its first roll and the chain's first,
+            # and one call per pass.
+            "musicAttack",
+            # Chung's 1002-tick wait.
+            "flySideWall",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead.
+            "airInatuma",
+        },
+        # Results: 勝ち (94) calls DEMO STAND (32) twice (PC 769), rolls a voice
+        # (PCs 770–788) and loops his stance from PC 789 (PC 792); the draw
+        # (104) calls 32 twice (PC 907) and holds image 122 (PC 909). Each
+        # first enters DEMO air (33) while airborne (op 0x16, PCs 768, 906).
+        # The darkening panel, Black (75). The Vs. intro: 開始時 (44) jumps
+        # to 開始時 BR (52) for global 3 = 0 (PC 267), which, for global 14 =
+        # 0, jumps past its display (PC 369), spawns Black and OP super Charge
+        # (71, PCs 371–372) and enters OP normal (65) + 2 (PC 374), which
+        # fades him in and calls DEMO STAND 7 times (PC 525); it plays
+        # flattened. ponytail: 開始時's test of global 10 for 10 (PC 266),
+        # into 開始時 SELECT (51), isn't played.
+        actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75, intro=(52, 4)),
+        flat={"intro"},
+        # 2001: the HUD face action 114 shows (PC 953); 139: *name (105, PC
+        # 913).
+        image_ids={2001, 139},
+    ),
 }
 
 
@@ -2689,7 +2788,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO and {counts['masa']} MASA images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA and {counts['times']} 3-TIMES images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

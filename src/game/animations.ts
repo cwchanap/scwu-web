@@ -459,9 +459,13 @@ const repeated = (frames: Pose[], ticks: number) => {
 };
 // Whose wins call their stand demo twice.
 const twiceWon = (who: Who) =>
-  who === 'kate' || who === 'remu' || who === 'rear' || who === 'masa';
+  who === 'kate' ||
+  who === 'remu' ||
+  who === 'rear' ||
+  who === 'masa' ||
+  who === 'times';
 const twiceDrawn = (who: Who) =>
-  who === 'rear' || who === 'gigi' || who === 'masa';
+  who === 'rear' || who === 'gigi' || who === 'masa' || who === 'times';
 // A flight's displays until `age`, then its landing action's.
 function landed(flight: Pose[], landing: Pose[], age: number) {
   const ticks = flight.map((f) => f.duration);
@@ -827,8 +831,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // Demo act2 (29, PC 324). MASA's 勝ち (94) calls DEMO STAND (32) twice (PC
     // 861) and jumps to Win Motion (95, PC 881), which loops images 450–451
     // from PC 889 (PC 891); his draw (105) calls 32 twice too (PC 1006).
-    // ponytail: the rolls that pick his win voice (PCs 862–880) aren't
-    // played.
+    // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
+    // his stance from PC 789 (PC 792), and his draw (104) calls 32 twice
+    // too (PC 907). ponytail: the rolls that pick their win voices (PCs
+    // 862–880; 770–788) aren't played.
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -935,6 +941,7 @@ const TWIN_ANIMATIONS = {
   ogi: twinAnimations('ogi'),
   ziro: twinAnimations('ziro'),
   masa: twinAnimations('masa'),
+  times: twinAnimations('times'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
