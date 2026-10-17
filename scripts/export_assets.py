@@ -846,6 +846,13 @@ SHINZ_TWINS = {name: (r, r + next(d for top, d in ((73, 9), (75, 14), (89, 15), 
 ZAKU_TWINS = {name: (r, r + next(d for top, d in ((73, -1), (75, 14), (89, 15), (139, 14), (149, 13)) if r < top))
               for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
     name: (r, 162 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
+# GOLF's sit thirteen before ZAKU's KOs and lose action and twenty-eight before
+# his reactions; twenty-nine from the heavy hits to Clothes off500, since the
+# ★変なＴＥＣＨ every player keeps at 89 follows them in GOLF's file and sits
+# among them in ZAKU's; twenty-eight again from Fire Hisa; and twenty-seven
+# from the DOWN header, past an empty action (129).
+GOLF_TWINS = {name: (r, z - next((d for top, d in ((73, 13), (89, 28), (118, 29), (157, 28)) if z < top), 27))
+              for name, (r, z) in ZAKU_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3080,6 +3087,57 @@ FIGHTERS = {
         # 617).
         image_ids={2001, 149},
     ),
+    "golf": dict(
+        source=("37 GOLF", "95d9b0970ee13808b626f1febd77019baea534fd01222c31a282fcc821e84230"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 38
+                 "crouchEnter": 14, "crouch": 15, "stand": 16, "turn": 19, "crouchTurn": 20},
+        twins=GOLF_TWINS,
+        # His reactions clear variable 14, as Ryuko's do, but never 6, which
+        # only his GIANT!! MUSIC ATTACK clears (PC 1390) and nothing reads; most
+        # play as Z-MEGA's:
+        differ={
+            # Z-MEGA's.
+            "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "launchDown", "bounceDown",
+            "knockdown", "grabbed", "hitRapid", "airHitRapid", "rushAirHit", "chuckToss", "stun", "airStun",
+            "fireLaunch", "flySide", "flySideWall", "twistSide", "gonMiss", "chuckUp", "twistSideHit", "vanish",
+            "inatuma", "airInatuma", "icePunch", "airIcePunch", "hisoStop", "chuckYo",
+            # SHIN-Z's.
+            "fly", "chainPull", "ko", "down",
+            # ZAKU's: Z-MEGA's, without clearing 14 first.
+            "guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+            "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+            "crouchTimeStopGuard", "airTimeStopGuard",
+            # Ryuko's, keeping 6.
+            "launchUp", "sweep", "lose",
+            # Ryuko's, keeping 6, without her rand % 6 > 2 (PCs 794, 819, 909,
+            # 1159, 1687, 1711, 1215, 1238).
+            "hitHeavy", "airHitHeavy", "launchAway", "uppercut", "dragonFireball", "liftUp", "tatumakiIn",
+            "tatumakiOut",
+            # SWW's: Ryuko's, setting variable 5 to 10 (PC 776), which his J
+            # Att tests (PCs 590–591), where hers clears it and sets 6 to 100.
+            "shock",
+            # Ryuko's, keeping 5 (PCs 1390–1392), but calling its two displays
+            # five times (PC 1396) on each pass, which rolls rand % 31 > 1 (PC
+            # 1394) to skip its sound; its clip plays flattened, so each pass
+            # takes 50 ticks to her 10.
+            "musicAttack",
+        },
+        # Results: 勝ち (44) calls demo act (24) once (PC 391), then plays its
+        # sound (PC 392) and loops a single call of it (PCs 393–394); from
+        # the sound it plays flattened, then loops demo act. The draw (51)
+        # loops the same stance from its start (PC 471), so the demo act its
+        # clip opens with changes nothing. Each first enters DEMO air (25)
+        # while airborne (op 0x16, PCs 390, 466). The darkening panel, Black
+        # (43). The Vs. intro: 開始時 (26) jumps to 開始時 BR (28) for global 3
+        # = 0 (PC 205), which spawns Black and OP super Charge (32, PCs
+        # 239–240) and enters Round 1 (29, PC 242), which calls demo act
+        # three times (PC 262); it plays flattened.
+        actions=dict(win=(44, 3), winStand=24, winLoop=24, draw=51, drawLoop=51, black=43, intro=28),
+        flat={"intro", "win", "musicAttack"},
+        # 2001: the HUD face action 56 shows (PC 511); 155: *name (52, PC
+        # 475).
+        image_ids={2001, 155},
+    ),
 }
 
 
@@ -3284,7 +3342,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU and {counts['pachelo']} PAC-HELO images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO and {counts['golf']} GOLF images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

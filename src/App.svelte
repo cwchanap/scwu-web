@@ -430,6 +430,11 @@
         drill: 'Roll',
         axe: 'Electric',
       },
+      golf: {
+        getterBeam: 'Super P',
+        drill: 'Sp P',
+        axe: 'Sp K',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -671,6 +676,7 @@
             <option value="shinz">SHIN-Z</option>
             <option value="zaku">ZAKU</option>
             <option value="pachelo">PAC-HELO</option>
+            <option value="golf">GOLF</option>
           </select></label
         >
         <label
@@ -716,6 +722,7 @@
             <option value="shinz">SHIN-Z</option>
             <option value="zaku">ZAKU</option>
             <option value="pachelo">PAC-HELO</option>
+            <option value="golf">GOLF</option>
           </select></label
         >
         <label
@@ -1887,12 +1894,28 @@
           <kbd>J</kbd> or <kbd>K</kbd> cancels into a special or the super.
         </p>
         <p>
+          Choose GOLF for a squat blue armoured trooper with only 300 life.
+          <kbd>J</kbd> slashes twice with his glowing sword, standing or
+          crouching, and <kbd>K</kbd> lashes out his whip; in the air
+          <kbd>J</kbd> slashes and <kbd>K</kbd> fires his finger guns. Shift
+          runs on while → is held, ↑ leaping into a high jump, and Shift with ←
+          hops back. He has no double jump, air dash, Hit Up or chuck. His
+          specials:
+          <kbd>U</kbd> or ↓→ <kbd>J</kbd> Sp P, four dashing slashes, and
+          <kbd>I</kbd> or ↓→ <kbd>K</kbd> Sp K, a low lash and a high one. His
+          super, for a stock: <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> Super P, six
+          lashes and a long thrust. On a hit, <kbd>J</kbd> cancels into
+          <kbd>K</kbd>, a special or the super, <kbd>K</kbd> into a special or
+          the super, a special into the super, and <kbd>J</kbd> in the air into
+          <kbd>K</kbd>.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU or PAC-HELO, and one of eighteen stages, in either mode.
-          Free practice has no timer, and you also choose how the partner
+          SHIN-Z, ZAKU, PAC-HELO or GOLF, and one of eighteen stages, in either
+          mode. Free practice has no timer, and you also choose how the partner
           behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health

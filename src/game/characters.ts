@@ -12,8 +12,8 @@
 // (28 ZIRO.PLAYER), MASA's (29 MASA.PLAYER), 3-TIMES's (30
 // 3-TIMES.PLAYER), ZENKA's (31 ZENKA.PLAYER), Z-MEGA's (32 Z-MEGA.PLAYER),
 // ALPHA's (33 ALPHA.PLAYER), SHIN-Z's (34 SHIN-Z.PLAYER), ZAKU's (35
-// ZAKU.PLAYER) and PAC-HELO's (36 PAC-HELO.PLAYER); and each stage's
-// objects, images and track.
+// ZAKU.PLAYER), PAC-HELO's (36 PAC-HELO.PLAYER) and GOLF's (37
+// GOLF.PLAYER); and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -50,6 +50,7 @@ import alpha from './generated/alpha.json';
 import shinz from './generated/shinz.json';
 import zaku from './generated/zaku.json';
 import pachelo from './generated/pachelo.json';
+import golf from './generated/golf.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -88,7 +89,8 @@ export type Who =
   | 'alpha'
   | 'shinz'
   | 'zaku'
-  | 'pachelo';
+  | 'pachelo'
+  | 'golf';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -126,6 +128,7 @@ export const CHARACTERS = {
   shinz,
   zaku,
   pachelo,
+  golf,
 };
 // Each other fighter's export: Ryuko's keys, and the twins pairing its victim
 // actions with hers (export_fighter). The export declares it for each file
@@ -148,7 +151,7 @@ export type Container = Who | Stage;
 // SEAN's 500, GON's 470, KATE's 430, REMU's 480, REAR's 470,
 // GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470, MASA's 450, 3-TIMES's 400,
 // ZENKA's 480, Z-MEGA's 350, ALPHA's 500, SHIN-Z's 800, ZAKU's and
-// PAC-HELO's 200.
+// PAC-HELO's 200, GOLF's 300.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -203,6 +206,7 @@ const twins = Object.fromEntries(
       'shinz',
       'zaku',
       'pachelo',
+      'golf',
     ] as const
   ).map((who) => {
     const own = new Map(
