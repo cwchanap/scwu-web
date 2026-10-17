@@ -59,7 +59,6 @@ import {
   lifeOf,
   responseEffectsOf,
   responsesOf,
-  ryukoTwin,
   STAGES,
   twin,
 } from './characters';
@@ -661,7 +660,8 @@ function struck(
 // Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's and
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
 // and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
-// 1818, 1938, 1848, 1725 and 1814), and Amiro's Tatumaki >> (105) at −300 (PC 1398).
+// 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880), and Amiro's
+// Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -691,11 +691,13 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   ziro: { launchDown: -800 },
   masa: { launchDown: -800 },
   times: { launchDown: -800 },
+  zenka: { launchDown: -800 },
 };
-// The darkening's variable: 14, or MASA's and 3-TIMES's 13, which their
-// Black (75) tests (PCs 664, 669; 573, 578) and clears (PCs 670, 579) as
-// Ryuko's does 14 (PCs 428–434).
-const darkening = (who: Who) => (who === 'masa' || who === 'times' ? 13 : 14);
+// The darkening's variable: 14, or MASA's, 3-TIMES's and ZENKA's 13, which
+// their Black (75, 75, 54) tests (PCs 664, 669; 573, 578; 602, 607) and
+// clears (PCs 670, 579, 608) as Ryuko's does 14 (PCs 428–434).
+const darkening = (who: Who) =>
+  who === 'masa' || who === 'times' || who === 'zenka' ? 13 : 14;
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
@@ -1004,7 +1006,7 @@ export interface Fighter {
   // 100 through an IORI stage, 12 is 10 from EX Fire 2 (232, PC 3364) until
   // EX Fire (231, PC 3341) or its shot's hit (235, PC 3438) clears it, and
   // 14 (selector 0x4e) is 100 through a super, which darkens the stage
-  // (MASA's and 3-TIMES's 13, darkening).
+  // (MASA's, 3-TIMES's and ZENKA's 13, darkening).
   // Zoma's 0 counts his bombs, ten each, and 6 marks DRAGON.
   variables: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
@@ -2505,9 +2507,13 @@ export class Match {
     );
     // 0x40f539: a response id selects the victim action from the victim's
     // own table. Another player's follows its Ryuko twin's rules
-    // (export_fighter), so `victim` is Ryuko's number for it.
+    // (export_fighter), so `victim` is Ryuko's number for it. Ryuko's
+    // Clothes off (101), which ZENKA's En300 grab names (response 46), has
+    // no rules, nor do the others' unpaired copies of it, so it meets no one.
+    // ponytail: the victim's strip and its 260-life loss (op 0x15, PC 1265)
+    // aren't played; add Clothes off as a reaction to land it.
     const own = responsesOf(target.who)[response];
-    const victim = ryukoTwin(target.who, own);
+    const victim = twinOf(target.who, own) ?? 0;
     const reaction = RESPONSE_REACTIONS[victim];
     // 0x40f527: response 0 names no reaction, but a box without damage
     // still meets the victim, turning it and taking the striker's handler

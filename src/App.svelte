@@ -382,6 +382,14 @@
         axe: 'Fire',
         iori: 'Dash P',
       },
+      zenka: {
+        getterBeam: 'Ranbu',
+        musashi: 'Daisharin',
+        changeAttack: 'En300',
+        drill: 'Dragon P',
+        axe: 'Fire Ball',
+        iori: 'New Move',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -617,6 +625,7 @@
             <option value="ziro">ZIRO</option>
             <option value="masa">MASA</option>
             <option value="times">3-TIMES</option>
+            <option value="zenka">ZENKA</option>
           </select></label
         >
         <label
@@ -656,6 +665,7 @@
             <option value="ziro">ZIRO</option>
             <option value="masa">MASA</option>
             <option value="times">3-TIMES</option>
+            <option value="zenka">ZENKA</option>
           </select></label
         >
         <label
@@ -1691,12 +1701,40 @@
           <kbd>O</kbd> into a special, and DASH P into a super.
         </p>
         <p>
+          Choose ZENKA to play her, a silver-haired woman in a long red coat who
+          fights with a knife and calls in robots: a blue drill robot, a red
+          robot and her own purple armour. <kbd>J</kbd> is a dashing knife slash
+          and <kbd>K</kbd> a stepping one; after a hit, <kbd>J</kbd>
+          brings the blue robot's sword thrust and <kbd>K</kbd> the red robot's
+          drill flurry, then <kbd>J</kbd> the blue robot's overhead swing or
+          <kbd>K</kbd> the red robot's sword swing. Down with <kbd>J</kbd> is
+          the blue robot's low thrust and with <kbd>K</kbd> the red robot's
+          drill that rolls along the floor; in the air <kbd>J</kbd> or
+          <kbd>K</kbd> is a robot's swing. <kbd>H</kbd> is her Hit Up, the red
+          robot's rising slash, which ↑ chases into the air after a hit,
+          <kbd>O</kbd> her chuck, the blue robot's sword skewering the opponent,
+          which ↓↘→ <kbd>K</kbd> follows with the red robot's leaping spin. She
+          double jumps and air dashes. Blocking with a stock,
+          <kbd>H</kbd> spends it on Counter Hit. Her specials: <kbd>U</kbd> or
+          →↓↘ <kbd>J</kbd> Dragon P, the red robot's rising slash, also in the
+          air, <kbd>I</kbd> or ↓→ <kbd>J</kbd> FIRE BALL, her purple armour's
+          slash across the screen, and <kbd>F</kbd> or ↓← <kbd>J</kbd> the new
+          move, a charge into a giant sword's thrust. Her supers, for a stock
+          each: <kbd>1</kbd> or ↓→↓→ <kbd>K</kbd> Ranbu, a grab into blows from
+          both robots and her own last slash, and <kbd>2</kbd> or ↓→↓→
+          <kbd>J</kbd> DAISHARIN, a giant sword hurled to spin out and back; for
+          three, <kbd>3</kbd> or ↓←↓← <kbd>J</kbd> En300, warnings, then a leap that
+          drops with a giant sword, whose grab names the opponent's Clothes off and
+          so meets no one here. FIRE BALL cancels into Ranbu or DAISHARIN for two
+          stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA or 3-TIMES, and one of eighteen
-          stages, in either mode. Free practice has no timer, and you also
-          choose how the partner behaves: standing, guarding high or low,
+          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES or ZENKA, and one of
+          eighteen stages, in either mode. Free practice has no timer, and you
+          also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the
           original CPU. Max stock refills your supers whenever you stand idle,
           and Low health keeps you just under 30% for desperation moves. Vs. CPU

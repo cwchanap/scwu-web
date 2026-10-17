@@ -35,6 +35,7 @@ import ogi from './generated/ogi.json';
 import ziro from './generated/ziro.json';
 import masa from './generated/masa.json';
 import times from './generated/times.json';
+import zenka from './generated/zenka.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -53,11 +54,12 @@ export interface CommandEntry {
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
-// 21, 3-TIMES's 19) and the distance in source pixels that splits their near and far
+// 21, 3-TIMES's 19, ZENKA's 23) and the distance in source pixels that splits
+// their near and far
 // actions (+0x7ca3): GIGI's 130, though each of his entries names the same
 // action for both, OGI's 140, which picks SCC's near or far start, ZIRO's
 // 130, RAMBU's and the telepots', and MASA's 130, his SCC's; 3-TIMES's
-// 130 splits nothing.
+// 130 splits nothing, and ZENKA's 130 his Ranbu's.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -90,6 +92,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     ziro: ziro.commands,
     masa: masa.commands,
     times: times.commands,
+    zenka: zenka.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -583,6 +586,18 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['iori', 6],
     ['dash', 10],
   ],
+  // ZENKA's supers Ranbu, DAISHARIN and en500 (4, 3, 2) on 1-3; his
+  // specials DRAGON (6), FIRE (7) and NEW MOVE (8) on Ryuko's drill, axe and
+  // iori keys, then Dash F (12) and Dash B (13).
+  zenka: [
+    ['getterBeam', 4],
+    ['musashi', 3],
+    ['changeAttack', 2],
+    ['drill', 6],
+    ['axe', 7],
+    ['iori', 8],
+    ['dash', 12],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -615,6 +630,7 @@ export const BACK_DASH: Record<Who, number> = {
   ziro: 21,
   masa: 12,
   times: 11,
+  zenka: 13,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;

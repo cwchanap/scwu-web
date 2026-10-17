@@ -9,8 +9,9 @@
 // (20 SEAN.PLAYER), GON's (21 GON.PLAYER), KATE's (22 KATE.PLAYER),
 // REMU's (23 REMU.PLAYER), REAR's (24 REAR.PLAYER), GIGI's
 // (25 GIGI.PLAYER), SWW's (26 SWW.PLAYER), OGI's (27 OGI.PLAYER), ZIRO's
-// (28 ZIRO.PLAYER), MASA's (29 MASA.PLAYER) and 3-TIMES's (30
-// 3-TIMES.PLAYER); and each stage's objects, images and track.
+// (28 ZIRO.PLAYER), MASA's (29 MASA.PLAYER), 3-TIMES's (30
+// 3-TIMES.PLAYER) and ZENKA's (31 ZENKA.PLAYER); and each stage's objects,
+// images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -41,6 +42,7 @@ import ogi from './generated/ogi.json';
 import ziro from './generated/ziro.json';
 import masa from './generated/masa.json';
 import times from './generated/times.json';
+import zenka from './generated/zenka.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -73,7 +75,8 @@ export type Who =
   | 'ogi'
   | 'ziro'
   | 'masa'
-  | 'times';
+  | 'times'
+  | 'zenka';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -105,6 +108,7 @@ export const CHARACTERS = {
   ziro,
   masa,
   times,
+  zenka,
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -116,7 +120,8 @@ export type Container = Who | Stage;
 // Suneo's 500, Yo's 480, SIN's 550, LIZARD's 510, KAY's 500, DIDO's 490,
 // SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450, OS FENG's 470,
 // SEAN's 500, GON's 470, KATE's 430, REMU's 480, REAR's 470,
-// GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470, MASA's 450, 3-TIMES's 400.
+// GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470, MASA's 450, 3-TIMES's 400,
+// ZENKA's 480.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -165,6 +170,7 @@ const twins = Object.fromEntries(
       'ziro',
       'masa',
       'times',
+      'zenka',
     ] as const
   ).map((who) => {
     const own = new Map(
@@ -203,11 +209,3 @@ export function twin(who: Who, index: number) {
 // The Ryuko action whose rules a player's victim action follows, if any.
 export const twinOf = (who: Who, index: number) =>
   who === 'ryuko' ? index : twins[who].ryuko.get(index);
-// The same, required; 0 (none) stays 0.
-export function ryukoTwin(who: Who, index: number) {
-  if (who === 'ryuko' || !index) return index;
-  const found = twinOf(who, index);
-  if (found === undefined)
-    throw new Error(`${named(who)}'s action ${index} has no Ryuko twin`);
-  return found;
-}

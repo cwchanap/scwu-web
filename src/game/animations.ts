@@ -834,7 +834,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
     // his stance from PC 789 (PC 792), and his draw (104) calls 32 twice
     // too (PC 907). ponytail: the rolls that pick their win voices (PCs
-    // 862–880; 770–788) aren't played.
+    // 862–880; 770–788) aren't played. ZENKA's 勝ち (77) plays flattened,
+    // holding image 283 (PC 799).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -861,7 +862,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               who === 'sou' ||
               who === 'hiso' ||
               who === 'erus' ||
-              who === 'feng'
+              who === 'feng' ||
+              who === 'zenka'
               ? z.win
               : z.winRp
                 ? [
@@ -942,6 +944,7 @@ const TWIN_ANIMATIONS = {
   ziro: twinAnimations('ziro'),
   masa: twinAnimations('masa'),
   times: twinAnimations('times'),
+  zenka: twinAnimations('zenka'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
