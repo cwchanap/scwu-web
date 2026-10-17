@@ -964,6 +964,7 @@ const TWIN_ANIMATIONS = {
   zaku: twinAnimations('zaku'),
   pachelo: twinAnimations('pachelo'),
   golf: twinAnimations('golf'),
+  asura: twinAnimations('asura'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

@@ -40,6 +40,7 @@ import shinz from './generated/shinz.json';
 import zaku from './generated/zaku.json';
 import pachelo from './generated/pachelo.json';
 import golf from './generated/golf.json';
+import asura from './generated/asura.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -62,7 +63,7 @@ export interface CpuEntry {
 // SEAN's 41, GON's 45, KATE's 46, REMU's 49, REAR's 43,
 // GIGI's 42, SWW's 48, OGI's 48, ZIRO's 57, MASA's 38, 3-TIMES's 28,
 // ZENKA's 47, Z-MEGA's 41, ALPHA's 45, SHIN-Z's 39, ZAKU's 22, PAC-HELO's 24,
-// GOLF's 22.
+// GOLF's 22, ASURA's 26.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
@@ -102,6 +103,7 @@ export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   zaku: zaku.cpu,
   pachelo: pachelo.cpu,
   golf: golf.cpu,
+  asura: asura.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
@@ -147,6 +149,7 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   zaku: {},
   pachelo: {},
   golf: {},
+  asura: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;

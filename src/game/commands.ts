@@ -42,6 +42,7 @@ import shinz from './generated/shinz.json';
 import zaku from './generated/zaku.json';
 import pachelo from './generated/pachelo.json';
 import golf from './generated/golf.json';
+import asura from './generated/asura.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -61,13 +62,14 @@ export interface CommandEntry {
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
 // 21, 3-TIMES's 19, ZENKA's 23, Z-MEGA's 29, ALPHA's 28, SHIN-Z's 29, ZAKU's
-// 16, PAC-HELO's 18, GOLF's 16) and the distance in source pixels that splits
-// their near and far actions (+0x7ca3): GIGI's 130, though each of his
-// entries names the same action for both, OGI's 140, which picks SCC's near
-// or far start, ZIRO's 130, RAMBU's and the telepots', and MASA's 130, his
-// SCC's; 3-TIMES's 130 splits nothing, ZENKA's 130 his Ranbu's, Z-MEGA's 110
-// nothing, ALPHA's 140 his SCC's and CC's, SHIN-Z's 130 nothing, and ZAKU's,
-// PAC-HELO's and GOLF's 0 nothing.
+// 16, PAC-HELO's 18, GOLF's 16, ASURA's 17) and the distance in source
+// pixels that splits their near and far actions (+0x7ca3): GIGI's 130,
+// though each of his entries names the same action for both, OGI's 140,
+// which picks SCC's near or far start, ZIRO's 130, RAMBU's and the
+// telepots', and MASA's 130, his SCC's; 3-TIMES's 130 splits nothing,
+// ZENKA's 130 his Ranbu's, Z-MEGA's 110 nothing, ALPHA's 140 his SCC's and
+// CC's, SHIN-Z's 130 nothing, and ZAKU's, PAC-HELO's, GOLF's and ASURA's 0
+// nothing.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -107,6 +109,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     zaku: zaku.commands,
     pachelo: pachelo.commands,
     golf: golf.commands,
+    asura: asura.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -681,6 +684,13 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['axe', 2],
     ['dash', 7],
   ],
+  // ASURA's super Shinku TATU (1) on 1; his special tatumaki (3) on Ryuko's
+  // drill key, as ZAKU's sp p, then Dash F (8) and Dash B (9).
+  asura: [
+    ['getterBeam', 1],
+    ['drill', 3],
+    ['dash', 8],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -720,6 +730,7 @@ export const BACK_DASH: Record<Who, number> = {
   zaku: 8,
   pachelo: 11,
   golf: 8,
+  asura: 9,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

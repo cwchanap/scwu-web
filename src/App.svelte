@@ -435,6 +435,10 @@
         drill: 'Sp P',
         axe: 'Sp K',
       },
+      asura: {
+        getterBeam: 'Shinku TATU',
+        drill: 'Tatumaki',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -677,6 +681,7 @@
             <option value="zaku">ZAKU</option>
             <option value="pachelo">PAC-HELO</option>
             <option value="golf">GOLF</option>
+            <option value="asura">ASURA</option>
           </select></label
         >
         <label
@@ -723,6 +728,7 @@
             <option value="zaku">ZAKU</option>
             <option value="pachelo">PAC-HELO</option>
             <option value="golf">GOLF</option>
+            <option value="asura">ASURA</option>
           </select></label
         >
         <label
@@ -1910,13 +1916,29 @@
           <kbd>K</kbd>.
         </p>
         <p>
+          Choose ASURA for a hooded brawler in a purple and grey robe with only
+          300 life. <kbd>J</kbd> jabs three times and <kbd>K</kbd> kicks three
+          times; crouching, <kbd>J</kbd> is a hopping uppercut and <kbd>K</kbd>
+          a hopping kick that lunges forward; in the air <kbd>J</kbd> punches
+          and <kbd>K</kbd> kicks. Shift runs on while → is held, ↑ leaping into
+          a high jump, and Shift with ← hops back. He has no double jump, air
+          dash, Hit Up or chuck. His special: <kbd>U</kbd> or ↓←
+          <kbd>K</kbd> Tatumaki, a spinning kick that rises and drifts forward,
+          also in the air. His super, for a stock: <kbd>1</kbd> or ↓→↓→
+          <kbd>K</kbd> Shinku TATU, a rising whirlwind of kicks that carries the
+          opponent round him, also in the air. On a hit, <kbd>J</kbd>
+          cancels into <kbd>K</kbd>, the special or the super, <kbd>K</kbd> and the
+          crouching and air attacks into the special or the super (the hops and the
+          air ones into their air forms), and the special into the super.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO or GOLF, and one of eighteen stages, in either
-          mode. Free practice has no timer, and you also choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
+          SHIN-Z, ZAKU, PAC-HELO, GOLF or ASURA, and one of eighteen stages, in
+          either mode. Free practice has no timer, and you also choose how the
+          partner behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health
           keeps you just under 30% for desperation moves. Vs. CPU is the

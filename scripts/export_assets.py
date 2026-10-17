@@ -853,6 +853,9 @@ ZAKU_TWINS = {name: (r, r + next(d for top, d in ((73, -1), (75, 14), (89, 15), 
 # from the DOWN header, past an empty action (129).
 GOLF_TWINS = {name: (r, z - next((d for top, d in ((73, 13), (89, 28), (118, 29), (157, 28)) if z < top), 27))
               for name, (r, z) in ZAKU_TWINS.items()}
+# ASURA's sit as GOLF's to Chuck 消える (128), then one before them from the
+# DOWN header, since he lacks GOLF's empty 129.
+ASURA_TWINS = {name: (r, g - (g > 129)) for name, (r, g) in GOLF_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3138,6 +3141,60 @@ FIGHTERS = {
         # 475).
         image_ids={2001, 155},
     ),
+    "asura": dict(
+        source=("38 ASURA", "7dc93f54ea34f63170983ca61e39b649493b409cea2a3b99eb2b94cd3f41dfb1"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 38
+                 "crouchEnter": 14, "crouch": 15, "stand": 16, "turn": 19, "crouchTurn": 20},
+        twins=ASURA_TWINS,
+        # His reactions play as GOLF's but where noted: they clear variable
+        # 14, as Ryuko's do, but never 6, which only his GIANT!! MUSIC ATTACK
+        # clears (PC 1398) and nothing reads.
+        differ={
+            # Z-MEGA's.
+            "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "launchDown", "hitRapid",
+            "airHitRapid", "rushAirHit", "chuckToss", "stun", "airStun", "fireLaunch", "flySide", "flySideWall",
+            "twistSide", "gonMiss", "chuckUp", "twistSideHit", "vanish", "inatuma", "airInatuma", "icePunch",
+            "airIcePunch", "hisoStop", "chuckYo",
+            # SHIN-Z's.
+            "fly", "chainPull", "down",
+            # SHIN-Z's, but rolling rand % 3 > 1 (PC 416) for its other voice.
+            "ko",
+            # ZAKU's: Z-MEGA's, without clearing 14 first.
+            "guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+            "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+            "crouchTimeStopGuard", "airTimeStopGuard",
+            # Ryuko's, keeping 6.
+            "launchUp", "sweep", "lose", "knockdown", "bounceDown",
+            # Ryuko's, keeping 6, its first display 30 ticks (PC 1344), not 10.
+            "grabbed",
+            # Ryuko's, keeping 6, without her rand % 6 > 2 (PCs 819, 909, 1159,
+            # 1687, 1711, 1215, 1238).
+            "airHitHeavy", "launchAway", "uppercut", "dragonFireball", "liftUp", "tatumakiIn", "tatumakiOut",
+            # Chung's, keeping 6: Ryuko's, rolling rand % 3 > 1 (PC 571) to her
+            # rand % 6 > 2 (PC 794).
+            "hitHeavy",
+            # Z-MEGA's and SHIN-Z's: Ryuko's, keeping 6, which hers clears and
+            # then sets to 100.
+            "shock",
+            # Ryuko's, keeping 5 (PCs 1398–1400).
+            "musicAttack",
+        },
+        # Results: 勝ち (44) calls demo stand (24) once (PC 392), plays its
+        # sound (PC 393) and loops the same stance from PC 394 (PC 398). The
+        # draw (51) plays that stance (PCs 474–477), as the demo stand its
+        # clip opens with does, then jumps to 勝ち's start (PC 478), from
+        # which it plays flattened. Each first enters DEMO air (25) while
+        # airborne (op 0x16, PCs 391, 473). The darkening panel, Black (43).
+        # The Vs. intro: 開始時 (26) jumps to 開始時 BR (28) for global 3 = 0
+        # (PC 207), which spawns Black and OP super Charge (32, PCs 241–242)
+        # and enters Round 1 (29, PC 244), which calls demo stand three times
+        # (PC 263); it plays flattened.
+        actions=dict(win=44, winStand=24, winLoop=(44, 4), draw=44, drawLoop=(44, 4), black=43, intro=28),
+        flat={"intro", "draw"},
+        # 2001: the HUD face action 56 shows (PC 511); 137: *name (52, PC
+        # 479).
+        image_ids={2001, 137},
+    ),
 }
 
 
@@ -3342,7 +3399,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO and {counts['golf']} GOLF images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF and {counts['asura']} ASURA images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 
