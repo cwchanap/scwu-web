@@ -439,6 +439,15 @@
         getterBeam: 'Shinku TATU',
         drill: 'Tatumaki',
       },
+      ttro: {
+        getterBeam: 'SCC',
+        musashi: 'Super Fire',
+        changeAttack: 'EN300',
+        drill: 'Dash P',
+        axe: 'Fire',
+        iori: 'Dash K',
+        dst: 'CC',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -682,6 +691,7 @@
             <option value="pachelo">PAC-HELO</option>
             <option value="golf">GOLF</option>
             <option value="asura">ASURA</option>
+            <option value="ttro">TTRO</option>
           </select></label
         >
         <label
@@ -729,6 +739,7 @@
             <option value="pachelo">PAC-HELO</option>
             <option value="golf">GOLF</option>
             <option value="asura">ASURA</option>
+            <option value="ttro">TTRO</option>
           </select></label
         >
         <label
@@ -1932,19 +1943,41 @@
           air ones into their air forms), and the special into the super.
         </p>
         <p>
+          Choose TTRO for a huge grey Totoro with 820 life, whose steps shake
+          the screen. <kbd>J</kbd> is a long swipe of his arm and <kbd>K</kbd>
+          a sweeping claw, standing or crouching; down with <kbd>J</kbd> is a
+          belly bounce that hops forward. In the air <kbd>J</kbd> swipes at his
+          chest's height and <kbd>K</kbd> is a diving bite. Shift hops forward,
+          and Shift with ← hops back; he double jumps and air dashes under his
+          umbrella. <kbd>O</kbd> is his chuck, a grab into a throw. He has no
+          Hit Up or Counter Attack. His specials: <kbd>U</kbd> or ↓←
+          <kbd>J</kbd> DASH P, a dashing swipe, <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> Fire, a blazing ball that the girl in his mouth fires,
+          striking well ahead of him, <kbd>F</kbd> or ↓← <kbd>K</kbd> DASH K, a
+          dashing claw, and <kbd>G</kbd> or ←↓→ <kbd>K</kbd> CC, close in a grab
+          into a leap and a slam. His supers, for a stock each: <kbd>1</kbd> or
+          →↓←→↓← <kbd>J</kbd> SCC, close in a grab into two leaps and slams and
+          a higher one for 200, and <kbd>2</kbd> or ↓→↓→ <kbd>J</kbd> SUPER
+          FIRE, five blazing balls; for three, <kbd>3</kbd> or ↓→↓→
+          <kbd>K</kbd> EN300, a phone call that sends a yellow car charging
+          across the court. On a hit, <kbd>J</kbd> and <kbd>K</kbd> cancel into a
+          special (CC only from afar) or SUPER FIRE, DASH P into DASH K, and the air
+          attacks into a double jump or air dash.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF or ASURA, and one of eighteen stages, in
-          either mode. Free practice has no timer, and you also choose how the
-          partner behaves: standing, guarding high or low, guarding in the air,
-          attacking in range, jumping in, or playing as the original CPU. Max
-          stock refills your supers whenever you stand idle, and Low health
-          keeps you just under 30% for desperation moves. Vs. CPU is the
-          original game's CPU, playing the opponent's own moves, specials and
-          supers. Reduce their health to zero, or lead on health when time runs
-          out. Changing modes, fighters or the stage starts a fresh match.
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA or TTRO, and one of eighteen
+          stages, in either mode. Free practice has no timer, and you also
+          choose how the partner behaves: standing, guarding high or low,
+          guarding in the air, attacking in range, jumping in, or playing as the
+          original CPU. Max stock refills your supers whenever you stand idle,
+          and Low health keeps you just under 30% for desperation moves. Vs. CPU
+          is the original game's CPU, playing the opponent's own moves, specials
+          and supers. Reduce their health to zero, or lead on health when time
+          runs out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

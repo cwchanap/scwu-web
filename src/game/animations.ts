@@ -670,7 +670,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     walk: clip(z.walk, true),
     backwalk: clip(z.backwalk, true),
     takeoff: clip(z.jump.slice(0, 1)),
-    jump: clip(z.jump.slice(1), false, waits(z.jump.slice(1))),
+    // TTRO's J RP (7) loops its two poses (PC 86) until he lands.
+    jump: clip(
+      z.jump.slice(1),
+      who === 'ttro' ? 0 : false,
+      waits(z.jump.slice(1)),
+    ),
     land: clip(z.land),
     crouchEnter: clip(z.crouchEnter),
     // Action 19 holds a single zero-length display.
@@ -965,6 +970,7 @@ const TWIN_ANIMATIONS = {
   pachelo: twinAnimations('pachelo'),
   golf: twinAnimations('golf'),
   asura: twinAnimations('asura'),
+  ttro: twinAnimations('ttro'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
