@@ -663,7 +663,7 @@ function struck(
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
 // and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
 // 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
-// PC 1624), and Amiro's
+// PC 1624; ALPHA's 161, PC 2332), and Amiro's
 // Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
@@ -696,12 +696,16 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   times: { launchDown: -800 },
   zenka: { launchDown: -800 },
   zmega: { launchDown: -800 },
+  alpha: { launchDown: -800 },
 };
-// The darkening's variable: 14, or MASA's, 3-TIMES's and ZENKA's 13, which
-// their Black (75, 75, 54) tests (PCs 664, 669; 573, 578; 602, 607) and
-// clears (PCs 670, 579, 608) as Ryuko's does 14 (PCs 428–434).
+// The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's and ALPHA's
+// 13, which their Black (75, 75, 54, 59) tests (PCs 664, 669; 573, 578; 602,
+// 607; 816, 821) and clears (PCs 670, 579, 608, 822) as Ryuko's does 14 (PCs
+// 428–434).
 const darkening = (who: Who) =>
-  who === 'masa' || who === 'times' || who === 'zenka' ? 13 : 14;
+  who === 'masa' || who === 'times' || who === 'zenka' || who === 'alpha'
+    ? 13
+    : 14;
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
@@ -2081,7 +2085,9 @@ export class Match {
           ('clip' in actor || actor.action === 'script') &&
           this.passes(self, event)
         )
-          return this.branchTo(actor, sourceKey(event.action, event.offset));
+          return event.called
+            ? this.rejoin(actor, owner, event)
+            : this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       // Op 0x24 jumps when its steps match in the input history (0x410a50).
       case 'command':
@@ -2232,20 +2238,28 @@ export class Match {
         if (!('clip' in actor) && actor.action !== 'script') break;
         if (this.cpu.random() % event.divisor <= event.above || !event.action)
           break;
-        // One in a call jumps within the called action, rejoining this path
-        // at its next display (Giant's super base ball picks a ball, PC
-        // 5358): the target's records up to there replace this tick's rest.
-        if (event.called) {
-          const key = sourceKey(event.action, event.offset);
-          for (const next of script(key, actor.who).events) {
-            if (next.t) break;
-            this.runEvent(actor, owner, next);
-          }
-          return true;
-        }
-        return this.branchTo(actor, sourceKey(event.action, event.offset));
+        return event.called
+          ? this.rejoin(actor, owner, event)
+          : this.branchTo(actor, sourceKey(event.action, event.offset));
     }
     return false;
+  }
+
+  // A roll or test in a call jumps within the called action, rejoining this
+  // path at its next display (Giant's super base ball picks a ball, PC 5358;
+  // ALPHA's No super rp skips its power, PC 4475): the target's records up
+  // to there replace this tick's rest.
+  private rejoin(
+    actor: Fighter | Effect,
+    owner: number,
+    event: { action: number; offset: number },
+  ) {
+    for (const next of script(sourceKey(event.action, event.offset), actor.who)
+      .events) {
+      if (next.t) break;
+      this.runEvent(actor, owner, next);
+    }
+    return true;
   }
 
   // Ops 0x07/0x14 move the opponent this super holds, is taking hold of (a

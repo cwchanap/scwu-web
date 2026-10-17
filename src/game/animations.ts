@@ -135,6 +135,8 @@ export type SourceEvent =
       value: number;
       action: number;
       offset: number;
+      // A forward skip in an inlined call.
+      called?: boolean;
     }
   | {
       op: 'spawn';
@@ -837,7 +839,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 862–880; 770–788) aren't played. ZENKA's 勝ち (77) plays flattened,
     // holding image 283 (PC 799). Z-MEGA's 勝ち (65) calls DEMO stand (30)
     // once (PC 619) and loops image 319 from PC 623 (PC 626), and his draw
-    // (73) loops image 201 from PC 717 (PC 719).
+    // (73) loops image 201 from PC 717 (PC 719). ALPHA's 勝ち (82) calls demo
+    // stand (28) once (PC 1002) and loops his stance from PC 1010 (PC 1017);
+    // his draw (98) holds image 130 (PC 1285).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -948,6 +952,7 @@ const TWIN_ANIMATIONS = {
   times: twinAnimations('times'),
   zenka: twinAnimations('zenka'),
   zmega: twinAnimations('zmega'),
+  alpha: twinAnimations('alpha'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

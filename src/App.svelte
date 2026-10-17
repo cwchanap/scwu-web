@@ -400,6 +400,16 @@
         dst: 'Reflect',
         ex: 'Shin Z',
       },
+      alpha: {
+        getterBeam: 'Snake Fire',
+        musashi: 'Ryuon',
+        changeAttack: 'Rambu',
+        blackRush: 'New En3',
+        megaBeam: 'SCC',
+        drill: 'CC',
+        axe: 'Munt',
+        iori: 'NC',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -637,6 +647,7 @@
             <option value="times">3-TIMES</option>
             <option value="zenka">ZENKA</option>
             <option value="zmega">Z-MEGA</option>
+            <option value="alpha">ALPHA</option>
           </select></label
         >
         <label
@@ -678,6 +689,7 @@
             <option value="times">3-TIMES</option>
             <option value="zenka">ZENKA</option>
             <option value="zmega">Z-MEGA</option>
+            <option value="alpha">ALPHA</option>
           </select></label
         >
         <label
@@ -1768,18 +1780,47 @@
           stock.
         </p>
         <p>
+          Choose ALPHA to play him, a red-haired boy in a chained white suit who
+          takes on four armours for his moves: a white tiger's, a green
+          knight's, a red one with a snake and a winged blue one. <kbd>J</kbd>
+          is a chained punch and <kbd>K</kbd> a kick; after a hit,
+          <kbd>J</kbd> brings the tiger's punches and <kbd>K</kbd> the red
+          armour's kick, then <kbd>J</kbd> the blue armour's wing slash or
+          <kbd>K</kbd> the knight's shield. Down with <kbd>J</kbd> is the
+          tiger's swipe and with <kbd>K</kbd> the knight's shield, ↘
+          <kbd>J</kbd> the knight's rising blow; in the air <kbd>J</kbd> is the
+          blue armour's slash, <kbd>K</kbd> the red armour's kick and ↘
+          <kbd>K</kbd> its diving kick. <kbd>H</kbd> is his Hit Up, the red
+          armour's snake, which ↑ chases into the air after a hit, and
+          <kbd>O</kbd> his chuck, the blue armour's grab into a beam. He double
+          jumps and air dashes. Blocking with a stock, <kbd>H</kbd> spends it on
+          Counter hit. His specials: <kbd>U</kbd> or ←↓→ <kbd>K</kbd> CC, the
+          knight's lunge that grabs into a throw, <kbd>I</kbd> or →←↓→
+          <kbd>J</kbd> Munt, a rock pillar thrust up from the floor well ahead,
+          and <kbd>F</kbd> or ↓← <kbd>J</kbd> NC, the tiger's chain strikes,
+          which ↓← <kbd>J</kbd> follows twice more. His supers, for a stock
+          each: <kbd>1</kbd> or ↓→↓→ <kbd>K</kbd> SNAKE FIRE, a giant snake's
+          strike, <kbd>3</kbd> or ↓→↓← <kbd>J</kbd> Rambu, the tiger's leap into
+          a long flurry, and <kbd>5</kbd> or →↓←→↓← <kbd>K</kbd> SCC, the
+          knight's grab into a launch and a slam; for three, <kbd>2</kbd> or
+          ↓→↓→ <kbd>J</kbd> RYUON HASANKEN, the blue armour's flight behind a
+          fire dragon, and <kbd>4</kbd> or ↓ ↓ ↓ <kbd>J</kbd> NEW EN3, pillars of
+          fire. A hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA or Z-MEGA, and one of
-          eighteen stages, in either mode. Free practice has no timer, and you
-          also choose how the partner behaves: standing, guarding high or low,
-          guarding in the air, attacking in range, jumping in, or playing as the
-          original CPU. Max stock refills your supers whenever you stand idle,
-          and Low health keeps you just under 30% for desperation moves. Vs. CPU
-          is the original game's CPU, playing the opponent's own moves, specials
-          and supers. Reduce their health to zero, or lead on health when time
-          runs out. Changing modes, fighters or the stage starts a fresh match.
+          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA or ALPHA, and
+          one of eighteen stages, in either mode. Free practice has no timer,
+          and you also choose how the partner behaves: standing, guarding high
+          or low, guarding in the air, attacking in range, jumping in, or
+          playing as the original CPU. Max stock refills your supers whenever
+          you stand idle, and Low health keeps you just under 30% for
+          desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
