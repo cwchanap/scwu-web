@@ -367,6 +367,16 @@ def player_tables(data, c, image_ids):
                 commands=dict(near=near, entries=commands), life=life)
 
 
+def jump_target(record):
+    """The (action, offset) an op 0x09, 0x0a, 0x0b, 0x16, 0x1f, 0x20 or 0x24 may enter, decoded or not."""
+    event = decode_event(record) or {}
+    if record[0] in (0x16, 0x20, 0x24) or event.get("op") == "test":
+        return event.get("action"), event.get("offset")
+    if record[0] == 0x09:
+        return u16(record, 2), record[4]
+    return (u16(record, 1), record[3]) if record[0] in (0x0a, 0x0b, 0x1f) else None
+
+
 def pose_clips(p, c, actions, image_ids):
     """Each named action's displays, with their body boxes, colour and events.
 
@@ -385,6 +395,13 @@ def pose_clips(p, c, actions, image_ids):
             # ANMC P's WIN (PC 579) passes the sound its roll plays instead.
             if p.records[pc][0] == 0x0a and u16(p.records[pc], 1) == index and pc < action.start + p.records[pc][3]:
                 pc = action.start + p.records[pc][3] - 1
+            # One back ends it, unless the action jumps past it: SHIN-Z's 勝ち
+            # loops from PC 698 (PC 701) before a display nothing reaches (PC
+            # 703), where each Black's test of variable 14 jumps past its loop.
+            elif p.records[pc][0] == 0x0a and u16(p.records[pc], 1) == index and not any(
+                    target and target[0] == index and action.start + target[1] > pc
+                    for target in map(jump_target, p.records[action.start:action.end])):
+                break
             elif p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
@@ -813,6 +830,16 @@ ZMEGA_TWINS = {name: (r, r + next(d for top, d in ((63, 8), (77, 12), (89, 13), 
 # (84–87) come before it, and its 2nd (90) and KO down after his ★.
 ALPHA_TWINS = {name: (r, r + next(d for top, d in ((89, 38), (103, 37), (139, 38), (173, 37)) if r < top))
                for name, (r, _) in ZOMA_TWINS.items()} | dict(lose=(59, 83), ko=(60, 88), koAgain=(61, 90), down=(62, 91))
+# SHIN-Z's sit nine after Ryuko's KOs and lose action, fourteen after her light
+# hits, fifteen from the heavy ones to SHOCK INFINITY (his ★変なＴＥＣＨ, 89,
+# sits among them), fourteen from Shock, thirteen past her Chuck Hiso (139),
+# which he lacks, and fourteen again from her DOWN header (144), past his
+# RAMDOM GET UP (158); his guards follow one after another from 164, as
+# Z-MEGA's.
+SHINZ_TWINS = {name: (r, r + next(d for top, d in ((73, 9), (75, 14), (89, 15), (139, 14), (144, 13), (149, 14))
+                                  if r < top))
+               for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 164 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2854,6 +2881,71 @@ FIGHTERS = {
         # 1289).
         image_ids={2001, 576},
     ),
+    "shinz": dict(
+        source=("34 SHIN-Z", "66c59fbf56c8bc5e8011c8aa57832019e3fd70ca401d8ce4bdd764bf804fc424"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 44
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=SHINZ_TWINS,
+        # His reactions clear variable 14, as Ryuko's do, but never 6, which
+        # nothing of his sets:
+        differ={
+            # Z-MEGA's.
+            "guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+            "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+            "crouchTimeStopGuard", "airTimeStopGuard",
+            "hit", "airHit", "hitHeavy", "airHitHeavy", "twist", "hitPull", "launchDown", "bounceDown", "launchUp",
+            "launchAway", "knockdown", "hitRapid", "airHitRapid", "rushAirHit", "shock", "uppercut", "stun",
+            "airStun", "dragonFireball", "liftUp", "tatumakiIn", "tatumakiOut", "fireLaunch", "flySide",
+            "flySideWall", "twistSideHit", "vanish", "inatuma", "airInatuma", "icePunch", "airIcePunch", "hisoStop",
+            # Z-MEGA's, clearing variable 0 first (PCs 1862, 1782, 1765, 1813,
+            # 1875, 1894, 1843, 1920), which only his Start KO 2 (44, PC 502)
+            # sets.
+            "drillDown", "dstToss", "grabbed", "chuckToss", "twistSide", "gonMiss", "chuckUp", "chuckYo",
+            # Ryuko's, clearing 0 (PC 1834) where hers clears 6, without her
+            # rand % 31 > 1 and its 5-tick display.
+            "musicAttack",
+            # Ryuko's, keeping 6, and 2 (PC 1275).
+            "fly",
+            # Ryuko's, keeping 6, without her rand % 6 > 2 (PC 1409).
+            "chainPull",
+            # Ryuko's, keeping 6, rolling rand % 4 > 1 past the sound (PCs
+            # 949, 988).
+            "jumpHit", "sweep",
+            # Ryuko's, clearing 8, 5 and 14 first (PCs 1542–1544).
+            "airHisoStop",
+            # Z-MEGA's, rolling rand % 6 > 4 (PC 2013) past its one-tick
+            # display whose hit and guard handlers name RAMDOM GET UP (158) and
+            # whose box (kind 2, PC 2016) sits 9890 pixels down; either way it
+            # takes 30 ticks. ponytail: it plays as a clip through that
+            # display, drawing no roll.
+            "getUp",
+            # Giant's KO NORMAL.
+            "ko",
+            # Ryuko's, setting variable 3 to 30 (PC 737), which only KO
+            # NORMAL's test reads (PC 712).
+            "koAgain",
+            # Zoma's KO DOWN.
+            "down",
+            # Ryuko's, clearing 4 and 8 (PCs 707–708), not 14 and 6, after a
+            # test of variable 0 for 10 (PC 705) into Start KO 3 (45).
+            "lose",
+        },
+        # Results: 勝ち (67) calls DEMO stand (29) once (PC 696) and loops
+        # image 319 from PC 698 (PC 701), shaking the screen each pass; the
+        # draw (74) calls 29 once (PC 781) and holds image 236 (PC 783). Each
+        # first enters DEMO air (30) while airborne (op 0x16, PCs 695, 780).
+        # The darkening panel, Black (50). The Vs. intro: 開始時 (31) jumps to
+        # 開始時 BR (33) for global 3 = 0 (PC 300), which, for global 14 = 0,
+        # jumps past its display (PC 336), spawns Black and OP super Charge
+        # (46, PCs 338–339) and enters Round 1 (34) + 2 (PC 342); it plays
+        # flattened. ponytail: 開始時's test of global 10 for 10 (PC 301),
+        # into 開始時 BR + 2, isn't played.
+        actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50, intro=(33, 3)),
+        flat={"intro"},
+        # 2001: the HUD face action 84 shows (PC 846); 323: *name (75, PC
+        # 787).
+        image_ids={2001, 323},
+    ),
 }
 
 
@@ -3058,7 +3150,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA and {counts['alpha']} ALPHA images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA and {counts['shinz']} SHIN-Z images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

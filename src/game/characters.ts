@@ -10,9 +10,9 @@
 // REMU's (23 REMU.PLAYER), REAR's (24 REAR.PLAYER), GIGI's
 // (25 GIGI.PLAYER), SWW's (26 SWW.PLAYER), OGI's (27 OGI.PLAYER), ZIRO's
 // (28 ZIRO.PLAYER), MASA's (29 MASA.PLAYER), 3-TIMES's (30
-// 3-TIMES.PLAYER), ZENKA's (31 ZENKA.PLAYER), Z-MEGA's (32 Z-MEGA.PLAYER)
-// and ALPHA's (33 ALPHA.PLAYER); and each stage's objects, images and
-// track.
+// 3-TIMES.PLAYER), ZENKA's (31 ZENKA.PLAYER), Z-MEGA's (32 Z-MEGA.PLAYER),
+// ALPHA's (33 ALPHA.PLAYER) and SHIN-Z's (34 SHIN-Z.PLAYER); and each
+// stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -46,6 +46,7 @@ import times from './generated/times.json';
 import zenka from './generated/zenka.json';
 import zmega from './generated/zmega.json';
 import alpha from './generated/alpha.json';
+import shinz from './generated/shinz.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -81,7 +82,8 @@ export type Who =
   | 'times'
   | 'zenka'
   | 'zmega'
-  | 'alpha';
+  | 'alpha'
+  | 'shinz';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -116,6 +118,7 @@ export const CHARACTERS = {
   zenka,
   zmega,
   alpha,
+  shinz,
 };
 // Each other fighter's export: Ryuko's keys, and the twins pairing its victim
 // actions with hers (export_fighter). The export declares it for each file
@@ -137,7 +140,7 @@ export type Container = Who | Stage;
 // SAKUYA's 470, ALEX's 450, SOU's and HISO's 480, ERUS's 450, OS FENG's 470,
 // SEAN's 500, GON's 470, KATE's 430, REMU's 480, REAR's 470,
 // GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470, MASA's 450, 3-TIMES's 400,
-// ZENKA's 480, Z-MEGA's 350, ALPHA's 500.
+// ZENKA's 480, Z-MEGA's 350, ALPHA's 500, SHIN-Z's 800.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -189,6 +192,7 @@ const twins = Object.fromEntries(
       'zenka',
       'zmega',
       'alpha',
+      'shinz',
     ] as const
   ).map((who) => {
     const own = new Map(

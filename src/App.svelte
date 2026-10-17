@@ -410,6 +410,16 @@
         axe: 'Munt',
         iori: 'NC',
       },
+      shinz: {
+        getterBeam: 'Kaisa',
+        musashi: 'S Giga',
+        changeAttack: 'Akuma',
+        drill: 'Sama',
+        axe: 'Fire Ball',
+        iori: 'Giga',
+        dst: 'Reflect',
+        ex: 'Gaisa',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -648,6 +658,7 @@
             <option value="zenka">ZENKA</option>
             <option value="zmega">Z-MEGA</option>
             <option value="alpha">ALPHA</option>
+            <option value="shinz">SHIN-Z</option>
           </select></label
         >
         <label
@@ -690,6 +701,7 @@
             <option value="zenka">ZENKA</option>
             <option value="zmega">Z-MEGA</option>
             <option value="alpha">ALPHA</option>
+            <option value="shinz">SHIN-Z</option>
           </select></label
         >
         <label
@@ -1808,15 +1820,40 @@
           fire. A hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.
         </p>
         <p>
+          Choose SHIN-Z to play Z-MEGA as Shin Z for good, a white-haired,
+          moustached brawler in a black vest and purple trousers. <kbd>J</kbd>
+          is a lunging palm strike that hits twice and <kbd>K</kbd> a stepping
+          spin kick, standing or crouching; on a hit, <kbd>K</kbd>, a special or
+          a super follows them. In the air <kbd>J</kbd> punches and
+          <kbd>K</kbd> kicks. Shift runs on while → is held, ↑ leaping into a
+          high jump, and Shift with ← hops back; he double jumps and air dashes.
+          <kbd>O</kbd> is his chuck, a grab into a beating and a blow that
+          knocks the opponent away. He has no Hit Up or Counter Attack. His
+          specials:
+          <kbd>U</kbd> or →↓↘ <kbd>K</kbd> SAMA, a rising somersault kick, also
+          in the air, where →↓↘ <kbd>K</kbd> kicks again, <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> Fire BALL, a fast straight fireball, <kbd>F</kbd> or →↓←
+          <kbd>J</kbd> GIGA, a dash behind a glowing palm that carries the
+          opponent into the screen's edge, <kbd>G</kbd> or ↓→ <kbd>K</kbd>
+          REFLACT, a round shield's shove that hurls the shield back at a shot it
+          meets, and <kbd>E</kbd> or →←↓→ <kbd>J</kbd> GAISA, a blue wave. His
+          supers, for a stock each: <kbd>1</kbd> or →←↓→ <kbd>K</kbd> KAISA
+          SUPER, a giant ghostly head of his that charges across the screen, and
+          <kbd>2</kbd> or ↓→↓← <kbd>J</kbd> SGIGA, a bigger GIGA; for three,
+          <kbd>3</kbd> or <kbd>J</kbd> <kbd>J</kbd> → <kbd>K</kbd> <kbd>J</kbd>
+          AKUMA SP, a dash that grabs into a storm of flashes for 250. On a hit, a
+          super cancels SAMA, Fire BALL, REFLACT or GAISA.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA or ALPHA, and
-          one of eighteen stages, in either mode. Free practice has no timer,
-          and you also choose how the partner behaves: standing, guarding high
-          or low, guarding in the air, attacking in range, jumping in, or
-          playing as the original CPU. Max stock refills your supers whenever
-          you stand idle, and Low health keeps you just under 30% for
+          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA or
+          SHIN-Z, and one of eighteen stages, in either mode. Free practice has
+          no timer, and you also choose how the partner behaves: standing,
+          guarding high or low, guarding in the air, attacking in range, jumping
+          in, or playing as the original CPU. Max stock refills your supers
+          whenever you stand idle, and Low health keeps you just under 30% for
           desperation moves. Vs. CPU is the original game's CPU, playing the
           opponent's own moves, specials and supers. Reduce their health to
           zero, or lead on health when time runs out. Changing modes, fighters
