@@ -2866,6 +2866,9 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins=pairs, aliases=aliases, counters=counters,
         neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
+    # Its type, so TypeScript needn't infer it from the JSON.
+    write_if_changed(GENERATED / f"{key}.d.json.ts",
+                     b"declare const data: import('../characters').FighterData;\nexport default data;\n")
     return len(images)
 
 
@@ -3144,5 +3147,23 @@ def export_ui():
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls))
 
 
+def inputs():
+    """What the export reads: this script, and the handoff's files by name, size and time."""
+    digest = hashlib.sha256(Path(__file__).read_bytes())
+    for path in sorted(RESEARCH.rglob("*")):
+        if path.is_file():
+            stat = path.stat()
+            digest.update(f"{path.relative_to(RESEARCH)}\0{stat.st_size}\0{stat.st_mtime_ns}\0".encode("utf8"))
+    return digest.hexdigest()
+
+
 if __name__ == "__main__":
-    main()
+    # Its outputs stand while nothing it reads has changed since the last export.
+    stamp = GENERATED / ".inputs"
+    key = inputs()
+    if stamp.exists() and stamp.read_text() == key and all(any(d.iterdir()) for d in (PUBLIC, FIXTURES)):
+        print("Assets are up to date.")
+    else:
+        stamp.unlink(missing_ok=True)
+        main()
+        stamp.write_text(key)

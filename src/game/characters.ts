@@ -113,6 +113,15 @@ export const CHARACTERS = {
   zenka,
   zmega,
 };
+// Each other fighter's export: Ryuko's keys, and the twins pairing its victim
+// actions with hers (export_fighter). The export declares it for each file
+// (*.d.json.ts), since inferring every fighter's JSON took most of the type
+// check.
+export type FighterData = typeof ryuko & {
+  twins: Record<string, number>;
+  aliases: Record<string, number>;
+  counters: Record<string, [number, number, number][]>;
+};
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
 // The container an object's scripts and images come from.

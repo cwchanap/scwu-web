@@ -9,6 +9,7 @@
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
     "resolveJsonModule": true,
+    "allowArbitraryExtensions": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,

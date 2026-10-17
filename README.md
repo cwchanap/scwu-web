@@ -20,7 +20,7 @@ bun run preview  # serve the production build locally
 bun run format   # apply Prettier
 ```
 
-`bun run test` and `bun run check` expect assets to have been exported once (`bun run assets`). Run `bun run test` for Vitest; `bun test` selects Bun's own runner. `bun install` installs Husky's pre-commit hook, which runs `bun run validate`.
+`bun run test` and `bun run check` expect assets to have been exported once (`bun run assets`). `bun run assets` skips the export while neither its script nor the handoff has changed. Run `bun run test` for Vitest; `bun test` selects Bun's own runner. `bun install` installs Husky's pre-commit hook, which runs `bun run validate`.
 
 ## Play
 
