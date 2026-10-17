@@ -459,13 +459,18 @@ const repeated = (frames: Pose[], ticks: number) => {
     out.push(frames[out.length % frames.length]);
   return out;
 };
-// Whose wins call their stand demo twice.
-const twiceWon = (who: Who) =>
-  who === 'kate' ||
-  who === 'remu' ||
-  who === 'rear' ||
-  who === 'masa' ||
-  who === 'times';
+// How many times each win calls its stand demo: twice, ZAKU's four times,
+// otherwise once.
+const winStands = (who: Who) =>
+  who === 'zaku'
+    ? 4
+    : who === 'kate' ||
+        who === 'remu' ||
+        who === 'rear' ||
+        who === 'masa' ||
+        who === 'times'
+      ? 2
+      : 1;
 const twiceDrawn = (who: Who) =>
   who === 'rear' || who === 'gigi' || who === 'masa' || who === 'times';
 // A flight's displays until `age`, then its landing action's.
@@ -841,7 +846,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // once (PC 619) and loops image 319 from PC 623 (PC 626), and his draw
     // (73) loops image 201 from PC 717 (PC 719). ALPHA's 勝ち (82) calls demo
     // stand (28) once (PC 1002) and loops his stance from PC 1010 (PC 1017);
-    // his draw (98) holds image 130 (PC 1285).
+    // his draw (98) holds image 130 (PC 1285). ZAKU's 勝ち (56) calls DEMO
+    // STAND (34) four times (PC 476) and loops his stance from PC 478 (PC
+    // 481), and his draw (67) loops it from its start (PC 605).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -881,13 +888,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                     ...z.win.slice(-1),
                   ]
                 : [
-                    ...z.winStand,
-                    ...(twiceWon(who) ? z.winStand : []),
+                    ...Array<Pose[]>(winStands(who)).fill(z.winStand).flat(),
                     ...z.win,
                     ...(z.winLoop ?? []),
                   ],
             z.winLoop
-              ? z.winStand.length * (twiceWon(who) ? 2 : 1) + z.win.length
+              ? z.winStand.length * winStands(who) + z.win.length
               : false,
             // OS FENG's holds its last pose with a zero-length display (PC
             // 734).
@@ -954,6 +960,7 @@ const TWIN_ANIMATIONS = {
   zmega: twinAnimations('zmega'),
   alpha: twinAnimations('alpha'),
   shinz: twinAnimations('shinz'),
+  zaku: twinAnimations('zaku'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

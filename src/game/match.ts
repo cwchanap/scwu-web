@@ -663,7 +663,8 @@ function struck(
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
 // and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
 // 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
-// PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702), and Amiro's
+// PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702; ZAKU's 137, PC
+// 1536), and Amiro's
 // Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
@@ -698,13 +699,18 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   zmega: { launchDown: -800 },
   alpha: { launchDown: -800 },
   shinz: { launchDown: -800 },
+  zaku: { launchDown: -800 },
 };
-// The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's and ALPHA's
-// 13, which their Black (75, 75, 54, 59) tests (PCs 664, 669; 573, 578; 602,
-// 607; 816, 821) and clears (PCs 670, 579, 608, 822) as Ryuko's does 14 (PCs
-// 428–434).
+// The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's, ALPHA's and
+// ZAKU's 13, which their Black (75, 75, 54, 59, 55) tests (PCs 664, 669; 573,
+// 578; 602, 607; 816, 821; 463, 468) and clears (PCs 670, 579, 608, 822, 469)
+// as Ryuko's does 14 (PCs 428–434).
 const darkening = (who: Who) =>
-  who === 'masa' || who === 'times' || who === 'zenka' || who === 'alpha'
+  who === 'masa' ||
+  who === 'times' ||
+  who === 'zenka' ||
+  who === 'alpha' ||
+  who === 'zaku'
     ? 13
     : 14;
 // Reactions whose script rolls op 0x20 on entry (PCs 794, 819, 909, 957, 982,

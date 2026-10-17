@@ -840,6 +840,12 @@ SHINZ_TWINS = {name: (r, r + next(d for top, d in ((73, 9), (75, 14), (89, 15), 
                                   if r < top))
                for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
     name: (r, 164 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
+# ZAKU's sit one before Ryuko's KOs and lose action, then as SHIN-Z's to her
+# Chuck Hiso (139), which he lacks too, and thirteen on through her DOWN
+# section; his guards follow one after another from 162.
+ZAKU_TWINS = {name: (r, r + next(d for top, d in ((73, -1), (75, 14), (89, 15), (139, 14), (149, 13)) if r < top))
+              for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 162 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2946,6 +2952,70 @@ FIGHTERS = {
         # 787).
         image_ids={2001, 323},
     ),
+    "zaku": dict(
+        source=("35 ZAKU", "a0fb0fb949e8e4d3a5c1f5d1ad789cf2e49995b40180d5e6358aca3186085088"),
+        neutral={"idle": 1, "walk": 12, "backwalk": 13, "jump": 14, "land": 20,  # PC 105
+                 "crouchEnter": 24, "crouch": 25, "stand": 26, "turn": 29, "crouchTurn": 30},
+        twins=ZAKU_TWINS,
+        # His reactions clear variable 13, his darkening's, where Ryuko's clear
+        # 14, and test global 10 for 10 into his story modes' Hit Mode (177,
+        # 178; PCs 751, 920, ...) where hers clear 6, which nothing of his
+        # sets; only KGT PCs 542 and 590 write global 10, to 0. With those
+        # swaps:
+        differ={
+            # Ryuko's.
+            "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "launchUp", "sweep",
+            "hitRapid", "airHitRapid", "stun", "fireLaunch", "gonMiss", "chuckUp", "twistSideHit", "icePunch",
+            "airIcePunch", "hisoStop", "chuckYo",
+            # Zoma's.
+            "rushAirHit", "shock", "chuckToss", "airStun", "flySide", "twistSide", "inatuma",
+            # Kiki's.
+            "uppercut", "dragonFireball", "liftUp",
+            # Chung's, SIN's, ANMC P's, SAKUYA's, ERUS's, OS FENG's, ZIRO's
+            # and Yo's.
+            "launchAway", "airHitHeavy", "chainPull", "grabbed", "launchDown", "hitHeavy", "tatumakiIn",
+            "tatumakiOut", "fly", "vanish",
+            # Ryuko's, without clearing 5 (PCs 1659–1662).
+            "musicAttack",
+            # Ryuko's, testing variable 14 for above 9 into INAI (11, PC 492),
+            # which only his story modes' stance sets (PC 28), and global 10
+            # into Single KO (78, PC 493).
+            "lose",
+            # And unswapped: Z-MEGA's, clearing 13 for 14 (PCs 1809, 1825).
+            "bounceDown", "knockdown",
+            # Zoma's KO NORMAL and ERUS INATUMA AIR, and Chung's fly side wall
+            # hit.
+            "ko", "airInatuma", "flySideWall",
+            # Z-MEGA's, without clearing 14 first.
+            "guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
+            "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
+            "crouchTimeStopGuard", "airTimeStopGuard",
+            # Ryuko's, its last display 5 ticks (PC 1805), not 10.
+            "getUp",
+            # Ryuko's KO DOWN, holding his last display 2000 ticks (PC 544),
+            # without her test of global 15 and life check (PCs 645–646); his
+            # tests of variable 11 (PCs 535, 545) keep their fall-through.
+            "down",
+        },
+        # Results: 勝ち (56) calls DEMO STAND (34) four times (PC 476) and
+        # loops the same stance from PC 478 (PC 481), past his sound (PC
+        # 477); the draw (67) loops it from its start (PC 605), calling
+        # nothing, so the DEMO STAND its clip opens with changes nothing.
+        # Each first enters DEMO air (35) while airborne (op 0x16, PCs 475,
+        # 601); their tests of global 10 (PCs 474, 600) keep their
+        # fall-through. The darkening panel, Black (55). The Vs. intro: 開始時
+        # (36) jumps to 開始時 BR (38) for global 3 = 0 (PC 276), which
+        # spawns Black and OP super Charge (44, PCs 312–313) and, past its
+        # tests of globals 4 and 5 (PCs 316–320), which character select sets
+        # to 0 (CHAR SELECT.DEMO, PCs 7–8), enters Round 1 (39, PC 321); it
+        # plays flattened. ponytail: 開始時's test of global 10 for 10 (PC
+        # 277), into Single Start (75), isn't played.
+        actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55, intro=38),
+        flat={"intro"},
+        # 2001: the HUD face action 72 shows (PC 645); 139: *name (68, PC
+        # 609).
+        image_ids={2001, 139},
+    ),
 }
 
 
@@ -3150,7 +3220,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA and {counts['shinz']} SHIN-Z images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z and {counts['zaku']} ZAKU images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

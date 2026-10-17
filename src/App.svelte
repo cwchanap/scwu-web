@@ -420,6 +420,11 @@
         dst: 'Reflect',
         ex: 'Gaisa',
       },
+      zaku: {
+        getterBeam: 'Super P',
+        musashi: 'Super K',
+        drill: 'Dash P',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -659,6 +664,7 @@
             <option value="zmega">Z-MEGA</option>
             <option value="alpha">ALPHA</option>
             <option value="shinz">SHIN-Z</option>
+            <option value="zaku">ZAKU</option>
           </select></label
         >
         <label
@@ -702,6 +708,7 @@
             <option value="zmega">Z-MEGA</option>
             <option value="alpha">ALPHA</option>
             <option value="shinz">SHIN-Z</option>
+            <option value="zaku">ZAKU</option>
           </select></label
         >
         <label
@@ -1845,19 +1852,32 @@
           super cancels SAMA, Fire BALL, REFLACT or GAISA.
         </p>
         <p>
+          Choose ZAKU for a squat green armoured trooper with only 200 life.
+          <kbd>J</kbd> swings his purple axe, standing or crouching, and
+          <kbd>K</kbd> lobs a grenade that bounces lower each time and bursts
+          where it lands; in the air <kbd>J</kbd> swings and <kbd>K</kbd> fires
+          his gun. Shift runs on while → is held, ↑ leaping into a high jump,
+          and Shift with ← hops back. He has no double jump, air dash, Hit Up or
+          chuck. His special: <kbd>U</kbd> or ↓→ <kbd>J</kbd> DASH P, a dashing
+          axe swing. His supers, for a stock each: <kbd>1</kbd> or ↓→↓→
+          <kbd>J</kbd> Super P, four dashing swings and a stronger fifth, and
+          <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> Super K, five grenades. On a hit,
+          <kbd>J</kbd> cancels into DASH P or a super, and DASH P into a super.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA or
-          SHIN-Z, and one of eighteen stages, in either mode. Free practice has
-          no timer, and you also choose how the partner behaves: standing,
-          guarding high or low, guarding in the air, attacking in range, jumping
-          in, or playing as the original CPU. Max stock refills your supers
-          whenever you stand idle, and Low health keeps you just under 30% for
-          desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
+          SHIN-Z or ZAKU, and one of eighteen stages, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you just
+          under 30% for desperation moves. Vs. CPU is the original game's CPU,
+          playing the opponent's own moves, specials and supers. Reduce their
+          health to zero, or lead on health when time runs out. Changing modes,
+          fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

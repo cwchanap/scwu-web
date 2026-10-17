@@ -125,7 +125,7 @@ export function gaugeImage(tick: number) {
 // KATE's and REMU's 76 (PCs 736, 754, 792), SEAN's and REAR's 75 (PCs
 // 756, 726), OGI's 77 (PC 789), ZIRO's 87 (PC 994), MASA's 117 (PC
 // 1056), 3-TIMES's 114 (PC 953), ZENKA's 92 (PC 934), Z-MEGA's 82 (PC
-// 767), ALPHA's 108 (PC 1333) and SHIN-Z's 84 (PC 846).
+// 767), ALPHA's 108 (PC 1333), SHIN-Z's 84 (PC 846) and ZAKU's 72 (PC 645).
 export const faceImage = (face: number, who?: Who) => {
   const side =
     who === 'suneo' ||
@@ -151,7 +151,7 @@ export const faceImage = (face: number, who?: Who) => {
 // 328 (PC 694), SWW's 65 399 (PC 649), OGI's 70 648 (PC 749), ZIRO's 79
 // 478 (PC 952), MASA's 106 139 (PC 1012), 3-TIMES's 105 139 (PC 913),
 // ZENKA's 85 333 (PC 891), Z-MEGA's 74 322 (PC 723), ALPHA's 99 576
-// (PC 1289) and SHIN-Z's 75 323 (PC 787).
+// (PC 1289), SHIN-Z's 75 323 (PC 787) and ZAKU's 68 139 (PC 609).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -187,6 +187,7 @@ const NAMES: Record<Who, number> = {
   zmega: 322,
   alpha: 576,
   shinz: 323,
+  zaku: 139,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
