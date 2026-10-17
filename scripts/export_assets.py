@@ -789,6 +789,16 @@ TIMES_TWINS = {name: (r, r + next(d for top, d in ((62, 36), (73, 38), (89, 44),
 # header (144), past his blank 164.
 ZENKA_TWINS = {name: (r, r + next(d for top, d in ((73, 19), (89, 22), (139, 21), (144, 20), (173, 21)) if r < top))
                for name, (r, _) in ZOMA_TWINS.items()}
+# Z-MEGA's sit eight after Ryuko's KOs and lose action (his Win2, 66, takes
+# WIN STAND's place), twelve after her other reactions up to the heavy air hit,
+# thirteen from J Att to SHOCK INFINITY (his ★変なＴＥＣＨ, 89, sits before
+# them, hers after), twelve from Shock, eleven past her Chuck Hiso (139), which
+# he lacks, and twelve again from her DOWN header (144), past his RAMDOM GET UP
+# (156); his guards follow one after another from 162, as 3-TIMES's.
+ZMEGA_TWINS = {name: (r, r + next(d for top, d in ((63, 8), (77, 12), (89, 13), (139, 12), (144, 11), (149, 12))
+                                  if r < top))
+               for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 162 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -2681,6 +2691,86 @@ FIGHTERS = {
         # 891).
         image_ids={2001, 333},
     ),
+    "zmega": dict(
+        source=("32 Z-MEGA", "1c6e25a2e665b7ccee92d417423d0b52abc4fd9ac9a72b3844c671a0306ff98a"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 53
+                 "crouchEnter": 20, "crouch": 21, "stand": 22, "turn": 25, "crouchTurn": 26},
+        twins=ZMEGA_TWINS,
+        # His reactions clear variable 14, as Ryuko's do, but never 6, which
+        # nothing of his sets:
+        differ={
+            # 3-TIMES's: Ryuko's, gaining more power (op 0x15: 2, 5 and 3 to
+            # her 1, 3 and 2, PCs 1986, 2016, 2077, ...) without her op 0x10
+            # into its COUNTER NO form, op 0x1e or Hit Up checks into COUNTER
+            # HIT, so each holds one longer display.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # 3-TIMES's: Ryuko's, gaining more power (PCs 2006, ...).
+            "airGuard", "airBlockHeavy", "airBlockRapid", "airTimeStopGuard",
+            # Ryuko's, keeping 6 (PCs 786, ...).
+            "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "hitRapid", "airHitRapid",
+            "fly", "stun", "fireLaunch", "gonMiss", "chuckUp", "twistSideHit", "musicAttack", "icePunch",
+            "airIcePunch", "hisoStop", "chuckYo",
+            # SAKUYA's rand % 4 > 1 (PCs 830, 853, 1173, 1654, 1676, 1227,
+            # 1248) to Ryuko's rand % 6 > 2.
+            "hitHeavy", "airHitHeavy", "uppercut", "dragonFireball", "liftUp", "tatumakiIn", "tatumakiOut",
+            # Chung's rand % 3 > 1 (PCs 934, 1336) to Ryuko's rand % 6 > 2,
+            # or where hers has none (PC 911), or none where hers has one.
+            "launchAway", "chainPull", "sweep", "chuckToss",
+            # Kiki's HISA Down at raw −800 (PC 1624), with Zoma's order of op
+            # 0x1a and op 0x15 (PC 1615).
+            "launchDown",
+            # SAKUYA's Hit UP: its op 0x1f on variable 8 (PC 947), which a
+            # test doesn't read, in place of Ryuko's two.
+            "launchUp",
+            # MASA's: Ryuko's, clearing 14 (PCs 1951, 1967) where hers clear 6.
+            "knockdown", "bounceDown",
+            # ANMC P's op 0x01 before op 0x02 (PC 1693).
+            "grabbed",
+            # Zoma's.
+            "shock", "airStun", "rushAirHit", "flySide", "twistSide", "inatuma",
+            # Yo's: clears 14 before 8 and 5 (PC 1898), not after.
+            "vanish",
+            # Chung's 1002-tick wait (PC 1158).
+            "flySideWall",
+            # Op 0x16 after clearing the variables, which Ryuko's ERUS INATUMA
+            # AIR clears instead.
+            "airInatuma",
+            # Ryuko's, but rolling rand % 6 > 2 (PC 1937) past a one-tick
+            # display whose hit and guard handlers name RAMDOM GET UP (156)
+            # while its box (kind 2, PC 1940) sits 9869 pixels down, where
+            # nothing meets it; either way it takes 30 ticks. ponytail: it
+            # plays as a clip through that display, drawing no roll.
+            "getUp",
+            # ZIRO's: Zoma's KO tests (PC 647).
+            "ko",
+            # KAY's: Zoma's KO DOWN (PC 695).
+            "down",
+            # Ryuko's, keeping 6, after a test of variable 0 for 10 (PC 636),
+            # which his form change sets only to 0 and 100, into his empty
+            # Start KO 3 (46). It deletes his slots 5 and 9 (PCs 637–638),
+            # Shin Z's drain among them.
+            "lose",
+        },
+        # Results: 勝ち (65) calls DEMO stand (30) once (PC 619) and loops
+        # image 319 from PC 623 (PC 626), shaking the screen each pass; the
+        # draw (73) calls 30 once (PC 716) and loops image 201 (PC 719). Each
+        # first deletes his slot 5 (PCs 615, 714) and enters DEMO air (32)
+        # while airborne (op 0x16, PCs 616, 715). ponytail: 勝ち's test of
+        # variable 0 into Win2 (66, PC 617) and rand % 6 > 1 into Random
+        # win1 (53, PC 618), and DEMO stand's into DEMO stand sp (31, PC
+        # 342), aren't played. The darkening panel, Black (52). The Vs.
+        # intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC
+        # 367), which, for global 14 = 0, jumps past its display (PC 402),
+        # spawns Black and OP super Charge (48, PCs 404–405) and enters Round
+        # 1 (36) + 2 (PC 407); it plays flattened. ponytail: 開始時's test of
+        # global 10 for 10 (PC 368), into 開始時 BR + 2, isn't played.
+        actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52, intro=(35, 3)),
+        flat={"intro"},
+        # 2001: the HUD face action 82 shows (PC 767); 322: *name (74, PC
+        # 723).
+        image_ids={2001, 322},
+    ),
 }
 
 
@@ -2882,7 +2972,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES and {counts['zenka']} ZENKA images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA and {counts['zmega']} Z-MEGA images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

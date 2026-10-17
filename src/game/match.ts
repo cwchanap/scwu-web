@@ -489,8 +489,10 @@ const introWalk = (who: Who) =>
   );
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
-// Ryuko's knockdown, 'DOWN normal'.
+// Ryuko's knockdown, 'DOWN normal', and its get-up, 'Down Get up': Z-MEGA's
+// GAISA FINAL ends in his (157) + 5 (PC 4137), at its roll.
 const KNOCKDOWN = 146;
+const GET_UP = 145;
 // Victim actions reached through the response table, with their op 0x1a stops
 // for the victim and, where they differ, the attacker.
 const RESPONSE_REACTIONS: Record<
@@ -660,7 +662,8 @@ function struck(
 // Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's and
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
 // and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
-// 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880), and Amiro's
+// 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
+// PC 1624), and Amiro's
 // Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
@@ -692,6 +695,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   masa: { launchDown: -800 },
   times: { launchDown: -800 },
   zenka: { launchDown: -800 },
+  zmega: { launchDown: -800 },
 };
 // The darkening's variable: 14, or MASA's, 3-TIMES's and ZENKA's 13, which
 // their Black (75, 75, 54) tests (PCs 664, 669; 573, 578; 602, 607) and
@@ -1856,7 +1860,11 @@ export class Match {
     const ryuko = twinOf(f.who, index) ?? 0;
     const named =
       (offset ? undefined : NEUTRAL[f.who][index]) ??
-      (ryuko === KNOCKDOWN ? 'knockdown' : RESPONSE_REACTIONS[ryuko]?.action);
+      (ryuko === KNOCKDOWN
+        ? 'knockdown'
+        : ryuko === GET_UP
+          ? 'getUp'
+          : RESPONSE_REACTIONS[ryuko]?.action);
     if (named) return this.action(f, named, true);
     const key = sourceKey(index, offset);
     // A target one past its action's end runs out at once (0x4125ea): DIDO's

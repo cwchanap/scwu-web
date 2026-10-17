@@ -390,6 +390,16 @@
         axe: 'Fire Ball',
         iori: 'New Move',
       },
+      zmega: {
+        getterBeam: 'Gaisa',
+        musashi: 'S Giga',
+        changeAttack: 'Akuma',
+        drill: 'Sama',
+        axe: 'Fire Ball',
+        iori: 'Giga',
+        dst: 'Reflect',
+        ex: 'Shin Z',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -626,6 +636,7 @@
             <option value="masa">MASA</option>
             <option value="times">3-TIMES</option>
             <option value="zenka">ZENKA</option>
+            <option value="zmega">Z-MEGA</option>
           </select></label
         >
         <label
@@ -666,6 +677,7 @@
             <option value="masa">MASA</option>
             <option value="times">3-TIMES</option>
             <option value="zenka">ZENKA</option>
+            <option value="zmega">Z-MEGA</option>
           </select></label
         >
         <label
@@ -1729,10 +1741,37 @@
           stocks.
         </p>
         <p>
+          Choose Z-MEGA to play him, a white-haired, moustached brawler in a
+          black vest who turns into Shin Z, trading life for power.
+          <kbd>J</kbd> is a lunging palm strike that hits twice and
+          <kbd>K</kbd> a stepping spin kick, standing or crouching; in the air
+          <kbd>J</kbd> punches and <kbd>K</kbd> kicks. Shift runs on while → is
+          held, ↑ leaping into a high jump, and Shift with ← hops back; he
+          double jumps and air dashes. <kbd>O</kbd> is his chuck, a grab into a
+          beating and a blow that knocks the opponent away. He has no Hit Up or
+          Counter Attack. <kbd>E</kbd> or ↓ ↓ <kbd>H</kbd> is TYPE CHANGE: as
+          Shin Z he loses a point of life every 0.1 seconds while his power
+          rises 15, and his moves take their Shin forms; again turns him back,
+          which holds his power at zero until he next turns. His specials:
+          <kbd>U</kbd> or →↓↘ <kbd>K</kbd> SAMA, a rising somersault kick, also
+          in the air, <kbd>I</kbd> or ↓→ <kbd>J</kbd> Fire BALL, a fireball that
+          bounces twice and rolls along the floor, <kbd>F</kbd> or →↓←
+          <kbd>J</kbd> GIGA, a dash behind a glowing palm that carries the
+          opponent into the screen's edge, and <kbd>G</kbd> or ↓→ <kbd>K</kbd>
+          REFLACT, a round shield's shove, which doesn't reflect shots here. His supers,
+          for a stock each: <kbd>1</kbd> or →←↓→ <kbd>J</kbd> GAISA, a charge
+          through three levels, whose wave <kbd>J</kbd> fires at the level
+          reached before he collapses, and <kbd>2</kbd> or ↓→↓←
+          <kbd>J</kbd> SGIGA, a bigger GIGA; for three, <kbd>3</kbd> or
+          <kbd>J</kbd> <kbd>J</kbd> → <kbd>K</kbd> <kbd>J</kbd> AKUMA SP, a dash that
+          grabs into a storm of flashes for 250, which Shin Z plays even short of
+          stock.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES or ZENKA, and one of
+          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA or Z-MEGA, and one of
           eighteen stages, in either mode. Free practice has no timer, and you
           also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the

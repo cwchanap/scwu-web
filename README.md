@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES or ZENKA on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA or Z-MEGA on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -757,7 +757,28 @@ And ZENKA's, a silver-haired woman in a long red coat who fights with a knife an
 | 2, or ↓→↓→ J                   | DAISHARIN: a giant sword hurled to spin out and back, 1 stock                                                                       |
 | 3, or ↓←↓← J                   | En300: warnings, then a leap that drops with a giant sword, 3 stocks; its grab names the opponent's Clothes off, so it meets no one |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES or ZENKA), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And Z-MEGA's, a white-haired, moustached brawler in a black vest who turns into Shin Z, trading life for power:
+
+| Input                      | Z-MEGA's move                                                                                                                                                      |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| J, standing or crouching   | A lunging palm strike that hits twice                                                                                                                              |
+| K, standing or crouching   | A stepping spin kick                                                                                                                                               |
+| In the air: J / K          | A punch / a kick                                                                                                                                                   |
+| Shift or → →               | A run that goes on while → is held; ↑ leaps into a high jump                                                                                                       |
+| Shift + ← or ← ←           | A hop back                                                                                                                                                         |
+| ↑ in the air, or → → / ← ← | Double jump; air dash                                                                                                                                              |
+| H                          | Nothing: he has no Hit Up or Counter Attack                                                                                                                        |
+| O                          | Chuck: a grab into a beating, then a blow that knocks the opponent away                                                                                            |
+| E, or ↓ ↓ H                | TYPE CHANGE: into Shin Z, who loses a point of life every 0.1 seconds as his power rises 15; again to turn back, which holds his power at zero until he next turns |
+| U, or →↓↘ K                | SAMA: a rising somersault kick (also in the air; Shin Z: lower, and →↓↘ K kicks again in the air)                                                                  |
+| I, or ↓→ J                 | Fire BALL: a fireball that arcs, bounces twice and rolls along the floor (Shin Z: a fast straight shot)                                                            |
+| F, or →↓← J                | GIGA: a dash behind a glowing palm that carries the opponent into the screen's edge and slams them (Shin Z: faster and harder)                                     |
+| G, or ↓→ K                 | REFLACT: a round shield's shove (Shin Z: harder); it doesn't reflect shots here                                                                                    |
+| 1, or →←↓→ J               | GAISA: a charge through three levels; J fires its wave at the level reached, or he collapses, 1 stock (Shin Z: a level higher)                                     |
+| 2, or ↓→↓← J               | SGIGA: a bigger GIGA, 1 stock (Shin Z: faster and harder)                                                                                                          |
+| 3, or J J → K J            | AKUMA SP: a cut-in, then a dash that grabs into a storm of flashes, 250, 3 stocks (Shin Z: short of them, the flashes alone, still 250)                            |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA or Z-MEGA), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -773,7 +794,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** thirty-one fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** thirty-two fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -785,7 +806,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's and ZENKA's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's and Z-MEGA's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

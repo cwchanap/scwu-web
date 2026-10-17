@@ -36,6 +36,7 @@ import ziro from './generated/ziro.json';
 import masa from './generated/masa.json';
 import times from './generated/times.json';
 import zenka from './generated/zenka.json';
+import zmega from './generated/zmega.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -54,12 +55,13 @@ export interface CommandEntry {
 // SIN's 25, LIZARD's 21, KAY's 22, DIDO's 24, SAKUYA's 26, ALEX's 28, SOU's
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
-// 21, 3-TIMES's 19, ZENKA's 23) and the distance in source pixels that splits
+// 21, 3-TIMES's 19, ZENKA's 23, Z-MEGA's 29) and the distance in source pixels that splits
 // their near and far
 // actions (+0x7ca3): GIGI's 130, though each of his entries names the same
 // action for both, OGI's 140, which picks SCC's near or far start, ZIRO's
 // 130, RAMBU's and the telepots', and MASA's 130, his SCC's; 3-TIMES's
-// 130 splits nothing, and ZENKA's 130 his Ranbu's.
+// 130 splits nothing, ZENKA's 130 his Ranbu's, and Z-MEGA's 110
+// nothing.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -93,6 +95,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     masa: masa.commands,
     times: times.commands,
     zenka: zenka.commands,
+    zmega: zmega.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -598,6 +601,21 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['iori', 8],
     ['dash', 12],
   ],
+  // Z-MEGA's supers GAISA, SGIGA and AKUMA SP (5, 4, 1) on 1-3; his specials
+  // SAMA (12), Fire BALL (14), GIGA (11) and REFLACT (13) on Ryuko's drill,
+  // axe, iori and DST keys, TYPE CHANGE (15) on EX, then Dash F (19) and
+  // Dash B (20).
+  zmega: [
+    ['getterBeam', 5],
+    ['musashi', 4],
+    ['changeAttack', 1],
+    ['drill', 12],
+    ['axe', 14],
+    ['iori', 11],
+    ['dst', 13],
+    ['ex', 15],
+    ['dash', 19],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -631,6 +649,7 @@ export const BACK_DASH: Record<Who, number> = {
   masa: 12,
   times: 11,
   zenka: 13,
+  zmega: 20,
 };
 // Long enough for the longest window (90) and the tick before it.
 export const HISTORY_TICKS = 128;
