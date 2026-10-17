@@ -805,7 +805,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     knockdown: clip(z.knockdown),
     getUp: clip(z.getUp),
     down: clip(z.ko, false, waits(z.ko)),
-    koAgain: clip(z.koAgain),
+    // ASTROMAN's lies on a 0-tick display (PC 694).
+    koAgain: clip(z.koAgain, false, waits(z.koAgain)),
     // ZIRO_KO. ponytail: KO down's rand % 3 > 1 (PC 828) only picks its
     // sound, and its rand % 4 > 2 (PC 834) into Random lose (75), which
     // stands until struck, isn't played; the port always bursts.
@@ -971,6 +972,7 @@ const TWIN_ANIMATIONS = {
   golf: twinAnimations('golf'),
   asura: twinAnimations('asura'),
   ttro: twinAnimations('ttro'),
+  astroman: twinAnimations('astroman'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

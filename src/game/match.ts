@@ -665,8 +665,8 @@ function struck(
 // 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
 // PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702; ZAKU's 137, PC
 // 1536; PAC-HELO's 137, PC 1582; GOLF's 109, PC 1272; ASURA's 109, PC
-// 1283; TTRO's 124, PC 1494), and Amiro's Tatumaki >> (105) at −300 (PC
-// 1398).
+// 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676), and Amiro's
+// Tatumaki >> (105) at −300 (PC 1398).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -705,6 +705,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   golf: { launchDown: -800 },
   asura: { launchDown: -800 },
   ttro: { launchDown: -800 },
+  astroman: { launchDown: -800 },
 };
 // The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's, ALPHA's,
 // ZAKU's and PAC-HELO's 13, which their Black (75, 75, 54, 59, 55, 55) tests

@@ -448,6 +448,15 @@
         iori: 'Dash K',
         dst: 'CC',
       },
+      astroman: {
+        getterBeam: 'S CC',
+        musashi: 'Super P',
+        changeAttack: 'Gun Super',
+        drill: 'Jump Att',
+        axe: 'Punch',
+        iori: 'Ass Gun',
+        dst: 'C Chuck',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -692,6 +701,7 @@
             <option value="golf">GOLF</option>
             <option value="asura">ASURA</option>
             <option value="ttro">TTRO</option>
+            <option value="astroman">ASTROMAN</option>
           </select></label
         >
         <label
@@ -740,6 +750,7 @@
             <option value="golf">GOLF</option>
             <option value="asura">ASURA</option>
             <option value="ttro">TTRO</option>
+            <option value="astroman">ASTROMAN</option>
           </select></label
         >
         <label
@@ -1965,13 +1976,37 @@
           attacks into a double jump or air dash.
         </p>
         <p>
+          Choose ASTROMAN for a hulking, muscle-bound boy robot with 780 life,
+          whose steps shake the screen. <kbd>J</kbd> is a jab and <kbd>K</kbd>
+          two stepping kicks; down with <kbd>J</kbd> is a rushing punch and down
+          with <kbd>K</kbd> a leaping kick. In the air <kbd>J</kbd> and
+          <kbd>K</kbd> strike ahead, in other forms after a double jump, an air
+          dash or a dash. Shift is a rocket dash that hovers on while → is held,
+          and Shift with ← dashes back. <kbd>O</kbd> is his chuck, a grab into a
+          rocket leap and a slam. He has no Hit Up or Counter Attack. His
+          specials: <kbd>U</kbd> or ↓← <kbd>K</kbd> Jump att, a rocket leap that
+          lands in a blast, also in the air, <kbd>I</kbd> or ↓→
+          <kbd>J</kbd> Punch, a rocket fist, <kbd>F</kbd> or ↓→ <kbd>K</kbd> ASS
+          GUN, five bullets from a gun in his backside, and <kbd>G</kbd> or →↓←
+          <kbd>J</kbd>
+          C Chuck, close in a grab into kisses that heal him 60. His supers, for a
+          stock each: <kbd>2</kbd> or ↓→↓→ <kbd>J</kbd> SUPER P, a huge black
+          rocket fist, and <kbd>3</kbd> or ↓→↓→ <kbd>K</kbd> ASS GUN SUPER, a
+          beam from his backside that strikes twenty times from a little ahead
+          of him; for three,
+          <kbd>1</kbd> or →↓←→↓← <kbd>J</kbd> S CC, close in a grab into knees,
+          blasts and kisses that heal him 50, for 300. On a hit, <kbd>J</kbd>
+          and <kbd>K</kbd> cancel into a special (C Chuck aside) or a super (S CC
+          aside), and the air attacks into a double jump, an air dash or Jump att.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA or TTRO, and one of eighteen
-          stages, in either mode. Free practice has no timer, and you also
-          choose how the partner behaves: standing, guarding high or low,
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO or ASTROMAN, and one of
+          eighteen stages, in either mode. Free practice has no timer, and you
+          also choose how the partner behaves: standing, guarding high or low,
           guarding in the air, attacking in range, jumping in, or playing as the
           original CPU. Max stock refills your supers whenever you stand idle,
           and Low health keeps you just under 30% for desperation moves. Vs. CPU

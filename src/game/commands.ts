@@ -44,6 +44,7 @@ import pachelo from './generated/pachelo.json';
 import golf from './generated/golf.json';
 import asura from './generated/asura.json';
 import ttro from './generated/ttro.json';
+import astroman from './generated/astroman.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -63,14 +64,15 @@ export interface CommandEntry {
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
 // 21, 3-TIMES's 19, ZENKA's 23, Z-MEGA's 29, ALPHA's 28, SHIN-Z's 29, ZAKU's
-// 16, PAC-HELO's 18, GOLF's 16, ASURA's 17, TTRO's 21) and the distance in
-// source pixels that splits their near and far actions (+0x7ca3): GIGI's
-// 130, though each of his entries names the same action for both, OGI's
-// 140, which picks SCC's near or far start, ZIRO's 130, RAMBU's and the
-// telepots', and MASA's 130, his SCC's; 3-TIMES's 130 splits nothing,
-// ZENKA's 130 his Ranbu's, Z-MEGA's 110 nothing, ALPHA's 140 his SCC's and
-// CC's, SHIN-Z's 130 nothing, ZAKU's, PAC-HELO's, GOLF's and ASURA's 0
-// nothing, and TTRO's 180 his SCC's and CC's.
+// 16, PAC-HELO's 18, GOLF's 16, ASURA's 17, TTRO's 21, ASTROMAN's 22) and
+// the distance in source pixels that splits their near and far actions
+// (+0x7ca3): GIGI's 130, though each of his entries names the same action
+// for both, OGI's 140, which picks SCC's near or far start, ZIRO's 130,
+// RAMBU's and the telepots', and MASA's 130, his SCC's; 3-TIMES's 130
+// splits nothing, ZENKA's 130 his Ranbu's, Z-MEGA's 110 nothing, ALPHA's
+// 140 his SCC's and CC's, SHIN-Z's 130 nothing, ZAKU's, PAC-HELO's, GOLF's
+// and ASURA's 0 nothing, TTRO's 180 his SCC's and CC's, and ASTROMAN's 200
+// his C Chuck's.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -112,6 +114,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     golf: golf.commands,
     asura: asura.commands,
     ttro: ttro.commands,
+    astroman: astroman.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -706,6 +709,19 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dst', 5],
     ['dash', 14],
   ],
+  // ASTROMAN's supers S CC, SUPER P and ASS GUN SUPER on 1-3; his specials
+  // Jump att (6), Punch (7), ASS GUN (8) and C Chuck (5) on Ryuko's drill,
+  // axe, iori and DST keys, then Dash F (13) and Dash B (14).
+  astroman: [
+    ['getterBeam', 1],
+    ['musashi', 2],
+    ['changeAttack', 3],
+    ['drill', 6],
+    ['axe', 7],
+    ['iori', 8],
+    ['dst', 5],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -747,6 +763,7 @@ export const BACK_DASH: Record<Who, number> = {
   golf: 8,
   asura: 9,
   ttro: 15,
+  astroman: 14,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

@@ -13,8 +13,8 @@
 // 3-TIMES.PLAYER), ZENKA's (31 ZENKA.PLAYER), Z-MEGA's (32 Z-MEGA.PLAYER),
 // ALPHA's (33 ALPHA.PLAYER), SHIN-Z's (34 SHIN-Z.PLAYER), ZAKU's (35
 // ZAKU.PLAYER), PAC-HELO's (36 PAC-HELO.PLAYER), GOLF's (37 GOLF.PLAYER),
-// ASURA's (38 ASURA.PLAYER) and TTRO's (39 TTRO.PLAYER); and each stage's
-// objects, images and track.
+// ASURA's (38 ASURA.PLAYER), TTRO's (39 TTRO.PLAYER) and ASTROMAN's (40
+// ASTROMAN.PLAYER); and each stage's objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -54,6 +54,7 @@ import pachelo from './generated/pachelo.json';
 import golf from './generated/golf.json';
 import asura from './generated/asura.json';
 import ttro from './generated/ttro.json';
+import astroman from './generated/astroman.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -95,7 +96,8 @@ export type Who =
   | 'pachelo'
   | 'golf'
   | 'asura'
-  | 'ttro';
+  | 'ttro'
+  | 'astroman';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -136,6 +138,7 @@ export const CHARACTERS = {
   golf,
   asura,
   ttro,
+  astroman,
 };
 // Each other fighter's export: Ryuko's keys, and the twins pairing its victim
 // actions with hers (export_fighter). The export declares it for each file
@@ -158,7 +161,7 @@ export type Container = Who | Stage;
 // SEAN's 500, GON's 470, KATE's 430, REMU's 480, REAR's 470,
 // GIGI's 500, SWW's 460, OGI's 500, ZIRO's 470, MASA's 450, 3-TIMES's 400,
 // ZENKA's 480, Z-MEGA's 350, ALPHA's 500, SHIN-Z's 800, ZAKU's and
-// PAC-HELO's 200, GOLF's and ASURA's 300, and TTRO's 820.
+// PAC-HELO's 200, GOLF's and ASURA's 300, TTRO's 820 and ASTROMAN's 780.
 // Each block puts the desperation threshold at 30% (+0x7ca6), which 0x40e7c0
 // compares against.
 export const lifeOf = (who: Who) => CHARACTERS[who].life;
@@ -216,6 +219,7 @@ const twins = Object.fromEntries(
       'golf',
       'asura',
       'ttro',
+      'astroman',
     ] as const
   ).map((who) => {
     const own = new Map(
