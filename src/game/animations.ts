@@ -459,10 +459,10 @@ const repeated = (frames: Pose[], ticks: number) => {
     out.push(frames[out.length % frames.length]);
   return out;
 };
-// How many times each win calls its stand demo: twice, ZAKU's four times,
-// otherwise once.
+// How many times each win calls its stand demo: twice, ZAKU's and
+// PAC-HELO's four times, otherwise once.
 const winStands = (who: Who) =>
-  who === 'zaku'
+  who === 'zaku' || who === 'pachelo'
     ? 4
     : who === 'kate' ||
         who === 'remu' ||
@@ -848,7 +848,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // stand (28) once (PC 1002) and loops his stance from PC 1010 (PC 1017);
     // his draw (98) holds image 130 (PC 1285). ZAKU's 勝ち (56) calls DEMO
     // STAND (34) four times (PC 476) and loops his stance from PC 478 (PC
-    // 481), and his draw (67) loops it from its start (PC 605).
+    // 481), and his draw (67) loops it from its start (PC 605), as
+    // PAC-HELO's do (PCs 484, 486, 488; 613).
     // SIN's draw holds its last display (PC 714). LIZARD's 勝ち (60) plays
     // flattened (export_fighter), calls and all, holding image 409 (PC 638),
     // as DIDO's 勝ち (61) does image 330 (PC 688), SAKUYA's 勝ち (69) image
@@ -961,6 +962,7 @@ const TWIN_ANIMATIONS = {
   alpha: twinAnimations('alpha'),
   shinz: twinAnimations('shinz'),
   zaku: twinAnimations('zaku'),
+  pachelo: twinAnimations('pachelo'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

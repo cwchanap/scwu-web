@@ -40,6 +40,7 @@ import zmega from './generated/zmega.json';
 import alpha from './generated/alpha.json';
 import shinz from './generated/shinz.json';
 import zaku from './generated/zaku.json';
+import pachelo from './generated/pachelo.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -59,12 +60,13 @@ export interface CommandEntry {
 // 31, HISO's 25, ERUS's 29, OS FENG's 26, SEAN's 29, GON's 30, KATE's 27,
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
 // 21, 3-TIMES's 19, ZENKA's 23, Z-MEGA's 29, ALPHA's 28, SHIN-Z's 29, ZAKU's
-// 16) and the distance in source pixels that splits their near and far
-// actions (+0x7ca3): GIGI's 130, though each of his entries names the same
-// action for both, OGI's 140, which picks SCC's near or far start, ZIRO's
-// 130, RAMBU's and the telepots', and MASA's 130, his SCC's; 3-TIMES's 130
-// splits nothing, ZENKA's 130 his Ranbu's, Z-MEGA's 110 nothing, ALPHA's 140
-// his SCC's and CC's, SHIN-Z's 130 nothing, and ZAKU's 0 nothing.
+// 16, PAC-HELO's 18) and the distance in source pixels that splits their
+// near and far actions (+0x7ca3): GIGI's 130, though each of his entries
+// names the same action for both, OGI's 140, which picks SCC's near or far
+// start, ZIRO's 130, RAMBU's and the telepots', and MASA's 130, his SCC's;
+// 3-TIMES's 130 splits nothing, ZENKA's 130 his Ranbu's, Z-MEGA's 110
+// nothing, ALPHA's 140 his SCC's and CC's, SHIN-Z's 130 nothing, and ZAKU's
+// and PAC-HELO's 0 nothing.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -102,6 +104,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     alpha: alpha.commands,
     shinz: shinz.commands,
     zaku: zaku.commands,
+    pachelo: pachelo.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -660,6 +663,14 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['drill', 3],
     ['dash', 7],
   ],
+  // PAC-HELO's super super roll (1) on 1; his specials roll (5) and elertic
+  // (6) on Ryuko's drill and axe keys, then Dash F (10) and Dash B (11).
+  pachelo: [
+    ['getterBeam', 1],
+    ['drill', 5],
+    ['axe', 6],
+    ['dash', 10],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -697,8 +708,10 @@ export const BACK_DASH: Record<Who, number> = {
   alpha: 21,
   shinz: 20,
   zaku: 8,
+  pachelo: 11,
 };
-// Long enough for the longest window (90) and the tick before it.
+// Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
+// before it.
 export const HISTORY_TICKS = 128;
 
 export function inputWord(input: Input, forwardIsRight: boolean) {
@@ -716,24 +729,22 @@ const DIRECTIONS = [0, 0, 2, 10, 8, 9, 1, 5, 4, 6, 1, 4, 2, 8, 0, 0];
 
 // 0x410acf–0x410c24 (and the scan's 0x4101a7–0x4102e8): nibble 0 takes any
 // direction, 1–9 exactly theirs (1 none), 10–13 any that has their bit. The
-// buttons, bits 4–9, must all be held, and none of them the tick before.
-// Only ZIRO's TWIN SHOT has a typed step (bits 14–15), the turn (type 3,
-// below); ponytail: the scan's types 1 and 2 (0x4102ed, 0x410473) aren't
-// ported.
-function stepMatches(step: number, word: number, before: number) {
+// buttons, bits 4–9, must all be held.
+function holds(step: number, word: number) {
   const nibble = step & 15;
   const direction = word & 15;
   const buttons = step & 0x3f0;
   return (
-    !(step & 0xc000) &&
     (!nibble ||
       (nibble < 10
         ? direction === DIRECTIONS[nibble]
         : nibble < 14 && (direction & DIRECTIONS[nibble]) > 0)) &&
-    (word & buttons) === buttons &&
-    !(before & buttons)
+    (word & buttons) === buttons
   );
 }
+// An untyped step's buttons, besides, are none of them held the tick before.
+const stepMatches = (step: number, word: number, before: number) =>
+  holds(step, word) && !(before & step & 0x3f0);
 
 // 0x41061a–0x410714: a turn step's first F, D, B or U scanned back (table
 // 0x410a00: DF counts as F, DB as D, UF as U, UB as B) starts two counts at
@@ -765,6 +776,11 @@ export function commanded(
   while (k >= 0 && !(steps[k] & 0x2000)) k--;
   if (k < 0) return false;
   const now = history.length - 1;
+  // A mash step's count (+0x10: the last marked step's u16 × 4, then each
+  // earlier step's u16 once one matches, 0x410854) and whether its press is
+  // still held (+0x30).
+  let left = (params[k] ?? 0) * 4;
+  let pressed = false;
   // The turn's states and counts, one each way round.
   let ahead = -1;
   let back = -1;
@@ -772,10 +788,27 @@ export function commanded(
   let backLeft = 0;
   for (let t = now; t > now - window; t--) {
     const word = history[t] ?? 0;
-    let matched: boolean;
-    if (steps[k] >> 14 !== 3)
-      matched = stepMatches(steps[k], word, history[t - 1] ?? 0);
-    else if (ahead < 0) {
+    const type = steps[k] >> 14;
+    let matched = false;
+    if (!type) matched = stepMatches(steps[k], word, history[t - 1] ?? 0);
+    else if (type === 1) {
+      // 0x4102ed: a mash (PAC-HELO's elertic) counts 4 off for each tick
+      // that holds the step after one with no button (scanning back), and
+      // matches once the count is spent.
+      if (pressed) pressed = (word & 0x3f0) > 0;
+      else if (holds(steps[k], word)) {
+        pressed = true;
+        left -= 4;
+        matched = left <= 0;
+      }
+    } else if (type === 2) {
+      // 0x410473: a hold (PAC-HELO's roll) matches once the step holds for
+      // its u16 ticks running back from this one, past the window.
+      let held = 0;
+      while (held < (params[k] ?? 0) && holds(steps[k], history[t - held] ?? 0))
+        held++;
+      matched = held === (params[k] ?? 0);
+    } else if (ahead < 0) {
       ahead = back = TURN_START[word & 15] ?? -1;
       aheadLeft = backLeft = (params[k] ?? 0) * 4;
       matched = false;
@@ -790,7 +823,10 @@ export function commanded(
       }
       matched = aheadLeft < 2 || backLeft < 2;
     }
-    if (matched && --k < 0) return true;
+    if (matched) {
+      if (--k < 0) return true;
+      left = params[k] ?? 0;
+    }
   }
   return false;
 }
@@ -830,7 +866,7 @@ export function scan(
   return null;
 }
 
-// 0x4115e3–0x41166a: the CPU enters a command by writing its marked steps
+// 0x4115e3–0x411777: the CPU enters a command by writing its marked steps
 // into its history, the last at this tick, each as its direction's bits from
 // 0x41f138 plus its buttons, and `direction`'s bits.
 export function inject(
@@ -840,15 +876,32 @@ export function inject(
   direction = 0,
   spaced = false,
 ) {
-  const words = entriesOf(who)
-    [entry - 1].steps.filter((step) => step & 0x2000)
-    .flatMap((step) =>
-      // A turn step writes nothing the scan reads, which no CPU table enters.
-      // Authored: a key writes ZIRO's TWIN SHOT turn as F, D, B and U.
-      spaced && step >> 14 === 3
-        ? [2, 8, 1, 4]
-        : [DIRECTIONS[step & 15] | (step & 0x3f0) | direction],
-    )
+  const { steps, params = [] } = entriesOf(who)[entry - 1];
+  const words = steps
+    .flatMap((step, k) => {
+      if (!(step & 0x2000)) return [];
+      const word = DIRECTIONS[step & 15] | (step & 0x3f0) | direction;
+      const times = params[k] ?? 0;
+      switch (step >> 14) {
+        // 0x411681: a mash (PAC-HELO's elertic) writes its u16 presses, each
+        // with a blank after;
+        case 1:
+          return Array.from({ length: times }, () => [word, 0]).flat();
+        // 0x4116c6: a hold (his roll's) its u16 ticks;
+        case 2:
+          return Array<number>(times).fill(word);
+        // 0x4116f7: a turn its u16 rounds of U, B, D and F, which no CPU table
+        // enters. Authored: a key writes ZIRO's TWIN SHOT turn as F, D, B and
+        // U.
+        case 3:
+          return spaced
+            ? [2, 8, 1, 4]
+            : Array.from({ length: times }, () =>
+                [4, 1, 8, 2].map((bit) => word | bit),
+              ).flat();
+      }
+      return [word];
+    })
     // Authored: a key puts a blank tick before a button its last step held,
     // the fresh press each step needs (G Suneo's hh: K, K, ←, J, K).
     .flatMap((word, k, words) =>

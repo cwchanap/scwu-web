@@ -425,6 +425,11 @@
         musashi: 'Super K',
         drill: 'Dash P',
       },
+      pachelo: {
+        getterBeam: 'Super Roll',
+        drill: 'Roll',
+        axe: 'Electric',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -665,6 +670,7 @@
             <option value="alpha">ALPHA</option>
             <option value="shinz">SHIN-Z</option>
             <option value="zaku">ZAKU</option>
+            <option value="pachelo">PAC-HELO</option>
           </select></label
         >
         <label
@@ -709,6 +715,7 @@
             <option value="alpha">ALPHA</option>
             <option value="shinz">SHIN-Z</option>
             <option value="zaku">ZAKU</option>
+            <option value="pachelo">PAC-HELO</option>
           </select></label
         >
         <label
@@ -1865,19 +1872,34 @@
           <kbd>J</kbd> cancels into DASH P or a super, and DASH P into a super.
         </p>
         <p>
+          Choose PAC-HELO for a round yellow Pac-Man robot with a rotor on top,
+          hose arms and only 200 life. <kbd>J</kbd> punches with a spiked fist,
+          standing or crouching, and <kbd>K</kbd> kicks; in the air either
+          stomps. Shift rolls on while → is held, ↑ leaping into a high jump,
+          and Shift with ← hops back. He has no double jump, air dash, Hit Up or
+          chuck. His specials: <kbd>U</kbd>, or ← held for 0.6 seconds then →
+          <kbd>J</kbd>, Roll, a rolling charge, also in the air, that bounces
+          him off on a hit or guard, and <kbd>I</kbd>, or <kbd>J</kbd> five
+          times within a second, Electric, a crackling orb that sparks on while
+          <kbd>J</kbd> comes again within 0.2 seconds. His super, for a stock:
+          <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> Super roll, a roll steered by the
+          direction held as it starts (on the ground, not down). On a hit,
+          <kbd>J</kbd> or <kbd>K</kbd> cancels into a special or the super.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z or ZAKU, and one of eighteen stages, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you just
-          under 30% for desperation moves. Vs. CPU is the original game's CPU,
-          playing the opponent's own moves, specials and supers. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes,
-          fighters or the stage starts a fresh match.
+          SHIN-Z, ZAKU or PAC-HELO, and one of eighteen stages, in either mode.
+          Free practice has no timer, and you also choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you just under 30% for desperation moves. Vs. CPU is the
+          original game's CPU, playing the opponent's own moves, specials and
+          supers. Reduce their health to zero, or lead on health when time runs
+          out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
