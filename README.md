@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or DoraEmon on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon or RARIO on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -994,7 +994,20 @@ And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's fil
 | 5, or J J → K H           | Hug (激神超抱擁): carries the opponent through the Anywhere Door, 270, 3 stocks             |
 | →←↓→ G                    | FK之意思: a leap into a flashing barrage, 3 stocks                                          |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or DoraEmon), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And RARIO's, a muscle-bound, barefoot plumber in a red cap and blue overalls who fights in Ryu's stance, with 450 life:
+
+| Input             | RARIO's move                                                                                                                                                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| J / K             | P, 18 / K, 15; on a hit, P cancels into K, a special or a super                                                                                                                |
+| In the air: J / K | P J / K J, 15 each; he has no double jump                                                                                                                                      |
+| Shift / Shift + ← | A dash forward / a hop back                                                                                                                                                    |
+| U, or ↓→ J        | Hado: a dark fireball, 30, that bounces along the floor; another while it flies is a punch                                                                                     |
+| I, or →↓↘ J       | Shoryu: a rising uppercut, 35, that knocks a ? block loose for a coin (2 life, 10 power) or a mushroom; the mushrooms name the opponent's RARIO reactions, so they meet no one |
+| F, or ↓← K        | Tatumaki: a hopping spin kick, two hits of 18                                                                                                                                  |
+| 1, or ↓→↓→ J      | Shinku: a leap that hurls a red shell along the floor, 84, 1 stock                                                                                                             |
+| 2, or ↓→↓→ K      | Shin Shoryu: a grab into a chain of stomps on the opponent's head and a flagpole finish, 200, 2 stocks                                                                         |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon or RARIO), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -1010,7 +1023,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** forty-three fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** forty-four fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -1022,7 +1035,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's, YINAN's, AYA's and DoraEmon's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's, YINAN's, AYA's, DoraEmon's and RARIO's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

@@ -128,8 +128,8 @@ export function gaugeImage(tick: number) {
 // 1056), 3-TIMES's 114 (PC 953), ZENKA's 92 (PC 934), Z-MEGA's 82 (PC
 // 767), ALPHA's 108 (PC 1333), SHIN-Z's 84 (PC 846), ZAKU's 72 (PC 645),
 // PAC-HELO's 72 (PC 652), GOLF's 56 (PC 511), ASURA's 56 (PC 511), TTRO's
-// 71 (PC 674), ASTROMAN's 69 (PC 769), AYA's 100 (PC 747) and DoraEmon's 95
-// (PC 1085). YINAN's 104
+// 71 (PC 674), ASTROMAN's 69 (PC 769), AYA's 100 (PC 747), DoraEmon's 95
+// (PC 1085) and RARIO's 63 (PC 584). YINAN's 104
 // shows 2001, or in EX
 // mode 2002, 2007, 2008 and 2007 for 40 ticks each (PCs 1240–1256).
 export const faceImage = (face: number, who?: Who) => {
@@ -163,7 +163,7 @@ export const faceImage = (face: number, who?: Who) => {
 // PAC-HELO's 68 149 (PC 617), GOLF's 52 155 (PC 475), ASURA's 52 137
 // (PC 479) and TTRO's 66 170 (PC 636); ASTROMAN, with no *NAME, shows VS
 // NAME's (56) 170 (PC 610). YINAN's 99 and AYA's 93 show 349 (PCs 1197,
-// 705), and DoraEmon's 83 SEAN's 247 (PC 1047).
+// 705), DoraEmon's 83 SEAN's 247 (PC 1047) and RARIO's 58 235 (PC 546).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -208,6 +208,7 @@ const NAMES: Record<Who, number> = {
   yinan: 349,
   aya: 349,
   dora: 247,
+  rario: 235,
 };
 
 // The stock count picks its digits from the word at 0x445202 + stock × 2

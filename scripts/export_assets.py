@@ -912,6 +912,16 @@ AYA_TWINS = {name: (r, r + next((d for top, d in ((73, 26), (90, 30), (121, 29),
 # down (76, PC 796), past KO NORMAL CPU (70) and his KO RELOAD forms (72–75).
 DORA_TWINS = {name: (r, r + next((d for top, d in ((79, 25), (89, 24), (139, 23), (149, 22)) if r < top), 23))
               for name, (r, _) in ZOMA_TWINS.items()} | dict(lose=(59, 68), ko=(60, 69), koAgain=(61, 71), down=(62, 76))
+# RARIO's sit eight before Ryuko's KOs and lose action, seven before her
+# other reactions up to SHOCK INFINITY, eight from her Shock rp (his ★変な
+# ＴＥＣＨ, 89, follows his DRAGON P), seven again from FLY NO HIT, three from
+# her Chuck GON MISS (his DOWN section, 130–133, comes before it), four past
+# her Chuck Hiso (139), which he lacks, and fourteen before her DOWN section;
+# his guards follow one after another from 141.
+RARIO_TWINS = {name: (r, r + next(d for top, d in ((63, -8), (89, -7), (97, -8), (137, -7), (139, -3), (144, -4),
+                                                   (149, -14)) if r < top))
+               for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 141 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3522,6 +3532,60 @@ FIGHTERS = {
         # 1047).
         image_ids={2001, 247},
     ),
+    "rario": dict(
+        source=("47 RARIO", "4b0e8e17d17c7b3778e55925b20d8259fcab5a04179227ec722639c4839ed49f"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 46
+                 "crouchEnter": 12, "crouch": 13, "stand": 14, "turn": 17, "crouchTurn": 18},
+        twins=RARIO_TWINS,
+        # His reactions play as ASTROMAN's but where noted:
+        differ={
+            # ASTROMAN's.
+            "hit", "airHit", "hitHeavy", "airHitHeavy", "jumpHit", "drillDown", "dstToss", "twist", "hitPull",
+            "launchDown", "launchAway", "sweep", "grabbed", "lose", "hitRapid", "airHitRapid", "rushAirHit", "fly",
+            "shock", "chuckToss", "uppercut", "stun", "airStun", "dragonFireball", "liftUp", "tatumakiIn",
+            "tatumakiOut", "fireLaunch", "flySide", "flySideWall", "twistSide", "gonMiss", "chuckUp", "twistSideHit",
+            "vanish", "inatuma", "airInatuma", "icePunch", "airIcePunch", "chainPull", "guard", "crouchGuard",
+            "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop", "crouchBlockStop",
+            "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            "airTimeStopGuard",
+            # Z-MEGA's: ASTROMAN's, its variable 8 test carrying 100 in r[7:9],
+            # which a test doesn't read.
+            "launchUp",
+            # ASTROMAN's, clearing variable 5 (PCs 1529, 1513) where his clear 1.
+            "bounceDown", "knockdown",
+            # ASTROMAN's, on 12-, 8- and 10-tick displays, not three 10s.
+            "getUp",
+            # ASTROMAN's, launching straight up at raw −1820 (PCs 487, 500),
+            # not back at −500/−1520.
+            "ko", "koAgain",
+            # Ryuko's KO DOWN without its slide (PC 641): he sinks through the
+            # floor on eight 2-tick displays (PCs 509–516) and hides on a
+            # 50-tick one (PC 517); its global 15 test is == 100, not > 99.
+            "down",
+            # TTRO's, holding 36 ticks (PC 1190), where ASTROMAN's hold 33.
+            "hisoStop",
+            # Z-MEGA's, without his op 0x20 roll.
+            "musicAttack",
+            # DoraEmon's, without clearing variables.
+            "chuckYo",
+        },
+        # Results: 勝ち (50) calls Demo stand (22) once (PC 452), plays sound
+        # 21 (PC 454) and loops three poses from PC 456 (PC 460); the draw
+        # (57) calls 22 once (PC 537) and loops image 227 from PC 541 (PC
+        # 542). Each first enters DEMO air (23) while airborne (op 0x16, PCs
+        # 451, 536). The darkening panel, Black (36). The Vs. intro: 開始時
+        # (24) jumps to 開始時 BR (26) for global 3 = 0 (PC 193), which, for
+        # global 14 = 0, jumps past its display (PC 229), spawns Black and OP
+        # super Charge (32, PCs 231–232) and enters Round 1 (27) + 3 (PC
+        # 234), which hops (PC 246), hangs (PC 248) and hops again (PC 251),
+        # landing into Round 1 + 19 (slot 1, PC 250); both play flattened.
+        actions=dict(win=50, winStand=22, winLoop=(50, 6), draw=57, drawLoop=(57, 6), black=36, intro=(26, 3),
+                     introLand=(27, 19)),
+        flat={"intro", "introLand"},
+        # 2001: the HUD face action 63 shows (PC 584); 235: *name (58, PC
+        # 546).
+        image_ids={2001, 235},
+    ),
 }
 
 
@@ -3728,7 +3792,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA and {counts['dora']} DoraEmon images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon and {counts['rario']} RARIO images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

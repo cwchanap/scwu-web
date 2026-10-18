@@ -46,6 +46,7 @@ import astroman from './generated/astroman.json';
 import yinan from './generated/yinan.json';
 import aya from './generated/aya.json';
 import dora from './generated/dora.json';
+import rario from './generated/rario.json';
 import type { Control, Fighter, Input } from './match';
 import { rand } from './standing';
 
@@ -69,7 +70,7 @@ export interface CpuEntry {
 // GIGI's 42, SWW's 48, OGI's 48, ZIRO's 57, MASA's 38, 3-TIMES's 28,
 // ZENKA's 47, Z-MEGA's 41, ALPHA's 45, SHIN-Z's 39, ZAKU's 22, PAC-HELO's 24,
 // GOLF's 22, ASURA's 26, TTRO's 36, ASTROMAN's 38, YINAN's 42, AYA's 43,
-// DoraEmon's 57.
+// DoraEmon's 57, RARIO's 27.
 export const RYUKO_CPU: readonly CpuEntry[] = data.cpu;
 export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   ryuko: RYUKO_CPU,
@@ -115,6 +116,7 @@ export const CPU_TABLES: Record<Who, readonly CpuEntry[]> = {
   yinan: yinan.cpu,
   aya: aya.cpu,
   dora: dora.cpu,
+  rario: rario.cpu,
 };
 // Ryuko's CPU presses the port's keys for its commands (authored); the
 // others', with no keys for their CPU commands (Zoma's dashes, entries 22-24,
@@ -166,6 +168,7 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   yinan: {},
   aya: {},
   dora: {},
+  rario: {},
 };
 // Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
 export const CPU_LEVEL = 50;

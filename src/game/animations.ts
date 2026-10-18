@@ -448,6 +448,11 @@ export const ZIRO_LANDING = 119;
 // the floor 13 source pixels down on his 9th move, into Round 1 + 27 (slot
 // 1, PC 399).
 export const DORA_LANDING = 217;
+// RARIO's, 44 ticks still, 25 hopping at raw vy −1000 under gravity 30 (PC
+// 246), 50 hanging still (PC 248), then hopping again under gravity 80 (PC
+// 251) until the fall passes the floor on his 56th move, into Round 1 + 19
+// (slot 1, PC 250).
+export const RARIO_LANDING = 175;
 // His Round 1 checks down at PC 486, 68 ticks after he lands.
 export const ZIRO_INTRO_EX_TICK =
   ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
@@ -745,7 +750,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // through RANDOM OP1 (31) + 2 (PC 444), isn't played. DoraEmon's 開始時
     // BR (32) from PC 366 (authored, export_assets.py) runs into Round 1 +
     // 3, rises and lands out of the wait at PC 400 at DORA_LANDING into Round
-    // 1 + 27.
+    // 1 + 27. RARIO's 開始時 BR (26) from PC 231, past its global 14 = 0
+    // test (PC 229), runs into Round 1 + 3, hops twice and lands out of the
+    // wait at PC 253 at RARIO_LANDING into Round 1 + 19, whose poses its
+    // flattening runs on into.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
@@ -754,9 +762,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             who === 'remu' ||
             who === 'rear' ||
             who === 'ziro' ||
-            who === 'dora'
+            who === 'dora' ||
+            who === 'rario'
           ? landed(
-              z.intro,
+              who === 'rario' ? z.intro.slice(0, -z.introLand.length) : z.intro,
               z.introLand,
               {
                 sou: SOU_LANDING,
@@ -765,6 +774,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                 rear: REAR_LANDING,
                 ziro: ZIRO_LANDING,
                 dora: DORA_LANDING,
+                rario: RARIO_LANDING,
               }[who],
             )
           : who === 'sean'
@@ -1011,6 +1021,7 @@ const TWIN_ANIMATIONS = {
   yinan: twinAnimations('yinan'),
   aya: twinAnimations('aya'),
   dora: twinAnimations('dora'),
+  rario: twinAnimations('rario'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

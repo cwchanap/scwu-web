@@ -48,6 +48,7 @@ import astroman from './generated/astroman.json';
 import yinan from './generated/yinan.json';
 import aya from './generated/aya.json';
 import dora from './generated/dora.json';
+import rario from './generated/rario.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -123,6 +124,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     yinan: yinan.commands,
     aya: aya.commands,
     dora: dora.commands,
+    rario: rario.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -798,6 +800,17 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['iori', 19],
     ['dash', 28],
   ],
+  // RARIO's supers Shinku hado (2), for a stock, and Shin Shoryu (1), for
+  // two, on 1-2; his specials HADO (6), DRAGON (4) and tatumaki (5) on
+  // Ryuko's drill, axe and iori keys, then Dash F (11) and Dash B (12).
+  rario: [
+    ['getterBeam', 2],
+    ['musashi', 1],
+    ['drill', 6],
+    ['axe', 4],
+    ['iori', 5],
+    ['dash', 11],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -843,6 +856,7 @@ export const BACK_DASH: Record<Who, number> = {
   yinan: 18,
   aya: 15,
   dora: 29,
+  rario: 12,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

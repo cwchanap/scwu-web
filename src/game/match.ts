@@ -27,6 +27,7 @@ import {
   ZIRO_KO,
   ZIRO_LANDING,
   DORA_LANDING,
+  RARIO_LANDING,
   ZIRO_INTRO_EX_TICK,
   YINAN_INTRO_EX_TICK,
   LIZARD_LANDING,
@@ -405,8 +406,10 @@ const reactionPower = (f: Fighter): [number, number] =>
 // waits 48, then falls at 2000 under gravity 30 (PC 459) until he lands
 // (ZIRO_LANDING). DoraEmon's Round 1 (34) rises at −50 for 27 ticks (PC
 // 381) after its first 100, stops (PC 393) and falls under gravity 50 (PC
-// 398) until he lands (DORA_LANDING). The others' have no op 0x01, so they
-// start where these end.
+// 398) until he lands (DORA_LANDING). RARIO's Round 1 (27) hops at −1000
+// with gravity 30 (PC 246) after its first 44 ticks, hangs 50 (PC 248) and
+// hops again with gravity 80 (PC 251) until he lands (RARIO_LANDING). The
+// others' have no op 0x01, so they start where these end.
 type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -458,6 +461,12 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [27, 0, -50],
     [81, 0],
     [DORA_LANDING - 208, 0, 0, 50],
+  ],
+  rario: [
+    [44, 0],
+    [25, 0, -1000, 30],
+    [50, 0],
+    [RARIO_LANDING - 119, 0, -1000, 80],
   ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP) and REMU's flight
@@ -680,7 +689,8 @@ function struck(
 // 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
 // PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702; ZAKU's 137, PC
 // 1536; PAC-HELO's 137, PC 1582; GOLF's 109, PC 1272; ASURA's 109, PC
-// 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676), Amiro's
+// 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676; RARIO's 116, PC
+// 1337), Amiro's
 // Tatumaki >> (105) at −300 (PC 1398) and YINAN's and AYA's Chuck DOWN (170,
 // 166) at −1000 (PCs 2593, 1965).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
@@ -722,6 +732,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   asura: { launchDown: -800 },
   ttro: { launchDown: -800 },
   astroman: { launchDown: -800 },
+  rario: { launchDown: -800 },
   yinan: { drillDown: -1000 },
   aya: { drillDown: -1000 },
 };
@@ -1700,7 +1711,9 @@ export class Match {
   // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
   // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
-  // is over (PC 645).
+  // is over (PC 645). RARIO's launch straight up at −1820 (PCs 487, 500),
+  // and his KO down (54) sinks through the floor in its displays (PCs
+  // 509–516) without sliding.
   private moveKO(f: Fighter) {
     if (f.action === 'koLand' && f.who === 'ziro') {
       if (f.age === ZIRO_KO.burst)
@@ -1711,7 +1724,7 @@ export class Match {
       return true;
     }
     if (f.action === 'koLand') {
-      if (f.age <= (f.who === 'amiro' ? 12 : 10))
+      if (f.who !== 'rario' && f.age <= (f.who === 'amiro' ? 12 : 10))
         f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
       return true;
     }
@@ -1719,8 +1732,9 @@ export class Match {
     if (!launch) return false;
     if (f.action === 'down' && f.age === 5) this.koStop += 40;
     if (f.age === launch) {
-      f.vx = -f.facing * 500 * SOURCE_VELOCITY_SCALE;
-      f.vy = -1520 * SOURCE_VELOCITY_SCALE;
+      const rario = f.who === 'rario';
+      f.vx = rario ? 0 : -f.facing * 500 * SOURCE_VELOCITY_SCALE;
+      f.vy = (rario ? -1820 : -1520) * SOURCE_VELOCITY_SCALE;
       f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
       f.airAge = 0;
     }

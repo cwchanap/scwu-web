@@ -495,6 +495,13 @@
         axe: 'Sky Rise',
         iori: 'Charge',
       },
+      rario: {
+        getterBeam: 'Shinku',
+        musashi: 'Shin Shoryu',
+        drill: 'Hado',
+        axe: 'Shoryu',
+        iori: 'Tatumaki',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -745,6 +752,7 @@
             <option value="yinan">YINAN</option>
             <option value="aya">AYA</option>
             <option value="dora">DoraEmon</option>
+            <option value="rario">RARIO</option>
           </select></label
         >
         <label
@@ -797,6 +805,7 @@
             <option value="yinan">YINAN</option>
             <option value="aya">AYA</option>
             <option value="dora">DoraEmon</option>
+            <option value="rario">RARIO</option>
           </select></label
         >
         <label
@@ -2134,20 +2143,38 @@
           down; the port plays his normal entrance.
         </p>
         <p>
+          Choose RARIO for a muscle-bound, barefoot plumber in a red cap with
+          450 life who fights in Ryu's stance. <kbd>J</kbd> is a punch that
+          chains into
+          <kbd>K</kbd>, a kick, or a special; both strike in the air, and he has
+          no double jump. Shift dashes forward, and Shift with ← hops back. His
+          specials: <kbd>U</kbd> or ↓→ <kbd>J</kbd> Hado, a dark fireball that
+          bounces along the floor, one at a time; <kbd>I</kbd> or →↓↘
+          <kbd>J</kbd>
+          Shoryu, a rising uppercut that knocks a ? block loose for a coin, which
+          gives him life and power, or a mushroom, which the port lets pass through
+          the opponent; and <kbd>F</kbd> or ↓←
+          <kbd>K</kbd> Tatumaki, a hopping spin kick. His supers: <kbd>1</kbd>
+          or ↓→↓→ <kbd>J</kbd> Shinku, a leap that hurls a red shell along the
+          floor, for a stock, and <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> Shin Shoryu, a
+          grab into a chain of stomps on the opponent's head that ends at a flagpole,
+          for two. Knocked out, he jumps straight up and falls through the floor.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or
-          DoraEmon, and one of eighteen stages, in either mode. Free practice
-          has no timer, and you also choose how the partner behaves: standing,
-          guarding high or low, guarding in the air, attacking in range, jumping
-          in, or playing as the original CPU. Max stock refills your supers
-          whenever you stand idle, and Low health keeps you just under 30% for
-          desperation moves. Vs. CPU is the original game's CPU, playing the
-          opponent's own moves, specials and supers. Reduce their health to
-          zero, or lead on health when time runs out. Changing modes, fighters
-          or the stage starts a fresh match.
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA,
+          DoraEmon or RARIO, and one of eighteen stages, in either mode. Free
+          practice has no timer, and you also choose how the partner behaves:
+          standing, guarding high or low, guarding in the air, attacking in
+          range, jumping in, or playing as the original CPU. Max stock refills
+          your supers whenever you stand idle, and Low health keeps you just
+          under 30% for desperation moves. Vs. CPU is the original game's CPU,
+          playing the opponent's own moves, specials and supers. Reduce their
+          health to zero, or lead on health when time runs out. Changing modes,
+          fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
