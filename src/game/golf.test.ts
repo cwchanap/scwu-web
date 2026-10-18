@@ -19,7 +19,7 @@ function golfPlayer(gap = 90) {
 const now = (f: Fighter) => (f.action === 'script' ? f.branch : f.action);
 // Inputs from `at(t)` for 1500 ticks: his actions, the damage Ryuko took and
 // his stock.
-function play(at: (t: number) => Input, { gap = 90, stock = 3 } = {}) {
+function play(at: (t: number) => Input, { gap = 90, stock = 2 } = {}) {
   const { golf, other, steps } = golfPlayer(gap);
   golf.stock = stock;
   steps({}, 2);
@@ -83,29 +83,29 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
       expect(byKey(key, { gap: 60 })).toEqual({
         mine: ['idle'],
         damage: 0,
-        stock: 3,
+        stock: 2,
       });
   });
 
   it('slashes twice with P, standing or crouching, lashes with K, and strikes PJ or KJ in the air', () => {
     for (const key of [{ punch: true }, { punch: true, crouch: true }])
-      expect(byKey(key)).toEqual({ mine: [152, 'idle'], damage: 15, stock: 3 });
+      expect(byKey(key)).toEqual({ mine: [152, 'idle'], damage: 15, stock: 2 });
     // K's box (kind 3, PC 1753) re-arms at each of its three displays.
     for (const gap of [90, 350])
       expect(byKey({ kick: true }, { gap })).toEqual({
         mine: [153, 'idle'],
         damage: 18,
-        stock: 3,
+        stock: 2,
       });
     expect(play(presses({ 0: { jump: true }, 50: { punch: true } }))).toEqual({
       mine: ['takeoff', 'jump', 154, 'land', 'idle'],
       damage: 12,
-      stock: 3,
+      stock: 2,
     });
     expect(play(presses({ 0: { jump: true }, 30: { kick: true } }))).toEqual({
       mine: ['takeoff', 'jump', 155, 'land', 'idle'],
       damage: 12,
-      stock: 3,
+      stock: 2,
     });
   });
 
@@ -115,14 +115,14 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
       expect(byKey({ drill: true }, { gap })).toEqual({
         mine: [157, 'idle'],
         damage: 30,
-        stock: 3,
+        stock: 2,
       });
     // Its second lash (response 53) pulls Ryuko past him in Chain pull back,
     // so he turns.
     expect(byKey({ axe: true })).toEqual({
       mine: [160, 'turn', 'idle'],
       damage: 30,
-      stock: 3,
+      stock: 2,
     });
   });
 
@@ -130,19 +130,19 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
     expect(play(presses({ 0: { punch: true }, 30: { kick: true } }))).toEqual({
       mine: [152, 153, 'idle'],
       damage: 25,
-      stock: 3,
+      stock: 2,
     });
     expect(play(presses({ 0: { punch: true }, 25: { drill: true } }))).toEqual({
       mine: [152, 157, 'idle'],
       damage: 37,
-      stock: 3,
+      stock: 2,
     });
     expect(
       play(presses({ 0: { kick: true }, 30: { getterBeam: true } })),
-    ).toEqual({ mine: [153, 162, 'idle'], damage: 86, stock: 2 });
+    ).toEqual({ mine: [153, 162, 'idle'], damage: 86, stock: 1 });
     expect(
       play(presses({ 0: { drill: true }, 40: { getterBeam: true } })),
-    ).toEqual({ mine: [157, 162, 'idle'], damage: 87, stock: 2 });
+    ).toEqual({ mine: [157, 162, 'idle'], damage: 87, stock: 1 });
     expect(
       play(presses({ 0: { punch: true }, 25: { drill: true } }), { gap: 700 })
         .mine,
@@ -155,7 +155,7 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
       expect(byKey({ getterBeam: true }, { gap })).toEqual({
         mine: [162, 'idle'],
         damage: 80,
-        stock: 2,
+        stock: 1,
       });
     expect(byKey({ getterBeam: true }, { stock: 0 })).toEqual({
       mine: [167, 'idle'],
@@ -166,7 +166,7 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
 
   it('darkens the court through variable 14, which his Black (43) tests', () => {
     const { golf, steps } = golfPlayer();
-    golf.stock = 3;
+    golf.stock = 2;
     steps({}, 2);
     steps({ getterBeam: true });
     // super p sets it at age 0 (PC 1900).

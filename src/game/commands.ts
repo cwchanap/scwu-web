@@ -47,6 +47,7 @@ import ttro from './generated/ttro.json';
 import astroman from './generated/astroman.json';
 import yinan from './generated/yinan.json';
 import aya from './generated/aya.json';
+import dora from './generated/dora.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -121,13 +122,34 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     astroman: astroman.commands,
     yinan: yinan.commands,
     aya: aya.commands,
+    dora: dora.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
 export const ENTRIES = entriesOf('ryuko');
 export const NEAR = nearOf('ryuko');
 export const DOWN = 8;
-const BUTTONS = { kick: 0x10, hitUp: 0x20, punch: 0x80, throw: 0x100 };
+const BUTTONS: Partial<Record<Control, number>> = {
+  kick: 0x10,
+  hitUp: 0x20,
+  punch: 0x80,
+  throw: 0x100,
+};
+// Authored: DoraEmon's attacks each take two of the source's six buttons
+// (A–F, bits 4–9, 0x414340), which no two keys press on one tick, so his
+// keys press both: J LP (C, D), K LK (A, B), H HP (D, E), G HK (B, C), O
+// his chuck (C, D, E) and E, held, EN (E, F).
+const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
+  dora: {
+    punch: 0xc0,
+    kick: 0x30,
+    hitUp: 0x180,
+    dst: 0x60,
+    throw: 0x1c0,
+    ex: 0x300,
+  },
+};
+export const buttonsOf = (who: Who) => OWN_BUTTONS[who] ?? BUTTONS;
 // Entries (1-based) as the port's controls, with the direction a jump or
 // dash carries.
 export const CONTROLS: Record<number, [Control, string?]> = {
@@ -760,6 +782,22 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 6],
     ['dash', 14],
   ],
+  // DoraEmon's supers 魔神空大砲 HP (10), 秘神具騒嵐 HP (6), 鬼神双乱槌 HP
+  // (8), 覇神極突貫 HK (4) and 激神超抱擁 (1) on 1-5; his specials 機猫神空砲
+  // HP (17), 機猫神天翔 HP (13) and 機猫神突進 HK (19) on Ryuko's drill, axe
+  // and iori keys, then Dash F (28) and Dash B (29). FK之意思 (2, 3),
+  // 機猫神双槌 (15, 16) and 機猫神瞬移 (21–24) take their commands only.
+  dora: [
+    ['getterBeam', 10],
+    ['musashi', 6],
+    ['changeAttack', 8],
+    ['blackRush', 4],
+    ['megaBeam', 1],
+    ['drill', 17],
+    ['axe', 13],
+    ['iori', 19],
+    ['dash', 28],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -804,16 +842,21 @@ export const BACK_DASH: Record<Who, number> = {
   astroman: 14,
   yinan: 18,
   aya: 15,
+  dora: 29,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.
 export const HISTORY_TICKS = 128;
 
-export function inputWord(input: Input, forwardIsRight: boolean) {
+export function inputWord(
+  input: Input,
+  forwardIsRight: boolean,
+  who: Who = 'ryuko',
+) {
   let word = (input.jump ? 4 : 0) | (input.crouch ? DOWN : 0);
   if (input.left) word |= forwardIsRight ? 1 : 2;
   if (input.right) word |= forwardIsRight ? 2 : 1;
-  for (const [control, bit] of Object.entries(BUTTONS))
+  for (const [control, bit] of Object.entries(buttonsOf(who)))
     if (input[control as Control]) word |= bit;
   return word;
 }

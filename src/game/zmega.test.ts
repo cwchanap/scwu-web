@@ -237,7 +237,8 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     steps({}, 2);
     steps({ ex: true });
     steps({}, 300);
-    expect([zmega.variables[0], zmega.stock]).toEqual([100, 3]);
+    // 450 power from the drain: four of his five stocks (+0x7cb2).
+    expect([zmega.variables[0], zmega.stock]).toEqual([100, 4]);
     // TO SHIN enters TO NORMAL (198) while variable 0 is 100 (PC 2376),
     // which clears it (PC 2457) and spawns OBJ TO NORMAL (199) over the
     // drain: it takes 1000 power each tick (PC 2467).
@@ -268,7 +269,7 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     expect(BLACK.zmega.opaque.image).toBe(1011);
   });
 
-  it('charges three stocks through his Vs. intro, 開始時 BR + 3 (PC 404)', () => {
+  it('charges four stocks through his Vs. intro, 開始時 BR + 3 (PC 404)', () => {
     expect(animationDuration('intro', 'zmega')).toBe(258);
     const match = new Match('cpu', true, 0, ['zmega', 'zoma']);
     const zmega = match.fighters[0];
@@ -277,8 +278,9 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
       match.step({});
       ticks++;
     }
-    // OP super Charge (48) clears his power and adds 400 (PCs 479–480).
-    expect([ticks, zmega.stock]).toEqual([258, 3]);
+    // OP super Charge (48) clears his power and adds 400 (PCs 479–480):
+    // four of his five stocks (+0x7cb2).
+    expect([ticks, zmega.stock]).toEqual([258, 4]);
     // Round 1 (36) + 2 (PC 407).
     expect(
       [0, 159, 160, 170, 178, 257].map(

@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN or AYA on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or DoraEmon on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -970,9 +970,33 @@ And AYA's, a white-haired, bunny-eared girl with 500 life who dresses as other f
 | 3, or ↓←↓→ J           | EN3: a sword sweep into a holy blast, 211, 3 stocks                                                             |
 | After SHO's hit: 1–2   | The super's SC form, 2 stocks                                                                                   |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN or AYA), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's file, whose name plate he still wears. Each of his attacks takes two of the original six buttons, which his keys press together; his stocks hold 90 power each, up to five. His commands allow only a tenth of a second, so his keys carry his moves:
 
-- **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
+| Input                     | DoraEmon's move                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------- |
+| J / K / H / G             | LP, 5 / LK, 8 / HP, 12 / HK, 12; on a hit, LP cancels into the others, a special or a super |
+| Down + J / K / H / G      | Low LP, 7 / LK, 10 / HP, 15 / HK, 12                                                        |
+| In the air: J / K / H / G | An air strike, in another form after an air dash; he has no double jump                     |
+| → + J / → + K             | SP1 / SP2: a dashing punch, 25 / kick, 30                                                   |
+| ↘ + H                     | Hit Up: a launcher, 15; ↑ after its hit jumps after them                                    |
+| O                         | Chuck: a grab and beating, 30                                                               |
+| Shift / Shift + ←         | A dash forward / a hop back; in the air, an air dash                                        |
+| E (hold)                  | EN: charges 4 power a tick; at five stocks, a taunt that gives the opponent 20              |
+| U, or ↓→ H                | Air Cannon: a blast from his arm cannon, 40, starting too far ahead to hit up close         |
+| I, or →↓↘ H               | Sky Rise: a rising flying punch, 60, also in the air                                        |
+| F, or ↓→ G                | Charge: a flying rush, 50                                                                   |
+| ↓← J or H                 | Twin Hammer: a dashing punch into an uppercut                                               |
+| ↓↓ J or H / K or G        | The Anywhere Door: a teleport forward / back                                                |
+| 1, or ↓→↓→ H              | Cannon (魔神空大砲): a shockwave across the screen, 130, 1 stock                            |
+| 2, or ↓←↓→ H              | Gadgets (秘神具騒嵐): green shells and gadgets that pummel the opponent, up to 457, 1 stock |
+| 3, or ↓←↓← H              | Fists (鬼神双乱槌): a punch flurry into a dash and uppercut, 258, 1 stock                   |
+| 4, or ↓→↓← G              | Pierce (覇神極突貫): a flying multi-hit rush, 215, 1 stock                                  |
+| 5, or J J → K H           | Hug (激神超抱擁): carries the opponent through the Anywhere Door, 270, 3 stocks             |
+| →←↓→ G                    | FK之意思: a leap into a flashing barrage, 3 stocks                                          |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or DoraEmon), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+
+- **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
 
 Tick **Music** for the stage's track. Leaving the window pauses the match. The touch buttons cover every control; landscape is recommended on phones.
@@ -986,7 +1010,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** forty-two fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** forty-three fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -998,7 +1022,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's, YINAN's and AYA's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's, YINAN's, AYA's and DoraEmon's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

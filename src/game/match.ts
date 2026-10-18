@@ -26,6 +26,7 @@ import {
   REAR_LANDING,
   ZIRO_KO,
   ZIRO_LANDING,
+  DORA_LANDING,
   ZIRO_INTRO_EX_TICK,
   YINAN_INTRO_EX_TICK,
   LIZARD_LANDING,
@@ -58,9 +59,11 @@ import {
   desperationOf,
   twinOf,
   lifeOf,
+  perStockOf,
   responseEffectsOf,
   responsesOf,
   STAGES,
+  stocksOf,
   twin,
 } from './characters';
 import type { Container, Stage, Who } from './characters';
@@ -295,10 +298,6 @@ const launchMotion: Partial<
     drift: -100,
   },
 };
-// Ryuko's parameter block (file offset 0x157a1d9): 100 power per stock, three
-// stocks, none at the start. Routine 0x40e6f0 carries and borrows between them.
-export const POWER_PER_STOCK = 100;
-export const MAX_STOCK = 3;
 // The same block's 510 life. Its 30% (153, desperationOf) selects desperation
 // branches and, in 0x40e7c0, shrinks every loss to 60%.
 export const LIFE = 510;
@@ -365,8 +364,8 @@ REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
 // Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
 // 181) and ERUS's stop guards (167, 169) have no op 0x15, so add them none.
-// YINAN's and AYA's HISA Down (158, 154) give the attacker none (PCs 2389,
-// 1775).
+// YINAN's, AYA's and DoraEmon's HISA Down (158, 154, 146) give the attacker
+// none (PCs 2389, 1775, 2037).
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
@@ -377,6 +376,7 @@ const OWN_REACTION_POWER: Partial<
   erus: { blockStop: [0, 0], crouchBlockStop: [0, 0] },
   yinan: { launchDown: [5, 0] },
   aya: { launchDown: [5, 0] },
+  dora: { launchDown: [5, 0] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -403,8 +403,10 @@ const reactionPower = (f: Fighter): [number, number] =>
 // him 30 source pixels on at the first step, and he lands that much nearer
 // the middle. ZIRO's 開始時 BR (38) rises at −20000 for eight ticks (PC 445),
 // waits 48, then falls at 2000 under gravity 30 (PC 459) until he lands
-// (ZIRO_LANDING). The others' have no op 0x01, so they start where these
-// end.
+// (ZIRO_LANDING). DoraEmon's Round 1 (34) rises at −50 for 27 ticks (PC
+// 381) after its first 100, stops (PC 393) and falls under gravity 50 (PC
+// 398) until he lands (DORA_LANDING). The others' have no op 0x01, so they
+// start where these end.
 type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -450,6 +452,12 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [8, 0, -20000],
     [48, 0],
     [ZIRO_LANDING - 56, 0, 2000, 30],
+  ],
+  dora: [
+    [100, 0],
+    [27, 0, -50],
+    [81, 0],
+    [DORA_LANDING - 208, 0, 0, 50],
   ],
 };
 // The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP) and REMU's flight
@@ -663,7 +671,8 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
-// Ryuko's, Zoma's, YINAN's (158, PC 2398) and AYA's (154, PC 1784) at −800 (Kiki's, Chung's,
+// Ryuko's, Zoma's, YINAN's (158, PC 2398), AYA's (154, PC 1784) and
+// DoraEmon's (146, PC 2045) at −800 (Kiki's, Chung's,
 // Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's,
 // DIDO's, SAKUYA's, ALEX's, SOU's and
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
@@ -1369,21 +1378,23 @@ function launchJump(f: Fighter) {
   f.airAge = 0;
 }
 
+// Routine 0x40e6f0 carries full gauges into stock, up to the fighter's cap,
+// and borrows stock back; none at the start (+0x7cc2).
 export function addPower(f: Fighter, amount: number) {
   f.power += amount;
   while (f.power < 0) {
     if (f.stock === 0) f.power = 0;
     else {
       f.stock--;
-      f.power += POWER_PER_STOCK;
+      f.power += perStockOf(f.who);
     }
   }
-  while (f.power >= POWER_PER_STOCK && f.stock < MAX_STOCK) {
-    f.power -= POWER_PER_STOCK;
+  while (f.power >= perStockOf(f.who) && f.stock < stocksOf(f.who)) {
+    f.power -= perStockOf(f.who);
     f.stock++;
   }
-  if (f.stock >= MAX_STOCK) {
-    f.stock = MAX_STOCK;
+  if (f.stock >= stocksOf(f.who)) {
+    f.stock = stocksOf(f.who);
     f.power = 0;
   }
 }
@@ -1530,7 +1541,7 @@ export class Match {
       ([control]) => input[control] && !this.previous[i][control],
     );
     if (key || clear) history.fill(0);
-    const word = inputWord(input, other.x >= f.x);
+    const word = inputWord(input, other.x >= f.x, f.who);
     history.push(word);
     history.shift();
     if (key)
@@ -2239,8 +2250,11 @@ export class Match {
         }
         if (self.stock <= event.min)
           return this.branchTo(actor, sourceKey(event.target, event.offset));
-        self.stock = Math.max(0, Math.min(MAX_STOCK, self.stock + event.add));
-        if (self.stock === MAX_STOCK) self.power = 0;
+        self.stock = Math.max(
+          0,
+          Math.min(stocksOf(self.who), self.stock + event.add),
+        );
+        if (self.stock === stocksOf(self.who)) self.power = 0;
         break;
       case 'life':
         if (
@@ -3218,7 +3232,7 @@ export class Match {
     if (this.mode === 'practice') {
       for (const f of this.fighters)
         if (this.practice.maxStock && f.action === 'idle') {
-          f.stock = MAX_STOCK;
+          f.stock = stocksOf(f.who);
           f.power = 0;
         }
       // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin

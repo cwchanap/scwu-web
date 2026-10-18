@@ -443,6 +443,11 @@ export const REAR_LANDING = 51;
 // passes the floor 1599 source pixels down on his 63rd move, into Round 1 +
 // 11 (slot 1, PC 458).
 export const ZIRO_LANDING = 119;
+// DoraEmon's, 100 ticks still, 27 rising at raw vy −50 (PC 381), 81 still
+// (PC 393), then falling under gravity 50 (PC 398) until the fall reaches
+// the floor 13 source pixels down on his 9th move, into Round 1 + 27 (slot
+// 1, PC 399).
+export const DORA_LANDING = 217;
 // His Round 1 checks down at PC 486, 68 ticks after he lands.
 export const ZIRO_INTRO_EX_TICK =
   ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
@@ -737,7 +742,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // past its roll (PC 428) and global 14 = 0 test (PC 429), rises unseen
     // and falls into Round 1 + 6 (introMotion), landing out of the wait at PC
     // 461 at ZIRO_LANDING into Round 1 + 11. ponytail: the roll's other half,
-    // through RANDOM OP1 (31) + 2 (PC 444), isn't played.
+    // through RANDOM OP1 (31) + 2 (PC 444), isn't played. DoraEmon's 開始時
+    // BR (32) from PC 366 (authored, export_assets.py) runs into Round 1 +
+    // 3, rises and lands out of the wait at PC 400 at DORA_LANDING into Round
+    // 1 + 27.
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
@@ -745,7 +753,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
             who === 'gon' ||
             who === 'remu' ||
             who === 'rear' ||
-            who === 'ziro'
+            who === 'ziro' ||
+            who === 'dora'
           ? landed(
               z.intro,
               z.introLand,
@@ -755,6 +764,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                 remu: REMU_LANDING,
                 rear: REAR_LANDING,
                 ziro: ZIRO_LANDING,
+                dora: DORA_LANDING,
               }[who],
             )
           : who === 'sean'
@@ -1000,6 +1010,7 @@ const TWIN_ANIMATIONS = {
   astroman: twinAnimations('astroman'),
   yinan: twinAnimations('yinan'),
   aya: twinAnimations('aya'),
+  dora: twinAnimations('dora'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

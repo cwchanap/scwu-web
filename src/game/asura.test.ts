@@ -19,7 +19,7 @@ function asuraPlayer(gap = 90) {
 const now = (f: Fighter) => (f.action === 'script' ? f.branch : f.action);
 // Inputs from `at(t)` for 1500 ticks: his actions, the damage Ryuko took and
 // his stock.
-function play(at: (t: number) => Input, { gap = 90, stock = 3 } = {}) {
+function play(at: (t: number) => Input, { gap = 90, stock = 2 } = {}) {
   const { asura, other, steps } = asuraPlayer(gap);
   asura.stock = stock;
   steps({}, 2);
@@ -86,7 +86,7 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       expect(byKey(key, { gap: 60 })).toEqual({
         mine: ['idle'],
         damage: 0,
-        stock: 3,
+        stock: 2,
       });
   });
 
@@ -97,28 +97,28 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
         expect(byKey(key, { gap })).toEqual({
           mine: [key.punch ? 151 : 152, 'idle'],
           damage: 16,
-          stock: 3,
+          stock: 2,
         });
     // P sit and K sit hop (PCs 1779, 1806) and land in 153 + 22 and 154 + 18.
     expect(byKey({ punch: true, crouch: true })).toEqual({
       mine: [153, '153+22', 'idle'],
       damage: 15,
-      stock: 3,
+      stock: 2,
     });
     expect(byKey({ kick: true, crouch: true }, { gap: 400 })).toEqual({
       mine: [154, '154+18', 'idle'],
       damage: 15,
-      stock: 3,
+      stock: 2,
     });
     expect(play(presses({ 0: { jump: true }, 50: { punch: true } }))).toEqual({
       mine: ['takeoff', 'jump', 155, 'land', 'idle'],
       damage: 15,
-      stock: 3,
+      stock: 2,
     });
     expect(play(presses({ 0: { jump: true }, 30: { kick: true } }))).toEqual({
       mine: ['takeoff', 'jump', 156, 'land', 'idle'],
       damage: 18,
-      stock: 3,
+      stock: 2,
     });
   });
 
@@ -131,12 +131,12 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       expect(byKey({ drill: true }, { gap })).toEqual({
         mine: [160, '160+21', 'idle'],
         damage,
-        stock: 3,
+        stock: 2,
       });
     expect(play(presses({ 0: { jump: true }, 10: { drill: true } }))).toEqual({
       mine: ['takeoff', 'jump', 159, '160+21', 'idle'],
       damage: 15,
-      stock: 3,
+      stock: 2,
     });
     // ponytail: the port's back jump doesn't run action 7, which sets
     // variable 0 to 10 (PC 74), so air tatu never enters air tatu back
@@ -152,23 +152,23 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     expect(play(presses({ 0: { punch: true }, 12: { kick: true } }))).toEqual({
       mine: [151, 152, 'idle'],
       damage: 19,
-      stock: 3,
+      stock: 2,
     });
     // P sit is level 21, below P's window (22).
     expect(
       play(presses({ 0: { punch: true }, 12: { punch: true, crouch: true } })),
-    ).toEqual({ mine: [151, 'idle'], damage: 16, stock: 3 });
+    ).toEqual({ mine: [151, 'idle'], damage: 16, stock: 2 });
     expect(play(presses({ 0: { punch: true }, 12: { drill: true } }))).toEqual({
       mine: [151, 160, '160+21', 'idle'],
       damage: 21,
-      stock: 3,
+      stock: 2,
     });
     expect(
       play(presses({ 0: { kick: true }, 30: { getterBeam: true } })),
     ).toEqual({
       mine: [152, 168, '168+41', 'idle', 'turn', 'idle'],
       damage: 92,
-      stock: 2,
+      stock: 1,
     });
     // P sit's hop and tatumaki's rise are airborne, so the commands enter
     // their air forms.
@@ -177,14 +177,14 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     ).toEqual({
       mine: [153, 159, '160+21', 'turn', 'idle'],
       damage: 24,
-      stock: 3,
+      stock: 2,
     });
     expect(
       play(presses({ 0: { drill: true }, 20: { getterBeam: true } })),
     ).toEqual({
       mine: [160, 167, '167+41', 'idle', 'turn', 'idle'],
       damage: 79,
-      stock: 2,
+      stock: 1,
     });
     expect(
       play(
@@ -204,7 +204,7 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       expect(byKey({ getterBeam: true }, { gap })).toEqual({
         mine: [168, '168+41', 'idle', 'turn', 'idle'],
         damage: 76,
-        stock: 2,
+        stock: 1,
       });
     expect(
       play(presses({ 0: { jump: true }, 20: { getterBeam: true } }), {
@@ -213,7 +213,7 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     ).toEqual({
       mine: ['takeoff', 'jump', 167, '167+41', 'idle', 'turn', 'idle'],
       damage: 76,
-      stock: 2,
+      stock: 1,
     });
     expect(byKey({ getterBeam: true }, { stock: 0 })).toEqual({
       mine: [164, 'idle'],
@@ -229,7 +229,7 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
 
   it('darkens the court through variable 14, which his Black (43) tests', () => {
     const { asura, steps } = asuraPlayer();
-    asura.stock = 3;
+    asura.stock = 2;
     steps({}, 2);
     steps({ getterBeam: true });
     // super tatu start sets it at age 0 (PC 2015).

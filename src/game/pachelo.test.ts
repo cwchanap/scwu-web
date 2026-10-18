@@ -19,7 +19,7 @@ function pacPlayer(gap = 90) {
 const now = (f: Fighter) => (f.action === 'script' ? f.branch : f.action);
 // Inputs from `at(t)` for 1500 ticks: his actions, the damage Ryuko took and
 // his stock.
-function play(at: (t: number) => Input, { gap = 90, stock = 3 } = {}) {
+function play(at: (t: number) => Input, { gap = 90, stock = 1 } = {}) {
   const { pac, other, steps } = pacPlayer(gap);
   pac.stock = stock;
   steps({}, 2);
@@ -76,23 +76,23 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
       expect(byKey(key, { gap: 60 })).toEqual({
         mine: ['idle'],
         damage: 0,
-        stock: 3,
+        stock: 1,
       });
   });
 
   it('punches with P, standing or crouching, kicks with K, and strikes P J for either in the air', () => {
     for (const key of [{ punch: true }, { punch: true, crouch: true }])
-      expect(byKey(key)).toEqual({ mine: [186, 'idle'], damage: 10, stock: 3 });
+      expect(byKey(key)).toEqual({ mine: [186, 'idle'], damage: 10, stock: 1 });
     expect(byKey({ kick: true })).toEqual({
       mine: [187, 'idle'],
       damage: 8,
-      stock: 3,
+      stock: 1,
     });
     for (const button of [{ punch: true }, { kick: true }])
       expect(play(presses({ 0: { jump: true }, 20: button }))).toEqual({
         mine: ['takeoff', 'jump', 188, 'land', 'idle'],
         damage: 4,
-        stock: 3,
+        stock: 1,
       });
   });
 
@@ -120,7 +120,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
       play((t) =>
         t ? (t < 300 && t % 6 === 0 ? { punch: true } : {}) : { axe: true },
       ),
-    ).toEqual({ mine: [192, 193, 'idle'], damage: 25, stock: 3 });
+    ).toEqual({ mine: [192, 193, 'idle'], damage: 25, stock: 1 });
   });
 
   it("rolls on F + P after holding back 60 ticks, roll's hold step (0x410473)", () => {
@@ -145,14 +145,14 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
       expect(byKey({ drill: true }, { gap })).toEqual({
         mine: [196, 198, 200, 'idle'],
         damage: 20,
-        stock: 3,
+        stock: 1,
       });
     expect(
       play(presses({ 0: { jump: true }, 20: { drill: true } }), { gap: 300 }),
     ).toEqual({
       mine: ['takeoff', 'jump', 195, 198, 200, 'idle'],
       damage: 20,
-      stock: 3,
+      stock: 1,
     });
   });
 
@@ -160,19 +160,19 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     expect(play(presses({ 0: { punch: true }, 35: { kick: true } }))).toEqual({
       mine: [186, 187, 'idle'],
       damage: 18,
-      stock: 3,
+      stock: 1,
     });
     expect(play(presses({ 0: { punch: true }, 25: { drill: true } }))).toEqual({
       mine: [186, 196, 198, 200, 'idle'],
       damage: 30,
-      stock: 3,
+      stock: 1,
     });
     expect(
       play(presses({ 0: { punch: true }, 25: { getterBeam: true } })),
-    ).toEqual({ mine: [186, 207, 209, 200, 'idle'], damage: 70, stock: 2 });
+    ).toEqual({ mine: [186, 207, 209, 200, 'idle'], damage: 70, stock: 0 });
     expect(
       play(presses({ 0: { kick: true }, 30: { getterBeam: true } })),
-    ).toEqual({ mine: [187, 207, 209, 200, 'idle'], damage: 68, stock: 2 });
+    ).toEqual({ mine: [187, 207, 209, 200, 'idle'], damage: 68, stock: 0 });
     expect(
       play(presses({ 0: { punch: true }, 25: { drill: true } }), { gap: 400 })
         .mine,
@@ -184,7 +184,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
       expect(byKey({ getterBeam: true }, { gap })).toEqual({
         mine: [207, 209, 200, 'idle'],
         damage: 60,
-        stock: 2,
+        stock: 0,
       });
     expect(
       play(presses({ 0: { jump: true }, 20: { getterBeam: true } }), {
@@ -193,7 +193,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     ).toEqual({
       mine: ['takeoff', 'jump', 206, 209, 200, 'idle'],
       damage: 60,
-      stock: 2,
+      stock: 0,
     });
     // A direction held into SR Stop picks 技名6's motion (212); the ground
     // roll enters it at B (PC 2427), so down ones keep it rolling forward.
@@ -204,13 +204,13 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     expect(steer({ left: true })).toEqual({
       mine: [207, '212+7', '207+29', 'idle'],
       damage: 0,
-      stock: 2,
+      stock: 0,
     });
     expect(steer({ jump: true }).mine).toEqual([207, '212+11', 200, 'idle']);
     expect(steer({ right: true, jump: true })).toEqual({
       mine: [207, '212+13', 209, 200, 'idle'],
       damage: 60,
-      stock: 2,
+      stock: 0,
     });
     expect(steer({ crouch: true }).mine).toEqual([207, 209, 200, 'idle']);
     expect(byKey({ getterBeam: true }, { stock: 0 })).toEqual({
@@ -227,7 +227,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
 
   it('darkens the court through variable 13, which his Black (55) tests', () => {
     const { pac, steps } = pacPlayer();
-    pac.stock = 3;
+    pac.stock = 1;
     steps({}, 2);
     steps({ getterBeam: true });
     // super roll start sets it at age 0 (PC 2412).
@@ -241,7 +241,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     expect(BLACK.pachelo.opaque.image).toBe(1011);
   });
 
-  it('charges two stocks through his Vs. intro, 開始時 BR (38)', () => {
+  it('fills his one stock through his Vs. intro, 開始時 BR (38)', () => {
     expect(animationDuration('intro', 'pachelo')).toBe(259);
     const match = new Match('cpu', true, 0, ['pachelo', 'zoma']);
     const pac = match.fighters[0];
@@ -250,7 +250,8 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
       match.step({});
       ticks++;
     }
-    expect([ticks, pac.stock]).toEqual([259, 2]);
+    // Its 200 power fills his one stock (+0x7cb2).
+    expect([ticks, pac.stock]).toEqual([259, 1]);
     // Round 1 (39) shows nothing for 50 ticks, then fades his stance in
     // (PCs 333–344) and calls Demo stand five times (PC 345).
     expect(

@@ -264,6 +264,9 @@ export class StandingVM {
         }
       } else if (op === 3) {
         this.sounds.push(u16(r, 2));
+      } else if (op === 4) {
+        // Op 0x04 (0x412a7b) spawns and deletes objects, which the match runs
+        // from the idle clip's events: DoraEmon's empties his slot 9 (PC 11).
       } else if (op === 25) {
         if (r[9] >= 20) throw new Error('Collision slot out of range');
         this.collisionRecords[r[9]] = u16(r, 5) && u16(r, 7) ? pc : null;

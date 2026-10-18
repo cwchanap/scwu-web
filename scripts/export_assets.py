@@ -382,12 +382,15 @@ def player_tables(data, c, image_ids):
         cpu.pop()
     # The loader reads the CPU block, then 0x74b bytes into player +0x757a
     # (0x403c0b). Its s16 at +0x7ca3 splits a command's near and far actions
-    # (0x41080e), in source pixels, and the u16 at +0x7caa is the life.
+    # (0x41080e), in source pixels, and the u16 at +0x7caa is the life. Round 1
+    # sets the power per stock from its u32 at +0x7cae and the stock cap from
+    # +0x7cb2 (0x411f50–0x411f64), which 0x40e6f0 fills to.
     block = cpu_offset - 10 + 0x2b66 - 0x757a
     near = struct.unpack_from("<h", data, block + 0x7ca3)[0]
     life = u16(data, block + 0x7caa)
+    per_stock, stocks = struct.unpack_from("<II", data, block + 0x7cae)
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
-                commands=dict(near=near, entries=commands), life=life)
+                commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks)
 
 
 def jump_target(record):
@@ -900,6 +903,15 @@ YINAN_TWINS = {name: (r, r + next((d for top, d in ((73, 33), (89, 34), (121, 33
 # Chuck OGI BALL, and 30 from her Chuck Yo (AYA lacks her Chuck Hiso, 139).
 AYA_TWINS = {name: (r, r + next((d for top, d in ((73, 26), (90, 30), (121, 29), (139, 31)) if r < top), 30))
              for name, (r, _) in ZOMA_TWINS.items()}
+# DoraEmon's sit 25 after Ryuko's hits to her J atttack (he lacks her J
+# atttack 2, 78), 24 from her DOWN to SHOCK INFINITY, 23 from her Shock rp
+# (his ★変なＴＥＣＨ, 89, sits among his basic actions), 22 past her Chuck
+# Hiso (139), which he lacks, and 23 again from her guards, past his *gard
+# eff (171). His lose action 負け (68) jumps to KO NORMAL (69, PC 771), which
+# tests variable 3 for 30 into >KO NORMAL 2nd (71, PC 777) and lands into KO
+# down (76, PC 796), past KO NORMAL CPU (70) and his KO RELOAD forms (72–75).
+DORA_TWINS = {name: (r, r + next((d for top, d in ((79, 25), (89, 24), (139, 23), (149, 22)) if r < top), 23))
+              for name, (r, _) in ZOMA_TWINS.items()} | dict(lose=(59, 68), ko=(60, 69), koAgain=(61, 71), down=(62, 76))
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3444,6 +3456,72 @@ FIGHTERS = {
         # 705).
         image_ids={2001, 349},
     ),
+    "dora": dict(
+        source=("46 B6", "09b4d37681acc17ab8a9c4370683b44a096a0890dbb18e0265dad2831a9a3e32"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 10,  # PC 47
+                 "crouchEnter": 18, "crouch": 19, "stand": 20, "turn": 23, "crouchTurn": 24},
+        twins=DORA_TWINS,
+        # His file is SEAN's reworked (it keeps SEAN's name image, 247, and
+        # sprites); his reactions play as SEAN's but where noted:
+        differ={
+            # SEAN's.
+            "launchAway", "launchUp", "shock", "uppercut", "dragonFireball", "liftUp", "tatumakiIn", "tatumakiOut",
+            "flySide", "flySideWall", "twistSide", "rushAirHit", "airStun", "chuckToss", "chainPull", "inatuma",
+            "airInatuma", "vanish",
+            # SEAN's, clearing variable 14 first (PCs 2385, 2441, ...), their
+            # counter checks taking B without a direction (0x2021) where his
+            # take it with any; the crouching stop guard checks once less.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop", "blockRapid",
+            "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
+            # SEAN's, clearing 14 first (PC 2691), on one 26-tick display for
+            # his 6 and 20.
+            "airTimeStopGuard",
+            # Ryuko's, rolling rand % 3 > 1 before the power (PC 1145, ...)
+            # for her rand % 6 > 2 after the motion; the J attack hit without
+            # her tests of variable 5 (PCs 828–831).
+            "hitHeavy", "airHitHeavy", "jumpHit",
+            # Ryuko's launch (raw −500, PC 2045), giving the striker no power
+            # (PC 2037); its bounce clears 6, 5 and 14 (PCs 2048–2051).
+            "launchDown", "slamBounce",
+            # Ryuko's, clearing 13 (PC 2341) and holding 20 ticks first.
+            "getUp",
+            # SEAN's KO tests, beside an op 0x10 into KO RELOAD (72) with three
+            # stocks (PC 775) and a test of global 3 for 10 into KO NORMAL CPU
+            # (70, PC 776), which Vs. play leaves at 0; KO down with a 1-tick
+            # display before its test (PC 975). ponytail: KO RELOAD, which
+            # spends 270 power, darkens and refills his life through Stop (79)
+            # after the round is decided, isn't played.
+            "ko", "down",
+            # SEAN's, testing variable 0 for 10 into Start KO 3 (44, PC 763),
+            # which only his Start KO intro sets (PC 544), and 13 into make
+            # hikari (77, PC 769), without clearing 14.
+            "lose",
+            # SEAN's, on 2-tick displays (PCs 2196–2197), not 5.
+            "musicAttack",
+            # SEAN's, without clearing variables (PCs 2081–2084).
+            "chuckYo",
+        },
+        # Results: 勝ち (67) calls STAND DEMO (28) once (PC 748), shows four
+        # poses and loops three from PC 758 (PCs 756, 761), its rand % 3 > 1
+        # (PC 754) picking sound 5 or 10. The draw (81) calls 28 once (PC
+        # 1029), spawns his flying double (81 + 6, PC 1030) and hides on image
+        # 0 (PC 1032). Each first enters air demo (29) while airborne (op 0x16,
+        # PCs 747, 1028). The darkening panel, Black (50). The Vs. intro:
+        # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 320), whose
+        # first record jumps to Start KO (38, PC 363), a scene in which SEAN
+        # beats him down and he takes 1000 life himself (PC 547). Authored:
+        # the intro plays 開始時 BR past that jump and its global 14 = 0 test
+        # (PC 364), from its spawns of Black and OP super Charge (46, PCs
+        # 366–367) into Round 1 (34) + 3 (PC 369), which rises (PC 381) and
+        # lands into Round 1 + 27 (slot 1, PC 399), calling STAND DEMO once
+        # (PC 404); both play flattened.
+        actions=dict(win=67, winStand=28, winLoop=(67, 12), draw=81, black=50, intro=(32, 4),
+                     introLand=(34, 27)),
+        flat={"intro", "introLand"},
+        # 2001: the HUD face action 95 shows (PC 1085); 247: *name (83, PC
+        # 1047).
+        image_ids={2001, 247},
+    ),
 }
 
 
@@ -3650,7 +3728,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN and {counts['aya']} AYA images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA and {counts['dora']} DoraEmon images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 
@@ -3806,8 +3884,9 @@ def export_ui():
                  results=dict(win=wait(30), perfect=wait(27), draw=wait(32)))
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"]]
     sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])})
-    # 17–20: stock digits EMPTY/100/200/300; 31–38: gauge shimmer; 135: UNDER PW.
-    ids = {17, 18, 19, 20, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
+    # 17–23: stock digits EMPTY/100–600 (KGT 45–51, 0x445202); 31–38: gauge
+    # shimmer; 135: UNDER PW.
+    ids = {17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
     ids.update(range(31, 39))
     ids.update(range(47, 93, 5))
     ids.update(f["image"] for t in timelines for f in t["frames"] if c.images[f["image"]].width > 1)

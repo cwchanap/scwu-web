@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
-import { desperationOf, lifeOf } from './characters';
+import { desperationOf, lifeOf, perStockOf } from './characters';
 import type { Who } from './characters';
-import { LIFE, POWER_PER_STOCK, ROUNDS_TO_WIN } from './match';
+import { LIFE, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -99,10 +99,11 @@ export function healthCrop(hp: number, right: boolean, life = LIFE) {
   return { x: right ? 254 - width : 0, width };
 }
 
-// Object types 20/21 (0x40de1b/0x40de44) draw power × 126 / 100 pixels of the
-// bar. Both keep the texture's right-hand columns; 2P shows them mirrored.
-export function gaugeCrop(power: number) {
-  const width = Math.floor((126 * Math.max(0, power)) / POWER_PER_STOCK);
+// Object types 20/21 (0x40de1b/0x40de44) draw power × 126 pixels of the bar
+// over the power per stock (+0xdf21). Both keep the texture's right-hand
+// columns; 2P shows them mirrored.
+export function gaugeCrop(power: number, perStock = 100) {
+  const width = Math.floor((126 * Math.max(0, power)) / perStock);
   return { x: 126 - width, width };
 }
 
@@ -127,7 +128,8 @@ export function gaugeImage(tick: number) {
 // 1056), 3-TIMES's 114 (PC 953), ZENKA's 92 (PC 934), Z-MEGA's 82 (PC
 // 767), ALPHA's 108 (PC 1333), SHIN-Z's 84 (PC 846), ZAKU's 72 (PC 645),
 // PAC-HELO's 72 (PC 652), GOLF's 56 (PC 511), ASURA's 56 (PC 511), TTRO's
-// 71 (PC 674), ASTROMAN's 69 (PC 769) and AYA's 100 (PC 747). YINAN's 104
+// 71 (PC 674), ASTROMAN's 69 (PC 769), AYA's 100 (PC 747) and DoraEmon's 95
+// (PC 1085). YINAN's 104
 // shows 2001, or in EX
 // mode 2002, 2007, 2008 and 2007 for 40 ticks each (PCs 1240–1256).
 export const faceImage = (face: number, who?: Who) => {
@@ -161,7 +163,7 @@ export const faceImage = (face: number, who?: Who) => {
 // PAC-HELO's 68 149 (PC 617), GOLF's 52 155 (PC 475), ASURA's 52 137
 // (PC 479) and TTRO's 66 170 (PC 636); ASTROMAN, with no *NAME, shows VS
 // NAME's (56) 170 (PC 610). YINAN's 99 and AYA's 93 show 349 (PCs 1197,
-// 705).
+// 705), and DoraEmon's 83 SEAN's 247 (PC 1047).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -205,14 +207,19 @@ const NAMES: Record<Who, number> = {
   astroman: 170,
   yinan: 349,
   aya: 349,
+  dora: 247,
 };
 
-// KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.
+// The stock count picks its digits from the word at 0x445202 + stock × 2
+// (0x40a30b): KGT actions 45–51, images 17–23, EMPTY and 100–600.
 const STOCK_OFFSETS = [
   [0, 0],
   [0, -1],
   [-4, -1],
   [-2, -2],
+  [-3, -1],
+  [-2, -1],
+  [-2, -1],
 ];
 
 export function createHud(scene: Phaser.Scene) {
@@ -291,7 +298,7 @@ export function createHud(scene: Phaser.Scene) {
 
   return (match: Match) => {
     match.fighters.forEach((f, index) => {
-      const crop = gaugeCrop(f.power);
+      const crop = gaugeCrop(f.power, perStockOf(f.who));
       gauges[index]
         .setTexture(`ui-${gaugeImage(match.ticks)}`)
         .setCrop(crop.x, 0, crop.width, 20)

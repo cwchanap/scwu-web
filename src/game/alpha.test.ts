@@ -236,7 +236,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     expect(BLACK.alpha.opaque.image).toBe(1026);
   });
 
-  it('charges three stocks through his Vs. intro, 開始時 BR + 4 (PC 466)', () => {
+  it('charges four stocks through his Vs. intro, 開始時 BR + 4 (PC 466)', () => {
     expect(animationDuration('intro', 'alpha')).toBe(346);
     const match = new Match('cpu', true, 0, ['alpha', 'zoma']);
     const alpha = match.fighters[0];
@@ -245,8 +245,9 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
       match.step({});
       ticks++;
     }
-    // OP super Charge (54) clears his power and adds 400 (PCs 800–801).
-    expect([ticks, alpha.stock]).toEqual([346, 3]);
+    // OP super Charge (54) clears his power and adds 400 (PCs 800–801):
+    // four of his five stocks (+0x7cb2).
+    expect([ticks, alpha.stock]).toEqual([346, 4]);
     // OP2 (30) + 2 (PC 469), which calls demo stand (PC 422).
     expect(
       [0, 104, 105, 120, 196, 345].map(

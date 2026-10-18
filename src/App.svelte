@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { KEYS } from './game/commands';
+  import { buttonsOf, KEYS } from './game/commands';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
@@ -479,15 +479,33 @@
         dst: 'TE P',
         ex: 'TE K',
       },
+      dora: {
+        punch: 'LP',
+        kick: 'LK',
+        hitUp: 'HP',
+        dst: 'HK',
+        throw: 'Chuck',
+        ex: 'EN',
+        getterBeam: 'Cannon',
+        musashi: 'Gadgets',
+        changeAttack: 'Fists',
+        blackRush: 'Pierce',
+        megaBeam: 'Hug',
+        drill: 'Air Cannon',
+        axe: 'Sky Rise',
+        iori: 'Charge',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
-  // A move key the fighter has no command for has no button.
+  // A move key the fighter has no command or button for has no button.
   const moveKeys = new Set(
     Object.values(KEYS).flatMap((keys) => keys.map(([control]) => control)),
   );
   const has = (control: Control) =>
-    !moveKeys.has(control) || KEYS[fighter].some(([key]) => key === control);
+    !moveKeys.has(control) ||
+    KEYS[fighter].some(([key]) => key === control) ||
+    control in buttonsOf(fighter);
 
   onMount(() => {
     let disposed = false;
@@ -726,6 +744,7 @@
             <option value="astroman">ASTROMAN</option>
             <option value="yinan">YINAN</option>
             <option value="aya">AYA</option>
+            <option value="dora">DoraEmon</option>
           </select></label
         >
         <label
@@ -777,6 +796,7 @@
             <option value="astroman">ASTROMAN</option>
             <option value="yinan">YINAN</option>
             <option value="aya">AYA</option>
+            <option value="dora">DoraEmon</option>
           </select></label
         >
         <label
@@ -880,13 +900,15 @@
 
   <p class="keyboard-guide">
     <span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd> Jump</span
-    ><span><kbd>S</kbd> Crouch</span><span><kbd>J</kbd> Punch</span><span
-      ><kbd>K</kbd> Kick</span
-    ><span><kbd>L</kbd> Guard</span><span><kbd>Shift</kbd> Dash</span><span
+    ><span><kbd>S</kbd> Crouch</span><span
+      ><kbd>J</kbd> {labelOf('punch', 'Punch')}</span
+    ><span><kbd>K</kbd> {labelOf('kick', 'Kick')}</span><span
+      ><kbd>L</kbd> Guard</span
+    ><span><kbd>Shift</kbd> Dash</span><span
       ><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
     ><span><kbd>I</kbd> {labelOf('axe', 'Axe')}</span><span
-      ><kbd>O</kbd> Throw</span
-    ><span><kbd>H</kbd> Hit Up</span><span
+      ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
+    ><span><kbd>H</kbd> {labelOf('hitUp', 'Hit Up')}</span><span
       ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
     >{#if has('dst')}<span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span
       >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
@@ -973,8 +995,8 @@
         </p>
         <p>
           Landing hits, blocking, and taking damage fill the power gauge at the
-          bottom of the screen. Each full gauge becomes one stock, up to three.
-          Keys <kbd>1</kbd>
+          bottom of the screen. Each full gauge becomes one stock, up to three
+          for most fighters. Keys <kbd>1</kbd>
           to <kbd>5</kbd> spend it on Ryuko's supers: <kbd>1</kbd> Getter Beam
           (also in the air), <kbd>2</kbd> Musashi, <kbd>3</kbd> Getter Change
           Attack, and <kbd>5</kbd> Mega Getter Beam, which needs all three
@@ -2087,16 +2109,41 @@
           for two stocks.
         </p>
         <p>
+          Choose DoraEmon for a muscle-bound blue robot cat with 600 life, built
+          on SEAN's file, whose name plate he still wears. His attacks each take
+          two of the original six buttons, which his keys press together:
+          <kbd>J</kbd> LP, <kbd>K</kbd> LK, <kbd>H</kbd> HP and <kbd>G</kbd> HK,
+          low with ↓ and in the air, where an air dash changes their form; he
+          has no double jump. → with <kbd>J</kbd> or <kbd>K</kbd> dashes in with
+          a punch or kick, ↘ <kbd>H</kbd> is Hit Up, a launcher that ↑ follows
+          with a jump, and <kbd>O</kbd> his chuck, a grab and beating. Shift
+          dashes forward, and Shift with ← hops back. Hold <kbd>E</kbd>
+          for EN, which charges his gauge; his stocks hold 90 power each, up to five,
+          and once full he taunts, giving the opponent 20. His commands allow a tenth
+          of a second, so his keys carry his moves: <kbd>U</kbd>
+          Air Cannon, a blast from a cannon on his arm that starts too far ahead to
+          hit an opponent close in, <kbd>I</kbd> Sky Rise, a rising flying
+          punch, also in the air, and <kbd>F</kbd> Charge, a flying rush. His
+          supers, for a stock each: <kbd>1</kbd> Cannon, a shockwave across the
+          screen, <kbd>2</kbd> Gadgets, green shells and gadgets that pummel the
+          opponent, <kbd>3</kbd> Fists, a punch flurry into a dash and uppercut,
+          and <kbd>4</kbd> Pierce, a flying multi-hit rush; for three,
+          <kbd>5</kbd> Hug, which carries the opponent through the Anywhere Door.
+          His Twin Hammer, his Anywhere Door teleport and his FK之意思 super take
+          their commands only. His Vs. intro jumps into a scene where SEAN beats him
+          down; the port plays his normal entrance.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN or AYA, and
-          one of eighteen stages, in either mode. Free practice has no timer,
-          and you also choose how the partner behaves: standing, guarding high
-          or low, guarding in the air, attacking in range, jumping in, or
-          playing as the original CPU. Max stock refills your supers whenever
-          you stand idle, and Low health keeps you just under 30% for
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA or
+          DoraEmon, and one of eighteen stages, in either mode. Free practice
+          has no timer, and you also choose how the partner behaves: standing,
+          guarding high or low, guarding in the air, attacking in range, jumping
+          in, or playing as the original CPU. Max stock refills your supers
+          whenever you stand idle, and Low health keeps you just under 30% for
           desperation moves. Vs. CPU is the original game's CPU, playing the
           opponent's own moves, specials and supers. Reduce their health to
           zero, or lead on health when time runs out. Changing modes, fighters

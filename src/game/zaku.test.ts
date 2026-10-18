@@ -19,7 +19,7 @@ function zakuPlayer(gap = 90) {
 const now = (f: Fighter) => (f.action === 'script' ? f.branch : f.action);
 // Inputs from `at(t)` for 3000 ticks: his actions, the damage Ryuko took and
 // his stock.
-function play(at: (t: number) => Input, { gap = 90, stock = 3 } = {}) {
+function play(at: (t: number) => Input, { gap = 90, stock = 1 } = {}) {
   const { zaku, other, steps } = zakuPlayer(gap);
   zaku.stock = stock;
   steps({}, 2);
@@ -79,7 +79,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       expect(byKey(key, { gap: 60 })).toEqual({
         mine: ['idle'],
         damage: 0,
-        stock: 3,
+        stock: 1,
       });
     // A second jump only presses the air punch on.
     expect(
@@ -91,7 +91,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
 
   it('punches with P, standing or crouching, and lobs a bomb with K', () => {
     for (const key of [{ punch: true }, { punch: true, crouch: true }])
-      expect(byKey(key)).toEqual({ mine: [186, 'idle'], damage: 10, stock: 3 });
+      expect(byKey(key)).toEqual({ mine: [186, 'idle'], damage: 10, stock: 1 });
     // K bomb (188, PC 2065) bounces lower each time and bursts where it
     // lands (PCs 2092–2097).
     for (const [gap, damage] of [
@@ -103,7 +103,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       expect(byKey({ kick: true }, { gap })).toEqual({
         mine: [187, 'idle'],
         damage,
-        stock: 3,
+        stock: 1,
       });
     expect(
       play(presses({ 0: { jump: true }, 20: { kick: true } })),
@@ -118,18 +118,18 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       expect(byKey({ drill: true }, { gap })).toEqual({
         mine: [192, 'idle'],
         damage: 20,
-        stock: 3,
+        stock: 1,
       });
     for (const at of [10, 30])
       expect(
         play(presses({ 0: { punch: true }, [at]: { drill: true } })),
-      ).toEqual({ mine: [186, 192, 'idle'], damage: 30, stock: 3 });
+      ).toEqual({ mine: [186, 192, 'idle'], damage: 30, stock: 1 });
     expect(
       play(presses({ 0: { punch: true }, 30: { getterBeam: true } })),
-    ).toEqual({ mine: [186, 197, 'idle'], damage: 70, stock: 2 });
+    ).toEqual({ mine: [186, 197, 'idle'], damage: 70, stock: 0 });
     expect(
       play(presses({ 0: { drill: true }, 30: { getterBeam: true } })),
-    ).toEqual({ mine: [192, 197, 'idle'], damage: 80, stock: 2 });
+    ).toEqual({ mine: [192, 197, 'idle'], damage: 80, stock: 0 });
   });
 
   it('spends a stock on Super P or Super K, or enters No super', () => {
@@ -138,14 +138,14 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       expect(byKey({ getterBeam: true }, { gap })).toEqual({
         mine: [197, 'idle'],
         damage: 60,
-        stock: 2,
+        stock: 0,
       });
     // Five bombs (PCs 2264–2268), 13 each.
     for (const gap of [90, 200])
       expect(byKey({ musashi: true }, { gap })).toEqual({
         mine: [201, 'idle'],
         damage: 65,
-        stock: 2,
+        stock: 0,
       });
     expect(byKey({ getterBeam: true }, { stock: 0 })).toEqual({
       mine: [194, 'idle'],
@@ -156,7 +156,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
 
   it('darkens the court through variable 13, which his Black (55) tests', () => {
     const { zaku, steps } = zakuPlayer();
-    zaku.stock = 3;
+    zaku.stock = 1;
     steps({}, 2);
     steps({ getterBeam: true });
     // super P start sets it at age 0 (PC 2184).
@@ -170,7 +170,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
     expect(BLACK.zaku.opaque.image).toBe(1011);
   });
 
-  it('charges two stocks through his Vs. intro, 開始時 BR (38)', () => {
+  it('fills his one stock through his Vs. intro, 開始時 BR (38)', () => {
     expect(animationDuration('intro', 'zaku')).toBe(255);
     const match = new Match('cpu', true, 0, ['zaku', 'zoma']);
     const zaku = match.fighters[0];
@@ -180,8 +180,8 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       ticks++;
     }
     // OP super Charge (44) takes 300 power, then adds 2 a hundred times
-    // (PCs 371–372).
-    expect([ticks, zaku.stock]).toEqual([255, 2]);
+    // (PCs 371–372), past his one stock (+0x7cb2).
+    expect([ticks, zaku.stock]).toEqual([255, 1]);
     // Round 1 (39) shows nothing for 50 ticks, then fades his stance in
     // (PCs 323–333) and calls DEMO STAND four times (PC 336).
     expect(

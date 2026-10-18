@@ -215,7 +215,7 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     expect(BLACK.zenka.opaque.image).toBe(1011);
   });
 
-  it('charges three stocks through her Vs. intro, 開始時 BR + 3 (PC 466)', () => {
+  it('charges four stocks through her Vs. intro, 開始時 BR + 3 (PC 466)', () => {
     expect(animationDuration('intro', 'zenka')).toBe(384);
     const match = new Match('cpu', true, 0, ['zenka', 'zoma']);
     const zenka = match.fighters[0];
@@ -224,8 +224,9 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
       match.step({});
       ticks++;
     }
-    // OP super Charge (49) clears her power and adds 400 (PCs 586–587).
-    expect([ticks, zenka.stock]).toEqual([384, 3]);
+    // OP super Charge (49) clears her power and adds 400 (PCs 586–587):
+    // four of her five stocks (+0x7cb2).
+    expect([ticks, zenka.stock]).toEqual([384, 4]);
     // demo speak rp (38) ten times (PC 470), then her stance (284–287).
     expect(
       [0, 15, 30, 299, 300, 334, 383].map(

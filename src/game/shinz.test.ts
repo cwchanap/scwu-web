@@ -244,7 +244,7 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     expect(BLACK.shinz.opaque.image).toBe(1011);
   });
 
-  it('charges three stocks through his Vs. intro, 開始時 BR + 3 (PC 338)', () => {
+  it('charges five stocks through his Vs. intro, 開始時 BR + 3 (PC 338)', () => {
     expect(animationDuration('intro', 'shinz')).toBe(258);
     const match = new Match('cpu', true, 0, ['shinz', 'zoma']);
     const shinz = match.fighters[0];
@@ -253,8 +253,9 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
       match.step({});
       ticks++;
     }
-    // OP super Charge (46) clears his power and adds 500 (PCs 521–522).
-    expect([ticks, shinz.stock]).toEqual([258, 3]);
+    // OP super Charge (46) clears his power and adds 500 (PCs 521–522):
+    // five of his six stocks (+0x7cb2).
+    expect([ticks, shinz.stock]).toEqual([258, 5]);
     // Round 1 (34) + 2 (PC 342).
     expect(
       [0, 159, 160, 170, 178, 257].map(
