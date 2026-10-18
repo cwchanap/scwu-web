@@ -105,8 +105,10 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
   it('plays SAMA, Fire BALL, GIGA and REFLACT', () => {
     for (const [key, gap, mine, damage] of [
       ['drill', 90, [213, 215, 'idle'], 50],
-      ['axe', 90, [207, 'idle'], 40],
-      ['axe', 500, [207, 'idle'], 40],
+      // *Fire ball 01 strikes 25 into ***ball hit (201, slot 2), which
+      // clears its landing handler (0x40e510), so it doesn't bounce on.
+      ['axe', 90, [207, 'idle'], 25],
+      ['axe', 500, [207, 'idle'], 25],
       // GIGA Start dashes at raw 850 into GIGA HIT and its wall (PC 3641).
       ['iori', 90, [245, 246, 247, 'idle'], 41],
       ['iori', 500, [245, 246, 247, 'idle'], 41],

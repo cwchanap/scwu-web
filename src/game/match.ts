@@ -3107,7 +3107,10 @@ export class Match {
     for (const e of objects) {
       if (!e.stage && !this.effects.includes(e)) continue;
       // A queued handler comes first, stopped or not (0x412327): an action
-      // change that drops its boxes.
+      // change that drops its boxes and, for a fighter's objects (+0x15a 1,
+      // 0x412c00–0x412c4c), every handler (0x40e510): Z-MEGA's *Fire ball 01
+      // (202) that strikes falls on as ***ball hit (201), not into *Fire ball
+      // 02 (203, slot 1).
       if (e.pending !== undefined) {
         const key = e.pending;
         Object.assign(e, {
@@ -3115,6 +3118,7 @@ export class Match {
           boxes: [],
           responses: [],
           pending: undefined,
+          onLand: e.stage ? e.onLand : undefined,
         });
         this.branchTo(e, key);
         continue;
