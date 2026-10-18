@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO or ASTROMAN on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
+Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN or YINAN on any of its 18 stages, rebuilt for the browser from reverse-engineered data of the Windows game SCWU with TypeScript, Svelte 5, Phaser 4, Vite and Vitest. Each fighter's moves play from their own recovered action scripts and command table, in free practice or against the original CPU.
 
 ## Run
 
@@ -922,7 +922,33 @@ And ASTROMAN's, a hulking, muscle-bound boy robot with 780 life, whose steps sha
 | 2, or ↓→↓→ J         | SUPER P: a huge black rocket fist, 120, 1 stock                                                                                    |
 | 3, or ↓→↓→ K         | ASS GUN SUPER: a beam from his backside that strikes twenty times from a little ahead of him, 1 stock                              |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO or ASTROMAN), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+And YINAN's, a white-haired wolf girl with 450 life who borrows armour, mecha and costumes for her moves. TO EX switches her between a Normal and an EX type, and each special and super has a form for each:
+
+| Input                   | YINAN's move                                                                                                                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| J                       | A punch, 10; on a hit, J or K chains into a second strike and again into a third, or a special or super follows                                                                      |
+| K                       | A kick, 15; on a hit, the same chains                                                                                                                                                |
+| Down + J / K            | A low punch, 25 / a low kick, 20                                                                                                                                                     |
+| In the air: J / K       | A punch / a kick, in other forms after a double jump or an air dash, and in EX                                                                                                       |
+| Shift or → →            | A run that keeps on while → is held; ↑ jumps out of it, and → with K swings into Savage                                                                                              |
+| Shift + ← or ← ←        | A dash back                                                                                                                                                                          |
+| In the air: ↑ or → →    | A double jump or an air dash                                                                                                                                                         |
+| H                       | Hit Up: a launcher, 15; ↑ after its hit jumps after them                                                                                                                             |
+| O                       | Chuck: a grab, 35 (in EX, 30)                                                                                                                                                        |
+| E, or ↓↓ H              | TO EX: switches between her Normal and EX types for 50 power; without it, No super                                                                                                   |
+| U, or ↓→ J              | Driver: a strike, 10, that ← or → with J or K follows into Boxer, Venom, ARX-7 or Codarl (in EX, a rushing punch)                                                                    |
+| I, or ↓← J              | Assault: a long rush, 40 (in EX, Fist S: rapid fists that J extends, up to six volleys)                                                                                              |
+| F, or ↓← K              | DogeAttack: a dodge back that J, K, O or H (Dragon, a rising strike, 45) follows; in the air a dive (in EX, BTK S: a counter stance in a Bonta-kun suit, and in the air a P90 burst) |
+| G, or ↓↓ J; ↓↓ K        | ECS P / ECS K: an unseen dash through (in EX, Flash P / K: a flashbang)                                                                                                              |
+| 1, or ↓→↓→ J            | SS: a sniper's aim that J fires up to four times and K lowers, 1 stock (in EX, Trap: a claymore)                                                                                     |
+| 2, or ↓→↓← K            | EN Driver: a shield that strikes up close, 80, and answers a fireball with beams, 1 stock (in EX, FB: a batter's swing)                                                              |
+| 4, or →↓←→↓← J          | EN Chuck: a Venom doll that grabs, 50, 1 stock (in EX, Call Lin: Lin charges in, 100)                                                                                                |
+| ↓→↓→ K                  | EN3: the Arbalest against a Venom, 211, 3 stocks (in EX, MUSIKI, 189)                                                                                                                |
+| 3, or ←→←→ J            | Eat, under 150 life: a leap that catches a jumping opponent, 80, and heals her 50, 1 stock; otherwise Driver                                                                         |
+| 5, or →←↓→ K            | R300, under 150 life: a shell whose burst calls in her friends, 230, 3 stocks; otherwise Driver                                                                                      |
+| After Driver's hit: 1–4 | The super's SC form, 2 stocks                                                                                                                                                        |
+
+Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN or YINAN), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters at three stocks, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -938,7 +964,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - **Recovered:** each fighter's moves, objects and reactions run from their exported action scripts. Commands, attack and body boxes, the response table, contact pauses, damage, power, the camera, the HUD, KO and the CPU port the engine's own routines.
 - **Authored:** the single-key bindings, the Shift dash, jumping on a fresh press, the practice partners and settings, and the few other training choices that [docs/evidence.md](docs/evidence.md) names.
 - **Acceptance:** Vitest compares the idle interpreter with independently generated Python traces and the handoff's seed-0 timeline, and pins each rule's ticks and positions. The original Windows game has not been run here.
-- **Scope:** forty fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
+- **Scope:** forty-one fighters, all 18 stages, local single-player. No full gameplay VM, original-game parity, gamepad, multiplayer, or public deployment.
 
 [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule, and tabulates the contact pauses.
 
@@ -950,7 +976,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.
 - `src/game/cpu.ts` / `dummy.ts`: the original CPU and the authored practice partners.
 - `src/game/animations.ts`: neutral, guard, victim and result clips, the flattened source timelines, frame sampling and body boxes, per character.
-- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's and ASTROMAN's) and the twins that pair their victim actions, and each stage's.
+- `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's and YINAN's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.

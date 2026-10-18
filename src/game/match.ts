@@ -27,6 +27,7 @@ import {
   ZIRO_KO,
   ZIRO_LANDING,
   ZIRO_INTRO_EX_TICK,
+  YINAN_INTRO_EX_TICK,
   LIZARD_LANDING,
   INTRO_EX_TICK,
   entryColor,
@@ -364,6 +365,7 @@ REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
 // Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
 // 181) and ERUS's stop guards (167, 169) have no op 0x15, so add them none.
+// YINAN's HISA Down (158) gives the attacker none (PC 2389).
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
@@ -372,6 +374,7 @@ const OWN_REACTION_POWER: Partial<
   kay: { fireLaunch: [5, 13] },
   alex: { airBlockRapid: [0, 0], airTimeStopGuard: [0, 0] },
   erus: { blockStop: [0, 0], crouchBlockStop: [0, 0] },
+  yinan: { launchDown: [5, 0] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -658,15 +661,17 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
-// Ryuko's and Zoma's at −800 (Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G
-// Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's and
+// Ryuko's, Zoma's and YINAN's (158, PC 2398) at −800 (Kiki's, Chung's,
+// Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's,
+// DIDO's, SAKUYA's, ALEX's, SOU's and
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
 // and 131, PCs 1522, 1582, 1883, 1631, 1799, 1756, 1582, 1638, 1623, 1795,
 // 1818, 1938, 1848, 1725 and 1814; ZENKA's 144, PC 1880; Z-MEGA's 135,
 // PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702; ZAKU's 137, PC
 // 1536; PAC-HELO's 137, PC 1582; GOLF's 109, PC 1272; ASURA's 109, PC
-// 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676), and Amiro's
-// Tatumaki >> (105) at −300 (PC 1398).
+// 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676), Amiro's
+// Tatumaki >> (105) at −300 (PC 1398) and YINAN's Chuck DOWN (170) at −1000
+// (PC 2593).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -706,6 +711,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   asura: { launchDown: -800 },
   ttro: { launchDown: -800 },
   astroman: { launchDown: -800 },
+  yinan: { drillDown: -1000 },
 };
 // The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's, ALPHA's,
 // ZAKU's and PAC-HELO's 13, which their Black (75, 75, 54, 59, 55, 55) tests
@@ -839,6 +845,7 @@ const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   gigi: { value: 100, intro: GIGI_INTRO_EX_TICK },
   sww: { value: 100, intro: SWW_INTRO_EX_TICK },
   ziro: { value: 100, intro: ZIRO_INTRO_EX_TICK },
+  yinan: { value: 100, intro: YINAN_INTRO_EX_TICK },
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
@@ -1032,6 +1039,9 @@ export interface Fighter {
   // (MASA's, 3-TIMES's and ZENKA's 13, darkening).
   // Zoma's 0 counts his bombs, ten each, and 6 marks DRAGON.
   variables: Record<number, number>;
+  // The object's own variables (+0x131, op 0x1f below selector 0x40):
+  // YINAN's Fist S and p90 count their passes in 0.
+  locals: Record<number, number>;
   // +0x15e bits 0–3: a hit sets 8 and a guard 12 (0x40f7a8, 0x40f6a2), a
   // hold 0xa (0x413020). Action changes (0x410cf0) keep them until the
   // fighter returns to neutral. `striker` (+0xdefd): the opponent's own box
@@ -1115,6 +1125,8 @@ export interface Effect {
   hitStop: number;
   color: Color;
   trail: Trail | null;
+  // Its own variables (+0x131), zeroed as it spawns.
+  locals: Record<number, number>;
   // Op 0x02 handlers: what a hit (slot 2) or a guard (slot 3) enters.
   onHit?: ObjectKey;
   onGuard?: ObjectKey;
@@ -1260,6 +1272,7 @@ const newEffect = (
   hitStop: 0,
   color: NORMAL_COLOR,
   trail: null,
+  locals: {},
   ...fields,
 });
 const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
@@ -1303,6 +1316,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   branch: null,
   face: -1,
   variables: {},
+  locals: {},
   stopped: 0,
   transfer: 0,
   moving: 0,
@@ -1941,14 +1955,21 @@ export class Match {
     return true;
   }
 
-  // Op 0x1f's checks (0x4137a4) of player variables (selectors 0x40 up) and
+  // Op 0x1f's checks (0x4137a4) of the actor's own variables (below selector
+  // 0x40), which `pre` sets or adds to first, player variables (0x40 up) and
   // global 6 (the freeze): == (1), > (2) or < (3).
   private passes(
     self: Fighter,
-    { selector, compare, value }: Extract<SourceEvent, { op: 'test' }>,
+    actor: Fighter | Effect,
+    { selector, compare, value, pre }: Extract<SourceEvent, { op: 'test' }>,
   ) {
+    if (pre) this.setLocal(actor, selector, pre);
     const variable =
-      selector === 0x86 ? this.freeze : (self.variables[selector & 0x3f] ?? 0);
+      selector < 0x40
+        ? (actor.locals[selector] ?? 0)
+        : selector === 0x86
+          ? this.freeze
+          : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -1986,7 +2007,7 @@ export class Match {
   ): void {
     for (const event of script(key, actor.who).events)
       if (event.op !== 'test') this.runEvent(actor, owner, event);
-      else if (this.passes(this.fighters[owner], event))
+      else if (this.passes(this.fighters[owner], actor, event))
         return this.runCall(
           actor,
           owner,
@@ -2101,7 +2122,7 @@ export class Match {
       case 'test':
         if (
           ('clip' in actor || actor.action === 'script') &&
-          this.passes(self, event)
+          this.passes(self, actor, event)
         )
           return event.called
             ? this.rejoin(actor, owner, event)
@@ -2199,6 +2220,9 @@ export class Match {
         self.variables[event.index] =
           (self.variables[event.index] ?? 0) + event.value;
         break;
+      case 'local':
+        this.setLocal(actor, event.index, event);
+        break;
       // Ops 0x10 and 0x11 (0x413500, 0x413164) jump to their target on too
       // little stock, which otherwise pays the super, or past a life
       // threshold. Op 0x10 without r[5] bit 0 (0x4135eb) jumps on enough
@@ -2261,6 +2285,18 @@ export class Match {
           : this.branchTo(actor, sourceKey(event.action, event.offset));
     }
     return false;
+  }
+
+  // Op 0x1f sets an object's own variable, or adds to it within ±30000
+  // (0x4138f0–0x41391d).
+  private setLocal(
+    actor: Fighter | Effect,
+    index: number,
+    { value, add }: { value: number; add: boolean },
+  ) {
+    actor.locals[index] = add
+      ? Math.max(-30000, Math.min(30000, (actor.locals[index] ?? 0) + value))
+      : value;
   }
 
   // A roll or test in a call jumps within the called action, rejoining this
@@ -2560,7 +2596,11 @@ export class Match {
     // (0x40f73c, 0x40f6e6, 0x40f885): LIZARD's dragon up handen (247) so
     // finds whom his birds strike.
     if (!reaction && (response || box.damage)) return [];
-    const blocked = reaction ? blocks.has(reaction.action) : guarding;
+    // A guarded contact (the guard half, 0x40f4be) stays one unless the
+    // response is unguardable (0x40f544), as a guard half naming a hit is;
+    // a hit half naming a guard, YINAN's R300 Hit's time stop (response 80,
+    // PC 10429), is a hit.
+    const blocked = guarding && (!reaction || blocks.has(reaction.action));
     return [
       {
         f: attacker,

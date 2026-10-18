@@ -109,6 +109,7 @@ const object = (
   hitStop: 0,
   color: NORMAL_COLOR,
   trail: null,
+  locals: {},
   ...fields,
 });
 

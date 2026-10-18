@@ -457,6 +457,18 @@
         iori: 'Ass Gun',
         dst: 'C Chuck',
       },
+      yinan: {
+        getterBeam: 'SS',
+        musashi: 'EN Driver',
+        changeAttack: 'Eat',
+        blackRush: 'EN Chuck',
+        megaBeam: 'R300',
+        drill: 'Driver',
+        axe: 'Assault',
+        iori: 'Doge',
+        dst: 'ECS',
+        ex: 'Type',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -702,6 +714,7 @@
             <option value="asura">ASURA</option>
             <option value="ttro">TTRO</option>
             <option value="astroman">ASTROMAN</option>
+            <option value="yinan">YINAN</option>
           </select></label
         >
         <label
@@ -751,6 +764,7 @@
             <option value="asura">ASURA</option>
             <option value="ttro">TTRO</option>
             <option value="astroman">ASTROMAN</option>
+            <option value="yinan">YINAN</option>
           </select></label
         >
         <label
@@ -2000,19 +2014,58 @@
           aside), and the air attacks into a double jump, an air dash or Jump att.
         </p>
         <p>
+          Choose YINAN for a white-haired wolf girl with 450 life who borrows
+          armour, mecha and costumes for her moves, and switches between a
+          Normal and an EX type. <kbd>J</kbd> is a punch and <kbd>K</kbd> a
+          kick, each chaining on a hit into a second and third with
+          <kbd>J</kbd> or <kbd>K</kbd>; down with either strikes low. In the air
+          <kbd>J</kbd>
+          and <kbd>K</kbd> strike, in other forms after a double jump or an air
+          dash. Shift runs while → is held, jumping out on ↑ or into Savage on →
+          with <kbd>K</kbd>, and Shift with ← dashes back. <kbd>H</kbd> is Hit
+          Up, a launcher that ↑ follows with a jump, and <kbd>O</kbd> her chuck.
+          <kbd>E</kbd>
+          or ↓↓ <kbd>H</kbd> switches type for half a stock, which changes every
+          special and super. Her Normal specials: <kbd>U</kbd> or ↓→
+          <kbd>J</kbd>
+          Driver, a strike that ← or → with <kbd>J</kbd> or <kbd>K</kbd> follows
+          into four armoured attacks, <kbd>I</kbd> or ↓← <kbd>J</kbd> Assault, a
+          long rush,
+          <kbd>F</kbd> or ↓← <kbd>K</kbd> DogeAttack, a dodge back that
+          <kbd>J</kbd>, <kbd>K</kbd>, <kbd>O</kbd> or <kbd>H</kbd> (a rising
+          Dragon) follows, also a dive in the air, and <kbd>G</kbd> or ↓↓
+          <kbd>J</kbd> (or ↓↓ <kbd>K</kbd>) ECS, an unseen dash through. In EX
+          Driver is a rushing punch, Assault rapid fists that more <kbd>J</kbd>
+          extends, DogeAttack a counter stance in a Bonta-kun suit or, in the air,
+          a P90 burst, and ECS a flashbang. Her supers, for a stock each:
+          <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> SS, a sniper's aim that
+          <kbd>J</kbd> fires up to four times and <kbd>K</kbd> lowers (in EX a
+          claymore trap), <kbd>2</kbd> or ↓→↓← <kbd>K</kbd> EN Driver, a shield
+          that strikes up close and counters projectiles (in EX a batter's
+          swing), and <kbd>4</kbd> or →↓←→↓← <kbd>J</kbd> EN Chuck, a Venom doll
+          that grabs (in EX Lin charges in); for three, ↓→↓→
+          <kbd>K</kbd> EN3, the Arbalest against a Venom (in EX MUSIKI). Under
+          150 life, <kbd>3</kbd> or ←→←→ <kbd>J</kbd> Eat, for one, leaps to
+          catch a jumping opponent and heal her, and <kbd>5</kbd> or →←↓→
+          <kbd>K</kbd> R300, for three, a shell that calls in her friends. On a hit
+          her normals cancel into a special or super, and Driver into its supers'
+          SC forms for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO or ASTROMAN, and one of
-          eighteen stages, in either mode. Free practice has no timer, and you
-          also choose how the partner behaves: standing, guarding high or low,
-          guarding in the air, attacking in range, jumping in, or playing as the
-          original CPU. Max stock refills your supers whenever you stand idle,
-          and Low health keeps you just under 30% for desperation moves. Vs. CPU
-          is the original game's CPU, playing the opponent's own moves, specials
-          and supers. Reduce their health to zero, or lead on health when time
-          runs out. Changing modes, fighters or the stage starts a fresh match.
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN or YINAN, and one
+          of eighteen stages, in either mode. Free practice has no timer, and
+          you also choose how the partner behaves: standing, guarding high or
+          low, guarding in the air, attacking in range, jumping in, or playing
+          as the original CPU. Max stock refills your supers whenever you stand
+          idle, and Low health keeps you just under 30% for desperation moves.
+          Vs. CPU is the original game's CPU, playing the opponent's own moves,
+          specials and supers. Reduce their health to zero, or lead on health
+          when time runs out. Changing modes, fighters or the stage starts a
+          fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to

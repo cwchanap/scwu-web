@@ -137,6 +137,9 @@ export type SourceEvent =
       offset: number;
       // A forward skip in an inlined call.
       called?: boolean;
+      // Below selector 0x40, the object's own variable, set or added to
+      // first.
+      pre?: { value: number; add: boolean };
     }
   | {
       op: 'spawn';
@@ -212,6 +215,7 @@ export type SourceEvent =
   | ({ op: 'trail' } & TrailSpec)
   | { op: 'variable'; index: number; value: number }
   | { op: 'add'; index: number; value: number }
+  | { op: 'local'; index: number; value: number; add: boolean }
   | {
       op: 'screen';
       fader: FaderSpec | null;
@@ -357,7 +361,8 @@ export function heldFrame(
 // stand demo (PCs 265–268), OS FENG's Round 1 at PC 393, from PC 363,
 // GIGI's Round 1 at PC 361, from PC 356, before his flattened intro's call of
 // Demo stand (PCs 288–295), and SWW's Round 1 at PC 330, from PC 325, before
-// his (PCs 258–265).
+// his (PCs 258–265). YINAN's Round 1 checks at PC 648, entering 開始時 SELECT
+// (40) + 8 (PC 609), which sets variable 0 to 100.
 const ticksBefore = (frames: Pose[], pc: number) =>
   frames
     .filter((frame) => frame.pc < pc)
@@ -391,6 +396,15 @@ export const SWW_INTRO_EX_TICK = ticksBefore(
   fighterClips.sww.intro.filter((frame) => frame.pc > 265),
   330,
 );
+// YINAN's 開始時 BR (41) jumps past its display at PC 622 for global 14 = 0
+// (PC 621) into Round 1 (42) + 7 (PC 624), past the fader between (PC 623),
+// so his spawns (PCs 614–620) run as Round 1's display starts.
+const yinanIntro = (z = fighterClips.yinan) => [
+  z.intro[0],
+  { ...z.intro[2], events: z.intro[1].events },
+  ...z.intro.slice(3),
+];
+export const YINAN_INTRO_EX_TICK = ticksBefore(yinanIntro(), 648);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
@@ -755,7 +769,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                   ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
                   : who === 'sin'
                     ? [...z.intro, ...z.winStand]
-                    : z.intro,
+                    : who === 'yinan'
+                      ? yinanIntro()
+                      : z.intro,
               ),
     ...guardAnimations(z),
     hit: clip(z.hit),
@@ -973,6 +989,7 @@ const TWIN_ANIMATIONS = {
   asura: twinAnimations('asura'),
   ttro: twinAnimations('ttro'),
   astroman: twinAnimations('astroman'),
+  yinan: twinAnimations('yinan'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
