@@ -37,6 +37,7 @@ import {
   scriptTick,
   heldFrame,
   hurtboxes,
+  idlePower,
   pushboxes,
   NORMAL_COLOR,
   POSE_EVENTS,
@@ -409,7 +410,10 @@ const reactionPower = (f: Fighter): [number, number] =>
 // 398) until he lands (DORA_LANDING). RARIO's Round 1 (27) hops at −1000
 // with gravity 30 (PC 246) after its first 44 ticks, hangs 50 (PC 248) and
 // hops again with gravity 80 (PC 251) until he lands (RARIO_LANDING). The
-// others' have no op 0x01, so they start where these end.
+// others' have no op 0x01, so they start where these end. ponytail:
+// TRAINING's 開始時 (24) dashes back at −10000 and in at 2870 on blank
+// displays (PCs 229–231), which would leave him 430 source pixels from the
+// left bound wherever he starts; it plays in place.
 type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -511,6 +515,8 @@ const introWalk = (who: Who) =>
   );
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
+// The KOs that launch straight up and sink without sliding (moveKO).
+const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // Ryuko's knockdown, 'DOWN normal', and its get-up, 'Down Get up': Z-MEGA's
 // GAISA FINAL ends in his (157) + 5 (PC 4137), at its roll.
 const KNOCKDOWN = 146;
@@ -733,6 +739,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   ttro: { launchDown: -800 },
   astroman: { launchDown: -800 },
   rario: { launchDown: -800 },
+  training: { launchDown: -800 },
   yinan: { drillDown: -1000 },
   aya: { drillDown: -1000 },
 };
@@ -1713,7 +1720,7 @@ export class Match {
   // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
   // is over (PC 645). RARIO's launch straight up at −1820 (PCs 487, 500),
   // and his KO down (54) sinks through the floor in its displays (PCs
-  // 509–516) without sliding.
+  // 509–516) without sliding; TRAINING's alike (PCs 400, 413, 423–430).
   private moveKO(f: Fighter) {
     if (f.action === 'koLand' && f.who === 'ziro') {
       if (f.age === ZIRO_KO.burst)
@@ -1724,7 +1731,10 @@ export class Match {
       return true;
     }
     if (f.action === 'koLand') {
-      if (f.who !== 'rario' && f.age <= (f.who === 'amiro' ? 12 : 10))
+      if (
+        !STRAIGHT_KO.includes(f.who) &&
+        f.age <= (f.who === 'amiro' ? 12 : 10)
+      )
         f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
       return true;
     }
@@ -1732,9 +1742,9 @@ export class Match {
     if (!launch) return false;
     if (f.action === 'down' && f.age === 5) this.koStop += 40;
     if (f.age === launch) {
-      const rario = f.who === 'rario';
-      f.vx = rario ? 0 : -f.facing * 500 * SOURCE_VELOCITY_SCALE;
-      f.vy = (rario ? -1820 : -1520) * SOURCE_VELOCITY_SCALE;
+      const straight = STRAIGHT_KO.includes(f.who);
+      f.vx = straight ? 0 : -f.facing * 500 * SOURCE_VELOCITY_SCALE;
+      f.vy = (straight ? -1820 : -1520) * SOURCE_VELOCITY_SCALE;
       f.gravity = 90 * SOURCE_ACCELERATION_SCALE;
       f.airAge = 0;
     }
@@ -2215,7 +2225,9 @@ export class Match {
         // (0x41323a, 0x413298), a gain up to full life (0x40ea9f): Yo's
         // ZOMBI WALK bite, 2 a pass through ZOMBI RP (PC 3056), then 6 (PC
         // 3011). SWW's Roll Crash hit takes 1000 from both (PC 5957), his
-        // own first: a double KO.
+        // own first: a double KO. TRAINING's K refills the opponent's life
+        // (PC 1633), his P takes 100 (PC 1629) and his chuck KOs himself
+        // (PC 1662).
         if (event.selfLife > 0)
           self.hp = Math.min(lifeOf(self.who), self.hp + event.selfLife);
         if (event.selfLife < 0) {
@@ -2223,6 +2235,8 @@ export class Match {
           loseLife(self, -event.selfLife);
           if (self.hp === 0) this.queue(self, knockedOut(wasOut));
         }
+        if (event.otherLife > 0)
+          other.hp = Math.min(lifeOf(other.who), other.hp + event.otherLife);
         if (event.otherLife < 0) {
           const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
@@ -2877,6 +2891,9 @@ export class Match {
         f.moving = 0;
         if (this.land(f)) return;
         if (this.cancel(f, other, history)) return;
+        if (f.action === 'idle')
+          for (const event of idlePower(f.who, f.age))
+            this.runEvent(f, this.fighters.indexOf(f), event);
       } else {
         f.hitStop--;
         return;

@@ -49,6 +49,7 @@ import yinan from './generated/yinan.json';
 import aya from './generated/aya.json';
 import dora from './generated/dora.json';
 import rario from './generated/rario.json';
+import training from './generated/training.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -125,6 +126,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     aya: aya.commands,
     dora: dora.commands,
     rario: rario.commands,
+    training: training.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -811,6 +813,12 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['iori', 5],
     ['dash', 11],
   ],
+  // TRAINING's special fb (6) on Ryuko's drill key, then Dash F (4) and
+  // Dash B (5).
+  training: [
+    ['drill', 6],
+    ['dash', 4],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -857,6 +865,7 @@ export const BACK_DASH: Record<Who, number> = {
   aya: 15,
   dora: 29,
   rario: 12,
+  training: 5,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

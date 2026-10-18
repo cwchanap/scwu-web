@@ -51,7 +51,8 @@ export type Pose = Frame & {
   held?: boolean;
   body?: BodyBox[];
   color?: Color;
-  events?: PoseEvent[];
+  // The idle's op 0x15 too (idlePower).
+  events?: (PoseEvent | Extract<SourceEvent, { op: 'power' }>)[];
 };
 // JSON infers each event's op as a string; the export writes only Pose's.
 const clips = data.clips as unknown as Record<keyof typeof data.clips, Pose[]>;
@@ -489,19 +490,26 @@ const repeated = (frames: Pose[], ticks: number) => {
   return out;
 };
 // How many times each win calls its stand demo: twice, ZAKU's and
-// PAC-HELO's four times, otherwise once.
+// PAC-HELO's four times, TRAINING's three (PC 366), otherwise once.
 const winStands = (who: Who) =>
   who === 'zaku' || who === 'pachelo'
     ? 4
-    : who === 'kate' ||
-        who === 'remu' ||
-        who === 'rear' ||
-        who === 'masa' ||
-        who === 'times'
+    : who === 'training'
+      ? 3
+      : who === 'kate' ||
+          who === 'remu' ||
+          who === 'rear' ||
+          who === 'masa' ||
+          who === 'times'
+        ? 2
+        : 1;
+// And each draw: TRAINING's three times (PC 446).
+const drawStands = (who: Who) =>
+  who === 'training'
+    ? 3
+    : who === 'rear' || who === 'gigi' || who === 'masa' || who === 'times'
       ? 2
       : 1;
-const twiceDrawn = (who: Who) =>
-  who === 'rear' || who === 'gigi' || who === 'masa' || who === 'times';
 // A flight's displays until `age`, then its landing action's.
 function landed(flight: Pose[], landing: Pose[], age: number) {
   const ticks = flight.map((f) => f.duration);
@@ -753,7 +761,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 1 + 27. RARIO's 開始時 BR (26) from PC 231, past its global 14 = 0
     // test (PC 229), runs into Round 1 + 3, hops twice and lands out of the
     // wait at PC 253 at RARIO_LANDING into Round 1 + 19, whose poses its
-    // flattening runs on into.
+    // flattening runs on into. TRAINING's 開始時 (24), with no BR, dashes
+    // on blank displays (PCs 229–232), stands 70 ticks and calls Demo stand
+    // four times (PC 240).
     intro:
       who === 'lizard'
         ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
@@ -955,19 +965,17 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // ponytail: its step back at raw −200 (PC 944) isn't played.
     draw: clip(
       [
-        ...z.winStand,
-        ...(twiceDrawn(who) ? z.winStand : []),
+        ...Array<Pose[]>(drawStands(who)).fill(z.winStand).flat(),
         ...z.draw,
         ...(z.drawLoop ?? []),
       ],
       who === 'sww'
         ? z.winStand.length
         : z.drawLoop
-          ? z.winStand.length + z.draw.length
+          ? z.winStand.length * drawStands(who) + z.draw.length
           : false,
       waits([
-        ...z.winStand,
-        ...(twiceDrawn(who) ? z.winStand : []),
+        ...Array<Pose[]>(drawStands(who)).fill(z.winStand).flat(),
         ...z.draw,
         ...(z.drawLoop ?? []),
       ]),
@@ -1022,6 +1030,7 @@ const TWIN_ANIMATIONS = {
   aya: twinAnimations('aya'),
   dora: twinAnimations('dora'),
   rario: twinAnimations('rario'),
+  training: twinAnimations('training'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
@@ -1068,14 +1077,30 @@ export const clipPose = (
   action === 'idle'
     ? fighterClips[who].idle[0]
     : animationFrame(action, age, who, ex);
+// The op 0x15 of the idle display that starts at a looping `age`: TRAINING's
+// 通常立ち refills his life, drains his power and fills the opponent's as it
+// reaches its 15th display (PC 24). His idle has no rolls, so its age stands
+// for the program scene.ts runs.
+export function idlePower(who: Who, age: number) {
+  const frames = fighterClips[who].idle;
+  if (!frames.some((frame) => frame.events?.some((e) => e.op === 'power')))
+    return [];
+  let t = age % frames.reduce((total, frame) => total + frame.duration, 0);
+  for (const frame of frames) {
+    if (t === 0) return (frame.events ?? []).filter((e) => e.op === 'power');
+    t -= frame.duration;
+  }
+  return [];
+}
 function bodies(action: Shown, age: number, who: Who): BodyBox[] {
   return clipPose(action, age, who).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
 // (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436);
-// Zoma's action 40 and Kiki's 42 show image 1009 alike.
+// Zoma's action 40 and Kiki's 42 show image 1009 alike. TRAINING has none,
+// and nothing of his sets the variable that would show it.
 export const BLACK = Object.fromEntries(
-  Object.entries(fighterClips).map(([who, { black }]) => [
+  Object.entries(fighterClips).map(([who, { black = [] }]) => [
     who,
     { opaque: black[1], half: black[2] },
   ]),

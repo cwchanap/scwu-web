@@ -432,9 +432,12 @@ def pose_clips(p, c, actions, image_ids):
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
                 color = {k: v for k, v in color_state(p.records[pc]).items() if k != "op"}
-            elif p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1e, 0x1f, 0x25) and pc >= action.start + offset:
+            # The idle also carries its op 0x15, which the match runs at the
+            # display's age: TRAINING's (PC 24).
+            elif (p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1e, 0x1f, 0x25) or p.records[pc][0] == 0x15
+                  and name == "idle") and pc >= action.start + offset:
                 event = decode_event(p.records[pc])
-                if event and event["op"] in POSE_EVENTS:
+                if event and (event["op"] in POSE_EVENTS or event["op"] == "power"):
                     events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
                 frame = display_record(p, pc)
@@ -922,6 +925,17 @@ RARIO_TWINS = {name: (r, r + next(d for top, d in ((63, -8), (89, -7), (97, -8),
                                                    (149, -14)) if r < top))
                for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
     name: (r, 141 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
+# TRAINING's, RARIO's practice copy, sit 24 before Ryuko's KOs and lose
+# action, 26 before her other reactions up to SHOCK INFINITY, 27 from her
+# Shock rp to ERUS INATUMA, 26 from her INATUMA rp (his ★変なＴＥＣＨ, 92,
+# follows his ERUS INATUMA), 22 from her Chuck GON MISS (his DOWN section,
+# 111–114, comes before it), 23 past her Chuck Hiso (139), which he lacks,
+# and 33 before her DOWN section; his guards follow one after another from
+# 122.
+TRAINING_TWINS = {name: (r, r + next(d for top, d in ((63, -24), (89, -26), (119, -27), (137, -26), (139, -22),
+                                                      (144, -23), (149, -33)) if r < top))
+                  for name, (r, _) in ZOMA_TWINS.items() if r < 149} | {
+    name: (r, 122 + i) for i, (r, name) in enumerate(sorted((r, n) for n, (r, _) in ZOMA_TWINS.items() if r >= 149))}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3586,6 +3600,54 @@ FIGHTERS = {
         # 546).
         image_ids={2001, 235},
     ),
+    "training": dict(
+        source=("48 TRAINING", "6110badc3abe14d303bb3efd3303e3c7349d4c6819e278956e11263dee8ed6e9"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 54
+                 "crouchEnter": 12, "crouch": 13, "stand": 14, "turn": 17, "crouchTurn": 18},
+        twins=TRAINING_TWINS,
+        # His reactions play as RARIO's but where noted: none clears variable
+        # 14, which nothing of his sets or reads.
+        differ={
+            # RARIO's.
+            "hit", "airHit", "hitHeavy", "airHitHeavy", "jumpHit", "drillDown", "dstToss", "twist", "hitPull",
+            "launchDown", "launchUp", "launchAway", "sweep", "grabbed", "hitRapid", "airHitRapid", "rushAirHit", "fly",
+            "shock", "chuckToss", "uppercut", "stun", "airStun", "dragonFireball", "liftUp", "tatumakiIn",
+            "tatumakiOut", "fireLaunch", "flySide", "twistSide", "gonMiss", "chuckUp", "twistSideHit", "musicAttack",
+            "icePunch", "airIcePunch", "chainPull", "hisoStop",
+            # RARIO's, with nothing to clear.
+            "getUp", "ko", "flySideWall", "chuckYo", "guard", "crouchGuard", "airGuard", "blockHeavy",
+            "crouchBlockHeavy", "airBlockHeavy", "blockStop", "crouchBlockStop", "blockRapid", "crouchBlockRapid",
+            "airBlockRapid", "timeStopGuard", "crouchTimeStopGuard", "airTimeStopGuard",
+            # ASURA's, clearing variable 1 (PCs 1400, 1415).
+            "bounceDown", "knockdown",
+            # RARIO's, holding its last pose 1205 ticks (PC 416), not 0.
+            "koAgain",
+            # RARIO's, without its global 15 test.
+            "down",
+            # OS FENG's.
+            "lose",
+            # RARIO's, clearing no variables.
+            "vanish",
+            # Ryuko's, keeping 6.
+            "inatuma",
+            # RARIO's, clearing 8 and 5 first (PCs 1157–1158).
+            "airInatuma",
+        },
+        # Results: 勝ち (34) calls Demo stand (22) three times (PC 366), plays
+        # sound 19 (PC 368) and loops three poses from PC 370 (PC 374); the
+        # draw (40) calls 22 three times (PC 446) and loops image 227 from PC
+        # 450 (PC 451). Each first enters DEMO air (23) while airborne (op
+        # 0x16, PCs 365, 445). He has no Black, and nothing of his darkens.
+        # The Vs. intro: 開始時 (24) has no BR to jump to, as its op 0x1f on
+        # global 3 sets nothing and tests nothing (r[5] 0, PC 220); past its
+        # VS banners (PC 226) it dashes back and in on blank displays (PCs
+        # 229–232), spawns VS CHANGE (30, PC 234), stands 70 ticks (PC 235)
+        # and calls Demo stand four times (PC 240). It plays flattened.
+        actions=dict(win=34, winStand=22, winLoop=(34, 6), draw=40, drawLoop=(40, 6), intro=24),
+        flat={"intro"},
+        # 2001: the HUD face action 44 shows (PC 472).
+        image_ids={2001},
+    ),
 }
 
 
@@ -3792,7 +3854,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon and {counts['rario']} RARIO images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon, {counts['rario']} RARIO and {counts['training']} TRAINING images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

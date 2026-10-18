@@ -502,6 +502,12 @@
         axe: 'Shoryu',
         iori: 'Tatumaki',
       },
+      training: {
+        punch: 'Drain',
+        kick: 'Refill',
+        throw: 'Self KO',
+        drill: 'Hado',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -753,6 +759,7 @@
             <option value="aya">AYA</option>
             <option value="dora">DoraEmon</option>
             <option value="rario">RARIO</option>
+            <option value="training">TRAINING</option>
           </select></label
         >
         <label
@@ -806,6 +813,7 @@
             <option value="aya">AYA</option>
             <option value="dora">DoraEmon</option>
             <option value="rario">RARIO</option>
+            <option value="training">TRAINING</option>
           </select></label
         >
         <label
@@ -921,9 +929,9 @@
       ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
     >{#if has('dst')}<span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span
       >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-      >{/if}<span
-      ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
-    >
+      >{/if}{#if SUPER_CONTROLS.some(has)}<span
+        ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
+      >{/if}
   </p>
   {#if help}
     <section class="help-panel" id="controls-guide" aria-label="How to play">
@@ -2161,20 +2169,31 @@
           for two. Knocked out, he jumps straight up and falls through the floor.
         </p>
         <p>
+          Choose TRAINING for RARIO's practice copy, with his look and 500 life,
+          whose buttons run the training: <kbd>J</kbd> takes 100 life from the
+          opponent wherever they stand, <kbd>K</kbd> refills it, and
+          <kbd>O</kbd> knocks himself out. Standing still refills his life and
+          the opponent's power, and empties his. <kbd>H</kbd> is an uppercut and
+          <kbd>U</kbd>
+          or → <kbd>H</kbd> RARIO's bouncing Hado, each after a three-second countdown.
+          Shift dashes forward, and Shift with ← hops back. He has no supers, no air
+          attacks and no double jump.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
           SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA,
-          DoraEmon or RARIO, and one of eighteen stages, in either mode. Free
-          practice has no timer, and you also choose how the partner behaves:
-          standing, guarding high or low, guarding in the air, attacking in
-          range, jumping in, or playing as the original CPU. Max stock refills
-          your supers whenever you stand idle, and Low health keeps you just
-          under 30% for desperation moves. Vs. CPU is the original game's CPU,
-          playing the opponent's own moves, specials and supers. Reduce their
-          health to zero, or lead on health when time runs out. Changing modes,
-          fighters or the stage starts a fresh match.
+          DoraEmon, RARIO or TRAINING, and one of eighteen stages, in either
+          mode. Free practice has no timer, and you also choose how the partner
+          behaves: standing, guarding high or low, guarding in the air,
+          attacking in range, jumping in, or playing as the original CPU. Max
+          stock refills your supers whenever you stand idle, and Low health
+          keeps you just under 30% for desperation moves. Vs. CPU is the
+          original game's CPU, playing the opponent's own moves, specials and
+          supers. Reduce their health to zero, or lead on health when time runs
+          out. Changing modes, fighters or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
