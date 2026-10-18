@@ -255,6 +255,14 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
                 break
             action, pc = target, dest
             continue
+        elif op == 0x05 and stack:
+            # A player's runs its action out (0x412625), returning from the
+            # call: AYA's Rocket Hit2 att1 and att2 (294, 295), which Rocket
+            # Hit2 calls 18 times (PCs 4097–4132), end each burst with one
+            # (PCs 4194, 4239). ponytail: another object's deletes it, but no
+            # exported object's calls reach one.
+            pc = a.end
+            continue
         elif op == 0x05:
             # It ends a player's action and deletes any other object (0x412617).
             result["end"] = "delete"
@@ -887,6 +895,11 @@ ASTROMAN_TWINS = {name: (r, r - 1 - (r == 90 or r >= 140)) for name, (r, _) in Z
 # again from her Chuck Yo, and 35 from her Pull Back to her Chuck GON MISS.
 YINAN_TWINS = {name: (r, r + next((d for top, d in ((73, 33), (89, 34), (121, 33), (140, 35)) if r < top), 34))
                for name, (r, _) in ZOMA_TWINS.items()}
+# AYA's sit 26 after Ryuko's, 30 from her light hit to SHOCK INFINITY, 29 from
+# her Shock rp (AYA lacks her ★変なＴＥＣＨ, 89), 31 from her Pull Back to her
+# Chuck OGI BALL, and 30 from her Chuck Yo (AYA lacks her Chuck Hiso, 139).
+AYA_TWINS = {name: (r, r + next((d for top, d in ((73, 26), (90, 30), (121, 29), (139, 31)) if r < top), 30))
+             for name, (r, _) in ZOMA_TWINS.items()}
 # As in Ryuko's export, these play from their timelines (or only open one),
 # not as clips, so flattening follows their jumps.
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
@@ -3322,7 +3335,7 @@ FIGHTERS = {
         neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 71
                  "crouchEnter": 26, "crouch": 27, "stand": 28, "turn": 31, "crouchTurn": 32},
         twins=YINAN_TWINS,
-        # His reactions play as Giant's but where noted:
+        # Her reactions play as Giant's but where noted:
         differ={
             # Giant's.
             "guard", "crouchGuard", "blockHeavy", "hitHeavy", "airHitHeavy", "blockRapid", "timeStopGuard",
@@ -3368,20 +3381,20 @@ FIGHTERS = {
             # Yo's: Giant's, clearing variable 14 before 8 and 5 (PC 2708).
             "vanish",
         },
-        # Ryuko's DOWN and J attack responses name his 'ヒット (UNCOUNTER)
+        # Ryuko's DOWN and J attack responses name her 'ヒット (UNCOUNTER)
         # DOWN' (154) and 'ヒット (UNCOUNTER) Air Fire' (155), as Giant's.
         aliases={154: 79, 155: 77},
         # Results: 勝ち (79) calls Demo Stand (36) once (PC 908) and loops
-        # his last two poses from PC 922 (PC 924); the draw (98) calls 36
+        # her last two poses from PC 922 (PC 924); the draw (98) calls 36
         # once (PC 1162) and loops from PC 1177 (PC 1193). Each first enters
         # DEMO air (37) while airborne (op 0x16, PCs 905, 1161). The
         # darkening panel, Black (57). The Vs. intro: 開始時 (38) jumps to
         # 開始時 BR (41) for global 3 = 0 (PC 566), which spawns Black and OP
-        # super Charge (59, PCs 614–615) and his four friends (PCs 616–620)
+        # super Charge (59, PCs 614–615) and her four friends (PCs 616–620)
         # and, for global 14 = 0, jumps past its display (PC 621) to Round 1
         # (42) + 7 (PC 624); it plays flattened (animations.ts drops the
         # display). ponytail: 勝ち's rand % 6 > 3 rolls into Win 2 (82) and
-        # Win 3 (90) (PCs 906–907) aren't played, nor his EX results: Demo
+        # Win 3 (90) (PCs 906–907) aren't played, nor her EX results: Demo
         # Stand's EX stance (35, PC 543), Win 1 EX (81, PC 909) and the draw's
         # Stop (97, PC 1163), each for variable 0 = 100.
         actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57, intro=41),
@@ -3389,6 +3402,47 @@ FIGHTERS = {
         # 2001, 2002, 2007 and 2008: the HUD faces action 104 shows (PCs
         # 1240–1254); 349: *name (99, PC 1197).
         image_ids={2001, 2002, 2007, 2008, 349},
+    ),
+    "aya": dict(
+        source=("42 AYA", "3a9c8740b368b0648d9dd44bad7e448602f5c241d52438e95f7a9441f99c39f7"),
+        neutral={"idle": 1, "walk": 2, "backwalk": 3, "jump": 4, "land": 9,  # PC 53
+                 "crouchEnter": 19, "crouch": 20, "stand": 21, "turn": 24, "crouchTurn": 25},
+        twins=AYA_TWINS,
+        # Her reactions play as YINAN's but where noted:
+        differ={
+            # YINAN's.
+            "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "hitHeavy", "airHitHeavy", "jumpHit",
+            "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard", "blockStop", "crouchBlockStop",
+            "launchDown", "slamBounce", "bounceDown", "knockdown", "ko", "koAgain", "down", "lose", "hitRapid",
+            "shock", "fbb", "fbh", "chuckToss", "stun", "airStun", "dragonFireball", "liftUp", "flySide",
+            "flySideWall", "twistSide", "vanish", "inatuma", "airInatuma",
+            # YINAN's, but lying on a 0-tick display (PCs 961, 938, 914, 1763,
+            # 1190, 1249, 1272, 1344, 1952, 1367), not 1205.
+            "launchUp", "launchAway", "sweep", "rushAirHit", "uppercut", "tatumakiIn", "tatumakiOut", "fireLaunch",
+            "chuckUp", "chainPull",
+            # YINAN's, but holding a 0-tick display (PC 1967), not 1000.
+            "drillDown",
+            # Giant's, giving the striker 3 power (PC 1478), not YINAN's 13.
+            "fb",
+        },
+        # Ryuko's DOWN and J attack responses name her 'ヒット (UNCOUNTER)
+        # DOWN' (150) and 'ヒット (UNCOUNTER) Air Fire' (151), as Giant's.
+        aliases={150: 79, 151: 77},
+        # Results: 勝ち (74) calls Demo Stand (29) once (PC 600) and holds
+        # her last pose on a 0-tick display (PC 605); the draw (92) calls 29
+        # once (PC 698) and loops image 201 from PC 699 (PC 701). Each first
+        # enters DEMO air (30) while airborne (op 0x16, PCs 599, 697). The
+        # darkening panel, Black (50). The Vs. intro: 開始時 (31) jumps to
+        # 開始時 BR (34) for global 3 = 0 (PC 315), which spawns Black and OP
+        # super Charge (52, PCs 361–362) and, for global 14 = 0 (PC 363),
+        # jumps past its display (PC 364) to its fader, Round 1 (35, PC 366)
+        # and 開始時 + 23 (PC 368), which calls Demo Stand once (PC 340); it
+        # plays flattened (animations.ts drops the display).
+        actions=dict(win=74, winStand=29, draw=92, drawLoop=(92, 3), black=50, intro=34),
+        flat={"intro"},
+        # 2001: the HUD face action 100 shows (PC 747); 349: *name (93, PC
+        # 705).
+        image_ids={2001, 349},
     ),
 }
 
@@ -3596,7 +3650,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN and {counts['yinan']} YINAN images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN and {counts['aya']} AYA images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 

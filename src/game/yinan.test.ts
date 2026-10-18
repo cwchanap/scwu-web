@@ -17,8 +17,8 @@ function yinanPlayer(gap = 90) {
   return { match, yinan, other, steps };
 }
 const now = (f: Fighter) => (f.action === 'script' ? f.branch : f.action);
-// Inputs from `at(t)` for 1500 ticks: his actions, the damage Ryuko took, his
-// stock and the life he gained from `hp`. `ex` starts him in EX mode.
+// Inputs from `at(t)` for 1500 ticks: her actions, the damage Ryuko took, her
+// stock and the life she gained from `hp`. `ex` starts her in EX mode.
 function play(
   at: (t: number) => Input,
   {
@@ -53,7 +53,7 @@ const byKey = (key: Input, options: Options = {}) =>
 const presses = (keys: Record<number, Input>) => (t: number) => keys[t] ?? {};
 const P = { punch: true };
 const K = { kick: true };
-// His Driver's follow-ups, back or forward then a button within 20 ticks.
+// Her Driver's follow-ups, back or forward then a button within 20 ticks.
 const driver = (direction: Input, button: Input) =>
   presses({ 0: { drill: true }, 20: direction, 22: button });
 // ↓→↓→ K, each direction held for a few ticks, as fingers do.
@@ -69,7 +69,7 @@ const en3 = presses({
 });
 
 describe('YINAN (41 YINAN.PLAYER)', () => {
-  it('takes 450 life from his parameter block, desperate at 135', () => {
+  it('takes 450 life from her parameter block, desperate at 135', () => {
     expect([lifeOf('yinan'), desperationOf('yinan')]).toEqual([450, 135]);
     const { yinan } = yinanPlayer();
     expect(yinan).toMatchObject({ who: 'yinan', hp: 450, action: 'idle' });
@@ -82,7 +82,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       ryuko in twins ? [[ryuko, twins[ryuko], responsesOf('yinan')[id]]] : [],
     );
     expect(paired).toHaveLength(73);
-    // His UNCOUNTER DOWN and Air Fire (154, 155) answer Ryuko's DOWN and J
+    // Her UNCOUNTER DOWN and Air Fire (154, 155) answer Ryuko's DOWN and J
     // attack responses.
     expect(
       paired.filter(([, twin, own]) => twin !== own).map(([, , own]) => own),
@@ -97,11 +97,11 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ).toEqual([
       92, 94, 107, 111, 122, 123, 129, 151, 156, 163, 172, 174, 183, 206,
     ]);
-    // His KO NORMAL lies on a 0-tick display (PC 1113).
+    // Her KO NORMAL lies on a 0-tick display (PC 1113).
     expect(animationDuration('koAgain', 'yinan')).toBe(32);
   });
 
-  it('opens his reactions with BTK S’s and Driver Shield’s counter tests (variable 4)', () => {
+  it('opens her reactions with BTK S’s and Driver Shield’s counter tests (variable 4)', () => {
     const counters = CHARACTERS.yinan.counters as Record<string, number[][]>;
     // ヒット 弱 立ち enters BTK Hit (315) at 100 (PC 1271); FLY NO HIT
     // enters Driver Shield tobi Hit (418) at 50 (PC 1731); both clear it.
@@ -155,7 +155,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ]);
   });
 
-  it('reads his command table', () => {
+  it('reads her command table', () => {
     expect(CHARACTERS.yinan.levels).toEqual({
       10: 255, // Jump 2
       11: 255,
@@ -251,7 +251,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     }
   });
 
-  it('strikes in the air in forms variable 0 and his double jump or air dash pick', () => {
+  it('strikes in the air in forms variable 0 and her double jump or air dash pick', () => {
     const air = (button: Input, ex = false, gap = 90) =>
       play(presses({ 0: { jump: true }, 30: button }), { ex, gap }).mine;
     // P J (232) and K J (238) jump to their Normal forms, 235 and 242, for
@@ -370,7 +370,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       ),
     ).toEqual([13, 389, '389+13', 'idle']);
     expect(byKey({ dash: true, left: true }).mine).toEqual([17, 19, 'idle']);
-    // In EX mode his dashes jump to Dash EX (15) and Dash B EX (18), and
+    // In EX mode her dashes jump to Dash EX (15) and Dash B EX (18), and
     // after a normal's hit (variable 6 = 10, PC 3165) to Dash EX CC (16).
     expect(byKey({ dash: true }, { ex: true, gap: 600 }).mine).toEqual([
       15,
@@ -410,7 +410,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     expect(byKey({ ex: true }, { stock: 0 }).mine).toEqual(['258+3', 'idle']);
   });
 
-  it('plays his Normal specials and their follow-ups', () => {
+  it('plays her Normal specials and their follow-ups', () => {
     expect(byKey({ drill: true })).toMatchObject({
       mine: [268, '268+14', 269, 'idle'],
       damage: 10,
@@ -454,7 +454,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
         mine,
         damage,
       });
-    // ECS P speeds through him unseen (PCs 5661–5666).
+    // ECS P speeds through her unseen (PCs 5661–5666).
     expect(byKey({ dst: true }, { gap: 300 })).toMatchObject({
       mine: [320, 'turn', 'idle'],
       damage: 0,
@@ -467,10 +467,10 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
-  it('plays his EX specials, counting Fist S’s and p90’s passes in his own variable 0', () => {
+  it('plays her EX specials, counting Fist S’s and p90’s passes in her own variable 0', () => {
     expect(byKey({ drill: true }, { ex: true }).mine).toEqual([286, 'idle']);
     // Fist S fires two volleys (PCs 6315, 6327), then more while P is
-    // pressed, up to six (PC 6317), or seizes him on a hit (348).
+    // pressed, up to six (PC 6317), or seizes her on a hit (348).
     expect(byKey({ axe: true }, { ex: true, gap: 300 }).mine).toEqual([
       345,
       '345+14',
@@ -496,7 +496,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
-  it('spends his stocks on his Normal supers', () => {
+  it('spends her stocks on her Normal supers', () => {
     // Sharp Shooter aims until P fires (PC 6441) or K lowers it (PC
     // 6442); each shot's DRAGON Yinan lifts Ryuko above the next.
     expect(
@@ -585,7 +585,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
-  it('cancels Driver into his supers’ SC forms for two stocks', () => {
+  it('cancels Driver into her supers’ SC forms for two stocks', () => {
     const cancel = (key: Input) =>
       play(presses({ 0: { drill: true }, 25: key }));
     expect(cancel({ getterBeam: true })).toMatchObject({
@@ -604,7 +604,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
-  it('spends his stocks on his EX supers', () => {
+  it('spends her stocks on her EX supers', () => {
     expect(byKey({ getterBeam: true }, { ex: true, gap: 300 })).toMatchObject({
       mine: [370, 'idle'],
       stock: 2,
@@ -625,7 +625,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
-  it('darkens the court through variable 14, which his Black (57) tests', () => {
+  it('darkens the court through variable 14, which her Black (57) tests', () => {
     const { yinan, steps } = yinanPlayer();
     yinan.stock = 3;
     steps({}, 2);
@@ -635,7 +635,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     expect(BLACK.yinan.opaque.image).toBe(1011);
   });
 
-  it('charges two stocks through his Vs. intro, from which ↓ starts EX mode', () => {
+  it('charges two stocks through her Vs. intro, from which ↓ starts EX mode', () => {
     expect(animationDuration('intro', 'yinan')).toBe(202);
     const intro = (hold: (t: number) => Input = () => ({})) => {
       const match = new Match('cpu', true, 0, ['yinan', 'zoma']);
@@ -656,7 +656,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ).toEqual([4007, 4007, 4007, 4007, 4006, 4006, 4000, 4000]);
   });
 
-  it('wins after Demo Stand, looping his last two poses, and draws looping from PC 1177', () => {
+  it('wins after Demo Stand, looping her last two poses, and draws looping from PC 1177', () => {
     expect(animationDuration('win', 'yinan')).toBe(247);
     expect(
       [0, 84, 85, 124, 125, 127, 133, 160, 165, 180, 1000].map(
@@ -678,7 +678,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ).toEqual([2002, 2007, 2008, 2007, 2002]);
   });
 
-  it('stands through his idle program until it ends', () => {
+  it('stands through her idle program until it ends', () => {
     const vm = new StandingVM(CHARACTERS.yinan.idle);
     const images: number[] = [];
     while (!vm.ended) {
@@ -691,8 +691,8 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ]);
   });
 
-  it('plays his own CPU table in Vs. CPU', () => {
-    // His CPU's own CPU Driver Far (658) and its ARX-7 (660).
+  it('plays her own CPU table in Vs. CPU', () => {
+    // Her CPU's own CPU Driver Far (658) and its ARX-7 (660).
     for (const [seed, wanted] of [
       [0, [337, 658, '660+3', 661, 411, 394, 252]],
       [1, [658, 212, 213, 214, 216, 276, 249]],

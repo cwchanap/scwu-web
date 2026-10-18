@@ -365,7 +365,8 @@ REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
 // Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
 // Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
 // 181) and ERUS's stop guards (167, 169) have no op 0x15, so add them none.
-// YINAN's HISA Down (158) gives the attacker none (PC 2389).
+// YINAN's and AYA's HISA Down (158, 154) give the attacker none (PCs 2389,
+// 1775).
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
@@ -375,6 +376,7 @@ const OWN_REACTION_POWER: Partial<
   alex: { airBlockRapid: [0, 0], airTimeStopGuard: [0, 0] },
   erus: { blockStop: [0, 0], crouchBlockStop: [0, 0] },
   yinan: { launchDown: [5, 0] },
+  aya: { launchDown: [5, 0] },
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
@@ -661,7 +663,7 @@ function struck(
 // Ops 0x07 and 0x14 mark the player they hold or toss reeling and held
 // (+0x15e & ~5 | 0xa, 0x413020 and 0x41314a).
 // The twins whose op 0x01 flies at another raw vx: every HISA Down but
-// Ryuko's, Zoma's and YINAN's (158, PC 2398) at −800 (Kiki's, Chung's,
+// Ryuko's, Zoma's, YINAN's (158, PC 2398) and AYA's (154, PC 1784) at −800 (Kiki's, Chung's,
 // Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's,
 // DIDO's, SAKUYA's, ALEX's, SOU's and
 // HISO's 124, 127, 128, 125, 130, 135, 126, 128, 126, 128, 129, 143, 132, 133
@@ -670,8 +672,8 @@ function struck(
 // PC 1624; ALPHA's 161, PC 2332; SHIN-Z's 137, PC 1702; ZAKU's 137, PC
 // 1536; PAC-HELO's 137, PC 1582; GOLF's 109, PC 1272; ASURA's 109, PC
 // 1283; TTRO's 124, PC 1494; ASTROMAN's 122, PC 1676), Amiro's
-// Tatumaki >> (105) at −300 (PC 1398) and YINAN's Chuck DOWN (170) at −1000
-// (PC 2593).
+// Tatumaki >> (105) at −300 (PC 1398) and YINAN's and AYA's Chuck DOWN (170,
+// 166) at −1000 (PCs 2593, 1965).
 const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   kiki: { launchDown: -800 },
   chung: { launchDown: -800 },
@@ -712,6 +714,7 @@ const LAUNCH_VX: Partial<Record<Who, Partial<Record<Action, number>>>> = {
   ttro: { launchDown: -800 },
   astroman: { launchDown: -800 },
   yinan: { drillDown: -1000 },
+  aya: { drillDown: -1000 },
 };
 // The darkening's variable: 14, or MASA's, 3-TIMES's, ZENKA's, ALPHA's,
 // ZAKU's and PAC-HELO's 13, which their Black (75, 75, 54, 59, 55, 55) tests

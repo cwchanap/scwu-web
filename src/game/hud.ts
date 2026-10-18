@@ -127,7 +127,8 @@ export function gaugeImage(tick: number) {
 // 1056), 3-TIMES's 114 (PC 953), ZENKA's 92 (PC 934), Z-MEGA's 82 (PC
 // 767), ALPHA's 108 (PC 1333), SHIN-Z's 84 (PC 846), ZAKU's 72 (PC 645),
 // PAC-HELO's 72 (PC 652), GOLF's 56 (PC 511), ASURA's 56 (PC 511), TTRO's
-// 71 (PC 674) and ASTROMAN's 69 (PC 769). YINAN's 104 shows 2001, or in EX
+// 71 (PC 674), ASTROMAN's 69 (PC 769) and AYA's 100 (PC 747). YINAN's 104
+// shows 2001, or in EX
 // mode 2002, 2007, 2008 and 2007 for 40 ticks each (PCs 1240–1256).
 export const faceImage = (face: number, who?: Who) => {
   const side =
@@ -159,7 +160,8 @@ export const faceImage = (face: number, who?: Who) => {
 // (PC 1289), SHIN-Z's 75 323 (PC 787), ZAKU's 68 139 (PC 609),
 // PAC-HELO's 68 149 (PC 617), GOLF's 52 155 (PC 475), ASURA's 52 137
 // (PC 479) and TTRO's 66 170 (PC 636); ASTROMAN, with no *NAME, shows VS
-// NAME's (56) 170 (PC 610). YINAN's 99 shows 349 (PC 1197).
+// NAME's (56) 170 (PC 610). YINAN's 99 and AYA's 93 show 349 (PCs 1197,
+// 705).
 const NAMES: Record<Who, number> = {
   ryuko: 464,
   zoma: 340,
@@ -202,6 +204,7 @@ const NAMES: Record<Who, number> = {
   ttro: 170,
   astroman: 170,
   yinan: 349,
+  aya: 349,
 };
 
 // KGT actions 45–48 display the stock digits EMPTY, 100, 200 and 300.

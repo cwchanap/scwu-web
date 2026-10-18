@@ -398,13 +398,18 @@ export const SWW_INTRO_EX_TICK = ticksBefore(
 );
 // YINAN's 開始時 BR (41) jumps past its display at PC 622 for global 14 = 0
 // (PC 621) into Round 1 (42) + 7 (PC 624), past the fader between (PC 623),
-// so his spawns (PCs 614–620) run as Round 1's display starts.
-const yinanIntro = (z = fighterClips.yinan) => [
-  z.intro[0],
-  { ...z.intro[2], events: z.intro[1].events },
-  ...z.intro.slice(3),
-];
-export const YINAN_INTRO_EX_TICK = ticksBefore(yinanIntro(), 648);
+// so her spawns (PCs 614–620) run as Round 1's display starts. AYA's (34)
+// jumps past hers at PC 364 (PC 363) to its fader (PC 365), so her spawns
+// (PCs 361–362) run with it.
+const introPastDisplay = (who: 'yinan' | 'aya') => {
+  const [first, skipped, next, ...rest] = fighterClips[who].intro;
+  const events =
+    who === 'aya'
+      ? [...(skipped.events ?? []), ...(next.events ?? [])]
+      : skipped.events;
+  return [first, { ...next, events }, ...rest];
+};
+export const YINAN_INTRO_EX_TICK = ticksBefore(introPastDisplay('yinan'), 648);
 
 // The age LIZARD's intro lands at: the step after his fall passes the floor
 // (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
@@ -769,8 +774,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                   ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
                   : who === 'sin'
                     ? [...z.intro, ...z.winStand]
-                    : who === 'yinan'
-                      ? yinanIntro()
+                    : who === 'yinan' || who === 'aya'
+                      ? introPastDisplay(who)
                       : z.intro,
               ),
     ...guardAnimations(z),
@@ -919,8 +924,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
               ? z.winStand.length * winStands(who) + z.win.length
               : false,
             // OS FENG's holds its last pose with a zero-length display (PC
-            // 734).
-            who === 'feng' ? waits(z.win) : undefined,
+            // 734), as AYA's does (PC 605).
+            who === 'feng'
+              ? waits(z.win)
+              : who === 'aya'
+                ? waits([...z.winStand, ...z.win])
+                : undefined,
           ),
     // ZIRO's draw (78) then loops a call of Randon op rp (32, PCs 947–948).
     // ponytail: its step back at raw −200 (PC 944) isn't played.
@@ -990,6 +999,7 @@ const TWIN_ANIMATIONS = {
   ttro: twinAnimations('ttro'),
   astroman: twinAnimations('astroman'),
   yinan: twinAnimations('yinan'),
+  aya: twinAnimations('aya'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

@@ -222,7 +222,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
     expect(exMode(sakuya)).toBe(false);
   });
 
-  it('flies out of HISA Down at −800 (PC 1938), as every fighter but Ryuko, Zoma and YINAN', () => {
+  it('flies out of HISA Down at −800 (PC 1938), as every fighter but Ryuko, Zoma, YINAN and AYA', () => {
     for (const who of Object.keys(CHARACTERS) as Who[]) {
       const match = new Match('practice', false, 0, ['ryuko', who]);
       const victim = match.fighters[1];
@@ -235,7 +235,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
       const vx = victim.vx / victim.facing / VELOCITY;
       expect([who, vx]).toEqual([
         who,
-        who === 'ryuko' || who === 'zoma' || who === 'yinan' ? -500 : -800,
+        ['ryuko', 'zoma', 'yinan', 'aya'].includes(who) ? -500 : -800,
       ]);
     }
   });

@@ -46,6 +46,7 @@ import asura from './generated/asura.json';
 import ttro from './generated/ttro.json';
 import astroman from './generated/astroman.json';
 import yinan from './generated/yinan.json';
+import aya from './generated/aya.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -66,7 +67,7 @@ export interface CommandEntry {
 // REMU's 26, REAR's 30, GIGI's 28, SWW's 25, OGI's 30, ZIRO's 30, MASA's
 // 21, 3-TIMES's 19, ZENKA's 23, Z-MEGA's 29, ALPHA's 28, SHIN-Z's 29, ZAKU's
 // 16, PAC-HELO's 18, GOLF's 16, ASURA's 17, TTRO's 21, ASTROMAN's 22,
-// YINAN's 29) and
+// YINAN's 29, AYA's 22) and
 // the distance in source pixels that splits their near and far actions
 // (+0x7ca3): GIGI's 130, though each of his entries names the same action
 // for both, OGI's 140, which picks SCC's near or far start, ZIRO's 130,
@@ -74,7 +75,8 @@ export interface CommandEntry {
 // splits nothing, ZENKA's 130 his Ranbu's, Z-MEGA's 110 nothing, ALPHA's
 // 140 his SCC's and CC's, SHIN-Z's 130 nothing, ZAKU's, PAC-HELO's, GOLF's
 // and ASURA's 0 nothing, TTRO's 180 his SCC's and CC's, ASTROMAN's 200
-// his C Chuck's, and YINAN's 110 his Venom Doll's and CPU Driver's.
+// his C Chuck's, YINAN's 110 her Venom Doll's and CPU Driver's, and AYA's
+// 110 nothing.
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -118,6 +120,7 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     ttro: ttro.commands,
     astroman: astroman.commands,
     yinan: yinan.commands,
+    aya: aya.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -726,8 +729,8 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dash', 13],
   ],
   // YINAN's supers SS, EN Driver, Eat, EN Chuck and R300 (3, 4, 5, 1, 2) on
-  // 1-5; his specials Driver (10), Assault (9), DogeAttack (8) and ECS P (11)
-  // on Ryuko's drill, axe, iori and DST keys, his type change (13, TO EX) on
+  // 1-5; her specials Driver (10), Assault (9), DogeAttack (8) and ECS P (11)
+  // on Ryuko's drill, axe, iori and DST keys, her type change (13, TO EX) on
   // EX, then Dash F (17) and Dash B (18). EN3 (6) and ECS K (12) take their
   // commands only.
   yinan: [
@@ -742,6 +745,20 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['dst', 11],
     ['ex', 13],
     ['dash', 17],
+  ],
+  // AYA's supers Slash, Rocket and EN3 (2, 3, 1) on 1-3; her specials FB
+  // (9), DH (8), SHO (5) and TE P (7) on Ryuko's drill, axe, iori and DST
+  // keys, TE K (6) on EX, then Dash F (14) and Dash B (15).
+  aya: [
+    ['getterBeam', 2],
+    ['musashi', 3],
+    ['changeAttack', 1],
+    ['drill', 9],
+    ['axe', 8],
+    ['iori', 5],
+    ['dst', 7],
+    ['ex', 6],
+    ['dash', 14],
   ],
 };
 export const BACK_DASH: Record<Who, number> = {
@@ -786,6 +803,7 @@ export const BACK_DASH: Record<Who, number> = {
   ttro: 15,
   astroman: 14,
   yinan: 18,
+  aya: 15,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

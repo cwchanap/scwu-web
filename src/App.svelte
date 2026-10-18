@@ -469,6 +469,16 @@
         dst: 'ECS',
         ex: 'Type',
       },
+      aya: {
+        getterBeam: 'Slash',
+        musashi: 'Rocket',
+        changeAttack: 'EN3',
+        drill: 'FB',
+        axe: 'DH',
+        iori: 'SHO',
+        dst: 'TE P',
+        ex: 'TE K',
+      },
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
@@ -715,6 +725,7 @@
             <option value="ttro">TTRO</option>
             <option value="astroman">ASTROMAN</option>
             <option value="yinan">YINAN</option>
+            <option value="aya">AYA</option>
           </select></label
         >
         <label
@@ -765,6 +776,7 @@
             <option value="ttro">TTRO</option>
             <option value="astroman">ASTROMAN</option>
             <option value="yinan">YINAN</option>
+            <option value="aya">AYA</option>
           </select></label
         >
         <label
@@ -2052,20 +2064,43 @@
           SC forms for two stocks.
         </p>
         <p>
+          Choose AYA for a white-haired, bunny-eared girl with 500 life who
+          dresses as other fighters for her moves. <kbd>J</kbd> is a punch and
+          <kbd>K</kbd> a kick, each chaining on a hit into a second and third
+          with <kbd>J</kbd> or <kbd>K</kbd>; down with either strikes low. In
+          the air <kbd>J</kbd> and <kbd>K</kbd> strike, in other forms after a
+          double jump or an air dash. Shift dashes forward, and Shift with ←
+          hops back. <kbd>H</kbd> is Hit Up, a launcher that ↑ follows with a
+          jump, and <kbd>O</kbd> her chuck, a grab into a lightning shock. Her
+          specials: <kbd>U</kbd> or ↓→ <kbd>J</kbd> FB, a black mage's fireball
+          (in the air Air Crush, a dive), <kbd>I</kbd> or ↓→ <kbd>K</kbd> DH, a
+          caped rush (in the air Air Kick, a diving kick), <kbd>F</kbd> or →↓↘
+          <kbd>J</kbd> SHO, a sword stroke that raises purple pillars, and
+          <kbd>G</kbd> or ↓← <kbd>J</kbd> TE P (<kbd>E</kbd> or ↓←
+          <kbd>K</kbd> TE K), a long unseen dash into a leaping slash. Her
+          supers, for a stock each: <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> Slash, a
+          crescent hurled from a shield, and <kbd>2</kbd> or ↓→↓→
+          <kbd>K</kbd> Rocket, a diving kick that pins the opponent and pummels
+          them from every side, also in the air; for three, <kbd>3</kbd> or ↓←↓→
+          <kbd>J</kbd> EN3, a sword sweep into a holy blast. On a hit her normals
+          cancel into a special or super, and SHO into Slash's and Rocket's SC forms
+          for two stocks.
+        </p>
+        <p>
           Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
           Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
           DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
           REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN or YINAN, and one
-          of eighteen stages, in either mode. Free practice has no timer, and
-          you also choose how the partner behaves: standing, guarding high or
-          low, guarding in the air, attacking in range, jumping in, or playing
-          as the original CPU. Max stock refills your supers whenever you stand
-          idle, and Low health keeps you just under 30% for desperation moves.
-          Vs. CPU is the original game's CPU, playing the opponent's own moves,
-          specials and supers. Reduce their health to zero, or lead on health
-          when time runs out. Changing modes, fighters or the stage starts a
-          fresh match.
+          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN or AYA, and
+          one of eighteen stages, in either mode. Free practice has no timer,
+          and you also choose how the partner behaves: standing, guarding high
+          or low, guarding in the air, attacking in range, jumping in, or
+          playing as the original CPU. Max stock refills your supers whenever
+          you stand idle, and Low health keeps you just under 30% for
+          desperation moves. Vs. CPU is the original game's CPU, playing the
+          opponent's own moves, specials and supers. Reduce their health to
+          zero, or lead on health when time runs out. Changing modes, fighters
+          or the stage starts a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
