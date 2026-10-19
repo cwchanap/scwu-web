@@ -541,11 +541,33 @@ def export_images(c, folder, image_ids):
         pixels, palette, _ = c.pixels_and_palette(index)
         filename = f"{folder}/{index}.png"
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
-        images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
+        # One with its own palette (flag 1) keeps it whichever the player draws with.
+        images.append(dict(index=index, width=record.width, height=record.height, filename=filename,
+                           **({"own": True} if record.flags & 1 else {})))
     for path in (PUBLIC / folder).glob("*.png"):
         if path.stem not in {str(index) for index in image_ids}:
             path.unlink()
     return images
+
+
+def export_palettes(c, image_ids):
+    """The player's eight palettes (+0x11c, 0x420 bytes apart), which its objects draw with by the
+    palette the select chose (0x40ccf2), as each palette's 0xRRGGBB for every colour the images without
+    their own palette show in palette 0. Black, which draws nothing, is left out."""
+    def rgb(palette, i):
+        b, g, r = c.palette_bank[palette * 0x420 + i * 4:palette * 0x420 + i * 4 + 3]
+        return r << 16 | g << 8 | b
+    used = set()
+    for index in image_ids:
+        record = c.images[index]
+        if record.width and record.height and not record.flags & 1:
+            used.update(c.decode(index))
+    rows = {}
+    for i in sorted(used):
+        row = [rgb(palette, i) for palette in range(8)]
+        if row[0] and rows.setdefault(row[0], row) != row:
+            sys.exit(f"Palette 0's {row[0]:06x} stands for two colours; refusing to export.")
+    return list(rows.values())
 
 
 def write_if_changed(path, content):
@@ -3806,7 +3828,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     images = export_images(c, key, image_ids)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins=pairs, aliases=aliases, counters=counters,
-        select=select,
+        select=select, palettes=export_palettes(c, image_ids),
         neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     # Its type, so TypeScript needn't infer it from the JSON.
@@ -3913,7 +3935,7 @@ def main():
     images = export_images(c, "ryuko", image_ids)
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
-        **tables, scripts=scripts, select=select, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
+        **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
     export_ui()
     export_select()

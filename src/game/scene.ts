@@ -3,7 +3,7 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
-import { CharacterSelect } from './select';
+import { battlePalettes, CharacterSelect } from './select';
 import type { SelectObject } from './select';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
@@ -167,6 +167,8 @@ export class TrainingScene extends Phaser.Scene {
   // to from the toolbar, before the match it chooses.
   private select: CharacterSelect | null = new CharacterSelect();
   private selectSprites: Phaser.GameObjects.Image[] = [];
+  // The palette each player's objects draw with, from the select's buttons.
+  private palettes = [0, 0];
   private selectTrack?: Phaser.Sound.BaseSound;
 
   constructor(private onStatus: (status: GameStatus) => void) {
@@ -331,6 +333,7 @@ export class TrainingScene extends Phaser.Scene {
     }
     if (!select.done) return;
     [this.fighter, this.opponent] = select.done;
+    this.palettes = battlePalettes(select.palettes);
     this.select = null;
     this.selectTrack?.stop();
     for (const sprite of this.selectSprites) sprite.setVisible(false);
@@ -365,7 +368,8 @@ export class TrainingScene extends Phaser.Scene {
           flip_x: frame.flip_x,
           flip_y: frame.flip_y,
         };
-    this.paint(sprite, pose, o.color, prefix as Container)
+    const palette = player ? Math.max(0, this.select!.drawn[o.owner]) : 0;
+    this.paint(sprite, pose, o.color, prefix as Container, palette)
       .setOrigin(0)
       .setScrollFactor(0)
       .setDepth(200 + o.z / 256 + index / 1e6)
@@ -475,14 +479,56 @@ export class TrainingScene extends Phaser.Scene {
     return sprites;
   }
 
+  // A player's objects draw with its palette (0x40ccf2), but for images with
+  // their own; each recoloured image is drawn once and cached.
+  private recolored(image: number, who: Container, palette: number) {
+    const key = `${who}-${image}`;
+    if (!palette || !(who in CHARACTERS)) return key;
+    const recolored = `${key}@${palette}`;
+    if (this.textures.exists(recolored)) return recolored;
+    const { images, palettes } = CHARACTERS[who as Who];
+    if (images.find((i) => i.index === image)?.own) return key;
+    const colors = new Map(palettes.map((row) => [row[0], row[palette]]));
+    const source = this.textures.get(key).getSourceImage() as HTMLImageElement;
+    const canvas = this.textures.createCanvas(
+      recolored,
+      source.width,
+      source.height,
+    )!;
+    canvas.context.drawImage(source, 0, 0);
+    const pixels = canvas.getData(0, 0, source.width, source.height);
+    const { data } = pixels;
+    for (let i = 0; i < data.length; i += 4) {
+      const color = colors.get(
+        (data[i] << 16) | (data[i + 1] << 8) | data[i + 2],
+      );
+      if (!data[i + 3] || color === undefined) continue;
+      [data[i], data[i + 1], data[i + 2]] = [
+        color >> 16,
+        (color >> 8) & 255,
+        color & 255,
+      ];
+      // Black draws nothing.
+      if (!color) data[i + 3] = 0;
+    }
+    canvas.putData(pixels, 0, 0).refresh();
+    return recolored;
+  }
+
   // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
   // each tinted image is drawn once and cached.
-  private texture(image: number, { r, g, b }: Color, who: Container) {
-    const key = `${who}-${image}`;
+  private texture(
+    image: number,
+    { r, g, b }: Color,
+    who: Container,
+    palette: number,
+  ) {
+    const key = this.recolored(image, who, palette);
     if (!r && !g && !b) return key;
     const tinted = `${key}:${r},${g},${b}`;
     if (this.textures.exists(tinted)) return tinted;
-    const source = this.textures.get(key).getSourceImage() as HTMLImageElement;
+    const source = this.textures.get(key).getSourceImage() as
+      HTMLImageElement | HTMLCanvasElement;
     const canvas = this.textures.createCanvas(
       tinted,
       source.width,
@@ -503,6 +549,12 @@ export class TrainingScene extends Phaser.Scene {
     return tinted;
   }
 
+  // An object draws with its owner's palette when it comes from the owner's
+  // container (kinds 0 and 1); the stage's and the KGT's have one.
+  private paletteOf(who: Container, owner: number) {
+    return this.match.fighters[owner]?.who === who ? this.palettes[owner] : 0;
+  }
+
   // A running type-2 fader shows its start colour on odd drawn frames
   // (0x40cb72; 0x4456fc counts them).
   private faded(color: Color, owner: number): Color {
@@ -519,11 +571,12 @@ export class TrainingScene extends Phaser.Scene {
     pose: Pose,
     color: Color,
     who: Container,
+    palette = 0,
   ) {
     if (isBlank(pose, who)) return sprite.setVisible(false);
     return sprite
       .setVisible(true)
-      .setTexture(this.texture(pose.image, color, who))
+      .setTexture(this.texture(pose.image, color, who, palette))
       .setBlendMode(
         color.mode === 2 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL,
       )
@@ -538,6 +591,7 @@ export class TrainingScene extends Phaser.Scene {
     y: number,
     facing: -1 | 1,
     color = pose.color ?? NORMAL_COLOR,
+    palette = 0,
   ) {
     const p = placement(
       pose,
@@ -547,7 +601,7 @@ export class TrainingScene extends Phaser.Scene {
       y / ART_SCALE,
       facing === -1,
     );
-    this.paint(sprite, pose, color, who)
+    this.paint(sprite, pose, color, who, palette)
       .setOrigin(0)
       .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
       .setFlip(p.flip_x, p.flip_y);
@@ -696,7 +750,13 @@ export class TrainingScene extends Phaser.Scene {
             : undefined;
         // A KO (0x40e8cd) drops the fighter to z 0x3c, behind the other
         // fighter and the objects drawn behind it.
-        this.paint(sprite, pose, this.faded(f.color, i), f.who)
+        this.paint(
+          sprite,
+          pose,
+          this.faded(f.color, i),
+          f.who,
+          this.palettes[i],
+        )
           .setDepth(
             f.hp === 0 ? 0.9 : behind === undefined ? 2 : behind ? 1 : 3,
           )
@@ -712,6 +772,8 @@ export class TrainingScene extends Phaser.Scene {
             327 * ART_SCALE,
             498 * ART_SCALE,
             1,
+            undefined,
+            this.palettes[i],
           );
         const shadow = this.shadows[i];
         shadow
@@ -737,6 +799,7 @@ export class TrainingScene extends Phaser.Scene {
           effect.screen ? effect.y : GROUND + effect.y,
           effect.facing,
           this.faded(effect.color, effect.owner),
+          this.paletteOf(effect.who, effect.owner),
         );
       });
       // Each object draws its afterimages, oldest first, just before itself
@@ -750,15 +813,17 @@ export class TrainingScene extends Phaser.Scene {
             ? effectDepth(object)
             : this.sprites[index].depth;
           const skipped = trail.spec.count - trail.samples.length;
+          const owner = object?.owner ?? index;
           return trail.samples.map((sample, i) => ({
             ...sample,
             who: actor.who,
+            palette: this.paletteOf(actor.who, owner),
             depth: depth - 0.1,
             screen: object?.screen ?? false,
             color: afterimageColor(
               trail,
               skipped + i,
-              this.faded(actor.color, object?.owner ?? index),
+              this.faded(actor.color, owner),
             ),
           }));
         },
@@ -776,6 +841,7 @@ export class TrainingScene extends Phaser.Scene {
             image.screen ? image.y : GROUND + image.y,
             image.facing,
             image.color,
+            image.palette,
           );
         },
       );

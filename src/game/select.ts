@@ -140,6 +140,9 @@ export class CharacterSelect {
   decided = [false, false];
   // The button each side chose with (0x406ee0), which picks its palette.
   palettes = [0, 0];
+  // The palette each side's face draws with (player +0xe00b), −1 for palette
+  // 0 until it chooses.
+  drawn = [-1, -1];
   // Authored: one person drives the 1P cursor, then the 2P one.
   active = 0;
   done: [Who, Who] | null = null;
@@ -236,6 +239,7 @@ export class CharacterSelect {
         );
         this.decided[p] = true;
         this.palettes[p] = buttonIndex(pressed[p]);
+        this.drawn[p] = apart(this.palettes[p], this.drawn[1 - p]);
         // The 2P cursor takes over the keys as they are held, so the press
         // that chose isn't fresh for it too.
         if (p === 0) {
@@ -464,4 +468,15 @@ function buttonIndex(pressed: number) {
   let index = 0;
   for (let bit = 0; bit < 6; bit++) if (pressed & (0x10 << bit)) index = bit;
   return index;
+}
+// 0x406f20 and 0x412056: a palette the other player holds moves on to the
+// next of the eight.
+const apart = (palette: number, other: number) =>
+  palette === other ? (palette + 1) % 8 : palette;
+// The battle sets each player's palette to its button (0x408a9f), and each
+// fighter, player 1's first, moves off the other's as it enters (0x412056):
+// the same button twice turns player 1's.
+export function battlePalettes([first, second]: number[]) {
+  const one = apart(first, second);
+  return [one, apart(second, one)];
 }

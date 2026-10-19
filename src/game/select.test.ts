@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CharacterSelect, LAYOUT, ROSTER, selectable } from './select';
+import {
+  battlePalettes,
+  CharacterSelect,
+  LAYOUT,
+  ROSTER,
+  selectable,
+} from './select';
 import type { Input } from './match';
 
 const fresh = () =>
@@ -148,5 +154,23 @@ describe('character select (object type 10, VS single)', () => {
         ).toEqual([33, 34]);
     }
     expect([ticks, select.done]).toEqual([102, ['ryuko', 'training']]);
+  });
+
+  it("draws each chosen face in its button's palette, moved off the other side's", () => {
+    const select = fresh();
+    select.step();
+    expect(select.drawn).toEqual([-1, -1]);
+    // H is B, palette 1, for 1P; 2P's H takes the next palette, 2
+    // (0x406f20).
+    run(select, [{ hitUp: true }, {}]);
+    expect(select.drawn).toEqual([1, -1]);
+    run(select, [{ hitUp: true }, {}]);
+    expect([select.palettes, select.drawn]).toEqual([
+      [1, 1],
+      [1, 2],
+    ]);
+    // In battle player 1 enters first and moves off player 2's (0x412056).
+    expect(battlePalettes(select.palettes)).toEqual([2, 1]);
+    expect(battlePalettes([3, 0])).toEqual([3, 0]);
   });
 });
