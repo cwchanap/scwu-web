@@ -3,7 +3,9 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
-import { battlePalettes, CharacterSelect } from './select';
+import t1 from './generated/t1.json';
+import t2 from './generated/t2.json';
+import { battlePalettes, CharacterSelect, Title } from './select';
 import type { SelectObject } from './select';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
@@ -43,7 +45,7 @@ export interface GameStatus {
   matchWinner: Match['winner'];
   resultReady: boolean;
   error: string;
-  // On the character select screen, and the pair it last chose.
+  // On the title or the character select screen, and the pair it last chose.
   selecting: boolean;
   fighters: [Who, Who];
 }
@@ -64,6 +66,7 @@ export const initialStatus: GameStatus = {
   fighters: ['ryuko', 'zoma'],
 };
 const ART_SCALE = 1.5;
+const DEMOS = { select: selectData, t1, t2 };
 // A viewport object behind the fighters (the KO flash, z 15 like action 43)
 // sits over the court. Within its band a higher z draws in front: ANMC P's
 // EN300 cut-in (305, z 50) over its background (304, z 49).
@@ -165,10 +168,12 @@ export class TrainingScene extends Phaser.Scene {
   private track?: Phaser.Sound.BaseSound;
   // The character select screen (select.ts) the game opens on, and returns
   // to from the toolbar, before the match it chooses.
-  private select: CharacterSelect | null = new CharacterSelect();
+  // The title, which the game opens on, then the select screen.
+  private select: Title | CharacterSelect | null = new Title();
   private selectSprites: Phaser.GameObjects.Image[] = [];
   // The palette each player's objects draw with, from the select's buttons.
   private palettes = [0, 0];
+  // The title's or the select screen's track.
   private selectTrack?: Phaser.Sound.BaseSound;
 
   constructor(private onStatus: (status: GameStatus) => void) {
@@ -182,10 +187,12 @@ export class TrainingScene extends Phaser.Scene {
         this.load.image(`${who}-${image.index}`, BASE + image.filename);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
-    for (const image of selectData.images)
-      this.load.image(`select-${image.index}`, BASE + image.filename);
-    for (const sound of selectData.sounds)
-      this.load.audio(`select-sound-${sound.index}`, BASE + sound.filename);
+    for (const [demo, { images, sounds }] of Object.entries(DEMOS)) {
+      for (const image of images)
+        this.load.image(`${demo}-${image.index}`, BASE + image.filename);
+      for (const sound of sounds)
+        this.load.audio(`${demo}-sound-${sound.index}`, BASE + sound.filename);
+    }
     for (const [who, { sounds }] of Object.entries(CHARACTERS))
       for (const sound of sounds)
         this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
@@ -263,7 +270,8 @@ export class TrainingScene extends Phaser.Scene {
       this.togglePause();
     }
     if (!e.repeat && e.code === 'KeyR')
-      if (this.select) this.openSelect();
+      if (this.select instanceof Title) this.openTitle();
+      else if (this.select) this.openSelect();
       else this.reset(this.match.mode);
   };
   private keyup = (e: KeyboardEvent) => {
@@ -304,25 +312,32 @@ export class TrainingScene extends Phaser.Scene {
   }
   // Back to the character select screen, which opens afresh.
   openSelect() {
-    this.select = new CharacterSelect();
+    this.open(new CharacterSelect());
+  }
+  private openTitle() {
+    this.open(new Title());
+  }
+  private open(screen: Title | CharacterSelect) {
+    this.select = screen;
     this.sound.stopAll();
     this.paused = false;
     this.clearInput();
     this.report();
   }
-  // A step of the select screen with this tick's controls; once both sides
-  // have chosen, the match starts with them.
+  // A step of the title or the select screen with this tick's controls. VS
+  // single on the title opens the select screen; once both sides have
+  // chosen, the match starts with them.
   private stepSelect(input: Partial<Record<Control, boolean>>) {
     const select = this.select!;
     select.step(input);
     for (const { container, index } of select.sounds) {
-      // Authored: its 57-second track (CHAR SELECT's sound 1) plays only
-      // with Music ticked, as the stages' do.
-      if (container === 'select' && index === 1) {
+      // Authored: the title's 126-second track (T2's sound 1) and the select
+      // screen's 57-second one (CHAR SELECT's) play only with Music ticked,
+      // as the stages' do.
+      if ((container === 't2' || container === 'select') && index === 1) {
         if (this.music) {
-          this.selectTrack =
-            this.sound.get('select-sound-1') ??
-            this.sound.add('select-sound-1');
+          const key = `${container}-sound-1`;
+          this.selectTrack = this.sound.get(key) ?? this.sound.add(key);
           this.selectTrack.play();
         }
         continue;
@@ -332,6 +347,7 @@ export class TrainingScene extends Phaser.Scene {
       if (this.cache.audio.exists(key)) this.play(key);
     }
     if (!select.done) return;
+    if (select instanceof Title) return this.openSelect();
     [this.fighter, this.opponent] = select.done;
     this.palettes = battlePalettes(select.palettes);
     this.select = null;
@@ -359,7 +375,7 @@ export class TrainingScene extends Phaser.Scene {
     const size = selectImage(prefix, frame.image);
     if (!size) return sprite.setVisible(false);
     const pose: Pose = { ...frame, ...size };
-    const player = o.container !== 'select' && o.container !== 'kgt';
+    const player = !(o.container in DEMOS) && o.container !== 'kgt';
     const p = player
       ? placement(pose, size.width, size.height, o.x, o.y, o.facing === -1)
       : {
@@ -368,7 +384,10 @@ export class TrainingScene extends Phaser.Scene {
           flip_x: frame.flip_x,
           flip_y: frame.flip_y,
         };
-    const palette = player ? Math.max(0, this.select!.drawn[o.owner]) : 0;
+    const palette =
+      player && this.select instanceof CharacterSelect
+        ? Math.max(0, this.select.drawn[o.owner])
+        : 0;
     this.paint(sprite, pose, o.color, prefix as Container, palette)
       .setOrigin(0)
       .setScrollFactor(0)
@@ -885,11 +904,13 @@ export class TrainingScene extends Phaser.Scene {
   }
 }
 
-// An exported select-screen image's size: the demo's ('select'), the KGT's
-// ('ui') or a player's.
+// An exported title or select-screen image's size: a demo's ('t1', 't2',
+// 'select'), the KGT's ('ui') or a player's.
 const selectSizes = new Map(
   [
-    ...selectData.images.map((i) => [`select-${i.index}`, i] as const),
+    ...Object.entries(DEMOS).flatMap(([demo, { images }]) =>
+      images.map((i) => [`${demo}-${i.index}`, i] as const),
+    ),
     ...ui.images.map((i) => [`ui-${i.index}`, i] as const),
     ...Object.entries(CHARACTERS).flatMap(([who, { images }]) =>
       images.map((i) => [`${who}-${i.index}`, i] as const),

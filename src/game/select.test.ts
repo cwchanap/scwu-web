@@ -3,8 +3,11 @@ import {
   battlePalettes,
   CharacterSelect,
   LAYOUT,
+  MODES,
   ROSTER,
   selectable,
+  Title,
+  TITLE,
 } from './select';
 import type { Input } from './match';
 
@@ -172,5 +175,80 @@ describe('character select (object type 10, VS single)', () => {
     // In battle player 1 enters first and moves off player 2's (0x412056).
     expect(battlePalettes(select.palettes)).toEqual([2, 1]);
     expect(battlePalettes([3, 0])).toEqual([3, 0]);
+  });
+});
+
+describe('title (0x4080a0)', () => {
+  const frame = (title: Title, container: string, action: number) =>
+    title.objects.find((o) => o.container === container && o.action === action)
+      ?.frame?.image;
+
+  it('plays T1 for its 700 ticks, then T2 until a press brings the menu', () => {
+    const title = new Title();
+    title.step();
+    expect([title.state, title.objects.map((o) => o.container)]).toEqual([
+      1,
+      ['t1', 't1', 't1'],
+    ]);
+    // Its backdrop shows the volume warning (2) for 300 ticks, ALICUU (0) for
+    // 150, then NEO TEAM F.K. (1), cueing sounds 1–3.
+    title.step();
+    expect(frame(title, 't1', 3)).toBe(2);
+    expect(title.sounds).toEqual([{ container: 't1', index: 1 }]);
+    // T1's flags don't let a press skip it: ten ticks, then its 700.
+    for (let t = 2; t < 710; t++) title.step({ punch: !(t % 2) });
+    expect(title.state).toBe(1);
+    title.step();
+    expect(title.state).toBe(2);
+    title.step();
+    expect([title.state, title.objects.map((o) => o.container)]).toEqual([
+      3,
+      Array(9).fill('t2'),
+    ]);
+    // T2 lasts until a press: the logo (1) and the backdrop's quadrants.
+    for (let t = 0; t < 2000; t++) title.step();
+    expect([title.state, frame(title, 't2', 8)]).toEqual([3, 1]);
+    title.step({ crouch: true });
+    expect(title.state).toBe(4);
+    title.step({ crouch: true });
+    // The cursor (KGT 78) sets global 0, which shows T2's menu (5).
+    expect(title.items).toEqual([0, 1, 2]);
+    expect(title.state).toBe(5);
+    title.step();
+    title.step();
+    expect(frame(title, 't2', 9)).toBe(5);
+    expect(frame(title, 'kgt', TITLE.cursor)).toBe(137);
+  });
+
+  it('moves its cursor a press at a time, wrapping, and enters VS single', () => {
+    const title = new Title();
+    while (title.state !== 3) title.step();
+    title.step({ kick: true });
+    title.step();
+    const cursor = () => title.objects.find((o) => o.container === 'kgt')!;
+    const start = title.place;
+    expect([cursor().x, cursor().y]).toEqual(TITLE.items[start]);
+    // A held key moves once; another press moves on.
+    title.step({ crouch: true });
+    title.step({ crouch: true });
+    expect(title.place).toBe((start + 1) % 3);
+    title.step();
+    title.step({ jump: true });
+    title.step();
+    title.step({ jump: true });
+    expect(title.place).toBe((start + 2) % 3);
+    expect([cursor().x, cursor().y]).toEqual(TITLE.items[title.place]);
+    // Story and VS multi aren't ported; VS single chooses.
+    while (MODES[title.items[title.place]] !== 'vs') {
+      title.step();
+      title.step({ crouch: true });
+      title.step();
+      title.step({ punch: true });
+      if (MODES[title.items[title.place]] !== 'vs')
+        expect(title.done).toBeNull();
+    }
+    title.step();
+    title.step({ punch: true });
+    expect(title.done).toBe('vs');
   });
 });

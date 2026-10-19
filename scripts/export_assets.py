@@ -3938,7 +3938,8 @@ def main():
         **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
     export_ui()
-    export_select()
+    for key in DEMOS:
+        export_demo(key)
     write_json(GENERATED / "stages.json", {key: export_stage(key, *stage) for key, stage in STAGES.items()})
     # Python is an independent oracle. Keep fixtures out of the browser bundle.
     cases = []
@@ -4122,6 +4123,20 @@ def export_ui():
                   programs={})
     for cursor in cursors:
         select["programs"].update(select_program(p, cursor, select_images)["actions"])
+    # The title (0x4080a0) plays T1 (the demo at 0x4438a1), then T2 (0x44389c),
+    # and lists the modes 0x4438a4's bits 4, 8 and 0x10 allow (0x408263): story
+    # (0), VS single (1) and VS multi (2). Its cursor (0x445244) stands where
+    # each mode's action's first record says (0x445246, 0x445248, 0x445258).
+    demo_name = lambda index: tail[0x43d49c - base + 0x100 * (index - 1):].split(b"\0")[0]
+    if (demo_name(tail[0x4438a1 - base]), demo_name(tail[0x44389c - base])) != (b"T1", b"T2"):
+        sys.exit("The title no longer plays T1 and T2; refusing to export.")
+    cursor, story, single = at(0x445244, "<3H")
+    multi, = at(0x445258, "<H")
+    flags = tail[0x4438a4 - base]
+    title = dict(cursor=cursor, flags=flags,
+                 items=[[s16(p.records[p.action(a).start], 1), s16(p.records[p.action(a).start], 3)]
+                        for a in (story, single, multi)])
+    select["programs"].update(select_program(p, cursor, select_images)["actions"])
     cues = {u16(r, 2) for records in select["programs"].values() for r in map(bytes, records) if r[0] == 0x03}
     sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])} | cues)
     # 17–23: stock digits EMPTY/100–600 (KGT 45–51, 0x445202); 31–38: gauge
@@ -4140,18 +4155,29 @@ def export_ui():
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
-                                           select=select))
+                                           select=select, title=title))
 
 
-def export_select():
-    """The select screen's demo, CHAR SELECT (demo 10, the byte at 0x44389e for VS
-    single), as raw records: 0x403fc0 loads it and 0x406790 makes an object (type
+DEMOS = {
+    "select": ("CHAR SELECT", "b4b3435391a728f77316270909efad69c06c1d8b0c535c2cca63e91ebed2deef"),
+    "t1": ("T1", "76c9b0b306f2bd30edfa370df96b667a8ad5dac8fd736f3e114a3978b390ac87"),
+    "t2": ("T2", "2ec2d19c80d28957b8e9207b1668791e6c1cb443fdb8e883aee2cd12c828260a"),
+}
+
+
+def export_demo(key):
+    """A demo as raw records: the select screen's, CHAR SELECT (demo 10, the byte at
+    0x44389e for VS single), and the title's, T1 and T2 (demos 1 and 2, the bytes
+    at 0x4438a1 and 0x44389c). 0x403fc0 loads it and 0x406790 makes an object (type
     4, at 0, 0) of every named action between the first and the last that holds a
     display, at z 0xc, or 0x64 from the first action of kind 3 (+0x23) on, as a
-    stage's."""
-    data = (RESEARCH / "extracted/CHAR SELECT.DEMO").read_bytes()
-    if hashlib.sha256(data).hexdigest() != "b4b3435391a728f77316270909efad69c06c1d8b0c535c2cca63e91ebed2deef":
-        sys.exit("CHAR SELECT source hash differs from the verified handoff; refusing to export.")
+    stage's. After the common container the loader reads 0x409 bytes to 0x427c94
+    (0x4040d2), of which 0x406790 keeps the flags (0x427c96, bit 0 lets a press
+    skip it) and the ticks it lasts (0x427c99, 0 for until a press)."""
+    name, sha256 = DEMOS[key]
+    data = (RESEARCH / f"extracted/{name}.DEMO").read_bytes()
+    if hashlib.sha256(data).hexdigest() != sha256:
+        sys.exit(f"{name} source hash differs from the verified handoff; refusing to export.")
     c = Container(data)
     p = Program(c)
     objects, z = [], 0xc
@@ -4165,12 +4191,15 @@ def export_select():
             objects.append(dict(action=a.index, z=z))
     actions = {str(a.index): [list(r) for r in p.records[a.start:a.end]] for a in p.actions[1:-1]}
     image_ids = {display_record(p, pc)["image"] for pc in range(len(p.records)) if p.records[pc][0] == 0x0c}
-    # Sound 0, which the demo's header (0x40684c) and the closing panels cue, is
-    # empty.
+    # Image 0 shows like any other (0x40ccc4 skips only a missing one): CHAR
+    # SELECT's P1 sign opens on it, T1's ALICUU screen and T2's backdrop are it.
+    # Sound 0, which the demo's header (0x40684c) and CHAR SELECT's closing
+    # panels and T2's backdrop cue, is empty in all three.
     cues = {u16(r, 2) for r in p.records if r[0] == 0x03 and c.sounds[u16(r, 2)]["size"]}
-    write_json(GENERATED / "select.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), objects=objects,
-                                               actions=actions, images=export_images(c, "select", image_ids - {0, 8191}),
-                                               sounds=export_sounds(c, "select", cues)))
+    flags, duration = data[c.common_end + 2], struct.unpack_from("<I", data, c.common_end + 5)[0]
+    write_json(GENERATED / f"{key}.json", dict(source_sha256=sha256, objects=objects, actions=actions,
+                                               images=export_images(c, key, image_ids - {8191}),
+                                               sounds=export_sounds(c, key, cues), flags=flags, duration=duration))
 
 
 def inputs():
