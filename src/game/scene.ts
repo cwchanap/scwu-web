@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
+import selectData from './generated/select.json';
+import { CharacterSelect } from './select';
+import type { SelectObject } from './select';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
@@ -40,6 +43,9 @@ export interface GameStatus {
   matchWinner: Match['winner'];
   resultReady: boolean;
   error: string;
+  // On the character select screen, and the pair it last chose.
+  selecting: boolean;
+  fighters: [Who, Who];
 }
 export const initialStatus: GameStatus = {
   ready: false,
@@ -54,6 +60,8 @@ export const initialStatus: GameStatus = {
   matchWinner: null,
   resultReady: false,
   error: '',
+  selecting: true,
+  fighters: ['ryuko', 'zoma'],
 };
 const ART_SCALE = 1.5;
 // A viewport object behind the fighters (the KO flash, z 15 like action 43)
@@ -155,6 +163,11 @@ export class TrainingScene extends Phaser.Scene {
   // a stage load (0x40677c), each match starts it over.
   private music = false;
   private track?: Phaser.Sound.BaseSound;
+  // The character select screen (select.ts) the game opens on, and returns
+  // to from the toolbar, before the match it chooses.
+  private select: CharacterSelect | null = new CharacterSelect();
+  private selectSprites: Phaser.GameObjects.Image[] = [];
+  private selectTrack?: Phaser.Sound.BaseSound;
 
   constructor(private onStatus: (status: GameStatus) => void) {
     super('training');
@@ -167,6 +180,10 @@ export class TrainingScene extends Phaser.Scene {
         this.load.image(`${who}-${image.index}`, BASE + image.filename);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
+    for (const image of selectData.images)
+      this.load.image(`select-${image.index}`, BASE + image.filename);
+    for (const sound of selectData.sounds)
+      this.load.audio(`select-sound-${sound.index}`, BASE + sound.filename);
     for (const [who, { sounds }] of Object.entries(CHARACTERS))
       for (const sound of sounds)
         this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
@@ -243,7 +260,9 @@ export class TrainingScene extends Phaser.Scene {
       e.preventDefault();
       this.togglePause();
     }
-    if (!e.repeat && e.code === 'KeyR') this.reset(this.match.mode);
+    if (!e.repeat && e.code === 'KeyR')
+      if (this.select) this.openSelect();
+      else this.reset(this.match.mode);
   };
   private keyup = (e: KeyboardEvent) => {
     this.held.delete(e.code);
@@ -274,13 +293,86 @@ export class TrainingScene extends Phaser.Scene {
     } else this.virtual.delete(control);
   }
   togglePause() {
-    if (!this.ready || this.match.resultReady) return;
+    if (!this.ready || (this.match.resultReady && !this.select)) return;
     this.paused = !this.paused;
     if (this.paused) this.sound.pauseAll();
     else this.sound.resumeAll();
     this.clearInput();
     this.report();
   }
+  // Back to the character select screen, which opens afresh.
+  openSelect() {
+    this.select = new CharacterSelect();
+    this.sound.stopAll();
+    this.paused = false;
+    this.clearInput();
+    this.report();
+  }
+  // A step of the select screen with this tick's controls; once both sides
+  // have chosen, the match starts with them.
+  private stepSelect(input: Partial<Record<Control, boolean>>) {
+    const select = this.select!;
+    select.step(input);
+    for (const { container, index } of select.sounds) {
+      // Authored: its 57-second track (CHAR SELECT's sound 1) plays only
+      // with Music ticked, as the stages' do.
+      if (container === 'select' && index === 1) {
+        if (this.music) {
+          this.selectTrack =
+            this.sound.get('select-sound-1') ??
+            this.sound.add('select-sound-1');
+          this.selectTrack.play();
+        }
+        continue;
+      }
+      // CHAR SELECT's sound 0, which its closing panels cue, is empty.
+      const key = `${container}-sound-${index}`;
+      if (this.cache.audio.exists(key)) this.play(key);
+    }
+    if (!select.done) return;
+    [this.fighter, this.opponent] = select.done;
+    this.select = null;
+    this.selectTrack?.stop();
+    for (const sprite of this.selectSprites) sprite.setVisible(false);
+    this.reset(this.match.mode);
+  }
+  // Demo and KGT objects draw their display's top left at their offset; a
+  // player's select face and name stand on their ground point (placement).
+  private drawSelect() {
+    const objects = this.select!.objects.filter((o) => o.frame);
+    this.pool(this.selectSprites, objects.length).forEach((sprite, index) => {
+      const o = objects[index];
+      if (!o) return sprite.setVisible(false);
+      this.drawSelectObject(sprite, o, index);
+    });
+  }
+  private drawSelectObject(
+    sprite: Phaser.GameObjects.Image,
+    o: SelectObject,
+    index: number,
+  ) {
+    const frame = o.frame!;
+    const prefix = o.container === 'kgt' ? 'ui' : o.container;
+    const size = selectImage(prefix, frame.image);
+    if (!size) return sprite.setVisible(false);
+    const pose: Pose = { ...frame, ...size };
+    const player = o.container !== 'select' && o.container !== 'kgt';
+    const p = player
+      ? placement(pose, size.width, size.height, o.x, o.y, o.facing === -1)
+      : {
+          left: Math.trunc(o.x) + frame.dx,
+          top: Math.trunc(o.y) + frame.dy,
+          flip_x: frame.flip_x,
+          flip_y: frame.flip_y,
+        };
+    this.paint(sprite, pose, o.color, prefix as Container)
+      .setOrigin(0)
+      .setScrollFactor(0)
+      .setDepth(200 + o.z / 256 + index / 1e6)
+      .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
+      .setFlip(p.flip_x, p.flip_y);
+  }
+
   setPractice(options: PracticeOptions) {
     this.practice = { ...options };
     this.match.practice = { ...options };
@@ -323,7 +415,7 @@ export class TrainingScene extends Phaser.Scene {
     );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
-    this.playMusic();
+    if (!this.select) this.playMusic();
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
     this.resetIdle();
@@ -341,6 +433,10 @@ export class TrainingScene extends Phaser.Scene {
 
   setMusic(on: boolean) {
     this.music = on;
+    if (this.select) {
+      if (!on) this.selectTrack?.stop();
+      return;
+    }
     this.playMusic();
   }
   private playMusic() {
@@ -472,6 +568,28 @@ export class TrainingScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     if (!this.ready || this.error) return;
     try {
+      if (this.select) {
+        if (!this.paused)
+          this.clock.advance(delta, () => {
+            if (!this.select) return;
+            const controls = new Set([
+              ...this.virtual,
+              ...this.pressed,
+              ...[...this.held].map((key) => keyMap[key]),
+            ]);
+            this.pressed.clear();
+            this.stepSelect(
+              Object.fromEntries(
+                [...controls].map((control) => [control, true]),
+              ),
+            );
+          });
+        if (this.select) {
+          this.drawSelect();
+          this.report();
+          return;
+        }
+      }
       if (!this.paused && !this.match.resultReady)
         this.clock.advance(delta, () => {
           const controls = new Set([
@@ -486,6 +604,9 @@ export class TrainingScene extends Phaser.Scene {
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
           if (this.match.round !== round) this.resetIdle();
+          // A won Vs. match returns to the select screen (state 902 spawns
+          // object type 10, 0x40982b).
+          if (this.match.resultReady) this.openSelect();
           for (const { owner, index } of this.match.sounds)
             this.play(
               `${this.match.fighters[owner].who}-sound-${index}`,
@@ -687,6 +808,8 @@ export class TrainingScene extends Phaser.Scene {
       matchWinner: this.match.resultReady ? this.match.matchWinner : null,
       resultReady: this.match.resultReady,
       error: this.error,
+      selecting: !!this.select,
+      fighters: [this.fighter, this.opponent],
     };
     const serialized = JSON.stringify(status);
     if (serialized !== this.lastStatus) {
@@ -695,6 +818,20 @@ export class TrainingScene extends Phaser.Scene {
     }
   }
 }
+
+// An exported select-screen image's size: the demo's ('select'), the KGT's
+// ('ui') or a player's.
+const selectSizes = new Map(
+  [
+    ...selectData.images.map((i) => [`select-${i.index}`, i] as const),
+    ...ui.images.map((i) => [`ui-${i.index}`, i] as const),
+    ...Object.entries(CHARACTERS).flatMap(([who, { images }]) =>
+      images.map((i) => [`${who}-${i.index}`, i] as const),
+    ),
+  ].map(([key, { width, height }]) => [key, { width, height }]),
+);
+const selectImage = (prefix: string, image: number) =>
+  selectSizes.get(`${prefix}-${image}`);
 
 export function createGame(
   parent: HTMLElement,

@@ -61,6 +61,8 @@
     matchWinner: null,
     resultReady: false,
     error: '',
+    selecting: true,
+    fighters: ['ryuko', 'zoma'],
   });
   let help = $state(false);
   const asset = `${import.meta.env.BASE_URL}assets/`;
@@ -529,6 +531,7 @@
         if (!disposed)
           session = createGame(host, (next) => {
             status = next;
+            [fighter, opponent] = next.fighters;
           });
       })
       .catch((error: unknown) => {
@@ -546,6 +549,10 @@
   function reset(next = mode) {
     mode = next;
     session?.scene.reset(mode);
+    focusArena();
+  }
+  function openSelect() {
+    session?.scene.openSelect();
     focusArena();
   }
   function setPractice(changes: Partial<PracticeOptions>) {
@@ -584,7 +591,8 @@
         ? 'Player 1 wins.'
         : 'Player 2 wins.';
   function press(event: PointerEvent, control: Control) {
-    if (!status.ready || status.paused || status.winner) return;
+    if (!status.ready || status.paused || (status.winner && !status.selecting))
+      return;
     event.preventDefault();
     (event.currentTarget as HTMLButtonElement).setPointerCapture(
       event.pointerId,
@@ -621,6 +629,11 @@
           focusArena();
         }}
       /> Music</label
+    >
+    <button
+      class="text-button"
+      disabled={!status.ready || status.selecting}
+      onclick={openSelect}>Character select</button
     >
     <button
       class="text-button"
@@ -714,7 +727,7 @@
           >Fighter
           <select
             value={fighter}
-            disabled={!status.ready}
+            disabled={!status.ready || status.selecting}
             onchange={(event) => setFighter(event.currentTarget.value as Who)}
           >
             <option value="ryuko">Ryuko</option>
@@ -768,7 +781,7 @@
           >Opponent
           <select
             value={opponent}
-            disabled={!status.ready}
+            disabled={!status.ready || status.selecting}
             onchange={(event) => setOpponent(event.currentTarget.value as Who)}
           >
             <option value="zoma">Zoma</option>
@@ -897,7 +910,9 @@
         ].includes(item.control)}
         class:super-control={supers.has(item.control)}
         aria-label={labelOf(item.control, item.label)}
-        disabled={!status.ready || status.paused || !!status.winner}
+        disabled={!status.ready ||
+          status.paused ||
+          (!!status.winner && !status.selecting)}
         onpointerdown={(event) => press(event, item.control)}
         onpointerup={() => session?.scene.control(item.control, false)}
         onpointercancel={() => session?.scene.control(item.control, false)}
@@ -2186,14 +2201,24 @@
           attacks and no double jump.
         </p>
         <p>
-          Below the arena, choose your fighter and the opponent, Zoma, Ryuko,
-          Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY,
-          DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU,
-          REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA,
-          SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA,
-          DoraEmon, RARIO or TRAINING, and one of eighteen stages, in either
-          mode. Free practice has no timer, and you also choose how the partner
-          behaves: standing, guarding high or low, guarding in the air,
+          The game opens on the original's character select screen. Move the 1P
+          arrow with <kbd>A</kbd> <kbd>D</kbd> <kbd>W</kbd> <kbd>S</kbd>
+          (held, it repeats after half a second) and choose with any attack key; then
+          the same keys move the 2P arrow to the opponent. A cell marked GATE LOCK
+          can't be chosen, as in the original's VS mode: SHIN-Z, DoraEmon and the
+          empty slots. Once both are chosen the panels close and the match starts;
+          a won Vs. CPU match returns here, and Character select above the arena opens
+          it again.
+        </p>
+        <p>
+          Below the arena, you can also choose your fighter and the opponent,
+          Zoma, Ryuko, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN,
+          LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON,
+          KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA,
+          ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN,
+          AYA, DoraEmon, RARIO or TRAINING, and one of eighteen stages, in
+          either mode. Free practice has no timer, and you also choose how the
+          partner behaves: standing, guarding high or low, guarding in the air,
           attacking in range, jumping in, or playing as the original CPU. Max
           stock refills your supers whenever you stand idle, and Low health
           keeps you just under 30% for desperation moves. Vs. CPU is the

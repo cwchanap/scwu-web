@@ -1018,7 +1018,9 @@ And TRAINING's, RARIO's practice copy, with his look and 500 life. Standing stil
 | U, or → H         | Hado: RARIO's bouncing fireball, 10, after the same countdown |
 | Shift / Shift + ← | A dash forward / a hop back                                   |
 
-Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon, RARIO or TRAINING), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+The game opens on the original's character select screen, the VS single one: move the 1P arrow over the grid with A, D, W and S (held, a direction repeats after half a second, then every 50 ms) and choose with any attack key, then move the 2P arrow the same way to choose the opponent. Hovering a fighter stands their portrait and name at your side; a GATE LOCK cell (SHIN-Z, DoraEmon and the empty slots) can't be chosen. Once both are chosen the panels close and the match starts. A won Vs. CPU match returns to the screen, and **Character select** above the arena opens it again.
+
+Below the arena, you can also choose your fighter and the opponent directly (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon, RARIO or TRAINING), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
@@ -1049,6 +1051,7 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `src/game/characters.ts`: each fighter's exported data (Ryuko's, Zoma's, Kiki's, Chung's, Amiro's, ANMC P's, Giant's, G Suneo's, Yo's, SIN's, LIZARD's, KAY's, DIDO's, SAKUYA's, ALEX's, SOU's, HISO's, ERUS's, OS FENG's, SEAN's, GON's, KATE's, REMU's, REAR's, GIGI's, SWW's, OGI's, ZIRO's, MASA's, 3-TIMES's, ZENKA's, Z-MEGA's, ALPHA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's, ASTROMAN's, YINAN's, AYA's, DoraEmon's, RARIO's and TRAINING's) and the twins that pair their victim actions, and each stage's.
 - `src/game/hud.ts`: source HUD rendering, health cropping, and KO playback.
 - `src/game/standing.ts`: recovered idle interpreter and placement.
+- `src/game/select.ts`: the original's character select screen, run from its demo's, the KGT's and each fighter's raw records.
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.
 - `docs/gameplay.md` / `evidence.md`: how the rules play, and the source evidence behind them.
 

@@ -105,7 +105,8 @@ it('calls the Vs. CPU round: DRESS 1, then SHOW TIME and control', () => {
     [351, [7, 3]],
     [631, [2, 8]],
   ]);
-  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 7, 8]);
+  // And the select screen's decided cursors' 9 (KGT PCs 555, 591).
+  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 7, 8, 9]);
 });
 
 it("waits out the results, then calls round 2 with 'DRESS 2' (KGT 16, sound 4)", () => {

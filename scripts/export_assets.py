@@ -389,8 +389,11 @@ def player_tables(data, c, image_ids):
     near = struct.unpack_from("<h", data, block + 0x7ca3)[0]
     life = u16(data, block + 0x7caa)
     per_stock, stocks = struct.unpack_from("<II", data, block + 0x7cae)
+    # The select screen runs the default-action table's word 21 (+0x75a4,
+    # 0x407a2a) while the player's cell is hovered: キャラセレフェイス.
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
-                commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks)
+                commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
+                selectFace=u16(data, block + 0x75a4))
 
 
 def jump_target(record):
@@ -401,6 +404,30 @@ def jump_target(record):
     if record[0] == 0x09:
         return u16(record, 2), record[4]
     return (u16(record, 1), record[3]) if record[0] in (0x0a, 0x0b, 0x1f) else None
+
+
+def select_program(p, face, image_ids):
+    """The raw records the select screen runs for a player (select.ts): its select
+    face and every action that spawns, jumps to or tests into, by action, adding the
+    images they show."""
+    actions, todo = {}, [face]
+    while todo:
+        index = todo.pop()
+        if not index or index in actions:
+            continue
+        action = p.action(index)
+        actions[index] = [list(r) for r in p.records[action.start:action.end]]
+        for pc in range(action.start, action.end):
+            record = p.records[pc]
+            if record[0] == 0x0c:
+                image = display_record(p, pc)["image"]
+                if image not in (0, 8191):
+                    image_ids.add(image)
+            elif record[0] == 0x04:
+                todo.append(u16(record, 2))
+            elif record[0] == 0x0a or record[0] == 0x1f and record[5] & 0xc:
+                todo.append(u16(record, 1))
+    return dict(face=face, actions={str(i): records for i, records in sorted(actions.items())})
 
 
 def pose_clips(p, c, actions, image_ids):
@@ -3775,9 +3802,11 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     idle = p.action(1)
     sounds = export_sounds(c, key, cued(clips, scripts) | {u16(r, 2) for r in p.records[idle.start:idle.end]
                                                          if r[0] == 0x03})
+    select = select_program(p, tables["selectFace"], image_ids)
     images = export_images(c, key, image_ids)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, twins=pairs, aliases=aliases, counters=counters,
+        select=select,
         neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     # Its type, so TypeScript needn't infer it from the JSON.
@@ -3880,12 +3909,14 @@ def main():
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
     sounds = export_sounds(c, "ryuko", cued(clips, scripts))
+    select = select_program(p, tables["selectFace"], image_ids)
     images = export_images(c, "ryuko", image_ids)
     idle = p.action(1)
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
-        **tables, scripts=scripts, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
+        **tables, scripts=scripts, select=select, neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
     export_ui()
+    export_select()
     write_json(GENERATED / "stages.json", {key: export_stage(key, *stage) for key, stage in STAGES.items()})
     # Python is an independent oracle. Keep fixtures out of the browser bundle.
     cases = []
@@ -4050,13 +4081,34 @@ def export_ui():
                  fight=kgt_timeline(p, 25), transition=dict(kgt_timeline(p, 116), wait=wait(14)),
                  results=dict(win=wait(30), perfect=wait(27), draw=wait(32)))
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"]]
-    sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])})
+    # The select screen (object type 10, 0x406fc0) reads the system block the
+    # loader copies from the file's tail to 0x435474: the players' names, 256
+    # bytes each, the action words from 0x4451c2 (13, 14, 15, ... the round
+    # letterings'), its cursors' (0x445250: 1P, 2P and their decided forms),
+    # the grid's origin, spacing, columns and rows (0x4452b0–0x4452ba), where
+    # each side's hovered player stands (0x4452bc, 0x4452c4) and a flag byte a
+    # player (0x4452cc + index: bit 0 story, bit 1 VS).
+    tail, base = data[c.common_end:], 0x435474
+    at = lambda address, fmt: struct.unpack_from(fmt, tail, address - base)
+    if at(0x4451c2, "<3H") != (13, 14, 15):
+        sys.exit("The KGT system block no longer maps to 0x435474; refusing to export.")
+    cursors = at(0x445250, "<4H")
+    x0, y0, dx, dy, cols, rows, x1, y1, _, _, x2, y2, _, _ = at(0x4452b0, "<14h")
+    select_images = set()
+    select = dict(cursors=cursors, origin=[x0, y0], step=[dx, dy], cols=cols, rows=rows, sides=[[x1, y1], [x2, y2]],
+                  flags=list(tail[0x4452cc - base:0x4452cc - base + 50]), named=[bool(tail[256 * i]) for i in range(50)],
+                  programs={})
+    for cursor in cursors:
+        select["programs"].update(select_program(p, cursor, select_images)["actions"])
+    cues = {u16(r, 2) for records in select["programs"].values() for r in map(bytes, records) if r[0] == 0x03}
+    sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])} | cues)
     # 17–23: stock digits EMPTY/100–600 (KGT 45–51, 0x445202); 31–38: gauge
     # shimmer; 135: UNDER PW.
     ids = {17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 39, 40, 41, 135, 146}
     ids.update(range(31, 39))
     ids.update(range(47, 93, 5))
     ids.update(f["image"] for t in timelines for f in t["frames"] if c.images[f["image"]].width > 1)
+    ids.update(i for i in select_images if c.images[i].width and c.images[i].height)
     (PUBLIC / "ui").mkdir(exist_ok=True)
     images = []
     for index in sorted(ids):
@@ -4065,7 +4117,38 @@ def export_ui():
         filename = f"ui/{index}.png"
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
-    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls))
+    write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
+                                           select=select))
+
+
+def export_select():
+    """The select screen's demo, CHAR SELECT (demo 10, the byte at 0x44389e for VS
+    single), as raw records: 0x403fc0 loads it and 0x406790 makes an object (type
+    4, at 0, 0) of every named action between the first and the last that holds a
+    display, at z 0xc, or 0x64 from the first action of kind 3 (+0x23) on, as a
+    stage's."""
+    data = (RESEARCH / "extracted/CHAR SELECT.DEMO").read_bytes()
+    if hashlib.sha256(data).hexdigest() != "b4b3435391a728f77316270909efad69c06c1d8b0c535c2cca63e91ebed2deef":
+        sys.exit("CHAR SELECT source hash differs from the verified handoff; refusing to export.")
+    c = Container(data)
+    p = Program(c)
+    objects, z = [], 0xc
+    for a in p.actions[1:-1]:
+        raw = c.data[c.table39_offset + 39 * a.index:][:39]
+        if not raw[0]:
+            continue
+        if struct.unpack_from("<I", raw, 35)[0] == 3:
+            z = 0x64
+        if any(r[0] == 0x0c for r in p.records[a.start:a.end]):
+            objects.append(dict(action=a.index, z=z))
+    actions = {str(a.index): [list(r) for r in p.records[a.start:a.end]] for a in p.actions[1:-1]}
+    image_ids = {display_record(p, pc)["image"] for pc in range(len(p.records)) if p.records[pc][0] == 0x0c}
+    # Sound 0, which the demo's header (0x40684c) and the closing panels cue, is
+    # empty.
+    cues = {u16(r, 2) for r in p.records if r[0] == 0x03 and c.sounds[u16(r, 2)]["size"]}
+    write_json(GENERATED / "select.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), objects=objects,
+                                               actions=actions, images=export_images(c, "select", image_ids - {0, 8191}),
+                                               sounds=export_sounds(c, "select", cues)))
 
 
 def inputs():
