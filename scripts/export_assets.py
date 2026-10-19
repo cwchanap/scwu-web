@@ -947,6 +947,12 @@ SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway
             "airBlockRapid", "airTimeStopGuard", "lose", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
             "airHisoStop"]
 
+# The responses whose reactions only some players' moves reach, which the
+# match plays from the victim's own timeline: Clothes off and Clothes off 500
+# (46, 47: ZENKA's grabs), Chuck OGI BALL (62: OGI's, REAR's, Amiro's and
+# YINAN's throws) and RARIO grow, YARA and 1UP (65–67: his mushrooms).
+OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
+
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
           "crouchTimeStopGuard", "airTimeStopGuard")
@@ -3734,8 +3740,10 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # the clips spawn; the moves, and the guard reactions whose op 0x24
     # enters COUNTER HIT.
     guards = [name for name in GUARDS if not name.startswith("air")]
+    own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
-                              *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t)]]
+                              *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
+                              *sorted(own_timelines)]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -3752,10 +3760,16 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
             sys.exit(f"{source[0]}'s {name} no longer enters its heavy air hit's launch; refusing to export.")
     reactions = set(pairs.values()) | set(aliases)
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids, reactions)
+    # Clothes off and its 500 form run out into FLY NO HIT + 19 (Ryuko's PC
+    # 1267), past its displays to its launch at age 6 (PC 1186), which the
+    # match enters there.
     for name, script in scripts.items():
         if script["end"] == "jump" and script["next"] in reactions and int(name.split("+")[0]) not in reactions:
             target = p.action(script["next"])
-            if any(p.records[pc][0] == 0x0c for pc in range(target.start, target.start + script["offset"])):
+            displays = [pc for pc in range(target.start, target.start + script["offset"]) if p.records[pc][0] == 0x0c]
+            if displays and not (int(name.split("+")[0]) in own_timelines and script["next"] == twins["fly"][1]
+                                 and p.records[target.start + script["offset"]][0] == 0x01
+                                 and sum(display_record(p, pc)["duration"] for pc in displays) == 6):
                 sys.exit(f"{source[0]}'s {name} enters a reaction past a display; refusing to export.")
     # The idle program's cues too: GIGI's sound 8 (PC 24).
     idle = p.action(1)
@@ -3860,7 +3874,8 @@ def main():
     queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 96, 99, 100, 105, 126, 108, 109, 132, 153, 158,
                               167, 172, 59, 133, 120, 107, 114,
                               *filter(None, tables["response_effects"]), *moves,
-                              149, 151, 154, 156, 159, 161, 163, 165, 168, 170]]
+                              149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
+                              *sorted({tables["responses"][i] for i in OWN_TIMELINES})]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.

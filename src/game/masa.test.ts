@@ -255,16 +255,20 @@ describe('MASA (29 MASA.PLAYER)', () => {
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });
 
-  it("takes no reaction from REAR's Chuck OGI BALL (response 62), which Ryuko's has no rules for", () => {
+  it("plays his own Chuck OGI BALL from REAR's Viper hit (response 62)", () => {
     const match = new Match('practice', false, 5, ['rear', 'masa']);
     const [rear, masa] = match.fighters;
     masa.x = rear.x + 60;
     rear.stock = 3;
     match.step();
     enter(match, rear, 250);
-    expect(() => {
-      for (let t = 0; t < 3000; t++) match.step();
-    }).not.toThrow();
+    const own = responsesOf('masa')[62];
+    let flung = false;
+    for (let t = 0; t < 3000; t++) {
+      match.step();
+      if (masa.action === 'script' && masa.branch === own) flung = true;
+    }
+    expect(flung).toBe(true);
     expect(masa.hp).toBeLessThan(450);
   });
 });

@@ -141,7 +141,9 @@ describe('REAR (24 REAR.PLAYER)', () => {
   it('spends a stock on GYSA and VIPER FINAL and three on en300, or enters No super (232)', () => {
     for (const [key, stock, gap, mine, damage, left] of [
       ['getterBeam', 3, 90, [238, 'idle'], 84, 2],
-      ['musashi', 3, 90, [250, 255, 'idle'], 51, 2],
+      // Viper hit flings the victim in its own Chuck OGI BALL (response 62,
+      // PC 3735) into the wall, where *viper fire (253) strikes 50 more.
+      ['musashi', 3, 90, [250, 255, 'idle'], 101, 2],
       ['changeAttack', 3, 200, [265, 266, '273+30', 'idle'], 220, 0],
       ['getterBeam', 0, 90, [232, 'idle'], 0, 0],
       ['changeAttack', 2, 200, [232, 'idle'], 0, 2],
@@ -186,7 +188,7 @@ describe('REAR (24 REAR.PLAYER)', () => {
     const viper = cancel({ musashi: true });
     expect([viper.mine, viper.damage, viper.rear.stock]).toEqual([
       [221, '235+6', 255, 'idle'],
-      71,
+      121,
       1,
     ]);
   });

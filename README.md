@@ -739,23 +739,23 @@ And 3-TIMES's, a blond pilot in red armour like MASA's, who swings a purple axe 
 
 And ZENKA's, a silver-haired woman in a long red coat who fights with a knife and calls in robots: a blue drill robot, a red robot and her own purple armour:
 
-| Input                          | ZENKA's move                                                                                                                        |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| J / K                          | A dashing knife slash / a stepping one; on a hit, J for the blue robot's sword thrust or K for the red robot's drill flurry         |
-| Then J / K                     | The blue robot's overhead swing / the red robot's sword swing                                                                       |
-| Down + J / K                   | The blue robot's low sword thrust / the red robot's drill that rolls along the floor                                                |
-| In the air: J / K              | The blue robot's sword swing / the red robot's slash                                                                                |
-| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                  |
-| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                               |
-| H                              | Hit Up: the red robot's rising slash; on a hit, ↑ chases into the air                                                               |
-| O                              | Chuck: the blue robot's sword skewers the opponent; ↓↘→ K follows with the red robot's leaping spin                                 |
-| Blocking with a stock: H       | Counter Hit                                                                                                                         |
-| U, or →↓↘ J                    | Dragon P: the red robot's rising sword slash (also in the air)                                                                      |
-| I, or ↓→ J                     | FIRE BALL: her purple armour's slash across the screen; Ranbu or DAISHARIN cancels it for two stocks                                |
-| F, or ↓← J                     | New move: her purple armour charges, then thrusts a giant sword                                                                     |
-| 1, or ↓→↓→ K                   | Ranbu: a grab into blows from both robots and her own last slash, 1 stock                                                           |
-| 2, or ↓→↓→ J                   | DAISHARIN: a giant sword hurled to spin out and back, 1 stock                                                                       |
-| 3, or ↓←↓← J                   | En300: warnings, then a leap that drops with a giant sword, 3 stocks; its grab names the opponent's Clothes off, so it meets no one |
+| Input                          | ZENKA's move                                                                                                                                |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | A dashing knife slash / a stepping one; on a hit, J for the blue robot's sword thrust or K for the red robot's drill flurry                 |
+| Then J / K                     | The blue robot's overhead swing / the red robot's sword swing                                                                               |
+| Down + J / K                   | The blue robot's low sword thrust / the red robot's drill that rolls along the floor                                                        |
+| In the air: J / K              | The blue robot's sword swing / the red robot's slash                                                                                        |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                          |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                       |
+| H                              | Hit Up: the red robot's rising slash; on a hit, ↑ chases into the air                                                                       |
+| O                              | Chuck: the blue robot's sword skewers the opponent; ↓↘→ K follows with the red robot's leaping spin                                         |
+| Blocking with a stock: H       | Counter Hit                                                                                                                                 |
+| U, or →↓↘ J                    | Dragon P: the red robot's rising sword slash (also in the air)                                                                              |
+| I, or ↓→ J                     | FIRE BALL: her purple armour's slash across the screen; Ranbu or DAISHARIN cancels it for two stocks                                        |
+| F, or ↓← J                     | New move: her purple armour charges, then thrusts a giant sword                                                                             |
+| 1, or ↓→↓→ K                   | Ranbu: a grab into blows from both robots and her own last slash, 1 stock                                                                   |
+| 2, or ↓→↓→ J                   | DAISHARIN: a giant sword hurled to spin out and back, 1 stock                                                                               |
+| 3, or ↓←↓← J                   | En300: warnings, then a leap that drops with a giant sword, 3 stocks; its grab strips the opponent's clothes for 260 life, then flings them |
 
 And Z-MEGA's, a white-haired, moustached brawler in a black vest who turns into Shin Z, trading life for power:
 
@@ -996,16 +996,16 @@ And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's fil
 
 And RARIO's, a muscle-bound, barefoot plumber in a red cap and blue overalls who fights in Ryu's stance, with 450 life:
 
-| Input             | RARIO's move                                                                                                                                                                   |
-| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| J / K             | P, 18 / K, 15; on a hit, P cancels into K, a special or a super                                                                                                                |
-| In the air: J / K | P J / K J, 15 each; he has no double jump                                                                                                                                      |
-| Shift / Shift + ← | A dash forward / a hop back                                                                                                                                                    |
-| U, or ↓→ J        | Hado: a dark fireball, 30, that bounces along the floor; another while it flies is a punch                                                                                     |
-| I, or →↓↘ J       | Shoryu: a rising uppercut, 35, that knocks a ? block loose for a coin (2 life, 10 power) or a mushroom; the mushrooms name the opponent's RARIO reactions, so they meet no one |
-| F, or ↓← K        | Tatumaki: a hopping spin kick, two hits of 18                                                                                                                                  |
-| 1, or ↓→↓→ J      | Shinku: a leap that hurls a red shell along the floor, 84, 1 stock                                                                                                             |
-| 2, or ↓→↓→ K      | Shin Shoryu: a grab into a chain of stomps on the opponent's head and a flagpole finish, 200, 2 stocks                                                                         |
+| Input             | RARIO's move                                                                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K             | P, 18 / K, 15; on a hit, P cancels into K, a special or a super                                                                                                         |
+| In the air: J / K | P J / K J, 15 each; he has no double jump                                                                                                                               |
+| Shift / Shift + ← | A dash forward / a hop back                                                                                                                                             |
+| U, or ↓→ J        | Hado: a dark fireball, 30, that bounces along the floor; another while it flies is a punch                                                                              |
+| I, or →↓↘ J       | Shoryu: a rising uppercut, 35, that knocks a ? block loose for a coin (2 life, 10 power) or a mushroom that slides into the opponent: +31, −29, or +50 life and a stock |
+| F, or ↓← K        | Tatumaki: a hopping spin kick, two hits of 18                                                                                                                           |
+| 1, or ↓→↓→ J      | Shinku: a leap that hurls a red shell along the floor, 84, 1 stock                                                                                                      |
+| 2, or ↓→↓→ K      | Shin Shoryu: a grab into a chain of stomps on the opponent's head and a flagpole finish, 200, 2 stocks                                                                  |
 
 And TRAINING's, RARIO's practice copy, with his look and 500 life. Standing still refills his life and the opponent's power, and empties his; he has no supers, air attacks or double jump:
 

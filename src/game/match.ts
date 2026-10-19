@@ -521,6 +521,19 @@ const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // GAISA FINAL ends in his (157) + 5 (PC 4137), at its roll.
 const KNOCKDOWN = 146;
 const GET_UP = 145;
+// 'fly side wall hit', which Chuck OGI BALL's wall handler enters (slot 4,
+// PC 1885), as Chung's chuck's does (PC 1079).
+const FLY_SIDE_WALL = 95;
+// Ryuko's reactions that only some players' moves reach, which each victim
+// plays from its own timeline (export_fighter's OWN_TIMELINES): Clothes off
+// and its 500 form (101, 103; ZENKA's en300 and en500 grabs), the RARIO
+// mushrooms' grow, YARA and 1UP (115–117) and Chuck OGI BALL (138).
+const OWN_TIMELINES = new Set([101, 103, 115, 116, 117, 138]);
+// The victim's own timeline a response names, if it is one of those.
+const ownTimeline = (who: Who, response: number) =>
+  OWN_TIMELINES.has(responsesOf('ryuko')[response])
+    ? responsesOf(who)[response] || undefined
+    : undefined;
 // Victim actions reached through the response table, with their op 0x1a stops
 // for the victim and, where they differ, the attacker.
 const RESPONSE_REACTIONS: Record<
@@ -1935,13 +1948,28 @@ export class Match {
         ? 'knockdown'
         : ryuko === GET_UP
           ? 'getUp'
-          : RESPONSE_REACTIONS[ryuko]?.action);
-    if (named) return this.action(f, named, true);
+          : ryuko === FLY_SIDE_WALL
+            ? 'flySideWall'
+            : RESPONSE_REACTIONS[ryuko]?.action);
+    if (named) {
+      this.action(f, named, true);
+      // Clothes off runs out into FLY NO HIT + 19 (PC 1267), past its
+      // displays to its launch (PC 1186), entered at that age
+      // (export_fighter checks every player's).
+      if (named === 'fly' && offset) {
+        f.age = launchMotion.fly!.tick;
+        this.moveLaunch(f);
+      }
+      return;
+    }
     const key = sourceKey(index, offset);
     // A target one past its action's end runs out at once (0x4125ea): DIDO's
-    // >HE300 Hit5 lands in en300 hit + 28 (slot 1, PC 5047), so she stands.
+    // >HE300 Hit5 lands in en300 hit + 28 (slot 1, PC 5047), so she stands;
+    // RARIO 1UP (117) has no display, so its op 0x15 runs and it runs out.
     // ponytail: a step early, where the engine's next step runs it out.
     if (!animationDuration(key, f.who) && script(key, f.who).end === 'end') {
+      for (const event of script(key, f.who).events)
+        this.runEvent(f, this.fighters.indexOf(f), event);
       if (!this.runOut(f)) this.action(f, 'idle');
       return;
     }
@@ -2200,19 +2228,26 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
-        // Ryuko's Chuck OGI BALL (138), which REAR's 255 applies (response
-        // 62), has no rules, nor do the others' unpaired copies of it.
+        // REAR's 255 applies Chuck OGI BALL (response 62, Ryuko's 138),
+        // which the victim plays from its own timeline (ownTimeline).
         const own = responsesOf(other.who)[event.response];
         const reaction = RESPONSE_REACTIONS[twinOf(other.who, own) ?? 0];
-        if (!reaction || !this.struck(other)) break;
+        const timeline = reaction
+          ? undefined
+          : ownTimeline(other.who, event.response);
+        if ((!reaction && !timeline) || !this.struck(other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         // Like a contact it queues the reaction (0x413136), and it clears
         // the victim's stop (0x413147).
         other.hitStop = 0;
+        if (timeline) {
+          other.pending = { key: timeline };
+          break;
+        }
         this.queue(
           other,
-          reaction.action,
+          reaction!.action,
           reaction.stop,
           reaction.attackerStop ?? reaction.stop,
           0,
@@ -2628,24 +2663,25 @@ export class Match {
     );
     // 0x40f539: a response id selects the victim action from the victim's
     // own table. Another player's follows its Ryuko twin's rules
-    // (export_fighter), so `victim` is Ryuko's number for it. Ryuko's
-    // Clothes off (101), which ZENKA's En300 grab names (response 46), has
-    // no rules, nor do the others' unpaired copies of it, so it meets no one.
-    // ponytail: the victim's strip and its 260-life loss (op 0x15, PC 1265)
-    // aren't played; add Clothes off as a reaction to land it.
+    // (export_fighter), so `victim` is Ryuko's number for it; the reactions
+    // only some moves reach play from the victim's own timeline: ZENKA's
+    // En300 grab strips the victim in Clothes off (response 46, 101), which
+    // takes 260 life (op 0x15, PC 1265).
     const own = responsesOf(target.who)[response];
     const victim = twinOf(target.who, own) ?? 0;
     const reaction = RESPONSE_REACTIONS[victim];
+    const timeline = reaction ? undefined : ownTimeline(target.who, response);
     // 0x40f527: response 0 names no reaction, but a box without damage
     // still meets the victim, turning it and taking the striker's handler
     // (0x40f73c, 0x40f6e6, 0x40f885): LIZARD's dragon up handen (247) so
     // finds whom his birds strike.
-    if (!reaction && (response || box.damage)) return [];
+    if (!reaction && !timeline && (response || box.damage)) return [];
     // A guarded contact (the guard half, 0x40f4be) stays one unless the
     // response is unguardable (0x40f544), as a guard half naming a hit is;
     // a hit half naming a guard, YINAN's R300 Hit's time stop (response 80,
     // PC 10429), is a hit.
-    const blocked = guarding && (!reaction || blocks.has(reaction.action));
+    const blocked =
+      guarding && !timeline && (!reaction || blocks.has(reaction.action));
     return [
       {
         f: attacker,
@@ -2658,6 +2694,7 @@ export class Match {
         // whether its body or one of its objects struck.
         attackerStop: reaction?.attackerStop ?? reaction?.stop ?? 0,
         reaction: reaction?.action as AnimatedAction | undefined,
+        timeline,
         facing: source.facing,
         x: body.x,
         y: body.y,
@@ -3325,6 +3362,7 @@ export class Match {
       hitStop,
       attackerStop,
       reaction,
+      timeline,
       facing,
       x,
       y,
@@ -3334,7 +3372,7 @@ export class Match {
       own,
     } of contacts) {
       source.connected = true;
-      if (!reaction) {
+      if (!reaction && !timeline) {
         target.facing = facing === 1 ? -1 : 1;
         continue;
       }
@@ -3349,9 +3387,9 @@ export class Match {
       // action instead (0x40e84b), so the reaction's records never run: no
       // op 0x15 power, no op 0x1a stops. The last box to reach the victim
       // sets its reaction, so DST's two missiles stop it once.
-      if (target.hp > 0)
-        this.queue(target, reaction, hitStop, attackerStop, bonus, own);
-      else this.queue(target, knockedOut(wasOut));
+      if (target.hp === 0) this.queue(target, knockedOut(wasOut));
+      else if (timeline) target.pending = { key: timeline };
+      else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
       target.reaction = blocked
         ? target.reaction | 0xc
         : (target.reaction & ~4) | 8;

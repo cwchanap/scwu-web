@@ -166,15 +166,43 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     });
   });
 
-  it('falls from en500 into En300, whose grab meets no one', () => {
+  it('falls from en500 into En300, whose grab strips the victim in its own Clothes off', () => {
     // En500 Start (270) needs more than four stocks (op 0x10, PC 4079), so
-    // it enters En300 start (275), which spends three (PC 4182). Its grab
-    // names Ryuko's Clothes off (response 46), which has no rules.
+    // it enters En300 start (275), which spends three (PC 4182). Close in,
+    // its leap lands behind Ryuko.
     expect(byKey({ changeAttack: true })).toEqual({
       mine: [275, '275+42', 'turn', 'idle'],
       damage: 0,
       stock: 0,
     });
+    // Its grab names her Clothes off (response 46, 101): 228 ticks held,
+    // 320 stripped, then 260 life (PC 1265) and FLY NO HIT + 19 (PC 1267),
+    // its launch.
+    const strip = (stock: number) => {
+      const { match, zenka, other, steps } = zenkaPlayer(200);
+      zenka.stock = stock;
+      steps({}, 2);
+      const hers: unknown[] = [];
+      for (let t = 0; t < 1500; t++) {
+        steps(t ? {} : { changeAttack: true });
+        if (hers.at(-1) !== now(other)) hers.push(now(other));
+      }
+      return [hers, lifeOf('ryuko') - other.hp, match.winner];
+    };
+    expect(strip(3)).toEqual([
+      ['idle', 101, 'fly', 'knockdown', 'getUp', 'idle'],
+      261,
+      null,
+    ]);
+    // With five stocks, en500's grab names Clothes off 500 (response 47,
+    // 103), which takes 1000 (PC 1292): the loss queues her lose action
+    // (0x40e84b), which her next step enters, after the jump into FLY NO
+    // HIT.
+    expect(strip(5)).toEqual([
+      ['idle', 103, 'fly', 'down', 'koLand'],
+      510,
+      'player',
+    ]);
     expect(byKey({ changeAttack: true }, { stock: 2 })).toEqual({
       mine: [249, 'idle'],
       damage: 0,

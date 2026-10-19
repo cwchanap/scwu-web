@@ -1878,9 +1878,9 @@
           both robots and her own last slash, and <kbd>2</kbd> or ↓→↓→
           <kbd>J</kbd> DAISHARIN, a giant sword hurled to spin out and back; for
           three, <kbd>3</kbd> or ↓←↓← <kbd>J</kbd> En300, warnings, then a leap that
-          drops with a giant sword, whose grab names the opponent's Clothes off and
-          so meets no one here. FIRE BALL cancels into Ranbu or DAISHARIN for two
-          stocks.
+          drops with a giant sword, whose grab strips the opponent's clothes for 260
+          life before flinging them. FIRE BALL cancels into Ranbu or DAISHARIN for
+          two stocks.
         </p>
         <p>
           Choose Z-MEGA to play him, a white-haired, moustached brawler in a
@@ -2164,8 +2164,10 @@
           bounces along the floor, one at a time; <kbd>I</kbd> or →↓↘
           <kbd>J</kbd>
           Shoryu, a rising uppercut that knocks a ? block loose for a coin, which
-          gives him life and power, or a mushroom, which the port lets pass through
-          the opponent; and <kbd>F</kbd> or ↓←
+          gives him life and power, or a mushroom that bounces off along the floor
+          and changes the opponent's life as it meets them: one gives 31, a poison
+          one takes 29 and a 1UP gives 50 and a stock; and <kbd>F</kbd>
+          or ↓←
           <kbd>K</kbd> Tatumaki, a hopping spin kick. His supers: <kbd>1</kbd>
           or ↓→↓→ <kbd>J</kbd> Shinku, a leap that hurls a red shell along the
           floor, for a stock, and <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> Shin Shoryu, a

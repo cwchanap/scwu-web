@@ -200,6 +200,28 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
     ]);
   });
 
+  it("lands his mushrooms in the opponent's own grow, YARA and 1UP", () => {
+    // From 500 pixels a mushroom lands and slides into Ryuko: the poison
+    // one (177) names her 'RARIO YARA' (response 66, 116), which takes 29
+    // (PC 1519), and the 1UP (181) her 'RARIO 1UP' (67, 117), which gives 50
+    // life and 100 power (PC 1539) with no display; each box takes 1.
+    const items = [4, 5].map((seed) => {
+      const { rario, other, steps } = rarioPlayer(500, seed);
+      other.hp = 300;
+      steps({}, 2);
+      const hers: unknown[] = [];
+      for (let t = 0; t < 600; t++) {
+        steps(t ? {} : { axe: true });
+        if (hers.at(-1) !== now(other)) hers.push(now(other));
+      }
+      return [hers, other.hp, other.stock, rario.hp];
+    });
+    expect(items).toEqual([
+      [['idle', 116, 'idle'], 270, 0, 450],
+      [['idle'], 349, 1, 450],
+    ]);
+  });
+
   it('spins up and over with his Tatumaki', () => {
     expect(byKey({ iori: true })).toMatchObject({
       mine: [186, '186+17', 'idle'],

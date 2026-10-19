@@ -107,7 +107,9 @@ describe('OGI (27 OGI.PLAYER)', () => {
       damage: 66,
     });
     // K3 grabs (box kind 234, PC 2676) into K3 hit (197), or EVIL K3 (199)
-    // below 150 life (op 0x11, PC 2686).
+    // below 150 life (op 0x11, PC 2686), which flings the victim in its own
+    // Chuck OGI BALL (response 62) into the wall, where its fire (205)
+    // strikes 20 more.
     const kkk = presses({ 0: K, 30: K, 70: K });
     expect(play(kkk)).toMatchObject({
       mine: [191, 192, 194, 196, 197, 'idle'],
@@ -115,7 +117,7 @@ describe('OGI (27 OGI.PLAYER)', () => {
     });
     expect(play(kkk, { hp: 100 })).toMatchObject({
       mine: [191, 192, 194, 196, 199, 'idle'],
-      damage: 60,
+      damage: 80,
     });
     expect(byKey({ throw: true })).toMatchObject({
       mine: [223, 225, 'idle'],

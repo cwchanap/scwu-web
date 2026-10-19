@@ -468,7 +468,13 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
   });
 
   it('plays her EX specials, counting Fist S’s and p90’s passes in her own variable 0', () => {
-    expect(byKey({ drill: true }, { ex: true }).mine).toEqual([286, 'idle']);
+    // PAtt's box (response 62, PC 5127) flings the opponent in its own Chuck
+    // OGI BALL, and its hit handler enters PAtt Hit (288, PC 5123).
+    expect(byKey({ drill: true }, { ex: true }).mine).toEqual([
+      286,
+      288,
+      'idle',
+    ]);
     // Fist S fires two volleys (PCs 6315, 6327), then more while P is
     // pressed, up to six (PC 6317), or seizes her on a hit (348).
     expect(byKey({ axe: true }, { ex: true, gap: 300 }).mine).toEqual([
