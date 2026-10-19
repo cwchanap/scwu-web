@@ -773,7 +773,7 @@ And Z-MEGA's, a white-haired, moustached brawler in a black vest who turns into 
 | U, or →↓↘ K                | SAMA: a rising somersault kick (also in the air; Shin Z: lower, and →↓↘ K kicks again in the air)                                                                  |
 | I, or ↓→ J                 | Fire BALL: a fireball that arcs, bounces twice and rolls along the floor (Shin Z: a fast straight shot)                                                            |
 | F, or →↓← J                | GIGA: a dash behind a glowing palm that carries the opponent into the screen's edge and slams them (Shin Z: faster and harder)                                     |
-| G, or ↓→ K                 | REFLACT: a round shield's shove (Shin Z: harder); it doesn't reflect shots here                                                                                    |
+| G, or ↓→ K                 | REFLACT: a round shield's shove (Shin Z: harder); meeting a shot, it throws a ball back, which fizzles on the shot itself                                          |
 | 1, or →←↓→ J               | GAISA: a charge through three levels; J fires its wave at the level reached, or he collapses, 1 stock (Shin Z: a level higher)                                     |
 | 2, or ↓→↓← J               | SGIGA: a bigger GIGA, 1 stock (Shin Z: faster and harder)                                                                                                          |
 | 3, or J J → K J            | AKUMA SP: a cut-in, then a dash that grabs into a storm of flashes, 250, 3 stocks (Shin Z: short of them, the flashes alone, still 250)                            |

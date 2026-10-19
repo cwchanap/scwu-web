@@ -118,6 +118,32 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
       expect(byKey({ [key]: true }, { gap })).toMatchObject({ mine, damage });
   });
 
+  it('catches a projectile with REFLACT, whose return fizzles on it', () => {
+    const match = new Match('practice', false, 3, ['zoma', 'zmega']);
+    const [zoma, zmega] = match.fighters;
+    zmega.x = zoma.x + 450;
+    match.step({}, {});
+    match.step({}, {});
+    const mine: unknown[] = [];
+    const clips: unknown[] = [];
+    for (let t = 0; t < 400; t++) {
+      match.step(t ? {} : { axe: true }, t ? {} : { dst: true });
+      if (mine.at(-1) !== now(zmega)) mine.push(now(zmega));
+      for (const e of match.effects)
+        if (e.owner === 1 && !clips.includes(e.clip)) clips.push(e.clip);
+    }
+    // *Refl obj (230) meets FIRE BALL CALL 2000 pixels down, entering
+    // Reflact Success (232), but *Reflact fire ball's slot-1 box sits 1964
+    // down (PC 3370), so it strikes the caught ball, which an object's strike
+    // leaves flying (0x40f36a), and fizzles into **re hit (235).
+    expect([mine, clips, zoma.hp, zmega.hp]).toEqual([
+      [228, 232, 'idle'],
+      [230, 233, 235],
+      490,
+      350,
+    ]);
+  });
+
   it('spends a stock on SGIGA, three on AKUMA SP, or enters No super', () => {
     expect(byKey({ musashi: true })).toEqual({
       mine: [296, 301, 307, 'turn', 'idle'],
