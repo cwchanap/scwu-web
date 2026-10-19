@@ -32,7 +32,7 @@ Ground Drill Punch lunges from action ticks 11–59 (110–590 ms before contact
 
 ## Axe throw
 
-Axe throw releases a spinning axe that appears 170 ms in, flying at about 13.5 arena pixels per tick; pressing it again while that axe flies only makes Ryuko stand. The command stays in its 400 ms window, so she keeps standing until the axe's hit stops her, and throws another if the window is still open then. It hits through body boxes like any attack (36 against an attacking pose), so it passes through a fighter mid-throw and under a high enough jump, and it can be blocked. Two opposing axes break each other where they meet, the Mega Getter Beam's beam breaks every opposing axe, and its lunge meeting an axe enters its hit cinematic. A super's freeze holds a flying axe in place without its hitbox, and an axe vanishes 75 pixels past either end of the stage. These two basic specials are meter-free.
+Axe throw releases a spinning axe that appears 170 ms in, flying at about 13.5 arena pixels per tick; pressing it again while that axe flies only makes Ryuko stand for a moment. It hits through body boxes like any attack (36 against an attacking pose), so it passes through a fighter mid-throw and under a high enough jump, and it can be blocked. Two opposing axes break each other where they meet, the Mega Getter Beam's beam breaks every opposing axe, and its lunge meeting an axe enters its hit cinematic. A super's freeze holds a flying axe in place without its hitbox, and an axe vanishes 75 pixels past either end of the stage. These two basic specials are meter-free.
 
 ## Hit Up
 

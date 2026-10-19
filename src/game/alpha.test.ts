@@ -204,6 +204,14 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     // five calls (PC 4471); only Team VS 2P (65, PC 872) sets variable 12.
     steps({}, 39);
     expect([alpha.branch, alpha.age, alpha.power]).toEqual([283, 39, 10]);
+    // Authored: a key's command enters once, though SCC's 90-tick window
+    // outlasts No super.
+    const scc = alphaPlayer();
+    scc.alpha.stock = 0;
+    scc.steps({}, 2);
+    scc.steps({ megaBeam: true });
+    scc.steps({}, 120);
+    expect([scc.alpha.action, scc.alpha.power]).toEqual(['idle', 10]);
   });
 
   it('cancels NC, which sets variable 6 (PC 4274), into SC SUPER for two stocks', () => {

@@ -4716,20 +4716,14 @@ describe('prototype training rules', () => {
     const [axe] = axes(match);
     expect(axe.clip).toBe(227);
     // While its axe (slot 6) lives, 226 jumps to 225 (PC 3267): one display,
-    // then neutral, and the axe flies on. The command stays in its 40-tick
-    // window, so the free state enters it again each tick while the axe
-    // flies and breaks (its impact, 230, keeps the slot). Its hit stops
-    // Ryuko too (0x4136ae); once it is gone and she moves again, the same
-    // command throws another.
+    // then neutral, and the axe flies on. Authored: the key's command enters
+    // once, so another axe takes another press once this one is gone.
     match.step({ axe: true });
     expect(named(f)).toBe('axeBusy');
     expect(axes(match)).toEqual([axe]);
-    while (axes(match).length || f.hitStop) {
-      expect(named(f)).toBe('axeBusy');
-      match.step();
-    }
-    match.step();
-    expect(named(f)).toBe('axeThrow');
+    while (named(f) === 'axeBusy') match.step();
+    expect(named(f)).toBe('idle');
+    expect(axes(match)).toEqual([axe]);
     for (
       let tick = 0;
       tick < 1000 && (axes(match).length || f.action !== 'idle' || f.hitStop);

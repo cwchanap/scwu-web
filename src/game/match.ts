@@ -1498,6 +1498,10 @@ export class Match {
   // This tick's input, which op 0x16 reads.
   private inputs: [Input, Input] = [{}, {}];
   private history = [blankHistory(), blankHistory()];
+  // Whether a command key's command waits in its player's history, and the
+  // ticks recorded since one was entered (-1 for none).
+  private keyed = [false, false];
+  private spent = [-1, -1];
 
   constructor(
     public mode: Mode = 'practice',
@@ -1572,9 +1576,11 @@ export class Match {
       ([control]) => input[control] && !this.previous[i][control],
     );
     if (key || clear) history.fill(0);
+    if (key) [this.keyed[i], this.spent[i]] = [true, -1];
     const word = inputWord(input, other.x >= f.x, f.who);
     history.push(word);
     history.shift();
+    if (this.spent[i] >= 0) this.spent[i]++;
     if (key)
       inject(
         history,
@@ -1590,6 +1596,8 @@ export class Match {
   clearInput() {
     this.previous = [{}, {}];
     this.history = [blankHistory(), blankHistory()];
+    this.keyed = [false, false];
+    this.spent = [-1, -1];
   }
 
   // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
@@ -2841,6 +2849,8 @@ export class Match {
     const index = entriesOf(f.who)[found.entry - 1][found.stance];
     if (!ok(LEVELS[f.who][index], index)) return false;
     this.enterSource(f, index);
+    const i = this.fighters.indexOf(f);
+    if (this.keyed[i]) [this.keyed[i], this.spent[i]] = [false, 0];
     return true;
   }
 
@@ -3026,6 +3036,17 @@ export class Match {
       this.action(f, 'takeoff');
       f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
       return;
+    }
+    // Authored: a key's command enters once. Back in the free state, its
+    // history drops what came before the entry, as the CPU's clears every
+    // step it thinks (0x411307); 0x41073e keeps the last 20 ticks, which
+    // hold a key's steps, so a long window would enter it again (ALPHA's
+    // SCC, 90, outlasts No super's 40). Op 0x24 checks within the move
+    // still see it.
+    const i = this.fighters.indexOf(f);
+    if (this.spent[i] >= 0) {
+      history.fill(0, 0, history.length - this.spent[i]);
+      this.spent[i] = -1;
     }
     // The free state scans commands (0x411a01) after the port's own guard
     // and jump keys.

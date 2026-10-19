@@ -244,13 +244,12 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
       stock: 1,
     });
     // It takes two stocks (PC 2474), or enters No super, which adds 10
-    // power (PC 2328); the command, still in its 50-tick window, enters it
-    // once more.
+    // power (PC 2328).
     expect(byKey({ musashi: true }, { stock: 1 })).toMatchObject({
       mine: [190, 'idle'],
       damage: 0,
       stock: 1,
-      power: 20,
+      power: 10,
     });
   });
 

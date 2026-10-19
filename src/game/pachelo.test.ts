@@ -107,13 +107,8 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     expect(mash(5)).toEqual([186, 192, 'idle']);
     // The key writes the presses as the CPU does (0x411681), within the 20
     // ticks the match keeps (0x41073e), so LIGHTING ATT's check sees them (PC
-    // 2191): light rp (193) once.
-    expect(byKey({ axe: true }, { gap: 400 }).mine).toEqual([
-      192,
-      193,
-      192,
-      'idle',
-    ]);
+    // 2191): light rp (193) once. Authored: the key's command enters once.
+    expect(byKey({ axe: true }, { gap: 400 }).mine).toEqual([192, 193, 'idle']);
     // Its first box launches Ryuko (25); the rest (kind 0x87, PCs 2193,
     // 2228) skip her while she reels (0x40f18e), however long it sparks.
     expect(

@@ -162,12 +162,12 @@ describe('ERUS (18 ERUS.PLAYER)', () => {
       },
     );
     expect(coins.mine.filter((m) => m === 333 || m === 332)).toEqual([
-      333, 333, 333, 333, 333, 333, 333, 332, 333, 332,
+      333, 333, 333, 333, 333, 333, 333, 332, 333,
     ]);
     // A press while her coin flies jumps to idle + 18 (op 0x04's busy
     // target, PC 5423).
     expect(coins.mine).toContain('1+18');
-    expect(coins.erus.variables[13]).toBe(600);
+    expect(coins.erus.variables[13]).toBe(700);
   });
 
   it("answers a strike in Counter start's 128 ticks with Counter get (306, variable 4 at 100)", () => {
