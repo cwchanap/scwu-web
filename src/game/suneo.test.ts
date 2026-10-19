@@ -199,13 +199,14 @@ describe('G Suneo (08 G SUNEO.PLAYER)', () => {
   });
 
   it('enters EX mode with down held as her Vs. intro checks it (PC 403)', () => {
+    // 開始時 BR's two 2-tick displays (PCs 382, 384) come first.
     expect([SUNEO_INTRO_EX_TICK, animationDuration('intro', 'suneo')]).toEqual([
-      164, 200,
+      168, 204,
     ]);
     const match = new Match('cpu', true, 0, ['suneo', 'zoma']);
     const suneo = match.fighters[0];
     const { x } = suneo;
-    for (let t = 0; t < 200; t++) match.step({ crouch: t >= 150 });
+    for (let t = 0; t < 204; t++) match.step({ crouch: t >= 150 });
     // Round 1 (35) has no op 0x01. change character (41) sets variable 0
     // (PC 463) and jumps back (PC 464).
     expect([suneo.action, suneo.x, exMode(suneo)]).toEqual(['idle', x, true]);

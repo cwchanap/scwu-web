@@ -233,14 +233,15 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
   });
 
   it('enters EX mode with down held as his Vs. intro checks it (PC 338)', () => {
+    // ROUND 1 then calls Demo stand once.
     expect(CHUNG_INTRO_EX_TICK).toBe(150);
-    expect(animationDuration('intro', 'chung')).toBe(150);
+    expect(animationDuration('intro', 'chung')).toBe(200);
     const match = new Match('cpu', true, 0, ['chung', 'ryuko']);
     const chung = match.fighters[0];
-    for (let t = 0; t < 150; t++) match.step({ crouch: true });
+    for (let t = 0; t < 200; t++) match.step({ crouch: true });
     expect([chung.action, exMode(chung)]).toEqual(['idle', true]);
     const late = new Match('cpu', true, 0, ['chung', 'ryuko']);
-    for (let t = 0; t < 150; t++) late.step({});
+    for (let t = 0; t < 200; t++) late.step({});
     expect(exMode(late.fighters[0])).toBe(false);
   });
 

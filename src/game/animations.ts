@@ -364,11 +364,17 @@ export function heldFrame(
 // Demo stand (PCs 288–295), and SWW's Round 1 at PC 330, from PC 325, before
 // his (PCs 258–265). YINAN's Round 1 checks at PC 648, entering 開始時 SELECT
 // (40) + 8 (PC 609), which sets variable 0 to 100.
-const ticksBefore = (frames: Pose[], pc: number) =>
-  frames
-    .filter((frame) => frame.pc < pc)
-    .reduce((total, frame) => total + frame.duration, 0);
-export const INTRO_EX_TICK = ticksBefore(clips.intro.slice(2), 348);
+// The displays' ticks before `pc`, in order, up to a call into an earlier
+// action, as Chung's, Amiro's and SIN's of their stand demos.
+const ticksBefore = (frames: Pose[], pc: number) => {
+  let total = 0;
+  for (const frame of frames) {
+    if (frame.pc >= pc || frame.pc < frames[0].pc) break;
+    total += frame.duration;
+  }
+  return total;
+};
+export const INTRO_EX_TICK = ticksBefore(clips.intro, 348);
 export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
 export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
 export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
@@ -534,8 +540,9 @@ export const animations = {
   // Actions 23/24 display a mirrored mid-turn pose for ten ticks.
   turn: clip(clips.turn),
   crouchTurn: clip(clips.crouchTurn),
-  // Action 32 jumps to action 33 at PC 333, after its blank repositioning displays.
-  intro: clip(clips.intro.slice(2)),
+  // Action 32 jumps to action 33 + 4 (PC 328), past its blank repositioning
+  // displays (export_assets.py).
+  intro: clip(clips.intro),
   hitPull: clip(clips.hitPull),
   // Response 5/6 (air punch and kick against a grounded opponent) → action 77.
   jumpHit: clip(clips.jumpHit),
@@ -720,10 +727,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
-    // Zoma's Start N (31) from PC 309, Kiki's Round 1 (33) from PC 326,
-    // Chung's ROUND 1 (33) from PC 332, ANMC P's Round 1 (35) from PC 356,
-    // Giant's Round 1 (33) from PC 313, G Suneo's Round 1 (35) from PC 393
-    // HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344,
+    // Each 開始時 BR from past its global 14 = 0 test, through its spawns of
+    // Black and OP super Charge into Round 1: Zoma's Start N (31) from PC
+    // 309, Kiki's Round 1 (33) from PC 326, Chung's ROUND 1 (33) from PC 332
+    // and its call of Demo stand, ANMC P's Round 1 (35) from PC 356, Giant's
+    // Round 1 (33) from PC 313, G Suneo's 開始時 BR (34) from PC 382, into
+    // Round 1 (35) + 3, HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344,
     // OS FENG's 開始時 BR (34) from PC 363, KATE's 開始時 BR (32) from PC
     // 335, GIGI's 開始時 BR (32) from PC 350 and SWW's from PC 319, past
     // their global 14 = 0 tests (PCs 348, 317), into Round 1 + 2 and its call
@@ -731,9 +740,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // its (PC 382), into Round 1 (37) + 4 and its 14 calls of OP motion RP
     // (41, PC 403): no op
     // 0x01, so each stands where they start. Amiro's Round BR (33)
-    // drives in on her car and Yo's Round 1 (35) from PC 379 rides in on
-    // her robot (introMotion), then calls Demo Stand three times (PC 392);
-    // SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once (PC 404).
+    // drives in on her car and calls Demo stand, and Yo's Round 1 (35) from
+    // PC 379 rides in on her robot (introMotion), then calls Demo Stand three
+    // times (PC 392); SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once
+    // (PC 404).
     // LIZARD's 開始時 BR (33) from PC 367 leaps in (introMotion) and lands at
     // LIZARD_LANDING into OP lend (36, slot 1 at PC 383), cutting the
     // display at PC 385 short and the wait at PC 386 out. SOU's 開始時 BR
@@ -800,13 +810,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
                 SEAN_LANDING,
               )
             : clip(
-                who === 'yo'
-                  ? [...z.intro, ...Array(3).fill(z.winStand).flat()]
-                  : who === 'sin'
-                    ? [...z.intro, ...z.winStand]
-                    : who === 'yinan' || who === 'aya'
-                      ? introPastDisplay(who)
-                      : z.intro,
+                who === 'yinan' || who === 'aya'
+                  ? introPastDisplay(who)
+                  : z.intro,
               ),
     ...guardAnimations(z),
     hit: clip(z.hit),

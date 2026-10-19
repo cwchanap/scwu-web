@@ -83,17 +83,19 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
       slot: 9,
       follow: expect.anything(),
     });
+    // Round BR then calls Demo stand once (PC 388).
     expect([AMIRO_INTRO_EX_TICK, animationDuration('intro', 'amiro')]).toEqual([
-      63, 115,
+      63, 198,
     ]);
     for (let t = 1; t < 115; t++) match.step({ crouch: t >= 60 });
+    // PCs 375–377: a free copy (35 + 10) replaces it and drives away.
+    expect(match.effects.map((e) => e.clip)).toContain('35+10');
+    expect(match.effects.map((e) => e.clip)).not.toContain(35);
+    for (let t = 115; t < 198; t++) match.step({ crouch: true });
     expect(amiro.action).toBe('idle');
     expect(amiro.x).toBeCloseTo(STAGE_WIDTH / 2 - 180, 6);
     // PC 382 enters EX CHANGE (39) + 3 while down is held.
     expect(exMode(amiro)).toBe(true);
-    // PCs 375–377: a free copy (35 + 10) replaces it and drives away.
-    expect(match.effects.map((e) => e.clip)).toContain('35+10');
-    expect(match.effects.map((e) => e.clip)).not.toContain(35);
   });
 
   it('flies out of HISA Down (128) at −800 and Tatumaki >> (105) at −300', () => {

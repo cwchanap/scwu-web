@@ -513,6 +513,32 @@ describe('recovered neutral and round animations', () => {
     expect(playing(player)).toBe(RYUKO.punch);
   });
 
+  it("charges two stocks through each 開始時 BR's OP super Charge", () => {
+    // It takes 300 power, borrowing stocks down to none, then adds 2 a
+    // tick a hundred times (Ryuko's PCs 418, 423).
+    const charged = (
+      [
+        'ryuko',
+        'zoma',
+        'kiki',
+        'chung',
+        'amiro',
+        'anmc',
+        'giant',
+        'suneo',
+        'yo',
+        'sin',
+      ] as const
+    ).map((who) => {
+      const match = new Match('cpu', true, 0, [who, 'training']);
+      while (match.roundTicks < FIGHT_TICK) match.step();
+      return [who, match.fighters[0].stock, match.fighters[0].power];
+    });
+    expect(charged.filter(([, stock, power]) => stock !== 2 || power)).toEqual(
+      [],
+    );
+  });
+
   describe('Vs. CPU match', () => {
     // Play the round to SHOW TIME, then KO a side (both for a double KO).
     const ko = (match: Match, losers: number[], winnerHp = LIFE) => {
