@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { commanded, ENTRIES, NEAR } from './commands';
+import { commanded, ENTRIES, NEAR, usesButton } from './commands';
+import { CHARACTERS } from './characters';
+import type { Who } from './characters';
 import { LIFE, Match } from './match';
 import type { Fighter, Input } from './match';
 import { named, playing, RYUKO } from './testing';
@@ -76,6 +78,31 @@ describe('recovered command recognizer', () => {
       Object.assign(f, { stock: 3, power: 50, hp }),
     );
     expect(named(f)).toBe(action);
+  });
+
+  it('knows which button keys enter a one-step command', () => {
+    const idle = (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
+      (['punch', 'kick', 'hitUp', 'throw'] as const)
+        .filter((control) => !usesButton(who, control))
+        .map((control) => `${who} ${control}`),
+    );
+    expect(idle).toEqual([
+      'times hitUp',
+      'zmega hitUp',
+      'shinz hitUp',
+      'zaku hitUp',
+      'zaku throw',
+      'pachelo hitUp',
+      'pachelo throw',
+      'golf hitUp',
+      'golf throw',
+      'asura hitUp',
+      'asura throw',
+      'ttro hitUp',
+      'astroman hitUp',
+      'rario hitUp',
+      'rario throw',
+    ]);
   });
 
   it("reads back and forward from the opponent's side", () => {

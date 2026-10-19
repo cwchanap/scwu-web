@@ -1023,7 +1023,7 @@ Below the arena, choose your fighter and the opponent (Ryuko, Zoma, Kiki, Chung,
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match.
 
-Tick **Music** for the stage's track. Leaving the window pauses the match. The touch buttons cover every control; landscape is recommended on phones.
+Tick **Music** for the stage's track. Leaving the window pauses the match. The touch buttons cover every control the fighter has, as does the key list under the arena; landscape is recommended on phones.
 
 [docs/gameplay.md](docs/gameplay.md) describes how each move, chain, cancel, reaction and round rule plays.
 

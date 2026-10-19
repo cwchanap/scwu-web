@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { buttonsOf, KEYS } from './game/commands';
+  import { buttonsOf, KEYS, usesButton } from './game/commands';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
@@ -511,14 +511,16 @@
     };
   const labelOf = (control: Control, label: string) =>
     fighterLabels[fighter]?.[control] || label;
-  // A move key the fighter has no command or button for has no button.
+  // A move key the fighter has no command or button for has no button, nor
+  // a button no command with an action takes.
   const moveKeys = new Set(
     Object.values(KEYS).flatMap((keys) => keys.map(([control]) => control)),
   );
   const has = (control: Control) =>
-    !moveKeys.has(control) ||
-    KEYS[fighter].some(([key]) => key === control) ||
-    control in buttonsOf(fighter);
+    control in buttonsOf(fighter)
+      ? usesButton(fighter, control)
+      : !moveKeys.has(control) ||
+        KEYS[fighter].some(([key]) => key === control);
 
   onMount(() => {
     let disposed = false;
@@ -917,17 +919,19 @@
 
   <p class="keyboard-guide">
     <span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd> Jump</span
-    ><span><kbd>S</kbd> Crouch</span><span
-      ><kbd>J</kbd> {labelOf('punch', 'Punch')}</span
-    ><span><kbd>K</kbd> {labelOf('kick', 'Kick')}</span><span
-      ><kbd>L</kbd> Guard</span
-    ><span><kbd>Shift</kbd> Dash</span><span
-      ><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
-    ><span><kbd>I</kbd> {labelOf('axe', 'Axe')}</span><span
-      ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
-    ><span><kbd>H</kbd> {labelOf('hitUp', 'Hit Up')}</span><span
-      ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
-    >{#if has('dst')}<span><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span
+    ><span><kbd>S</kbd> Crouch</span>{#if has('punch')}<span
+        ><kbd>J</kbd> {labelOf('punch', 'Punch')}</span
+      >{/if}{#if has('kick')}<span><kbd>K</kbd> {labelOf('kick', 'Kick')}</span
+      >{/if}<span><kbd>L</kbd> Guard</span><span><kbd>Shift</kbd> Dash</span
+    >{#if has('drill')}<span><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
+      >{/if}{#if has('axe')}<span><kbd>I</kbd> {labelOf('axe', 'Axe')}</span
+      >{/if}{#if has('throw')}<span
+        ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
+      >{/if}{#if has('hitUp')}<span
+        ><kbd>H</kbd> {labelOf('hitUp', 'Hit Up')}</span
+      >{/if}{#if has('iori')}<span><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
+      >{/if}{#if has('dst')}<span
+        ><kbd>G</kbd> {labelOf('dst', 'Daisetsuzan')}</span
       >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
       >{/if}{#if SUPER_CONTROLS.some(has)}<span
         ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span

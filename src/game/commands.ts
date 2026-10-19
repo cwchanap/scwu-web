@@ -154,6 +154,23 @@ const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
   },
 };
 export const buttonsOf = (who: Who) => OWN_BUTTONS[who] ?? BUTTONS;
+// Whether a button key enters anything by itself: some one-step entry with
+// an action takes all its buttons. 3-TIMES's, Z-MEGA's (whose B only ends
+// TYPE CHANGE), SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's, TTRO's,
+// ASTROMAN's and RARIO's tables have no Hit Up, and ZAKU's, PAC-HELO's,
+// GOLF's, ASURA's and RARIO's no chuck.
+export const usesButton = (who: Who, control: Control) => {
+  const bits = buttonsOf(who)[control];
+  return (
+    bits !== undefined &&
+    entriesOf(who).some(
+      ({ air, near, far, crouch, steps }) =>
+        (air || near || far || crouch) &&
+        steps.length === 1 &&
+        (steps[0] & bits) === bits,
+    )
+  );
+};
 // Entries (1-based) as the port's controls, with the direction a jump or
 // dash carries.
 export const CONTROLS: Record<number, [Control, string?]> = {
