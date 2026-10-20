@@ -1008,6 +1008,11 @@ SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway
 # YINAN's throws) and RARIO grow, YARA and 1UP (65–67: his mushrooms).
 OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
 
+# The fighters besides Ryuko whose 開始時 a VS round plays from the start.
+# ponytail: ported one at a time; the match keeps the Br. intro for a pairing
+# with any other.
+VS_STARTS = {"zoma"}
+
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
           "crouchTimeStopGuard", "airTimeStopGuard")
@@ -3798,7 +3803,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
-                              *sorted(own_timelines)]]
+                              *sorted(own_timelines), *([tables["start"]] if key in VS_STARTS else [])]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his

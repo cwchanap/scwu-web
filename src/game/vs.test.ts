@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { animationFrame } from './animations';
+import type { Who } from './characters';
 import { FIGHT_TICK } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -7,16 +8,17 @@ import { named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
-const vsMatch = () =>
-  new Match('cpu', true, 0, ['ryuko', 'ryuko'], 'court', true);
+const vsMatch = (who: Who = 'ryuko') =>
+  new Match('cpu', true, 0, [who, who], 'court', true);
 const steps = (match: Match, ticks: number, input: Input = {}) => {
   for (let t = 0; t < ticks; t++) match.step(input);
 };
 // Source pixels.
 const at = (f: Fighter) => f.x / 1.5;
-const banners = (match: Match) =>
+// The VS 1P banners: Ryuko's 54, Zoma's 53.
+const banners = (match: Match, vs = 54) =>
   match.effects
-    .filter((e) => e.clip === 54 || e.clip === '54+9')
+    .filter((e) => e.clip === vs || e.clip === `${vs}+9`)
     .map((e) => [e.owner, e.clip, e.facing]);
 // Op 0x01 velocity, 16.16 scaled by floor(65536 / 100), per tick.
 const speed = (raw: number) => (raw * 655) / 65536;
@@ -140,6 +142,90 @@ describe("Ryuko's VS 開始時 (30)", () => {
     ]);
     steps(match, 124);
     expect([p1.action, p2.action]).toEqual(['script', 'script']);
+    match.step();
+    expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
+  });
+
+  it("plays each fighter's own, or the Br. intro if one has none exported", () => {
+    const mixed = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true);
+    expect(mixed.fighters.map((f) => f.branch)).toEqual([30, 28]);
+    const other = new Match('cpu', true, 0, ['zoma', 'kiki'], 'court', true);
+    expect(other.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
+  });
+});
+
+describe("Zoma's VS 開始時 (28)", () => {
+  it('crosses as Ryuko does, then plays Start N (31) from its start', () => {
+    const match = vsMatch('zoma');
+    const [p1, p2] = match.fighters;
+    steps(match, 5);
+    expect([p1.branch, p2.branch]).toEqual([28, 28]);
+    // Round 1 (PC 269) spawns VS 1P (53) twice (PCs 272–273) and dashes.
+    match.step();
+    expect([p1.branch, at(p1), at(p2)]).toEqual(['28+9', 370, 910]);
+    match.step();
+    expect(banners(match, 53)).toEqual([
+      [0, 53, 1],
+      [0, '53+9', 1],
+      [1, 53, -1],
+      [1, '53+9', -1],
+    ]);
+    steps(match, 23);
+    const cross = 15 * speed(2870);
+    expect(at(p1)).toBeCloseTo(370 + cross, 6);
+    expect(at(p2)).toBeCloseTo(910 - cross, 6);
+    expect(banners(match, 53)).toEqual([
+      [0, 53, 1],
+      [0, '53+9', 1],
+    ]);
+    // Image 113 for 70 ticks (PC 280), then Start N from its start (PC
+    // 284), whose 250 ticks of displays (PCs 308–321) don't move him.
+    steps(match, 70);
+    expect([p1.branch, animationFrame('28+9', p1.age, 'zoma').image]).toEqual([
+      '28+9',
+      113,
+    ]);
+    match.step();
+    expect([p1.branch, p2.branch]).toEqual([31, 31]);
+    // OP super Charge (36) takes VS CHARGE (35) for global 3 > 40 (PC 378).
+    match.step();
+    expect(
+      match.effects.filter((e) => e.clip === 35).map((e) => e.owner),
+    ).toEqual([0, 1]);
+    steps(match, 248);
+    expect([named(p1), named(p2)]).toEqual(['31', '31']);
+    match.step();
+    expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
+    expect(at(p1)).toBeCloseTo(370 + cross, 6);
+    while (match.roundTicks < FIGHT_TICK - 1) match.step();
+    expect(match.fighters.map((f) => [f.stock, f.power])).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+  });
+
+  it('shows image 114, then DEMO STAND four times from round 2', () => {
+    const match = vsMatch('zoma');
+    while (match.roundTicks < FIGHT_TICK) match.step();
+    match.fighters[1].hp = 0;
+    while (match.round === 1) match.step();
+    const [p1, p2] = match.fighters;
+    steps(match, 6);
+    expect([p1.branch, at(p1), at(p2), banners(match, 53)]).toEqual([
+      28,
+      370,
+      910,
+      [],
+    ]);
+    // Image 113 from age 30 (PC 280), 114 for 30 (PC 285), then DEMO STAND
+    // (41) four times (PC 286): 113, 114, 115 and 114 for 11, 11, 22, 11.
+    expect(
+      [29, 30, 99, 100, 129, 130, 141, 152, 174, 185, 349].map(
+        (age) => animationFrame(28, age, 'zoma').image,
+      ),
+    ).toEqual([0, 113, 113, 114, 114, 113, 114, 115, 114, 113, 114]);
+    steps(match, 344);
+    expect([p1.branch, p2.branch]).toEqual([28, 28]);
     match.step();
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
   });
