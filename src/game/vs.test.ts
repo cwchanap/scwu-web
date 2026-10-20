@@ -547,6 +547,30 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: '37+10',
   },
+  // Round 1 (33, PC 313): 250 ticks of displays. From round 2 image 118 for
+  // 70 ticks (PC 314), then Stand Demo (27) from + 1 (PC 315): 117, 116,
+  // 115, 116, 117 and 118 for 8, 7, 80, 7, 8, 70.
+  {
+    who: 'hiso',
+    start: 30,
+    round1: 33,
+    banner: 55,
+    image: 117,
+    charge: 37,
+    demo: [
+      [99, 117],
+      [100, 118],
+      [169, 118],
+      [170, 117],
+      [178, 116],
+      [185, 115],
+      [265, 116],
+      [272, 117],
+      [280, 118],
+      [349, 118],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1423,5 +1447,23 @@ describe("SOU's ZA finishers (global 3 > 0)", () => {
     const stop = (vs: boolean) =>
       finish(vs, 80, 403, { who: 'sou' }).branches.has('418');
     expect([stop(false), stop(true)]).toEqual([true, false]);
+  });
+});
+
+describe("HISO's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; Fly Arm hit Fin ZA's is
+  // *CARD EXPLOR ZA's (285), which it spawns (PC 4312).
+  it.each([
+    ['Chuck hit ZA (224, PC 3252)', { throw: true }, 224, [480, 480]],
+    ['Fly Arm hit Fin ZA (287, PC 4284)', 278, 287, [410, 410]],
+    ['Fish hit ZA (296, PC 4482)', 289, 296, [430, 430]],
+  ] as const)('%s', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'hiso' });
+    const vs = finish(true, 80, move, { held: 9, who: 'hiso' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
