@@ -1158,6 +1158,32 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Black (36) and ＺＡ (34, PC 208), whose box sits 20000 below it. Round 1
+  // (27, PC 213): a blank for 50 ticks, images 220 to 224 and 169, then his
+  // landing at + 19 (PC 254). From round 2 a stand (22) from + 4 (PC 214).
+  {
+    who: 'rario',
+    start: 24,
+    round1: 27,
+    banner: 47,
+    image: 115,
+    charge: 31,
+    demo: [
+      [107, 115],
+      [108, 116],
+      [113, 117],
+      [118, 118],
+      [123, 119],
+      [131, 118],
+      [139, 117],
+      [147, 116],
+      [155, 115],
+      [312, 116],
+      [319, 116],
+    ],
+    idle: [351, 321],
+    ends: '27+19',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -2855,6 +2881,20 @@ describe("ASTROMAN's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("RARIO's ZA finisher (global 3 > 0)", () => {
+  // Shin shoryu rp final's op 0x15s take 200 (PCs 2768–2773); its ZA's
+  // boxes strike for as much (PCs 2800, 2803) before it rejoins at + 14.
+  it('Shin shoryu rp final ZA (216, PC 2761)', () => {
+    const br = finish(false, 80, 200, { who: 'rario' });
+    const vs = finish(true, 80, 200, { who: 'rario' });
+    expect([br.branches.has('216'), vs.branches.has('216')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([310, 310]);
   });
 });
 
