@@ -965,6 +965,82 @@ describe.each(TEMPLATE)(
   },
 );
 
+describe("MASA's VS 開始時 (44)", () => {
+  // 開始時 spawns itself from + 7 (PC 349), whose global 3 = 50 test takes
+  // 開始時 D50 (47, PC 352): in round 1 it sets variables 14 and 0 to 10
+  // (PCs 397, 400), his Alpha form. 開始時 jumps into 開始時 1P (45, PC 351),
+  // which in round 1 enters OP Music 1P (46, PC 357) and rejoins at + 5:
+  // VS 1P twice, from its start and + 12 (PCs 360, 361), the first taking
+  // VS Alpha (88) for global 3 = 50 (PC 760) as variable 0 isn't 0, the
+  // dash and cross, Black, image 113 for 70 ticks and OP super Charge, then
+  // OP (53, PC 373), which plays OP Alpha (54, PC 473) for variable 0.
+  it('takes his Alpha form and plays OP Alpha in round 1', () => {
+    const match = vsMatch('masa');
+    const [p1, p2] = match.fighters;
+    steps(match, 4);
+    expect([p1.variables[0], p1.variables[14]]).toEqual([10, 10]);
+    steps(match, 2);
+    expect([named(p1), at(p1), at(p2)]).toEqual(['46', 370, 910]);
+    match.step();
+    expect(
+      match.effects
+        .filter((e) => e.clip === 88 || e.clip === '86+12')
+        .map((e) => [e.owner, e.clip]),
+    ).toEqual([
+      [0, 88],
+      [0, '86+12'],
+      [1, 88],
+      [1, '86+12'],
+    ]);
+    steps(match, 94);
+    expect([named(p1), named(p2)]).toEqual(['53', '53']);
+    // OP super Charge takes VS CHARGE for global 3 > 40 (PC 653).
+    match.step();
+    expect(
+      match.effects.filter((e) => e.clip === 70).map((e) => e.owner),
+    ).toEqual([0, 1]);
+    steps(match, 248);
+    expect([named(p1), named(p2)]).toEqual(['53', '53']);
+    match.step();
+    expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
+    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
+  });
+
+  // From round 2 開始時 D50 skips its sets (PC 394) and 開始時 1P its
+  // banners: image 113 for 70 ticks, image 115 for 16 (PC 375), then DEMO
+  // STAND (32) from + 9: 113, 114 and 115 for 10, 13, 3.
+  it('plays his normal round 2', () => {
+    const match = vsMatch('masa');
+    while (match.roundTicks < FIGHT_TICK) match.step();
+    match.fighters[1].hp = 0;
+    while (match.round === 1) match.step();
+    const [p1, p2] = match.fighters;
+    steps(match, 6);
+    expect([p1.branch, at(p1), at(p2), p1.variables[0] ?? 0]).toEqual([
+      44, 370, 910, 0,
+    ]);
+    const ages: [number, number][] = [
+      [29, 0],
+      [30, 113],
+      [99, 113],
+      [100, 115],
+      [116, 113],
+      [126, 114],
+      [139, 115],
+      [142, 113],
+      [347, 115],
+      [349, 115],
+    ];
+    expect(
+      ages.map(([age]) => [age, animationFrame(44, age, 'masa').image]),
+    ).toEqual(ages);
+    steps(match, 344);
+    expect([p1.branch, p2.branch]).toEqual([44, 44]);
+    match.step();
+    expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
+  });
+});
+
 // Down held on the step from `tick` in round 1 or 2 of a VS match between
 // two of `who`: where its 開始時 is 350 ticks in, whether EX mode is on, and
 // the images it showed after the press.
@@ -2239,5 +2315,27 @@ describe("ZIRO's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("MASA's VS finishers (global 3 > 0)", () => {
+  it('>>SCC Hit3 hit2 ZA (297, PC 4301) strikes for what op 0x15 takes', () => {
+    const br = finish(false, 80, 289, { who: 'masa' });
+    const vs = finish(true, 80, 289, { who: 'masa' });
+    expect([br.branches.has('297'), vs.branches.has('297')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([435, 435]);
+  });
+
+  it('SUN GO HIT2 takes EN3 Stop (346) only in VS (PC 5233)', () => {
+    const br = finish(false, 80, 340, { who: 'masa' });
+    const vs = finish(true, 80, 340, { who: 'masa' });
+    expect([br.branches.has('346'), vs.branches.has('346')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([310, 310]);
   });
 });
