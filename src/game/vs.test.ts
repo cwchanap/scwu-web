@@ -266,6 +266,31 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (35, PC 329): 206 ticks of displays, its EX check (PC 363),
+  // then 44 more (PCs 364–367). From round 2 image 114 for 4 ticks (PC 330),
+  // DEMO STAND (30) three times (PC 331), the EX check (PC 332), then three
+  // times more (PC 333): 113 for 15, 114 to 117 for 5 each, 114 for 6.
+  {
+    who: 'anmc',
+    start: 32,
+    round1: 35,
+    banner: 56,
+    image: 113,
+    charge: 40,
+    demo: [
+      [100, 114],
+      [103, 114],
+      [104, 113],
+      [119, 114],
+      [124, 115],
+      [129, 116],
+      [134, 117],
+      [139, 114],
+      [145, 113],
+      [349, 114],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -398,6 +423,37 @@ describe("Amiro's EX checks", () => {
     const demo = [113, 114, 115, 116, 117];
     expect(exCheck('amiro', true, 266)).toEqual(['29', false, demo]);
     expect(exCheck('amiro', true, 267)).toEqual(['39', true, demo]);
+  });
+});
+
+describe("ANMC P's EX checks", () => {
+  // Down held at Round 1's check (PC 363) or between round 2's DEMO STANDs
+  // (PC 332) enters 'Chage Character' (39) or + 3, which set variable 0 to
+  // 100 and rejoin the displays they skip from (PCs 364, 333).
+  it('in round 1, at Round 1 + 206', () => {
+    expect(exCheck('anmc', false, 305)).toEqual([
+      '35',
+      false,
+      [316, 317, 138, 113],
+    ]);
+    expect(exCheck('anmc', false, 306)).toEqual([
+      '39',
+      true,
+      [316, 317, 138, 113],
+    ]);
+  });
+
+  it('from round 2, between the DEMO STANDs', () => {
+    expect(exCheck('anmc', true, 226)).toEqual([
+      '32',
+      false,
+      [113, 114, 115, 116, 117],
+    ]);
+    expect(exCheck('anmc', true, 227)).toEqual([
+      '39+3',
+      true,
+      [113, 114, 115, 116, 117],
+    ]);
   });
 });
 
@@ -534,6 +590,33 @@ describe("Amiro's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, gap, ex, hp) => {
     const br = finish(false, gap, move, { who: 'amiro', ex });
     const vs = finish(true, gap, move, { who: 'amiro', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("ANMC P's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for the 25 or 100 its op 0x15 takes. CHUCK enters
+  // cHUCK NEW (232), or CHUCK (238) in EX mode (PC 3143).
+  it('cHUCK HIT NEW ZA (234, PC 3186)', () => {
+    const br = finish(false, 80, { throw: true }, { held: 9, who: 'anmc' });
+    const vs = finish(true, 80, { throw: true }, { held: 9, who: 'anmc' });
+    expect([br.branches.has('234'), vs.branches.has('234')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([485, 485]);
+  });
+
+  it.each([
+    ['CHUCK HIT ZA (240, PC 3264)', 232, 240, 80, true, [485, 485]],
+    ['chuck sp hit ZA (298, PC 4114)', 296, 298, 100, false, [410, 410]],
+  ] as const)('%s', (_, move, za, gap, ex, hp) => {
+    const br = finish(false, gap, move, { who: 'anmc', ex });
+    const vs = finish(true, gap, move, { who: 'anmc', ex });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
