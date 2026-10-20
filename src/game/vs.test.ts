@@ -652,6 +652,39 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: '36+15',
   },
+  // Round 1 (39, PC 414): 178 ticks of displays, a roll (PC 456) whether
+  // to show image 607, a hop held on image 609 until it lands in + 25 (PCs
+  // 451–463), its EX check (PC 466) and image 610 for 20. From round 2
+  // image 123 for a tick (PC 415), Stand DEMO (31) from + 2 twice (PC
+  // 416), the EX check (PC 417), then Stand DEMO from + 1 (PC 418): 115 to
+  // 123 for 10, 7, 12, 7, 14, 7, 7, 12, 7.
+  {
+    who: 'gon',
+    start: 36,
+    round1: 39,
+    banner: 62,
+    image: 115,
+    charge: 43,
+    demo: [
+      [99, 115],
+      [100, 123],
+      [101, 115],
+      [111, 116],
+      [118, 117],
+      [130, 118],
+      [137, 119],
+      [151, 120],
+      [158, 121],
+      [165, 122],
+      [177, 123],
+      [184, 115],
+      [267, 115],
+      [343, 123],
+      [349, 123],
+    ],
+    idle: [351, 351],
+    ends: '39+25',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1099,6 +1132,30 @@ describe("OS FENG's Round 1 roll and EX checks", () => {
       '52+3',
       true,
       [495, 496, 497, 494],
+    ]);
+  });
+});
+
+describe("GON's EX checks", () => {
+  // Down held as Round 1 lands (PC 466) enters 'TYPE CHANGE' (49), which
+  // sets variable 0 to 100 and rejoins at PC 467; after round 2's Stand
+  // DEMOs (PC 417) it enters + 3, which rejoins at PC 418, where Stand
+  // DEMO's test of variable 0 plays Stand DEMO 2 (32, PC 335).
+  it('in round 1, as Round 1 lands', () => {
+    expect(exCheck('gon', false, 329)).toEqual(['39+25', false, [610]]);
+    expect(exCheck('gon', false, 330)).toEqual(['49', true, [610]]);
+  });
+
+  it('from round 2, after two Stand DEMOs', () => {
+    expect(exCheck('gon', true, 266)).toEqual([
+      '36',
+      false,
+      [115, 116, 117, 118, 119, 120, 121, 122, 123],
+    ]);
+    expect(exCheck('gon', true, 267)).toEqual([
+      '49+3',
+      true,
+      [734, 735, 736, 737, 738, 739, 740, 741, 733],
     ]);
   });
 });
@@ -1727,5 +1784,55 @@ describe("SEAN's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("GON's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. counter start (292) runs in
+  // and sets variable 4 to 100 for 40 ticks (PCs 4516–4526), so a strike
+  // takes his hit reactions into Counter get (293, PCs 916, 954, ...), or
+  // its evil forms at life 150 or below; in EX mode it takes EX moveing
+  // chuck (309, PC 4500). ponytail: EX Chuck hit 2 and 3 want variable 7
+  // at 500 or 1000 40 ticks in (PCs 4869, 4870), but the 技名8 it spawns
+  // holds it so for its first 30 ticks only (PCs 4988–4995); untested.
+  // KUREN start (376) sets variable 4 to 200 (PC 6091) for KUREN GET (384),
+  // or Kuren under at life 150 or below (PC 6203).
+  const counter = { victim: [30, { punch: true }] } as const;
+  const kuren = { victim: [0, { punch: true }] } as const;
+  it.each([
+    ['Chuck hit ZA (243, PC 3642)', { throw: true }, 80, 243, {}, [470, 470]],
+    ['Counter hit get 3 ZA (300, PC 4630)', 292, 200, 300, counter, [470, 470]],
+    [
+      'COUNTER GET EVIL3 ZA (306, PC 4765)',
+      292,
+      200,
+      306,
+      { ...counter, life: 100 },
+      [465, 465],
+    ],
+    ['EX Chuck hit ZA (317, PC 4872)', 292, 80, 317, { ex: true }, [470, 470]],
+    ['Drill add1 hit ZA (329, PC 5213)', 519, 80, 329, {}, [452, 452]],
+    // *KUREN LEND EXPLOR ZA (380), a 110 box, takes the place of *KUREN
+    // LEND EXPLOR's 30 (379) and op 0x15's 110 (PC 6258).
+    ['KUREN GET ZA (385, PC 6252)', 376, 80, 385, kuren, [370, 400]],
+  ] as const)('%s', (_, move, gap, za, options, hp) => {
+    const br = finish(false, gap, move, { held: 9, who: 'gon', ...options });
+    const vs = finish(true, gap, move, { held: 9, who: 'gon', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+
+  // ponytail: Ryuko's response 61 reaction (137) has run out by Kuren
+  // under ZA's box (PC 6411), so it misses where the Br. path's op 0x15
+  // needs no contact; check the hold against the source if it matters.
+  it('takes Kuren under ZA (389, PC 6583) at life 150 or below', () => {
+    const options = { who: 'gon', life: 100, ...kuren } as const;
+    expect([
+      finish(false, 80, 376, options).branches.has('389'),
+      finish(true, 80, 376, options).branches.has('389'),
+    ]).toEqual([false, true]);
   });
 });
