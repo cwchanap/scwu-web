@@ -1034,6 +1034,30 @@ const TEMPLATE: {
     idle: [372, 376],
     copy: '26+8',
   },
+  // Its round copy is + 8 (PCs 210, 211). Round 1 (29, PC 225): a blank
+  // for 50 ticks, images 113 to 115 and back, then demo stand (24) from + 3
+  // in a loop: 113, 114, 115 and 114 for 12 each. From round 2 demo stand
+  // from + 5 (PC 226).
+  {
+    who: 'asura',
+    start: 26,
+    round1: 29,
+    banner: 40,
+    image: 113,
+    charge: 31,
+    demo: [
+      [99, 113],
+      [100, 113],
+      [112, 114],
+      [124, 115],
+      [136, 114],
+      [148, 113],
+      [328, 114],
+      [339, 114],
+    ],
+    idle: [343, 341],
+    copy: '26+8',
+  },
 ];
 
 describe.each(TEMPLATE)(
