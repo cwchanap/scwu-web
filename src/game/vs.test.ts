@@ -847,6 +847,37 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (39, PC 409): a roll for RANDOM OP1 that never passes (rand %
+  // 6 > 103, PC 453), a leap off, then a drop held on image 379 until it
+  // lands in + 11 (PCs 454–461), 91 ticks in: its displays, its EX check
+  // (PC 486), images 264 and 125. From round 2 image 116 for a tick (PC
+  // 410), demo act (30) from + 2 twice (PC 411), the EX check (PC 412),
+  // then demo act from + 1 (PC 413): 115 to 118 and back for 23, 10, 10,
+  // 20, 10, 10.
+  {
+    who: 'ziro',
+    start: 36,
+    round1: 39,
+    banner: 63,
+    image: 115,
+    charge: 44,
+    demo: [
+      [99, 115],
+      [100, 116],
+      [101, 115],
+      [124, 116],
+      [134, 117],
+      [144, 118],
+      [164, 117],
+      [174, 116],
+      [184, 115],
+      [267, 115],
+      [340, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+    ends: '39+11',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1353,6 +1384,30 @@ describe("SWW's EX checks", () => {
     const images = [113, 114, 115, 116];
     expect(exCheck('sww', true, 233)).toEqual(['30', false, images]);
     expect(exCheck('sww', true, 234)).toEqual(['37+3', true, images]);
+  });
+});
+
+describe("ZIRO's EX checks", () => {
+  // Down held at Round 1's check (PC 486) enters 'Change EX' (43), which
+  // sets variable 0 to 100 and rejoins at PC 487; after round 2's demo acts
+  // (PC 412) it enters + 5, which jumps to 開始時 + 25 (PC 553), where demo
+  // act's test of variable 0 plays Demo act2 (29, PC 324).
+  it('in round 1, after Round 1 lands', () => {
+    expect(exCheck('ziro', false, 258)).toEqual(['39+11', false, [264, 125]]);
+    expect(exCheck('ziro', false, 259)).toEqual(['43', true, [264, 125]]);
+  });
+
+  it('from round 2, after two demo acts', () => {
+    expect(exCheck('ziro', true, 266)).toEqual([
+      '36',
+      false,
+      [115, 116, 117, 118],
+    ]);
+    expect(exCheck('ziro', true, 267)).toEqual([
+      '43+5',
+      true,
+      [479, 480, 483, 481],
+    ]);
   });
 });
 
@@ -2169,5 +2224,20 @@ describe("OGI's ZA finishers (global 3 > 0)", () => {
       [true, false],
       [false, true],
     ]);
+  });
+});
+
+describe("ZIRO's ZA finishers (global 3 > 0)", () => {
+  it.each([
+    ['Chuck Hit ZA (247, PC 3702)', { throw: true }, 247, [485, 485]],
+    ['CC HIT3 ZA (321, PC 5306)', 317, 321, [470, 470]],
+  ] as const)('%s strikes for what op 0x15 takes', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'ziro' });
+    const vs = finish(true, 80, move, { held: 9, who: 'ziro' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
