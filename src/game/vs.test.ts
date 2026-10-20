@@ -411,6 +411,34 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: 36,
   },
+  // Round 1 (33, PC 326) steps back at −2250 for 5 ticks, waits 45, walks
+  // in at 200 for 56 (PCs 352–365), shows image 113 for 26, checks down
+  // (PC 367) and calls Demo stand (28) from + 2. From round 2 image 113 for
+  // 14 ticks (PC 327), Demo stand from + 2 (PC 328), the EX check (PC 329),
+  // then Demo stand again (PC 330).
+  {
+    who: 'kay',
+    start: 30,
+    round1: 33,
+    banner: 54,
+    image: 114,
+    charge: 38,
+    demo: [
+      [99, 114],
+      [100, 113],
+      [114, 114],
+      [122, 115],
+      [130, 116],
+      [139, 117],
+      [145, 118],
+      [151, 119],
+      [157, 120],
+      [163, 113],
+      [349, 113],
+    ],
+    idle: [351, 351],
+    walk: -5 * speed(2250) + 56 * speed(200),
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -670,6 +698,22 @@ describe("SIN's EX checks", () => {
   });
 });
 
+describe("KAY's EX checks", () => {
+  // Down held at Round 1's check (PC 367) or between round 2's Demo stands
+  // (PC 329) enters 'EX CH' (36), which sets variable 0 to 100 and jumps to
+  // 開始時 + 25 (PC 408), its last Demo stand call (PC 330).
+  const demo = [114, 115, 116, 117, 118, 119, 120, 113];
+  it('in round 1, at Round 1 + 132', () => {
+    expect(exCheck('kay', false, 231)).toEqual(['33', false, demo]);
+    expect(exCheck('kay', false, 232)).toEqual(['36', true, demo]);
+  });
+
+  it('from round 2, between the Demo stands', () => {
+    expect(exCheck('kay', true, 231)).toEqual(['30', false, demo]);
+    expect(exCheck('kay', true, 232)).toEqual(['36', true, demo]);
+  });
+});
+
 // `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
 // (held `held` ticks) or entering source action `input`: Ryuko's actions in
 // order, the striker's branches and the life Ryuko has left.
@@ -677,7 +721,15 @@ function finish(
   vs: boolean,
   gap: number,
   input: Input | number,
-  { held = 1, who = 'ryuko', ex = false, life, down }: FinishOptions = {},
+  {
+    held = 1,
+    who = 'ryuko',
+    ex = false,
+    life,
+    down,
+    jumps,
+    press,
+  }: FinishOptions = {},
 ) {
   const match = new Match('practice', false, 0, [who, 'ryuko'], 'court', vs);
   const [striker, target] = match.fighters;
@@ -700,7 +752,15 @@ function finish(
   const seen: string[] = [];
   const branches = new Set<string>();
   for (let t = 0; t < 3000; t++) {
-    match.step(typeof input !== 'number' && t < held ? input : {});
+    match.step(
+      typeof input !== 'number' && t < held
+        ? input
+        : t === press?.[0]
+          ? press[1]
+          : {},
+      // A victim jumping, for an anti-air.
+      jumps && t < 2 ? { jump: true } : undefined,
+    );
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
   }
@@ -712,6 +772,9 @@ type FinishOptions = {
   ex?: boolean;
   life?: number;
   down?: boolean;
+  jumps?: boolean;
+  // A press at a tick, for a follow-up's op 0x24.
+  press?: [number, Input];
 };
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
@@ -998,6 +1061,53 @@ describe("LIZARD's ZA finishers (global 3 > 0)", () => {
     const options = { held: 9, who: 'lizard', life } as const;
     const br = finish(false, 80, move, options);
     const vs = finish(true, 80, move, options);
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("KAY's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes, EX Shamshel Hit Fin ZA's 40
+  // where the Br. form's takes 30 (PC 4089). At life 150 or below Comment
+  // Chuck and EX Sachiel take their Evil forms; Lilith (258) enters EX
+  // Sachiel in EX mode (PC 4122), and Chuck at its op 0x24 (PC 4197)
+  // enters EX Sachiel G. Matriel (280) strikes rising (PC 4559): an
+  // anti-air.
+  const sachiel = [30, { throw: true }] as [number, Input];
+  it.each([
+    ['Chuck hit ZA (225, PC 3426)', { throw: true }, 225, {}, [485, 485]],
+    ['CC hit ZA (243, PC 3745)', 240, 243, {}, [480, 480]],
+    ['Evil CC hit ZA (247, PC 3879)', 241, 247, { life: 100 }, [450, 450]],
+    [
+      'EX Shamshel Hit Fin ZA (256, PC 4087)',
+      240,
+      256,
+      { ex: true },
+      [480, 470],
+    ],
+    [
+      'EX Sachiel G hit ZA (269, PC 4263)',
+      258,
+      269,
+      { ex: true, press: sachiel },
+      [465, 465],
+    ],
+    [
+      'EX Sachiel G hit ZA Evil (270, PC 4348)',
+      258,
+      270,
+      { ex: true, life: 100, press: sachiel },
+      [450, 450],
+    ],
+    ['Matriel hit ZA (282, PC 4617)', 280, 282, { jumps: true }, [470, 470]],
+    ['Kaoru hit ZA (342, PC 5690)', 339, 342, {}, [410, 410]],
+    ['en300 drop ZA (369, PC 6220)', 361, 369, {}, [280, 280]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'kay', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'kay', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
