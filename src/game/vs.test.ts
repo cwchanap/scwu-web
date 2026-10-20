@@ -959,6 +959,31 @@ const TEMPLATE: {
     idle: [449, 357],
     seed: 2,
   },
+  // Its global 10 = 10 tests (PCs 277, 294) pass over Single Start. Round 1
+  // (39, PC 296): a blank for 50 ticks, images 113 to 115, then DEMO STAND
+  // (34) from + 4 in a loop: 113, 114 and 115 for 15, 18, 8. From round 2
+  // DEMO STAND from + 6 (PC 297).
+  {
+    who: 'zaku',
+    start: 36,
+    round1: 39,
+    banner: 52,
+    image: 113,
+    charge: 43,
+    demo: [
+      [99, 113],
+      [100, 113],
+      [115, 114],
+      [133, 115],
+      [141, 113],
+      [156, 114],
+      [174, 115],
+      [182, 113],
+      [338, 115],
+      [345, 115],
+    ],
+    idle: [356, 347],
+  },
 ];
 
 describe.each(TEMPLATE)(
