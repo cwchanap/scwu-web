@@ -685,6 +685,29 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: '39+25',
   },
+  // Round 1 (33, PC 316): 250 ticks of displays. From round 2 image 116
+  // for 46 ticks (PC 317), then sTAND demo (27) three times (PC 318): 115,
+  // 116, 117 and 116, 17 ticks each.
+  {
+    who: 'kate',
+    start: 30,
+    round1: 33,
+    banner: 55,
+    image: 115,
+    charge: 37,
+    demo: [
+      [99, 115],
+      [100, 116],
+      [146, 115],
+      [163, 116],
+      [180, 117],
+      [197, 116],
+      [214, 115],
+      [333, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1834,5 +1857,22 @@ describe("GON's ZA finishers (global 3 > 0)", () => {
       finish(false, 80, 376, options).branches.has('389'),
       finish(true, 80, 376, options).branches.has('389'),
     ]).toEqual([false, true]);
+  });
+});
+
+describe("KATE's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. K3 (194) is the third link of
+  // P and K's chain (op 0x24, PCs 2661, 2744), entered here.
+  it.each([
+    ['K3 hit ZA (196, PC 2803)', 194, 196, [480, 480]],
+    ['new chuck hit ZA (214, PC 3090)', { throw: true }, 214, [480, 480]],
+  ] as const)('%s', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'kate' });
+    const vs = finish(true, 80, move, { held: 9, who: 'kate' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
