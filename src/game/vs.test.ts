@@ -291,6 +291,28 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (33, PC 287): 200 ticks of displays, its EX check (PC 328),
+  // then 50 more. From round 2 Demo Stand (28) three times (PC 288), the
+  // EX check (PC 289), then twice (PC 290): 113, 114, 115 and 114 for 12,
+  // 12, 14, 12.
+  {
+    who: 'giant',
+    start: 30,
+    round1: 33,
+    banner: 57,
+    image: 113,
+    charge: 38,
+    demo: [
+      [111, 113],
+      [112, 114],
+      [124, 115],
+      [138, 114],
+      [150, 113],
+      [338, 114],
+      [349, 114],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -453,6 +475,29 @@ describe("ANMC P's EX checks", () => {
       '39+3',
       true,
       [113, 114, 115, 116, 117],
+    ]);
+  });
+});
+
+describe("Giant's EX checks", () => {
+  // Down held at Round 1's check (PC 328) or between round 2's Demo Stands
+  // (PC 289) enters 'Chung Style' (37) or + 3, which set variable 0 to 100
+  // and rejoin the displays they skip from (PCs 329, 290).
+  it('in round 1, at Round 1 + 200', () => {
+    expect(exCheck('giant', false, 299)).toEqual([
+      '33',
+      false,
+      [340, 341, 342],
+    ]);
+    expect(exCheck('giant', false, 300)).toEqual(['37', true, [340, 341, 342]]);
+  });
+
+  it('from round 2, between the Demo Stands', () => {
+    expect(exCheck('giant', true, 249)).toEqual(['30', false, [113, 114, 115]]);
+    expect(exCheck('giant', true, 250)).toEqual([
+      '37+3',
+      true,
+      [113, 114, 115],
     ]);
   });
 });
@@ -622,5 +667,52 @@ describe("ANMC P's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("Giant's VS finishers", () => {
+  // Each ZA box strikes for what op 0x15 takes. counter start (278) enters
+  // New movieng chuck (290) in EX mode (PC 4261), whose hit runs into
+  // Moving C fin (293, PC 4483).
+  it.each([
+    ['K3 hit ZA (198, PC 2839)', 196, 198, false, [470, 470]],
+    ['New K3 Hit ZA (203, PC 2933)', 201, 203, false, [470, 470]],
+    ['Counter hit ZA (283, PC 4341)', 279, 283, false, [450, 450]],
+    ['Moving C fin ZA (294, PC 4537)', 278, 294, true, [470, 470]],
+  ] as const)('%s', (_, move, za, ex, hp) => {
+    const br = finish(false, 80, move, { who: 'giant', ex });
+    const vs = finish(true, 80, move, { who: 'giant', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+
+  it('sings SINGING START through (PC 3306) where Chuck hit ZA (221) sings less', () => {
+    // Chuck hit jumps into SINGING START (PC 3270), whose global 3 = 0 test
+    // takes 221 (820 ticks) outside VS; VS sings its own (PCs 3307–3346)
+    // and returns to Chuck hit + 32: 40 ticks sooner into FLY NO HIT.
+    const flies = (vs: boolean) => {
+      const match = new Match(
+        'practice',
+        false,
+        0,
+        ['giant', 'ryuko'],
+        'court',
+        vs,
+      );
+      const [giant, ryuko] = match.fighters;
+      giant.x = 500;
+      ryuko.x = 580;
+      const branches = new Set<string>();
+      for (let t = 0; t < 2000; t++) {
+        match.step(t < 9 ? { throw: true } : {});
+        if (giant.action === 'script') branches.add(String(giant.branch));
+        if (ryuko.action === 'stun') return [branches.has('221'), t];
+      }
+    };
+    expect(flies(false)).toEqual([true, 903]);
+    expect(flies(true)).toEqual([false, 863]);
   });
 });
