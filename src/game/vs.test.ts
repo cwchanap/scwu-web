@@ -626,6 +626,32 @@ const TEMPLATE: {
     idle: [349, 351],
     seed: 1,
   },
+  // Round 1 (36, PC 349) leaps off at −20000 for 4 ticks, waits 50, then
+  // drops back at 500 (PCs 384–391) through 115 and 121 until it lands in
+  // + 15 (PC 390), 214 ticks in, image 115 for 36. From round 2 STAND DEMO
+  // (29) twice (PC 351): 115, 116, 117 and 116 for 65, 20, 20, 20.
+  {
+    who: 'sean',
+    start: 33,
+    round1: 36,
+    banner: 56,
+    image: 116,
+    charge: 40,
+    demo: [
+      [99, 116],
+      [100, 115],
+      [165, 116],
+      [185, 117],
+      [205, 116],
+      [225, 115],
+      [290, 116],
+      [310, 117],
+      [330, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+    ends: '36+15',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1672,6 +1698,30 @@ describe("OS FENG's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'feng', ...options });
     const vs = finish(true, 80, move, { held: 9, who: 'feng', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("SEAN's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; CC start AIR (232) strikes a
+  // jumping victim.
+  it.each([
+    ['Chuck hit ZA (213, PC 3090)', { throw: true }, 213, {}, [480, 480]],
+    [
+      'air CC hit ZA (235, PC 3447)',
+      232,
+      235,
+      { air: 3, victim: [0, { jump: true }] },
+      [465, 465],
+    ],
+    ['SCC hit1-2 2 (264, PC 3865)', 256, 264, {}, [420, 420]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'sean', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'sean', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
