@@ -1124,6 +1124,54 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
   });
 });
 
+describe("SHIN-Z's VS 開始時 (31)", () => {
+  // VS 1P takes VS GL 1P (64) for global 3 > 40 (PC 624), beside VS 1P +
+  // 10; the dash, cross and Black, image 319 for 70 ticks, then, for global
+  // 3 > 40 in every round, Start KO (39, PC 316). It spawns OP super
+  // Charge, which takes VS CHANGE (38, PC 520), shows image 183 for 210
+  // ticks, 177 and 176, then jumps to Start KO 2 (44, PC 417): HP hit and
+  // HISA Hit objects, variable 0 set to 10 (PC 502), and op 0x15 takes 1000
+  // of his own life (PC 505) before Start KO 3 (45) holds. His lose action
+  // runs at once (0x412327); the round goes to his opponent at FIGHT, the
+  // fight state's first KO check (0x408eda).
+  it('knocks himself out with Start KO before FIGHT', () => {
+    const match = new Match('cpu', true, 0, ['shinz', 'ryuko'], 'court', true);
+    const [p1, p2] = match.fighters;
+    steps(match, 8);
+    expect(
+      match.effects
+        .filter((e) => e.owner === 0 && (e.clip === 64 || e.clip === '61+10'))
+        .map((e) => e.clip),
+    ).toEqual([64, '61+10']);
+    steps(match, 93);
+    expect(named(p1)).toBe('39');
+    steps(match, 2);
+    expect(match.effects.some((e) => e.owner === 0 && e.clip === 38)).toBe(
+      true,
+    );
+    steps(match, 338);
+    expect([named(p1), p1.hp, p1.variables[0]]).toEqual(['39', 0, 10]);
+    match.step();
+    expect([p1.action, p2.action, match.winner]).toEqual([
+      'down',
+      'idle',
+      null,
+    ]);
+    while (match.roundTicks < FIGHT_TICK - 1) match.step();
+    expect([p1.action, match.winner]).toEqual(['koLand', null]);
+    match.step();
+    expect(match.winner).toBe('opponent');
+  });
+
+  it('takes Start KO again in round 2', () => {
+    const match = new Match('cpu', true, 0, ['shinz', 'ryuko'], 'court', true);
+    while (match.round === 1) match.step();
+    const [p1] = match.fighters;
+    steps(match, 101);
+    expect([named(p1), p1.hp]).toEqual(['39', 800]);
+  });
+});
+
 // Down held on the step from `tick` in round 1 or 2 of a VS match between
 // two of `who`: where its 開始時 is 350 ticks in, whether EX mode is on, and
 // the images it showed after the press.
@@ -2510,6 +2558,25 @@ describe("ALPHA's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s strikes for what op 0x15 takes', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'alpha' });
     const vs = finish(true, 80, move, { held: 9, who: 'alpha' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("SHIN-Z's VS finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; sgiga wall ZA's op 0x15 takes
+  // 1 more (PC 3606). AKUMA FIN takes SZ Stop for global 3 > 0.
+  it.each([
+    ['Chuck hit ZA (194, PC 2432)', { throw: true }, 194, [465, 465]],
+    ['Shin GIGA wall ZA (222, PC 3014)', 219, 222, [464, 464]],
+    ['SZ Stop (244, PC 3419)', 236, 244, [260, 260]],
+    ['sgiga wall ZA (257, PC 3589)', 249, 257, [389, 389]],
+  ] as const)('%s', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'shinz' });
+    const vs = finish(true, 80, move, { held: 9, who: 'shinz' });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,

@@ -3333,7 +3333,22 @@ export class Match {
       !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     if (this.calls && this.roundTicks < FIGHT_TICK) {
       this.inputs = [player, opponent ?? {}];
+      this.cpuDriven = false;
+      this.koStop = 0;
       for (const [i, f] of this.fighters.entries()) {
+        // The step enters a queued action whatever the phase (0x412327):
+        // SHIN-Z's VS Start KO takes 1000 of his life (PC 505), and his lose
+        // action runs before FIGHT. Only the KO check waits for the fight
+        // state (0x408eda).
+        if (f.pending || !['script', 'intro', 'idle'].includes(f.action)) {
+          this.move(f, this.fighters[1 - i], {}, {}, []);
+          this.enter(f, i);
+          continue;
+        }
+        if (f.hitStop > 0) {
+          f.hitStop--;
+          continue;
+        }
         // A VS 開始時 steps as any script does, and runs out into idle.
         if (f.action === 'script') {
           f.age++;
@@ -3358,8 +3373,10 @@ export class Match {
       this.record(0, player);
       this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
+      for (const f of this.fighters) this.pause(f, this.koStop);
       this.stepObjects(objects.filter((e) => e.z >= FIGHTER_Z));
-      for (const f of this.fighters) if (f.action === 'script') this.travel(f);
+      for (const f of this.fighters)
+        if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
       this.moveObjects();
       return;
     }
