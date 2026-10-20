@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { animationFrame } from './animations';
-import type { Action } from './animations';
+import type { Action, ObjectKey } from './animations';
 import type { Who } from './characters';
 import { FIGHT_TICK } from './hud';
 import { EX_MODE, exMode, Match } from './match';
@@ -167,7 +167,8 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // then in round 1 the action the round copy jumps to, from its start. Each
 // row: those actions and images, round 2's images by age, the ticks to idle
 // in rounds 1 and 2, how far round 1's action walks, and the action it runs
-// out of when that action jumps on, with a seed whose rolls both take it.
+// out of when that action jumps on, with a seed whose rolls both take it,
+// and the timeline the round copy jumps to.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -180,6 +181,7 @@ const TEMPLATE: {
   walk?: number;
   ends?: number | string;
   seed?: number;
+  copy?: ObjectKey;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -464,6 +466,35 @@ const TEMPLATE: {
     idle: [351, 351],
     seed: 1,
   },
+  // 開始時 jumps into 開始時 1P (37, PC 340), the template from + 8, holding
+  // a blank. Round 1 (40, PC 360): 170 ticks of displays unless its rolls
+  // take others (below), its EX check (PC 413), then STAND DEMO (31) once.
+  // From round 2 image 116 for 10 ticks (PC 362), STAND DEMO from + 2
+  // twice (PC 363), the EX check (PC 364), then STAND DEMO once (PC 365):
+  // 117, 115 and 116 for 15, 45 and 20.
+  {
+    who: 'sakuya',
+    start: 36,
+    copy: '37+8',
+    round1: 40,
+    banner: 66,
+    image: 0,
+    charge: 50,
+    demo: [
+      [99, 0],
+      [100, 116],
+      [110, 117],
+      [125, 115],
+      [170, 116],
+      [190, 117],
+      [270, 117],
+      [285, 115],
+      [330, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+    seed: 5,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -480,6 +511,7 @@ describe.each(TEMPLATE)(
     walk = 0,
     ends = round1,
     seed = 0,
+    copy = `${start}+9`,
   }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
       const match = vsMatch(who, seed);
@@ -488,7 +520,7 @@ describe.each(TEMPLATE)(
       expect([p1.branch, p2.branch]).toEqual([start, start]);
       // The round copy passes in round 1: VS 1P twice, and the dash.
       match.step();
-      expect([p1.branch, at(p1), at(p2)]).toEqual([`${start}+9`, 370, 910]);
+      expect([p1.branch, at(p1), at(p2)]).toEqual([copy, 370, 910]);
       match.step();
       expect(banners(match, banner)).toEqual([
         [0, banner, 1],
@@ -505,7 +537,7 @@ describe.each(TEMPLATE)(
         [0, `${banner}+9`, 1],
       ]);
       steps(match, 70);
-      expect(animationFrame(`${start}+9`, p1.age, who).image).toBe(image);
+      expect(animationFrame(copy, p1.age, who).image).toBe(image);
       match.step();
       expect([p1.branch, p2.branch]).toEqual([round1, round1]);
       // OP super Charge takes VS CHARGE for global 3 > 40.
@@ -758,6 +790,49 @@ describe("DIDO's Round 1 roll", () => {
   });
 });
 
+describe("SAKUYA's Round 1 rolls and EX checks", () => {
+  // Round 1's op 0x20s take Random OP3 (45) in 2 of 4 (PC 397), and 89
+  // ticks in RANDOM OP1 (41) in 2 of 6 (PC 403), which takes random op2
+  // (42) in 1 of 3 (PC 416); both jump back to Round 1 + 17 (PCs 427, 440).
+  it.each([
+    [0, 101, ['40', '45']],
+    [2, 190, ['45', '41']],
+    [4, 190, ['40', '42']],
+  ] as const)('seed %i: %i ticks in, %j', (seed, ticks, names) => {
+    const match = vsMatch('sakuya', seed);
+    steps(match, ticks);
+    expect(match.fighters.map(named)).toEqual(names);
+    steps(match, 351 - ticks);
+    expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
+  });
+
+  // Down held at Round 1's check (PC 413) or round 2's (PC 364) enters 'ex
+  // change' (49), which sets variable 0 to 100 and jumps to 開始時 1P + 24
+  // (PC 522): STAND DEMO from its start, whose test of variable 0 takes
+  // Skill1 (32, PC 296).
+  it('in round 1, at Round 1 + 170', () => {
+    expect(exCheck('sakuya', false, 269)).toEqual([
+      '40',
+      false,
+      [117, 115, 116],
+    ]);
+    expect(exCheck('sakuya', false, 270)).toEqual([
+      '49',
+      true,
+      [236, 237, 238],
+    ]);
+  });
+
+  it('from round 2, after two STAND DEMOs', () => {
+    expect(exCheck('sakuya', true, 269)).toEqual([
+      '36',
+      false,
+      [117, 115, 116],
+    ]);
+    expect(exCheck('sakuya', true, 270)).toEqual(['49', true, [236, 237, 238]]);
+  });
+});
+
 // `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
 // (held `held` ticks) or entering source action `input`: Ryuko's actions in
 // order, the striker's branches and the life Ryuko has left.
@@ -771,7 +846,7 @@ function finish(
     ex = false,
     life,
     down,
-    jumps,
+    victim,
     press,
   }: FinishOptions = {},
 ) {
@@ -802,8 +877,9 @@ function finish(
         : t === press?.[0]
           ? press[1]
           : {},
-      // A victim jumping, for an anti-air.
-      jumps && t < 2 ? { jump: true } : undefined,
+      // The victim's input on its first ticks: a jump into an anti-air, a
+      // strike into a counter.
+      victim && t < 2 ? victim : undefined,
     );
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
@@ -816,7 +892,7 @@ type FinishOptions = {
   ex?: boolean;
   life?: number;
   down?: boolean;
-  jumps?: boolean;
+  victim?: Input;
   // A press at a tick, for a follow-up's op 0x24.
   press?: [number, Input];
 };
@@ -1146,7 +1222,13 @@ describe("KAY's ZA finishers (global 3 > 0)", () => {
       { ex: true, life: 100, press: sachiel },
       [450, 450],
     ],
-    ['Matriel hit ZA (282, PC 4617)', 280, 282, { jumps: true }, [470, 470]],
+    [
+      'Matriel hit ZA (282, PC 4617)',
+      280,
+      282,
+      { victim: { jump: true } },
+      [470, 470],
+    ],
     ['Kaoru hit ZA (342, PC 5690)', 339, 342, {}, [410, 410]],
     ['en300 drop ZA (369, PC 6220)', 361, 369, {}, [280, 280]],
   ] as const)('%s', (_, move, za, options, hp) => {
@@ -1169,5 +1251,29 @@ describe("DIDO's ZA finisher (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual([480, 480]);
+  });
+});
+
+describe("SAKUYA's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. counter (318) sets variable 4
+  // to 100 (PC 4923), so a strike takes her hit reactions into NewCounter
+  // Get (319, PCs 883, 922, ...).
+  it.each([
+    ['Chuck Hit ZA (252, PC 3636)', { throw: true }, 252, {}, [490, 490]],
+    [
+      'New Counter get2 ZA (323, PC 5012)',
+      318,
+      323,
+      { victim: { punch: true } },
+      [470, 470],
+    ],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'sakuya', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'sakuya', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
