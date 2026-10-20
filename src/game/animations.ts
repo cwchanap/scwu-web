@@ -139,8 +139,8 @@ export type SourceEvent =
       // A forward skip in an inlined call.
       called?: boolean;
       // Below selector 0x40, the object's own variable, set or added to
-      // first.
-      pre?: { value: number; add: boolean };
+      // first, or set to the round.
+      pre?: { value: number; add: boolean; round?: boolean };
     }
   | {
       op: 'spawn';
@@ -255,6 +255,8 @@ export type ObjectKey = number | `${number}+${number}`;
 export const RESPONSES: readonly number[] = data.responses;
 // The hit-effect action each response spawns at contact (0 = none).
 export const RESPONSE_EFFECTS: readonly number[] = data.response_effects;
+export const exported = (index: ObjectKey, who: Container) =>
+  index in scripts[who];
 export function script(index: ObjectKey, who: Container = 'ryuko') {
   const found = scripts[who][index];
   if (!found) throw new Error(`Source action ${index} was not exported`);

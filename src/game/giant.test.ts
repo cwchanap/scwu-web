@@ -13,8 +13,15 @@ import type { Fighter, Input } from './match';
 import { enter } from './testing';
 
 // Giant as player 1, `gap` from a standing opponent.
-function giantPlayer(gap = 90, opponent: Who = 'ryuko') {
-  const match = new Match('practice', false, 3, ['giant', opponent]);
+function giantPlayer(gap = 90, opponent: Who = 'ryuko', vs = false) {
+  const match = new Match(
+    'practice',
+    false,
+    3,
+    ['giant', opponent],
+    'court',
+    vs,
+  );
   const [giant, other] = match.fighters;
   other.x = giant.x + gap;
   const steps = (input: Input, ticks = 1, theirs: Input = {}) => {
@@ -131,7 +138,7 @@ describe('Giant (07 GIANT.PLAYER)', () => {
   });
 
   it('sings to a chucked victim through GIANT!! MUSIC ATTACK (133), rolling its sound each pass', () => {
-    const { match, giant, other, steps } = giantPlayer();
+    const { match, giant, other, steps } = giantPlayer(90, 'ryuko', true);
     steps({}, 2);
     const sounds: number[] = [];
     const seen = played(

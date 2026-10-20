@@ -92,15 +92,20 @@ def decode_event(record):
     # their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
-    # 6327), as p90 does (PCs 5294–5328). ponytail: with r[5] bit 0x80 the operand comes from r[6] instead, a
-    # position among them (0x413813–0x4138cf), so Flash Att's (PCs 5785–5786) keep their fall-through.
+    # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
+    # (0x413813–0x4138cf): 0xc7 is the round (0x470044), which each 開始時 sets its variable 1 to and tests for 1
+    # (Ryuko's PCs 290, 305). ponytail: the others are positions, so Flash Att's (PCs 5785–5786) keep their
+    # fall-through.
+    if op == 0x1f and record[4] >> 6 == 0 and record[5] & 0x80 and record[6] == 0xc7 and record[5] & 3 == 1 \
+            and record[5] & 0xc:
+        return dict(test_event(record), pre=dict(value=0, add=False, round=True))
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and (record[5] & 3) in (1, 2):
         pre = dict(value=s16(record, 7), add=record[5] & 3 == 2)
         return dict(test_event(record), pre=pre) if record[5] & 0xc else dict(op="local", index=record[4], **pre)
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x44, 0x46, 0x47,
-                                                                              0x4c, 0x4d, 0x4f, 0x86):
+                                                                              0x4c, 0x4d, 0x4f, 0x83, 0x86):
         return test_event(record)
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
@@ -390,10 +395,11 @@ def player_tables(data, c, image_ids):
     life = u16(data, block + 0x7caa)
     per_stock, stocks = struct.unpack_from("<II", data, block + 0x7cae)
     # The select screen runs the default-action table's word 21 (+0x75a4,
-    # 0x407a2a) while the player's cell is hovered: キャラセレフェイス.
+    # 0x407a2a) while the player's cell is hovered: キャラセレフェイス. A
+    # fighter's set-up enters its word 17 (+0x759c, 0x412180): 開始時.
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
                 commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
-                selectFace=u16(data, block + 0x75a4))
+                selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c))
 
 
 def jump_target(record):
@@ -3926,7 +3932,9 @@ def main():
                               167, 172, 59, 133, 120, 107, 114,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
-                              *sorted({tables["responses"][i] for i in OWN_TIMELINES})]]
+                              *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
+                              # 開始時, which a VS round plays from the start.
+                              tables["start"]]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.
@@ -4008,7 +4016,23 @@ def export_stage(key, name, filename, sha256, track):
     scripts = flatten_queue(p, c, [(o["action"], 0) for o in objects], set(), set())
     # The match runs a stage object's colour, motion, spawns and op 0x20
     # rolls; its op 0x1f checks (of globals 10, 11 and 14 among them), and the
-    # music behind them, keep their fall-through path.
+    # music behind them, keep their fall-through path. So do the four whose
+    # global 3 check picks special music in VS (SP BGM 12 and 14) and the
+    # round checks (Greek's scenery, PCs 10–198), and the paths only those
+    # checks reach go.
+    for script in scripts.values():
+        kept = [not (e["op"] == "test" and (e["selector"] == 0x83 or e.get("pre", {}).get("round")))
+                for e in script["events"]]
+        if "loopEvent" in script:
+            script["loopEvent"] = sum(kept[:script["loopEvent"]])
+        script["events"] = [e for e, keep in zip(script["events"], kept) if keep]
+    named = lambda action, offset: f"{action}+{offset}" if offset else str(action)
+    reached, todo = set(), [named(o["action"], 0) for o in objects]
+    while todo:
+        if (k := todo.pop()) not in reached:
+            reached.add(k)
+            todo += [named(e["action"], e["offset"]) for e in scripts[k]["events"] if e.get("action")]
+    scripts = {k: v for k, v in scripts.items() if k in reached}
     events = [e for script in scripts.values() for e in script["events"]]
     if any(e["op"] not in ("color", "motion", "spawn", "random") for e in events):
         sys.exit(f"{name} runs records the match does not; refusing to export.")

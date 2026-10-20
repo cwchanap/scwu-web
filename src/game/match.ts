@@ -35,6 +35,7 @@ import {
   entryColor,
   eventsAt,
   scriptTick,
+  exported,
   heldFrame,
   hurtboxes,
   idlePower,
@@ -1510,14 +1511,37 @@ export class Match {
     // Player 1's and player 2's characters.
     readonly characters: [Who, Who] = ['ryuko', 'ryuko'],
     readonly stage: Stage = 'court',
+    // Whether the select screen started it, which leaves global 3 at 50 (KGT
+    // PCs 541, 548, 585): VS single. Otherwise the title's demos clear it.
+    readonly vs = false,
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
     this.cpu = new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]);
     this.calls = intro;
     this.fighters = intro
-      ? introFighters(characters)
+      ? this.entrants()
       : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+  }
+
+  // VS single places the players at 390 and 890 source pixels (0x408ac3),
+  // and each set-up enters its 開始時 (+0x759c, 0x412180), which plays the
+  // VS intro as a script from the round's first step. ponytail: until every
+  // fighter's 開始時 is exported, a pairing with one that isn't plays the
+  // authored Br. intro.
+  private entrants(): [Fighter, Fighter] {
+    const starts = this.characters.map((who) => CHARACTERS[who].start);
+    if (!this.vs || this.characters.some((who, i) => !exported(starts[i], who)))
+      return introFighters(this.characters);
+    const fighters: [Fighter, Fighter] = [
+      fighter(390 * 1.5, 1, this.characters[0]),
+      fighter(890 * 1.5, -1, this.characters[1]),
+    ];
+    fighters.forEach((f, i) => {
+      this.action(f, 'script', true, starts[i]);
+      f.age = -1;
+    });
+    return fighters;
   }
 
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
@@ -1545,7 +1569,7 @@ export class Match {
   // re-enter at full life (0x411ca5) with their variables cleared
   // (0x4121cc), keeping their stock and power from round 2 (0x411f2d).
   private nextRound() {
-    const fighters = introFighters(this.characters);
+    const fighters = this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
       f.power = this.fighters[i].power;
@@ -2037,13 +2061,23 @@ export class Match {
     actor: Fighter | Effect,
     { selector, compare, value, pre }: Extract<SourceEvent, { op: 'test' }>,
   ) {
-    if (pre) this.setLocal(actor, selector, pre);
+    // Each 開始時 copies the round (0x470044) into its variable 1 first.
+    if (pre)
+      this.setLocal(
+        actor,
+        selector,
+        pre.round ? { value: this.round, add: false } : pre,
+      );
     const variable =
       selector < 0x40
         ? (actor.locals[selector] ?? 0)
         : selector === 0x86
           ? this.freeze
-          : (self.variables[selector & 0x3f] ?? 0);
+          : selector === 0x83
+            ? this.vs
+              ? 50
+              : 0
+            : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -3298,7 +3332,14 @@ export class Match {
     this.cpuDriven =
       !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     if (this.calls && this.roundTicks < FIGHT_TICK) {
+      this.inputs = [player, opponent ?? {}];
       for (const [i, f] of this.fighters.entries()) {
+        // A VS 開始時 steps as any script does, and runs out into idle.
+        if (f.action === 'script') {
+          f.age++;
+          if (!this.land(f) && !this.moveScripted(f)) this.action(f, 'idle');
+          continue;
+        }
         if (f.action !== 'intro') continue;
         f.age++;
         // EX_MODE: Zoma's, Kiki's and Yo's intros have no such check.
@@ -3318,6 +3359,7 @@ export class Match {
       this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
       this.stepObjects(objects.filter((e) => e.z >= FIGHTER_Z));
+      for (const f of this.fighters) if (f.action === 'script') this.travel(f);
       this.moveObjects();
       return;
     }

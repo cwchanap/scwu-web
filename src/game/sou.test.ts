@@ -177,10 +177,11 @@ describe('SOU (16 SOU.PLAYER)', () => {
       [{ musashi: true }, false, [444, 447, 450, 283, 'idle'], 120, 2],
       // PC 7115: EX SLASH SUP.
       [{ musashi: true }, true, [456, 458, 459, 'idle'], 100, 2],
+      // Beast FIN hit enters BA Stop (418) at global 3 = 0 (PC 6751), off VS.
       [
         { changeAttack: true },
         false,
-        [403, 404, '404+17', '417+20', 'turn', 'idle'],
+        [403, 404, '404+17', 418, '417+20', 'turn', 'idle'],
         210,
         0,
       ],
