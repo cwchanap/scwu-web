@@ -168,7 +168,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // row: those actions and images, round 2's images by age, the ticks to idle
 // in rounds 1 and 2, how far round 1's action walks, and the action it runs
 // out of when that action jumps on, with a seed whose rolls both take it,
-// and the timeline the round copy jumps to.
+// the timeline the round copy jumps to, and how many VS CHARGEs each has.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -182,6 +182,7 @@ const TEMPLATE: {
   ends?: number | string;
   seed?: number;
   copy?: ObjectKey;
+  charges?: number;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -984,6 +985,31 @@ const TEMPLATE: {
     ],
     idle: [356, 347],
   },
+  // Its global 10 = 10 tests (PCs 287, 304) pass over BR Start. In round 1
+  // PC 306 enters 開始時 BR (38), which spawns Black and OP super Charge
+  // again (PCs 322, 323), so each fighter has two of each, and as no
+  // Battle Royale test passes (PCs 326–329) jumps to Round 1 (39, PC 330):
+  // a blank for 50 ticks, images 115 and 116, then Demo stand (34) from +
+  // 5: 115 and 116 for 15, 20. From round 2 Demo stand from + 7 (PC 307).
+  {
+    who: 'pachelo',
+    start: 36,
+    round1: 38,
+    banner: 52,
+    image: 115,
+    charge: 43,
+    demo: [
+      [99, 115],
+      [100, 115],
+      [115, 116],
+      [135, 115],
+      [150, 116],
+      [325, 116],
+      [344, 116],
+    ],
+    idle: [360, 346],
+    charges: 2,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1001,6 +1027,7 @@ describe.each(TEMPLATE)(
     ends = round1,
     seed = 0,
     copy = `${start}+9`,
+    charges = 1,
   }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
       const match = vsMatch(who, seed);
@@ -1033,7 +1060,7 @@ describe.each(TEMPLATE)(
       match.step();
       expect(
         match.effects.filter((e) => e.clip === charge).map((e) => e.owner),
-      ).toEqual([0, 1]);
+      ).toEqual([...Array(charges).fill(0), ...Array(charges).fill(1)]);
       steps(match, idle[0] - 103);
       expect([named(p1), named(p2)]).toEqual([`${ends}`, `${ends}`]);
       match.step();
