@@ -1988,8 +1988,8 @@ function finish(
     match.step(
       typeof input !== 'number' && t < held
         ? input
-        : t === press?.[0]
-          ? press[1]
+        : press?.find(([at]) => at === t)
+          ? press.find(([at]) => at === t)![1]
           : air !== undefined && t < 1
             ? { jump: true }
             : {},
@@ -2003,7 +2003,7 @@ function finish(
     // Both back in neutral, the striker's objects gone and no press to come:
     // nothing more happens.
     if (
-      t >= Math.max(held, press?.[0] ?? 0, air ?? 0) &&
+      t >= Math.max(held, ...(press ?? []).map(([at]) => at), air ?? 0) &&
       striker.action === 'idle' &&
       target.action === 'idle' &&
       !match.effects.some((e) => !e.owner)
@@ -2020,8 +2020,8 @@ type FinishOptions = {
   down?: boolean;
   victim?: readonly [number, Input];
   air?: number;
-  // A press at a tick, for a follow-up's op 0x24.
-  press?: readonly [number, Input];
+  // Presses at their ticks, for a follow-up's op 0x24.
+  press?: readonly (readonly [number, Input])[];
 };
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
@@ -2339,14 +2339,14 @@ describe("KAY's ZA finishers (global 3 > 0)", () => {
       'EX Sachiel G hit ZA (269, PC 4263)',
       258,
       269,
-      { ex: true, press: sachiel },
+      { ex: true, press: [sachiel] },
       [465, 465],
     ],
     [
       'EX Sachiel G hit ZA Evil (270, PC 4348)',
       258,
       270,
-      { ex: true, life: 100, press: sachiel },
+      { ex: true, life: 100, press: [sachiel] },
       [450, 450],
     ],
     [
@@ -2586,9 +2586,11 @@ describe("GON's ZA finishers (global 3 > 0)", () => {
   // and sets variable 4 to 100 for 40 ticks (PCs 4516–4526), so a strike
   // takes his hit reactions into Counter get (293, PCs 916, 954, ...), or
   // its evil forms at life 150 or below; in EX mode it takes EX moveing
-  // chuck (309, PC 4500). ponytail: EX Chuck hit 2 and 3 want variable 7
-  // at 500 or 1000 40 ticks in (PCs 4869, 4870), but the 技名8 it spawns
-  // holds it so for its first 30 ticks only (PCs 4988–4995); untested.
+  // chuck (309, PC 4500). EX Chuck hit 2 and 3 want variable 7 at 500 or
+  // 1000 40 ticks in (PCs 4869, 4870), but the 技名8 it spawns holds it so
+  // for its first 30 ticks only (PCs 4988–4995), and only EX moveing
+  // chuck's catch enters EX Chuck hit (PC 4809): the source never reaches
+  // them either.
   // KUREN start (376) sets variable 4 to 200 (PC 6091) for KUREN GET (384),
   // or Kuren under at life 150 or below (PC 6203).
   const counter = { victim: [30, { punch: true }] } as const;
@@ -2740,14 +2742,33 @@ describe("SWW's ZA finisher (global 3 > 0)", () => {
 describe("OGI's ZA finishers (global 3 > 0)", () => {
   // Each box strikes for what op 0x15 takes. K3 (196), the third link of
   // his chain (op 0x24, PCs 2482, ...), is entered here; at life 150 or
-  // below K3 hit takes EVIL K3 (199, PC 2686). ponytail: > SCC NHIT ADD hit
-  // up and ADD CHUCK want op 0x24 commands in > SCC NHIT2 (PCs 4619,
-  // 4620); their ZA forms (291, 295) are untested.
+  // below K3 hit takes EVIL K3 (199, PC 2686). > SCC NHIT2 (286, from tick
+  // 267) takes ↓→ K into > SCC NHIT ADD hit up or → ↓ ← K into ADD CHUCK
+  // within 60 ticks of its op 0x24s, 139 ticks in (PCs 4619, 4620).
+  const hitUp = [
+    [380, { crouch: true }],
+    [381, { right: true }],
+    [382, { kick: true }],
+  ] as const;
+  const chuck = [
+    [380, { right: true }],
+    [381, { crouch: true }],
+    [382, { left: true }],
+    [383, { kick: true }],
+  ] as const;
   it.each([
     ['K3 hit ZA (198, PC 2733)', 196, 198, {}, [470, 470]],
     ['Evil K3-3 ZA (204, PC 2862)', 196, 204, { life: 100 }, [460, 460]],
     ['Chuck hit ZA (226, PC 3253)', { throw: true }, 226, {}, [490, 490]],
     ['> SCC NHIT NON ADD ZA (289, PC 4648)', 277, 289, {}, [410, 410]],
+    [
+      '> SCC NHIT ADD hit up ZA (291, PC 4692)',
+      277,
+      291,
+      { press: hitUp },
+      [450, 450],
+    ],
+    ['SCC NHIT2-2 ZA (295, PC 4785)', 277, 295, { press: chuck }, [390, 390]],
     ['SCC FAR hit3 ZA (309, PC 5124)', 297, 309, {}, [410, 410]],
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'ogi', ...options });
