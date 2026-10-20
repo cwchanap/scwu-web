@@ -4,7 +4,7 @@ import type { Who } from './characters';
 import { FIGHT_TICK } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
-import { named } from './testing';
+import { enter, named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
@@ -219,6 +219,28 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // ROUND 1 (33, PC 306): 200 ticks of displays with OP eff (36) twice at
+  // PCs 335–336, its EX check (PC 338), then Demo stand (27) once. From
+  // round 2 Demo stand twice (PC 307), the EX check (PC 308), then three
+  // times (PC 309): 113, 114, 115 and 114 for 15, 10, 15, 10.
+  {
+    who: 'chung',
+    start: 30,
+    round1: 33,
+    banner: 54,
+    image: 113,
+    charge: 38,
+    demo: [
+      [100, 113],
+      [115, 114],
+      [125, 115],
+      [140, 114],
+      [150, 113],
+      [340, 114],
+      [349, 114],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -293,40 +315,73 @@ describe.each(TEMPLATE)(
   },
 );
 
-// `who` as player 1, `gap` from Ryuko, with three stocks.
-function zaMatch(vs: boolean, gap: number, who: Who) {
+describe("Chung's EX checks", () => {
+  // Down held at ROUND 1's check (PC 338) or between round 2's Demo stands
+  // (PC 308) enters Change EX (35) or + 3, which set variable 0 to 100 and
+  // call Demo stand once or three times: Demo stand EX (28), as its check
+  // of variable 0 jumps there inside each call (PC 259).
+  const run = (round2: boolean, tick: number) => {
+    const match = vsMatch('chung');
+    if (round2) {
+      while (match.roundTicks < FIGHT_TICK) match.step();
+      match.fighters[1].hp = 0;
+      while (match.round === 1) match.step();
+    }
+    const [p1] = match.fighters;
+    const images: number[] = [];
+    for (let t = 0; t < 350; t++) {
+      match.step(t === tick ? { crouch: true } : {});
+      if (t > tick && p1.action === 'script')
+        images.push(animationFrame(p1.branch!, p1.age, 'chung').image);
+    }
+    return [named(p1), exMode(p1), [...new Set(images)]];
+  };
+
+  it('in round 1, at ROUND 1 + 200', () => {
+    expect(run(false, 299)).toEqual(['33', false, [113, 114, 115]]);
+    expect(run(false, 300)).toEqual(['35', true, [372, 373, 374]]);
+  });
+
+  it('from round 2, between the Demo stands', () => {
+    expect(run(true, 199)).toEqual(['30', false, [113, 114, 115]]);
+    expect(run(true, 200)).toEqual(['35+3', true, [372, 373, 374]]);
+  });
+});
+
+// `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
+// (held `held` ticks) or entering source action `input`: Ryuko's actions in
+// order, the striker's branches and the life Ryuko has left.
+function finish(
+  vs: boolean,
+  gap: number,
+  input: Input | number,
+  { held = 1, who = 'ryuko', ex = false }: FinishOptions = {},
+) {
   const match = new Match('practice', false, 0, [who, 'ryuko'], 'court', vs);
   const [striker, target] = match.fighters;
   striker.x = 500;
   target.x = 500 + gap;
   striker.stock = 3;
-  return { match, striker, target };
-}
-// The victim's actions in order, and the life it has left.
-function finish(
-  vs: boolean,
-  gap: number,
-  input: Input,
-  held = 1,
-  who: Who = 'ryuko',
-) {
-  const { match, striker, target } = zaMatch(vs, gap, who);
+  // EX mode: variable 0 at 100.
+  if (ex) striker.variables[0] = 100;
+  if (typeof input === 'number') enter(match, striker, input);
   const seen: string[] = [];
   const branches = new Set<string>();
-  for (let t = 0; t < 900; t++) {
-    match.step(t < held ? input : {});
+  for (let t = 0; t < 3000; t++) {
+    match.step(typeof input !== 'number' && t < held ? input : {});
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
   }
   return { seen, hp: target.hp, branches };
 }
+type FinishOptions = { held?: number; who?: Who; ex?: boolean };
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
   // Each ZA form swaps its op 0x15 life loss for an attack box (op 0x18),
   // whose response a contact queues after the op 0x14 one.
   it('Chuck Hit ZA (198) strikes for 20 where Chuck Hit takes 30', () => {
-    const br = finish(false, 110, { throw: true }, 9);
-    const vs = finish(true, 110, { throw: true }, 9);
+    const br = finish(false, 110, { throw: true }, { held: 9 });
+    const vs = finish(true, 110, { throw: true }, { held: 9 });
     expect([br.branches.has('198'), vs.branches.has('198')]).toEqual([
       false,
       true,
@@ -369,8 +424,8 @@ describe("Ryuko's ZA finishers (global 3 > 0)", () => {
 
 describe("Kiki's ZA finisher (global 3 > 0)", () => {
   it('CHUCK HIT ZA (209, PC 2861) strikes for the 20 CHUCK HIT takes', () => {
-    const br = finish(false, 110, { throw: true }, 9, 'kiki');
-    const vs = finish(true, 110, { throw: true }, 9, 'kiki');
+    const br = finish(false, 110, { throw: true }, { held: 9, who: 'kiki' });
+    const vs = finish(true, 110, { throw: true }, { held: 9, who: 'kiki' });
     expect([br.branches.has('209'), vs.branches.has('209')]).toEqual([
       false,
       true,
@@ -385,5 +440,30 @@ describe("Kiki's ZA finisher (global 3 > 0)", () => {
       'rushAirHit',
       'twist',
     ]);
+  });
+});
+
+describe("Chung's ZA finishers (global 3 > 0)", () => {
+  // Each swaps op 0x15's life for a box: the move entered, its ZA form, the
+  // gap, EX mode, and the life Ryuko has left without and with VS. P3 Hit
+  // ZA's kind-2 box spans two displays (PCs 2451–2452) and re-arms at each
+  // (0x41257d), so it strikes twice for 35; en300 end ZA's two boxes strike
+  // for the 50 and 120 its op 0x15s take.
+  it.each([
+    ['P3 Hit ZA (187, PC 2431)', 185, 187, 80, false, [475, 440]],
+    ['Chuck hit ZA (223, PC 3086)', 221, 223, 80, false, [470, 470]],
+    ['EX chuck Hit ZA (227, PC 3159)', 221, 227, 80, true, [470, 470]],
+    ['Orochi hit ZA (252, PC 3600)', 250, 252, 130, false, [470, 470]],
+    ['lee lend ZA (286, PC 4197)', 281, 286, 100, false, [410, 410]],
+    ['Evil LEE last lend ZA (303, PC 4522)', 294, 303, 400, true, [391, 391]],
+    ['en300 end ZA (334, PC 5226)', 329, 334, 120, false, [289, 289]],
+  ] as const)('%s', (_, move, za, gap, ex, hp) => {
+    const br = finish(false, gap, move, { who: 'chung', ex });
+    const vs = finish(true, gap, move, { who: 'chung', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });

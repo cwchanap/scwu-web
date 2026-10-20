@@ -214,6 +214,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             bodies = body_boxes(bodies, p.records[pc])
     t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
     action = index
+    # The player variables this path has set (op 0x1f r[5] = 1).
+    known = {}
     result = dict(loop=-1, end="end", next=None)
     for _ in range(20000):
         a = p.action(action)
@@ -223,7 +225,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             ret, called, remaining, caller, entry = stack[-1]
             if remaining > 1:
                 stack[-1] = (ret, called, remaining - 1, caller, entry)
-                pc = p.action(called).start + entry
+                # Re-entered from +0x7d (0x4126ae), even after a jump left it.
+                action, pc = called, p.action(called).start + entry
             else:
                 stack.pop()
                 pc, action = ret, caller
@@ -274,7 +277,24 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             break
         elif op == 0x19:
             bodies = body_boxes(bodies, record)
+        elif op == 0x1f and stack and record[4] >> 6 == 1 and not record[5] & 0x83 and record[4] & 0x3f in known \
+                and u16(record, 1) not in {action, *(s[1] for s in stack)} and not loops(p, u16(record, 1)):
+            # A check in a call of a player variable this path set, jumping out of the call into an
+            # action that runs out, takes its jump inside the call, whose end then repeats or returns
+            # from it (0x412617): Chung's Change EX sets variable 0 to 100 (PCs 364, 366), so each Demo
+            # stand it calls plays Demo stand EX (PC 259). Set-up clears the variables (0x4121cc), so
+            # the other paths' fall-through stands. ponytail: it assumes no object sets the variable
+            # meanwhile, as REAR's 246 does his 7 (PC 3614) for a skip the match takes (below).
+            value, against = known[record[4] & 0x3f], s16(record, 9)
+            if (value == against, value > against, value < against)[(record[5] >> 2 & 3) - 1]:
+                action, pc = u16(record, 1), p.action(u16(record, 1)).start + record[3]
+                continue
         else:
+            if op == 0x1f and record[4] >> 6 == 1 and record[5] & 3:
+                if record[5] == 1:
+                    known[record[4] & 0x3f] = s16(record, 7)
+                else:
+                    known.pop(record[4] & 0x3f, None)
             event = decode_event(record)
             # A branch can't return to a caller, so a call keeps its checks' fall-through path,
             # but for an op 0x24 in its caller's last call, whose return runs the caller out as
@@ -1011,7 +1031,7 @@ OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
 # The fighters besides Ryuko whose 開始時 a VS round plays from the start.
 # ponytail: ported one at a time; the match keeps the Br. intro for a pairing
 # with any other.
-VS_STARTS = {"zoma", "kiki"}
+VS_STARTS = {"zoma", "kiki", "chung"}
 
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
