@@ -935,6 +935,30 @@ const TEMPLATE: {
     ],
     idle: [409, 343],
   },
+  // Its global 1 = 1000 test (PC 442) passes over 開始時 yowai. Round 1 (35,
+  // PC 447) rolls for Round 1-2-1 and OP2 (below); seed 2's take neither:
+  // images 574 to 571 and back, then demo stand (28) from + 1, 348 ticks
+  // in all. From round 2 demo stand from + 1 (PC 448), then image 118 for
+  // 130 ticks (PC 449).
+  {
+    who: 'alpha',
+    start: 31,
+    round1: 35,
+    banner: 76,
+    image: 116,
+    charge: 52,
+    demo: [
+      [99, 116],
+      [100, 116],
+      [110, 117],
+      [160, 119],
+      [168, 115],
+      [176, 118],
+      [355, 118],
+    ],
+    idle: [449, 357],
+    seed: 2,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1543,6 +1567,49 @@ describe("ZIRO's EX checks", () => {
       true,
       [479, 480, 483, 481],
     ]);
+  });
+});
+
+describe("ALPHA's Round 1 rolls", () => {
+  // Round 1 (35) rolls rand % 3 > 1 for Round 1-2-1 (37, PC 488), then the
+  // same for OP2 (30, PC 489), 396 ticks of displays. Round 1-2-1 shows
+  // image 130 for 50 ticks, rolls rand % 3 > 1 (PC 524) to pass over its
+  // set of variable 1 to 1 (PC 525), spawns *eff RAMBU start and Start KO
+  // Obj, then jumps to Round 1-2-2 (38, PC 546), whose variable 1 = 1 test
+  // (PC 553) takes + 30, image 645 for image 644 (PCs 577, 554), before
+  // their HP hit and HISA Hit objects and Round 1-2-3 (39): 466 ticks in
+  // all. Each fighter rolls for itself.
+  it("takes Round 1-2-1 and its variable 1 set for seed 0's player 1", () => {
+    const match = vsMatch('alpha', 0);
+    const [p1, p2] = match.fighters;
+    steps(match, 101);
+    expect([named(p1), named(p2)]).toEqual(['37', '35']);
+    steps(match, 222);
+    expect(named(p1)).toBe('37');
+    match.step();
+    expect(named(p1)).toBe('38+30');
+    steps(match, 125);
+    expect([p1.action, p2.action]).toEqual(['script', 'idle']);
+    steps(match, 117);
+    expect(p1.action).toBe('script');
+    match.step();
+    expect(p1.action).toBe('idle');
+    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
+  });
+
+  it("passes over the set for seed 4's player 1, whose player 2 takes OP2", () => {
+    const match = vsMatch('alpha', 4);
+    const [p1, p2] = match.fighters;
+    steps(match, 101);
+    expect([named(p1), named(p2)]).toEqual(['37', '30']);
+    steps(match, 50);
+    expect(named(p1)).toBe('37+4');
+    steps(match, 345);
+    expect([p1.action, p2.action]).toEqual(['script', 'script']);
+    match.step();
+    expect([p1.action, p2.action]).toEqual(['script', 'idle']);
+    steps(match, 70);
+    expect(p1.action).toBe('idle');
   });
 });
 
@@ -2427,6 +2494,22 @@ describe("Z-MEGA's VS finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, ex, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'zmega', ex });
     const vs = finish(true, 80, move, { held: 9, who: 'zmega', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("ALPHA's ZA finishers (global 3 > 0)", () => {
+  it.each([
+    ['Chuck hit ZA (257, PC 3922)', { throw: true }, 257, [465, 465]],
+    ['CC hit2 ZA (274, PC 4225)', 272, 274, [445, 445]],
+    ['SCC hit3 ZA (335, PC 5784)', 328, 335, [330, 330]],
+  ] as const)('%s strikes for what op 0x15 takes', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'alpha' });
+    const vs = finish(true, 80, move, { held: 9, who: 'alpha' });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
