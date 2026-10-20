@@ -241,6 +241,31 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (32, PC 326): Ami (34), 115 blank ticks, its EX check (PC 356),
+  // displays (PCs 357–361) and Demo stand (27) once. From round 2 one tick
+  // more of image 113 (PC 327), Demo stand twice (PC 328), the EX check
+  // (PC 329), then once more (PC 330): 113 to 117 and back, 8 ticks each,
+  // 18 for 117.
+  {
+    who: 'amiro',
+    start: 29,
+    round1: 32,
+    banner: 56,
+    image: 113,
+    charge: 40,
+    demo: [
+      [100, 113],
+      [109, 114],
+      [117, 115],
+      [125, 116],
+      [133, 117],
+      [151, 116],
+      [192, 114],
+      [341, 113],
+      [349, 113],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -315,36 +340,64 @@ describe.each(TEMPLATE)(
   },
 );
 
+// Down held on the step from `tick` in round 1 or 2 of a VS match between
+// two of `who`: where its 開始時 is 350 ticks in, whether EX mode is on, and
+// the images it showed after the press.
+function exCheck(who: Who, round2: boolean, tick: number) {
+  const match = vsMatch(who);
+  if (round2) {
+    while (match.roundTicks < FIGHT_TICK) match.step();
+    match.fighters[1].hp = 0;
+    while (match.round === 1) match.step();
+  }
+  const [p1] = match.fighters;
+  const images: number[] = [];
+  for (let t = 0; t < 350; t++) {
+    match.step(t === tick ? { crouch: true } : {});
+    if (t > tick && p1.action === 'script')
+      images.push(animationFrame(p1.branch!, p1.age, who).image);
+  }
+  return [named(p1), exMode(p1), [...new Set(images)]];
+}
+
 describe("Chung's EX checks", () => {
   // Down held at ROUND 1's check (PC 338) or between round 2's Demo stands
   // (PC 308) enters Change EX (35) or + 3, which set variable 0 to 100 and
   // call Demo stand once or three times: Demo stand EX (28), as its check
   // of variable 0 jumps there inside each call (PC 259).
-  const run = (round2: boolean, tick: number) => {
-    const match = vsMatch('chung');
-    if (round2) {
-      while (match.roundTicks < FIGHT_TICK) match.step();
-      match.fighters[1].hp = 0;
-      while (match.round === 1) match.step();
-    }
-    const [p1] = match.fighters;
-    const images: number[] = [];
-    for (let t = 0; t < 350; t++) {
-      match.step(t === tick ? { crouch: true } : {});
-      if (t > tick && p1.action === 'script')
-        images.push(animationFrame(p1.branch!, p1.age, 'chung').image);
-    }
-    return [named(p1), exMode(p1), [...new Set(images)]];
-  };
-
   it('in round 1, at ROUND 1 + 200', () => {
-    expect(run(false, 299)).toEqual(['33', false, [113, 114, 115]]);
-    expect(run(false, 300)).toEqual(['35', true, [372, 373, 374]]);
+    expect(exCheck('chung', false, 299)).toEqual([
+      '33',
+      false,
+      [113, 114, 115],
+    ]);
+    expect(exCheck('chung', false, 300)).toEqual(['35', true, [372, 373, 374]]);
   });
 
   it('from round 2, between the Demo stands', () => {
-    expect(run(true, 199)).toEqual(['30', false, [113, 114, 115]]);
-    expect(run(true, 200)).toEqual(['35+3', true, [372, 373, 374]]);
+    expect(exCheck('chung', true, 199)).toEqual(['30', false, [113, 114, 115]]);
+    expect(exCheck('chung', true, 200)).toEqual([
+      '35+3',
+      true,
+      [372, 373, 374],
+    ]);
+  });
+});
+
+describe("Amiro's EX checks", () => {
+  // Down held at Round 1's check (PC 356) or between round 2's Demo stands
+  // (PC 329) enters EX CHANGE (39) + 3 or 39, which set variable 0 to 100
+  // and rejoin the displays they skip from (PCs 357, 330).
+  const round1 = [172, 208, 430, 128, 113, 114, 115, 116, 117];
+  it('in round 1, at Round 1 + 115', () => {
+    expect(exCheck('amiro', false, 214)).toEqual(['32', false, round1]);
+    expect(exCheck('amiro', false, 215)).toEqual(['39+3', true, round1]);
+  });
+
+  it('from round 2, between the Demo stands', () => {
+    const demo = [113, 114, 115, 116, 117];
+    expect(exCheck('amiro', true, 266)).toEqual(['29', false, demo]);
+    expect(exCheck('amiro', true, 267)).toEqual(['39', true, demo]);
   });
 });
 
@@ -460,6 +513,27 @@ describe("Chung's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, gap, ex, hp) => {
     const br = finish(false, gap, move, { who: 'chung', ex });
     const vs = finish(true, gap, move, { who: 'chung', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("Amiro's ZA finishers (global 3 > 0)", () => {
+  // The move entered, its ZA form, the gap, EX mode, and the life Ryuko has
+  // left without and with VS: each box strikes for what op 0x15 takes. EX
+  // P3 Hit ZA applies response 59 where the others apply 76 (PC 2754).
+  it.each([
+    ['EX P3 Hit ZA (188, PC 2742)', 186, 188, 80, true, [470, 470]],
+    ['Chuck hit ZA (211, PC 3246)', 209, 211, 80, false, [490, 490]],
+    ['cc hit ZA (244, PC 3737)', 242, 244, 100, false, [480, 480]],
+    ['ERX Fin Grab Hit ZA (361, PC 5805)', 359, 361, 80, false, [440, 440]],
+    ['WHIP Fin ZA (373, PC 6074)', 368, 373, 120, true, [409, 409]],
+  ] as const)('%s', (_, move, za, gap, ex, hp) => {
+    const br = finish(false, gap, move, { who: 'amiro', ex });
+    const vs = finish(true, gap, move, { who: 'amiro', ex });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
