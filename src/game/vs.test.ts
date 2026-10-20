@@ -1132,6 +1132,32 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (35, PC 368) jumps back into 開始時 at + 23 (PC 335), where
+  // round 2 runs on: image 4001 for 50 more, 4002 to 4005, then Demo Stand
+  // (29) from + 1 (PC 340): 4006 to 4008, and 4001 for 80.
+  {
+    who: 'aya',
+    start: 31,
+    round1: 35,
+    banner: 68,
+    image: 4001,
+    charge: 51,
+    demo: [
+      [149, 4001],
+      [150, 4002],
+      [160, 4003],
+      [170, 4004],
+      [190, 4005],
+      [198, 4006],
+      [206, 4007],
+      [214, 4008],
+      [222, 4001],
+      [302, 4002],
+      [342, 4005],
+      [349, 4005],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
