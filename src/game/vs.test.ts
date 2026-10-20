@@ -495,6 +495,30 @@ const TEMPLATE: {
     idle: [351, 351],
     seed: 5,
   },
+  // Round 1 (33, PC 306): 151 ticks of displays, its EX check (PC 356),
+  // then 99 more. From round 2 image 116 for 42 ticks (PC 307), DEMO stand
+  // (27) once (PC 308), the EX check (PC 309), then once more (PC 310):
+  // 117, 116, 115 and 116 twice over, 13 ticks each.
+  {
+    who: 'alex',
+    start: 30,
+    round1: 33,
+    banner: 56,
+    image: 117,
+    charge: 40,
+    demo: [
+      [99, 117],
+      [100, 116],
+      [142, 117],
+      [155, 116],
+      [168, 115],
+      [181, 116],
+      [194, 117],
+      [337, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -830,6 +854,30 @@ describe("SAKUYA's Round 1 rolls and EX checks", () => {
       [117, 115, 116],
     ]);
     expect(exCheck('sakuya', true, 270)).toEqual(['49', true, [236, 237, 238]]);
+  });
+});
+
+describe("ALEX's EX checks", () => {
+  // Down held at Round 1's check (PC 356) enters 'EX change' (39), which
+  // sets variable 0 to 100 and rejoins at PC 357; between round 2's DEMO
+  // stands (PC 309) it enters + 3, which rejoins at PC 310, where DEMO
+  // stand's test of variable 0 plays DEMO stand 2 (28, PC 254).
+  it('in round 1, at Round 1 + 151', () => {
+    expect(exCheck('alex', false, 250)).toEqual([
+      '33',
+      false,
+      [333, 158, 334, 335],
+    ]);
+    expect(exCheck('alex', false, 251)).toEqual([
+      '39',
+      true,
+      [333, 158, 334, 335],
+    ]);
+  });
+
+  it('from round 2, between the DEMO stands', () => {
+    expect(exCheck('alex', true, 245)).toEqual(['30', false, [117, 116, 115]]);
+    expect(exCheck('alex', true, 246)).toEqual(['39+3', true, [363, 364, 365]]);
   });
 });
 
@@ -1270,6 +1318,23 @@ describe("SAKUYA's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'sakuya', ...options });
     const vs = finish(true, 80, move, { held: 9, who: 'sakuya', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("ALEX's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. GYSA FAR (308) takes EX en
+  // chuck far (331) in EX mode (PC 4517), which hits into EN chuck hit.
+  it.each([
+    ['chuck hit ZA (221, PC 3274)', { throw: true }, 221, false, [490, 490]],
+    ['EN chuck hit ZA (334, PC 4899)', 308, 334, true, [410, 410]],
+  ] as const)('%s', (_, move, za, ex, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'alex', ex });
+    const vs = finish(true, 80, move, { held: 9, who: 'alex', ex });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
