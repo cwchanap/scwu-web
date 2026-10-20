@@ -599,6 +599,33 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (35, PC 341): 248 ticks of displays and its EX check (PC 393),
+  // unless its roll takes OP2 (below). From round 2 image 115 for 10 ticks
+  // (PC 342), Demo stand (28) from + 2 twice (PC 343), the EX check (PC
+  // 344), then Demo stand from + 1 (PC 345): 116, 117, 118 and 115 for 12,
+  // 13, 15, 40.
+  {
+    who: 'feng',
+    start: 32,
+    round1: 35,
+    banner: 64,
+    image: 116,
+    charge: 46,
+    demo: [
+      [99, 116],
+      [100, 115],
+      [110, 116],
+      [122, 117],
+      [135, 118],
+      [150, 115],
+      [190, 116],
+      [270, 116],
+      [310, 115],
+      [349, 115],
+    ],
+    idle: [349, 351],
+    seed: 1,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1004,6 +1031,49 @@ describe("ERUS's EX checks", () => {
     const images = [116, 117, 118, 115];
     expect(exCheck('erus', true, 269)).toEqual(['31', false, images]);
     expect(exCheck('erus', true, 270)).toEqual(['39', true, images]);
+  });
+});
+
+describe("OS FENG's Round 1 roll and EX checks", () => {
+  // Round 1 opens with an op 0x20 roll (PC 376) that takes OP2 (43) in 1 of
+  // 3: calls of >OP2 RP1 and RP2 among its displays, its own EX check (PC
+  // 538), running out 2 ticks after Round 1 does.
+  it('takes OP2 for one fighter and Round 1 for the other', () => {
+    const match = vsMatch('feng');
+    const [p1, p2] = match.fighters;
+    steps(match, 101);
+    expect([named(p1), named(p2)]).toEqual(['43', '35']);
+    steps(match, 248);
+    expect([p1.action, p2.action]).toEqual(['script', 'idle']);
+    match.step();
+    match.step();
+    expect(p1.action).toBe('idle');
+  });
+
+  // Down held at OP2's check (PC 538) enters 'OP TYPE CHANGE' + 7 (52),
+  // which sets variable 0 to 100 and rejoins at OP2 + 21 (PC 589); after
+  // round 2's Demo stands (PC 344) it enters + 3, which rejoins at PC 345,
+  // where Demo stand's test of variable 0 plays Demo stand 2 (29, PC 286).
+  it('in round 1, at OP2 + 184', () => {
+    expect(exCheck('feng', false, 283)).toEqual(['43', false, [573, 138, 137]]);
+    expect(exCheck('feng', false, 284)).toEqual([
+      '52+7',
+      true,
+      [573, 138, 137],
+    ]);
+  });
+
+  it('from round 2, after two Demo stands', () => {
+    expect(exCheck('feng', true, 269)).toEqual([
+      '32',
+      false,
+      [116, 117, 118, 115],
+    ]);
+    expect(exCheck('feng', true, 270)).toEqual([
+      '52+3',
+      true,
+      [495, 496, 497, 494],
+    ]);
   });
 });
 
@@ -1567,6 +1637,41 @@ describe("ERUS's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'erus', ...options });
     const vs = finish(true, 80, move, { held: 9, who: 'erus', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("OS FENG's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; New Chuck Hit ZA's and Chuck
+  // hit ZA's op 0x15 then take 1 more (PCs 3116, 3205), Chuck hit ZA's box
+  // 1 less. K3 (206) is the third link of P and K's chain (op 0x24, PCs
+  // 2529, 2654), entered here; Chuck takes New Chuck Hit in EX mode; A SUCK
+  // START is SUCK's air form, striking a jumping victim.
+  it.each([
+    ['K3 hit ZA (208, PC 2703)', 206, 208, {}, [474, 474]],
+    [
+      'New Chuck Hit ZA (232, PC 3098)',
+      { throw: true },
+      232,
+      { ex: true },
+      [490, 489],
+    ],
+    ['Chuck hit ZA (236, PC 3187)', { throw: true }, 236, {}, [475, 475]],
+    ['SUCK HIT ZA (263, PC 3733)', 260, 263, {}, [465, 465]],
+    [
+      '>A SUCK HIT ZA (270, PC 3838)',
+      267,
+      270,
+      { air: 20, victim: [0, { jump: true }] },
+      [465, 465],
+    ],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'feng', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'feng', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
