@@ -793,6 +793,34 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (33, PC 298): 165 ticks of displays, its EX check (PC 330),
+  // images 125, 123 and 113, then Demo stand (28) from + 1. From round 2
+  // image 114 for 18 ticks (PC 299), Demo stand from + 2 twice (PC 300),
+  // the EX check (PC 301), then twice more (PC 302): 113, 114, 115, 116,
+  // 115 and 114 for 15, 8, 6, 15, 6, 8.
+  {
+    who: 'sww',
+    start: 30,
+    round1: 33,
+    banner: 54,
+    image: 113,
+    charge: 38,
+    demo: [
+      [99, 113],
+      [100, 114],
+      [118, 113],
+      [133, 114],
+      [141, 115],
+      [147, 116],
+      [162, 115],
+      [168, 114],
+      [176, 113],
+      [234, 113],
+      [342, 114],
+      [349, 114],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1281,6 +1309,24 @@ describe("GIGI's EX checks", () => {
   it('from round 2, after two Demo stands', () => {
     expect(exCheck('gigi', true, 268)).toEqual(['30', false, images]);
     expect(exCheck('gigi', true, 269)).toEqual(['31+13', true, images]);
+  });
+});
+
+describe("SWW's EX checks", () => {
+  // Down held at Round 1's check (PC 330) enters 'EX CHANGE' (37), which
+  // sets variable 0 to 100 and rejoins at PC 331; between round 2's Demo
+  // stands (PC 301) it enters + 3, which rejoins at PC 302. Her Demo stand
+  // has no EX form.
+  it('in round 1, at Round 1 + 165', () => {
+    const images = [125, 123, 113, 114, 115, 116];
+    expect(exCheck('sww', false, 264)).toEqual(['33', false, images]);
+    expect(exCheck('sww', false, 265)).toEqual(['37', true, images]);
+  });
+
+  it('from round 2, between the Demo stands', () => {
+    const images = [113, 114, 115, 116];
+    expect(exCheck('sww', true, 233)).toEqual(['30', false, images]);
+    expect(exCheck('sww', true, 234)).toEqual(['37+3', true, images]);
   });
 });
 
@@ -2048,5 +2094,17 @@ describe("GIGI's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("SWW's ZA finisher (global 3 > 0)", () => {
+  it('Chuck Hit ZA (209, PC 2999) strikes for what op 0x15 takes', () => {
+    const br = finish(false, 80, { throw: true }, { held: 9, who: 'sww' });
+    const vs = finish(true, 80, { throw: true }, { held: 9, who: 'sww' });
+    expect([br.branches.has('209'), vs.branches.has('209')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([490, 490]);
   });
 });
