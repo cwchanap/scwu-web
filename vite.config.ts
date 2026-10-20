@@ -3,6 +3,10 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 
 export default defineConfig({
   plugins: [svelte()],
+  // The exports load as one JSON.parse each: as object literals they bring
+  // source maps five times their size, which every test worker kept (2 GB).
+  // The code imports them only by default.
+  json: { stringify: true, namedExports: false },
   server: {
     fs: { deny: ['**/scwu-web-handoff/**', '**/.git/**', '**/.env*'] },
   },
@@ -23,7 +27,8 @@ export default defineConfig({
     // test changes module state.
     isolate: false,
     // The tests are deterministic simulations, so a slow one means a busy
-    // machine, not a hang.
-    testTimeout: 30000,
+    // machine, not a hang (the minute of every stage's objects takes 30 s
+    // among match.test.ts's others).
+    testTimeout: 120000,
   },
 });

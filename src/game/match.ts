@@ -3282,9 +3282,10 @@ export class Match {
     // A script that runs out reaches the next action's op 0x00, which
     // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
     // leaves the world unless it follows a parent.
+    const stepped = new Set(objects);
     this.effects = this.effects.filter(
       (e) =>
-        !objects.includes(e) ||
+        !stepped.has(e) ||
         ((e.age < animationDuration(e.clip, e.who) || loops(e)) &&
           (e.follow !== null ||
             inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))),
@@ -3293,7 +3294,7 @@ export class Match {
     // petals (2–5) end; one holding a display stays.
     this.layers = this.layers.filter(
       (e) =>
-        !objects.includes(e) ||
+        !stepped.has(e) ||
         e.age < animationDuration(e.clip, e.who) ||
         script(e.clip, e.who).end !== 'delete',
     );

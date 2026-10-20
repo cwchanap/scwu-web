@@ -1919,6 +1919,15 @@ function finish(
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
     for (const e of match.effects) if (!e.owner) fx.add(String(e.clip));
+    // Both back in neutral, the striker's objects gone and no press to come:
+    // nothing more happens.
+    if (
+      t >= Math.max(held, press?.[0] ?? 0, air ?? 0) &&
+      striker.action === 'idle' &&
+      target.action === 'idle' &&
+      !match.effects.some((e) => !e.owner)
+    )
+      break;
   }
   return { seen, hp: target.hp, branches, fx };
 }

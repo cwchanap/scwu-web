@@ -64,6 +64,9 @@ interface Clip {
   ticks: number[];
   // Index of the first looping pose, or -1 to hold the final pose.
   loopStart: number;
+  // Total ticks, and those before the loop.
+  duration: number;
+  intro: number;
 }
 // A numeric loop plays the earlier poses once, like a source jump back to a later PC.
 function clip(
@@ -86,7 +89,14 @@ function clip(
     body = frame.body ?? body;
     return frame.body || !body ? frame : { ...frame, body };
   });
-  return { frames, ticks, loopStart };
+  const total = (n: number) => ticks.slice(0, n).reduce((a, b) => a + b, 0);
+  return {
+    frames,
+    ticks,
+    loopStart,
+    duration: total(ticks.length),
+    intro: total(Math.max(0, loopStart)),
+  };
 }
 
 // Source timelines flattened by scripts/export_assets.py: displays with op 0x09
@@ -262,7 +272,8 @@ export function script(index: ObjectKey, who: Container = 'ryuko') {
   if (!found) throw new Error(`Source action ${index} was not exported`);
   return found;
 }
-const scriptEvents = new Map<string, Map<number, ScriptEvent[]>>();
+// Keyed by the timeline, so a lookup builds no string.
+const scriptEvents = new WeakMap<object, Map<number, ScriptEvent[]>>();
 // Events that run when a scripted action or object reaches the given age. A
 // looping timeline repeats: each time it wraps, the records after its last
 // display run, then those from the loop's target on.
@@ -283,13 +294,13 @@ export function eventsAt(
   age: number,
   who: Container = 'ryuko',
 ) {
-  let byTick = scriptEvents.get(`${who}:${index}`);
   const found = script(index, who);
+  let byTick = scriptEvents.get(found);
   if (!byTick) {
     byTick = new Map();
     for (const event of found.events)
       byTick.set(event.t, [...(byTick.get(event.t) ?? []), event]);
-    scriptEvents.set(`${who}:${index}`, byTick);
+    scriptEvents.set(found, byTick);
   }
   const t = scriptTick(index, age, who);
   if (t === age) return byTick.get(age) ?? [];
@@ -315,15 +326,12 @@ const scriptClip = (index: ObjectKey, who: Container = 'ryuko') => {
     frames.map((frame) => frame.duration || 1),
   );
 };
-const objectClips = new Map<string, Clip | null>();
+const objectClips = new WeakMap<object, Clip | null>();
 function objectClip(index: ObjectKey, who: Container) {
-  const key = `${who}:${index}`;
-  if (!objectClips.has(key))
-    objectClips.set(
-      key,
-      script(index, who).frames.length ? scriptClip(index, who) : null,
-    );
-  return objectClips.get(key)!;
+  const found = script(index, who);
+  if (!objectClips.has(found))
+    objectClips.set(found, found.frames.length ? scriptClip(index, who) : null);
+  return objectClips.get(found)!;
 }
 // Image 0 (a solid marker block) and 8191 are a player's blank displays, as
 // is an empty image (Zoma's 2000, a stage's 1000). A stage's image 0 is its
@@ -1069,7 +1077,7 @@ export function animationDuration(
   who: Container = 'ryuko',
 ) {
   const found = clipOf(action, who);
-  return found ? found.ticks.reduce((total, ticks) => total + ticks, 0) : 0;
+  return found?.duration ?? 0;
 }
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
@@ -1146,11 +1154,7 @@ export function animationFrame(
     (ex && EX_ANIMATIONS[who as Who]?.[action as AnimatedAction]) ||
     clipOf(action, who);
   if (!found) throw new Error(`Source object ${action} has no displays`);
-  const { frames, ticks, loopStart } = found;
-  const duration = ticks.reduce((total, n) => total + n, 0);
-  const intro = ticks
-    .slice(0, Math.max(0, loopStart))
-    .reduce((total, n) => total + n, 0);
+  const { frames, ticks, loopStart, duration, intro } = found;
   let time = Math.max(0, age);
   time =
     loopStart < 0
