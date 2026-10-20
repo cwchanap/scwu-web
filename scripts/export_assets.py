@@ -504,8 +504,10 @@ def pose_clips(p, c, actions, image_ids):
     return clips
 
 
-def flatten_queue(p, c, queue, played, image_ids, reactions=()):
-    """Flatten every queued (action, offset) and whatever its events spawn, call or branch into."""
+def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
+    """Flatten every queued (action, offset) and whatever its events spawn, call or branch into.
+    `named`, when given, holds the played actions the match enters by name (its engine states
+    and reactions); it enters any other by its timeline."""
     scripts = {}
     while queue:
         index, offset = key = queue.pop()
@@ -515,8 +517,10 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=()):
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         # A timeline's last jump enters its target, unless played as a clip
         # from its start (the match enters a reaction at any offset): ZENKA's
-        # J cancel jumps into her jump + 22 (PC 3187).
-        if script["end"] == "jump" and (script["next"] not in played or
+        # J cancel jumps into her jump + 22 (PC 3187). LIZARD's Round 1 ends
+        # in OP lend (36, PC 392), his Br. intro's clip, which the match
+        # can't name.
+        if script["end"] == "jump" and (script["next"] not in played or named is not None and script["next"] not in named or
                                         script["offset"] and script["next"] not in reactions):
             queue.append((script["next"], script["offset"]))
         for event in script["events"]:
@@ -1031,7 +1035,7 @@ OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
 # The fighters besides Ryuko whose 開始時 a VS round plays from the start.
 # ponytail: ported one at a time; the match keeps the Br. intro for a pairing
 # with any other.
-VS_STARTS = {"zoma", "kiki", "chung", "amiro", "anmc", "giant", "suneo", "yo", "sin"}
+VS_STARTS = {"zoma", "kiki", "chung", "amiro", "anmc", "giant", "suneo", "yo", "sin", "lizard"}
 
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
@@ -3839,7 +3843,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 if p.records[pc][0] == 0x0c) != 6:
             sys.exit(f"{source[0]}'s {name} no longer enters its heavy air hit's launch; refusing to export.")
     reactions = set(pairs.values()) | set(aliases)
-    scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids, reactions)
+    scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids, reactions,
+                            set(neutral.values()) | reactions)
     # Clothes off and its 500 form run out into FLY NO HIT + 19 (Ryuko's PC
     # 1267), past its displays to its launch at age 6 (PC 1186), which the
     # match enters there.
