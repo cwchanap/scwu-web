@@ -1080,6 +1080,32 @@ const TEMPLATE: {
     ],
     idle: [419, 371],
   },
+  // Round 1 (34, PC 378): image 151 for 50 ticks, a roll (PC 402) that
+  // picks sound 3 or 4 (PCs 403, 405), whose pass is + 5, then images 151
+  // to 145 for 273 ticks. From round 2 Demo act (29) from + 5 (PC 379):
+  // 113 to 116 and back for 15, 8, 8, 8, 8, 5.
+  {
+    who: 'astroman',
+    start: 31,
+    round1: 34,
+    banner: 54,
+    image: 113,
+    charge: 38,
+    demo: [
+      [99, 113],
+      [100, 113],
+      [115, 114],
+      [123, 115],
+      [131, 116],
+      [139, 115],
+      [147, 114],
+      [152, 113],
+      [355, 114],
+      [359, 114],
+    ],
+    idle: [424, 361],
+    seed: 1,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -2708,9 +2734,10 @@ describe("SHIN-Z's VS finishers (global 3 > 0)", () => {
 });
 
 describe("TTRO's ZA finishers (global 3 > 0)", () => {
-  // Each box strikes for what op 0x15 takes. CC start's catch (kind 0x8a,
-  // PC 2368) takes only a reeling victim, so CC hit (188) is entered at a
-  // victim lying down, where CC drop lend ZA's box reaches it.
+  // Each box strikes for what op 0x15 takes. ponytail: CC start's catch
+  // (kind 0x8a, PC 2368) sits below the floor and never meets Ryuko in the
+  // port, so CC hit (188) is entered at a victim lying down, where CC drop
+  // lend ZA's box reaches it.
   it.each([
     ['Chuck Hit ZA (181, PC 2262)', { throw: true }, 181, {}, [470, 470]],
     ['CC drop lend ZA (192, PC 2425)', 188, 192, { down: true }, [430, 430]],
@@ -2718,6 +2745,25 @@ describe("TTRO's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'ttro', ...options });
     const vs = finish(true, 80, move, { held: 9, who: 'ttro', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("ASTROMAN's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; SCC FIN ZA's two, 255 and 45,
+  // what SCC FIN's takes, 300. ponytail: CC Start's catch (kind 0x88)
+  // sits below the floor and never meets Ryuko in the port, so CC HIT ZA
+  // (190, PC 2658) is untested.
+  it.each([
+    ['C Hit lend ZA (184, PC 2536)', { throw: true }, 184, [465, 465]],
+    ['SCC FIN ZA (244, PC 3307)', 237, 244, [210, 210]],
+  ] as const)('%s', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'astroman' });
+    const vs = finish(true, 80, move, { held: 9, who: 'astroman' });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
