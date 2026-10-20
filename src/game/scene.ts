@@ -234,7 +234,7 @@ export class TrainingScene extends Phaser.Scene {
         this.add.image(f.x, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
       );
     }
-    this.updateHud = createHud(this);
+    this.updateHud = createHud(this, (key, color) => this.tint(key, color));
     this.game.canvas.tabIndex = 0;
     this.game.canvas.setAttribute(
       'aria-label',
@@ -541,15 +541,18 @@ export class TrainingScene extends Phaser.Scene {
     return recolored;
   }
 
-  // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
-  // each tinted image is drawn once and cached.
   private texture(
     image: number,
-    { r, g, b }: Color,
+    color: Color,
     who: Container,
     palette: number,
   ) {
-    const key = this.recolored(image, who, palette);
+    return this.tint(this.recolored(image, who, palette), color);
+  }
+
+  // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
+  // each tinted image is drawn once and cached.
+  private tint(key: string, { r, g, b }: Pick<Color, 'r' | 'g' | 'b'>) {
     if (!r && !g && !b) return key;
     const tinted = `${key}:${r},${g},${b}`;
     if (this.textures.exists(tinted)) return tinted;

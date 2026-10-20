@@ -165,6 +165,19 @@ it("opens a VS round with KGT 13's VS splash, then demo black (117)", () => {
       .slice(-3)
       .map((frame) => ('fade' in frame ? frame.fade : 0)),
   ).toEqual([0, 10, 20]);
+  // V and S flash in: op 0x23 adds 32, 20, then 10 to each channel over
+  // their first 40 ticks (PCs 916–922).
+  for (const { frames } of first.slice(2))
+    expect(
+      frames
+        .slice(0, 4)
+        .map((frame) => [frame.duration, 'tint' in frame ? frame.tint : null]),
+    ).toEqual([
+      [30, [32, 32, 32]],
+      [5, [20, 20, 20]],
+      [5, [10, 10, 10]],
+      [50, null],
+    ]);
   // From round 2 the logo holds 110 ticks, then wipes away over 39.
   expect(later.map(({ z, frames }) => [z, frames[0].image])).toEqual([
     [0x7f, 182],

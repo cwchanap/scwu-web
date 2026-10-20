@@ -4103,11 +4103,12 @@ def export_sounds(c, prefix, indices):
 
 def kgt_timeline(p, action):
     """A KGT lettering's displays, following op 0x0a jumps until op 0x05 or its end: each
-    with the op 0x23 blit mode (and mode 4's fade, r[5]) in force and the op 0x03 sounds just before it, and the
+    with the op 0x23 blit mode (and mode 4's fade, r[5]) and colour offsets (r[2:5]) in force and the op 0x03
+    sounds just before it, and the
     header's r[1:3], the wait the round manager counts for it (0x4068e0). A jump
     back to a record already run ends it, with `loop` the frame it repeats from."""
     current, pc = action, p.action(action).start
-    frames, sounds, mode, fade, seen, loop = [], [], 0, 0, {}, None
+    frames, sounds, mode, fade, tint, seen, loop = [], [], 0, 0, [0, 0, 0], {}, None
     for _ in range(1000):
         if pc >= p.action(current).end or p.records[pc][0] == 0x05:
             break
@@ -4124,10 +4125,11 @@ def kgt_timeline(p, action):
             sounds.append(u16(record, 2))
         elif record[0] == 0x23:
             mode, fade = record[1], record[5] if record[1] == 4 else 0
+            tint = [s8(record, 2), s8(record, 3), s8(record, 4)]
         elif record[0] == 0x0c:
             f = display_record(p, pc)
             frame = dict(pc=pc, image=f["image"], duration=f["duration"], dx=f["dx"], dy=f["dy"], mode=mode,
-                         **({"fade": fade} if fade else {}))
+                         **({"fade": fade} if fade else {}), **({"tint": tint} if any(tint) else {}))
             frames.append(dict(frame, sounds=sounds) if sounds else frame)
             sounds = []
         pc += 1
@@ -4159,8 +4161,9 @@ def export_ui():
     # KGT 13's VS path (global 3 isn't 0, PC 72): in round 1 (PC 73) it spawns VS L, VS R, V and S
     # (118, 119, 122, 123, PCs 82-85), and from round 2 demo black (117, PC 76), the logo for 110
     # ticks and its wipe; each at its spawn record's place (r[8:12]) and z (r[13]). Their op 0x1f
-    # loops wait on global 15 = 10, which 13 clears (PC 69). ponytail: 13's own displays, the
-    # halves joined (199) and the logo (182), sit under these and are left out.
+    # loops wait on global 15 = 10, which 13 clears (PC 69). 13's own displays only repeat them: the
+    # halves joined (199) is VS L's and VS R's images where they stand, for 50 of their 150 still
+    # ticks, and the logo (182) is demo black's first, held 10 of its 50.
     def spawned(pc):
         record = p.records[pc]
         timeline = kgt_timeline(p, u16(record, 2))

@@ -21,6 +21,7 @@ type Lettering = {
     dy: number;
     mode: number;
     fade?: number;
+    tint?: [number, number, number];
     sounds?: number[];
   }[];
 };
@@ -237,7 +238,11 @@ const STOCK_OFFSETS = [
   [-2, -1],
 ];
 
-export function createHud(scene: Phaser.Scene) {
+// `tint` makes a texture with op 0x23's colour offsets (scene.ts).
+export function createHud(
+  scene: Phaser.Scene,
+  tint: (key: string, color: { r: number; g: number; b: number }) => string,
+) {
   // SCWU.KGT actions 60, 71–77, 103, 106–112 use a 640 × 480 screen.
   // Keep the recovered screen positions and pixels at a uniform 1.5× scale.
   const scale = 1.5;
@@ -353,9 +358,10 @@ export function createHud(scene: Phaser.Scene) {
     });
     infinity.setVisible(!finite);
     // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds, 4 fades
-    // by r[5] of 32. KGT 13's objects draw by their z among the screen
-    // objects (scene.ts's effectDepth), under the fighters' VS 1P banners.
-    // ponytail: V's and S's mode 0 brightening (PCs 916–922) is left out.
+    // by r[5] of 32, after its offsets tint the image: KO's blue, V's and
+    // S's flash (PCs 916–922). KGT 13's objects draw by their z among the
+    // screen objects (scene.ts's effectDepth), under the fighters' VS 1P
+    // banners.
     const current = letterings(match).flatMap(([lettering, age]) => {
       const frame = letteringFrame(lettering, age);
       return frame ? [{ ...frame, z: lettering.z }] : [];
@@ -365,7 +371,15 @@ export function createHud(scene: Phaser.Scene) {
       sprite.setVisible(!!frame);
       if (frame)
         sprite
-          .setTexture(`ui-${frame.image}`)
+          .setTexture(
+            frame.tint
+              ? tint(`ui-${frame.image}`, {
+                  r: frame.tint[0],
+                  g: frame.tint[1],
+                  b: frame.tint[2],
+                })
+              : `ui-${frame.image}`,
+          )
           .setPosition(frame.dx * scale, frame.dy * scale)
           .setDepth(frame.z === undefined ? 110 : 5 + frame.z / 1000)
           .setBlendMode(frame.mode === 2 ? 'ADD' : 'NORMAL')
