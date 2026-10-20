@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { animationFrame } from './animations';
+import type { Action } from './animations';
 import type { Who } from './characters';
 import { FIGHT_TICK } from './hud';
-import { exMode, Match } from './match';
+import { EX_MODE, exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { enter, named } from './testing';
 
@@ -365,6 +366,23 @@ const TEMPLATE: {
     idle: [356, 351],
     walk: -5 * speed(2000) + 90 * speed(110),
   },
+  // Round 1 (36, PC 368): 125 ticks of blanks and displays, its EX check
+  // (PC 403), then STAND DEMO 2 (30) once. From round 2 STAND DEMO 2 once
+  // (PC 371), the EX check (PC 372), then once more (PC 373): image 365 for
+  // 125 ticks.
+  {
+    who: 'sin',
+    start: 33,
+    round1: 36,
+    banner: 57,
+    image: 365,
+    charge: 41,
+    demo: [
+      [100, 365],
+      [349, 365],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -588,6 +606,31 @@ describe("G Suneo's EX checks", () => {
   });
 });
 
+describe("SIN's EX checks", () => {
+  // Down held at Round 1's check (PC 403) or between round 2's STAND DEMO
+  // 2s (PC 372) enters 'hanshin change' (40), which sets variable 0 to 10
+  // and rejoins 開始時 at PC 372: its STAND DEMO 2 plays STAND DEMO (29),
+  // as its check of variable 0 jumps there inside the call (PC 324), and
+  // runs out sooner.
+  it('in round 1, at Round 1 + 125', () => {
+    expect(exCheck('sin', false, 224)).toEqual(['36', false, [365]]);
+    expect(exCheck('sin', false, 225)).toEqual([
+      'idle',
+      true,
+      [113, 114, 115, 116, 117],
+    ]);
+  });
+
+  it('from round 2, between the STAND DEMO 2s', () => {
+    expect(exCheck('sin', true, 224)).toEqual(['33', false, [365]]);
+    expect(exCheck('sin', true, 225)).toEqual([
+      'idle',
+      true,
+      [113, 114, 115, 116, 117],
+    ]);
+  });
+});
+
 // `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
 // (held `held` ticks) or entering source action `input`: Ryuko's actions in
 // order, the striker's branches and the life Ryuko has left.
@@ -595,17 +638,25 @@ function finish(
   vs: boolean,
   gap: number,
   input: Input | number,
-  { held = 1, who = 'ryuko', ex = false, life }: FinishOptions = {},
+  { held = 1, who = 'ryuko', ex = false, life, down }: FinishOptions = {},
 ) {
   const match = new Match('practice', false, 0, [who, 'ryuko'], 'court', vs);
   const [striker, target] = match.fighters;
   striker.x = 500;
   target.x = 500 + gap;
   striker.stock = 3;
-  // EX mode: variable 0 at 100.
-  if (ex) striker.variables[0] = 100;
+  // EX mode: variable 0 at its EX value.
+  if (ex) striker.variables[0] = EX_MODE[who]!.value;
   // A desperation super's op 0x11 wants low life.
   if (life) striker.hp = life;
+  // A victim lying down, as a knockdown leaves it.
+  if (down) {
+    (match as unknown as { queue(f: Fighter, a: Action): void }).queue(
+      target,
+      'knockdown',
+    );
+    match.step();
+  }
   if (typeof input === 'number') enter(match, striker, input);
   const seen: string[] = [];
   const branches = new Set<string>();
@@ -621,6 +672,7 @@ type FinishOptions = {
   who?: Who;
   ex?: boolean;
   life?: number;
+  down?: boolean;
 };
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
@@ -852,5 +904,46 @@ describe("Yo's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("SIN's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. At life 165 or below Clack
+  // chuck and RUN CHUCK take their EVIL forms (op 0x11, PCs 3103, 3515) and
+  // NOZAN starts; LOW CHUCK START's first box (PC 2960) catches a victim
+  // lying down into LOw Chuck hit Down (221, PC 2958).
+  it.each([
+    ['Chuck hit ZA (206, PC 2754)', { throw: true }, 206, {}, [480, 480]],
+    ['LOw Chuck hit ZA (222, PC 2997)', 219, 222, {}, [475, 475]],
+    [
+      'LOw Chuck hit Down ZA (223, PC 3030)',
+      219,
+      223,
+      { down: true },
+      [490, 490],
+    ],
+    ['New CC down ZA (229, PC 3130)', 225, 229, {}, [455, 455]],
+    ['EVIL CLACK FIN ZA (245, PC 3400)', 225, 245, { life: 100 }, [440, 440]],
+    ['RUN C DOWN ZA (251, PC 3526)', 247, 251, {}, [455, 455]],
+    ['EVIL RUN C DOWN ZA (253, PC 3561)', 247, 253, { life: 100 }, [445, 445]],
+    ['RUN CHUCK DOWN ZA (260, PC 3684)', 247, 260, { ex: true }, [445, 445]],
+    ['RUN CHUCK SUPER ZA (267, PC 3781)', 272, 267, { ex: true }, [390, 390]],
+    ['new src down ZA (278, PC 3991)', 272, 278, {}, [390, 390]],
+    ['new en300 hit ZA (299, PC 4323)', 296, 299, {}, [280, 280]],
+    ['NOZAN FIN ZA (321, PC 4785)', 310, 321, { life: 100 }, [260, 260]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'sin', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'sin', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+
+  it('takes nozan SF BR (318) outside VS and nozan SF2 in VS (PC 4682)', () => {
+    const sf = (vs: boolean) =>
+      finish(vs, 80, 310, { who: 'sin', life: 100 }).branches.has('318');
+    expect([sf(false), sf(true)]).toEqual([true, false]);
   });
 });

@@ -871,7 +871,7 @@ const timeline = (f: Fighter) => f.branch!;
 // 3770), which the first enters while it is set (PC 3754); his intro's (PC
 // 486), 68 ticks after he lands, enters Change EX (43), which sets it (PC
 // 548) and jumps back (39 + 35, PC 549).
-const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
+export const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
   ryuko: { value: 10, intro: INTRO_EX_TICK },
   chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
   amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
