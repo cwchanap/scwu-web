@@ -910,6 +910,31 @@ const TEMPLATE: {
     ],
     idle: [485, 351],
   },
+  // Round 1 (36, PC 386): images 183 for 210 ticks, 177, 176 and 175 for
+  // 80, 308 ticks in all. From round 2 DEMO stand (30) from + 2 twice (PC
+  // 387): 115, 116, 117, 116 and 115 for 8, 8, 50, 5, 50.
+  {
+    who: 'zmega',
+    start: 33,
+    round1: 36,
+    banner: 62,
+    image: 115,
+    charge: 47,
+    demo: [
+      [99, 115],
+      [100, 115],
+      [108, 116],
+      [116, 117],
+      [166, 116],
+      [171, 115],
+      [229, 116],
+      [237, 117],
+      [287, 116],
+      [292, 115],
+      [341, 115],
+    ],
+    idle: [409, 343],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1544,8 +1569,8 @@ function finish(
   striker.x = 500;
   target.x = 500 + gap;
   striker.stock = 3;
-  // EX mode: variable 0 at its EX value.
-  if (ex) striker.variables[0] = EX_MODE[who]!.value;
+  // EX mode: variable 0 at its EX value, or at a value given.
+  if (ex) striker.variables[0] = ex === true ? EX_MODE[who]!.value : ex;
   // A desperation super's op 0x11 wants low life.
   if (life) striker.hp = life;
   // A victim lying down, as a knockdown leaves it.
@@ -1586,7 +1611,7 @@ function finish(
 type FinishOptions = {
   held?: number;
   who?: Who;
-  ex?: boolean;
+  ex?: boolean | number;
   life?: number;
   down?: boolean;
   victim?: readonly [number, Input];
@@ -2383,5 +2408,29 @@ describe("3-TIMES's VS finisher (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual([310, 310]);
+  });
+});
+
+describe("Z-MEGA's VS finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; sgiga wall ZA's and Shin GIGA
+  // WALL ZA's op 0x15 take 1 more (PCs 4888, 4920). GIGA Start and SUPER
+  // GIGA PRESS take their Shin forms for variable 0 = 100 (PCs 3602, 4665),
+  // which TO SHIN (194) sets (PC 2380); AKUMA FIN takes SZ Stop for global
+  // 3 > 0.
+  it.each([
+    ['Chuck hit ZA (192, PC 2356)', { throw: true }, 192, false, [465, 465]],
+    ['GIGA WALL ZA (248, PC 3680)', 245, 248, false, [469, 469]],
+    ['Shin GIGA wall ZA (253, PC 3805)', 245, 253, 100, [464, 464]],
+    ['SZ Stop (290, PC 4611)', 282, 290, false, [260, 260]],
+    ['sgiga wall ZA (308, PC 4871)', 296, 308, false, [409, 409]],
+    ['Shin GIGA WALL ZA (310, PC 4903)', 296, 310, 100, [389, 389]],
+  ] as const)('%s', (_, move, za, ex, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'zmega', ex });
+    const vs = finish(true, 80, move, { held: 9, who: 'zmega', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
