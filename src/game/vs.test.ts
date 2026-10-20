@@ -1058,6 +1058,28 @@ const TEMPLATE: {
     idle: [343, 341],
     copy: '26+8',
   },
+  // Round 1 (34, PC 298): images 159, 160 and 158 for 133 ticks, then
+  // DEMO ACT (29) from + 2 in a loop: 113, 114, 115 and 114 for 30, 18,
+  // 30, 12. From round 2 DEMO ACT from + 3 (PC 299).
+  {
+    who: 'ttro',
+    start: 31,
+    round1: 34,
+    banner: 54,
+    image: 113,
+    charge: 38,
+    demo: [
+      [99, 113],
+      [100, 113],
+      [130, 114],
+      [148, 115],
+      [178, 114],
+      [190, 113],
+      [358, 114],
+      [369, 114],
+    ],
+    idle: [419, 371],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -2677,6 +2699,25 @@ describe("SHIN-Z's VS finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'shinz' });
     const vs = finish(true, 80, move, { held: 9, who: 'shinz' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("TTRO's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. CC start's catch (kind 0x8a,
+  // PC 2368) takes only a reeling victim, so CC hit (188) is entered at a
+  // victim lying down, where CC drop lend ZA's box reaches it.
+  it.each([
+    ['Chuck Hit ZA (181, PC 2262)', { throw: true }, 181, {}, [470, 470]],
+    ['CC drop lend ZA (192, PC 2425)', 188, 192, { down: true }, [430, 430]],
+    ['SCC DROP LEND ZA (215, PC 2741)', 204, 215, {}, [310, 310]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'ttro', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'ttro', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
