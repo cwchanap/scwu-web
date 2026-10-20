@@ -212,6 +212,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
     for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
         if p.records[pc][0] == 0x19:
             bodies = body_boxes(bodies, p.records[pc])
+        elif p.records[pc][0] in (0x07, 0x14):
+            bodies = {}
     t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
     action = index
     # The player variables this path has set (op 0x1f r[5] = 1).
@@ -235,6 +237,11 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
         op = record[0]
         if not stack and pc not in seen:
             seen[pc], seen_events[pc] = len(frames), len(events)
+        # Ops 0x07 and 0x14 clear the holder's boxes and bodies (0x40e550) as an action change
+        # does, until op 0x19 sets them again. ponytail: they run only once a contact has set
+        # +0xdef9 and only for a player, which every holder here is.
+        if op in (0x07, 0x14):
+            bodies = {}
         if op == 0x0c:
             frame = display_record(p, pc)
             image = c.images[frame["image"]]

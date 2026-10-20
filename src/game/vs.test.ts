@@ -2060,13 +2060,14 @@ describe("Ryuko's ZA finishers (global 3 > 0)", () => {
     expect(vs.seen.slice(1, 4)).toEqual(['superHeld', 'rushAirHit', 'fly']);
   });
 
-  it('GCA hit 2 ZA (322) strikes with a box that re-arms each display', () => {
+  it('GCA hit 2 ZA (322) strikes once before its op 0x14 clears the box', () => {
     const br = finish(false, 120, { changeAttack: true });
     const vs = finish(true, 120, { changeAttack: true });
     expect(vs.branches.has('322')).toBe(true);
-    // Op 0x15's 40 and ten beam hits of 6; the ZA box's 39 three times,
-    // op 0x15's 1, and the same beam.
-    expect([br.hp, vs.hp]).toEqual([510 - 40 - 60, 510 - 3 * 39 - 1 - 60]);
+    // Op 0x15's 40 and ten beam hits of 6; the ZA box's 39, set 77 ticks in
+    // after that tick's ops 0x07 and 0x14, once, as the op 0x14 at 79
+    // clears it (0x40e550), then op 0x15's 1 and the same beam.
+    expect([br.hp, vs.hp]).toEqual([510 - 40 - 60, 510 - 39 - 1 - 60]);
   });
 });
 

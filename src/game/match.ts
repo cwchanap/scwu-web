@@ -2262,11 +2262,13 @@ export class Match {
           return this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       case 'hold':
-        // On an object they place it as they would the player, op 0x07
+        // Both clear the holder's boxes (0x40e550; the export drops its
+        // bodies). On an object they place it as they would the player, op 0x07
         // zeroing its motion (0x412f66) and stopping it for good (+0x40 at
         // -1, which only the step reads, 0x412397), then skip the player's
         // pose and response (0x412f72, 0x41310f). ponytail: the priorities
         // both ops give it (0x41f130) are left out, as the fighters' are.
+        if (self.caught) Object.assign(self, { box: null, boxes: [] });
         if (self.caught && 'clip' in self.caught) {
           this.placeHeld(self, self.caught, event);
           Object.assign(self.caught, {
@@ -2292,6 +2294,7 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
+        if (self.caught) Object.assign(self, { box: null, boxes: [] });
         if (self.caught && 'clip' in self.caught) {
           this.placeHeld(self, self.caught, event);
           break;

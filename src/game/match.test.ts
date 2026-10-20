@@ -21,6 +21,7 @@ import { FIGHT_TICK, ROUND_END_TICKS } from './hud';
 import {
   animationDuration,
   animationFrame,
+  hurtboxes,
   INTRO_EX_TICK,
   NORMAL_COLOR,
   RESPONSE_EFFECTS,
@@ -4872,7 +4873,7 @@ describe('prototype training rules', () => {
     });
   });
 
-  describe("+0xdef9 holding an object a fighter's box met", () => {
+  describe('ops 0x07 and 0x14 on what +0xdef9 holds', () => {
     // YINAN's 21 leaves 21 + 22 where he stood, with his bodies (x 0).
     const clone = (match: Match, x: number) => {
       const e = object('21+22', 1, { who: 'yinan', x });
@@ -4909,6 +4910,14 @@ describe('prototype training rules', () => {
         -ryuko.facing,
       ]);
       expect([yinan.x, yinan.held]).toEqual([x, null]);
+    });
+
+    it("clears the holder's bodies, as an action change does (0x40e550)", () => {
+      // 209 + 12's op 0x14 at age 1 empties Ryuko's body slots until its
+      // loop's op 0x19s set them again a tick on.
+      expect([0, 1, 2].map((age) => hurtboxes('209+12', age).length)).toEqual([
+        3, 0, 3,
+      ]);
     });
 
     it('stops it for good with op 0x07 (+0x40 at -1)', () => {
