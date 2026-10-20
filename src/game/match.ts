@@ -1092,6 +1092,12 @@ export interface Fighter {
   // ('body', 0x40f8a4) or an object following it ('object', 0x40f8ac).
   reaction: number;
   striker: 'body' | 'object' | null;
+  // +0xdef9: the other player a contact of either one's own box last joined
+  // this one to (0x40f2da, 0x40f2e0). Only the round's setup clears it
+  // (0x411f7c), so ops 0x07 and 0x14 reach that player long after.
+  // ponytail: a fighter's box meeting an object's body records the object;
+  // the port leaves those meetings out.
+  caught: Fighter | null;
   // Distance the walls stopped this tick, and player +0xdf49: x the next
   // motion step adds (0x40fa09).
   stopped: number;
@@ -1357,6 +1363,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   contact: false,
   reaction: 0,
   striker: null,
+  caught: null,
   branch: null,
   face: -1,
   variables: {},
@@ -2256,7 +2263,7 @@ export class Match {
           return this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       case 'hold':
-        if (!this.struck(other)) break;
+        if (!this.struck(self, other)) break;
         other.held = {
           pose: event.pose,
           flags: event.flags,
@@ -2277,7 +2284,7 @@ export class Match {
         const timeline = reaction
           ? undefined
           : ownTimeline(other.who, event.response);
-        if ((!reaction && !timeline) || !this.struck(other)) break;
+        if ((!reaction && !timeline) || !this.struck(self, other)) break;
         other.held = { pose: 0, flags: event.flags, x: event.x, y: event.y };
         this.placeHeld(self, other);
         // Like a contact it queues the reaction (0x413136), and it clears
@@ -2452,13 +2459,13 @@ export class Match {
     return true;
   }
 
-  // Ops 0x07 (0x412e93) and 0x14 (0x413057) reach whoever this player's box
-  // last struck (+0xdef9, 0x40f2e0), held or not: DST juggles its tossed
-  // victim, and Chung's EN300 holds the one its shock struck.
-  private struck(target: Fighter) {
+  // Ops 0x07 (0x412e93) and 0x14 (0x413057) reach the player this one's
+  // last contact joined it to (+0xdef9), held or not: DST juggles its tossed
+  // victim, and GON's Kuren under seizes whoever struck him.
+  private struck(self: Fighter, target: Fighter) {
     return (
       this.catchHeld(target) ||
-      (target.striker !== null && target.hp > 0 && Boolean(markHeld(target)))
+      (self.caught === target && target.hp > 0 && Boolean(markHeld(target)))
     );
   }
 
@@ -3453,6 +3460,8 @@ export class Match {
       own,
     } of contacts) {
       source.connected = true;
+      // 0x40f2c2: a player's own box joins the two, whatever it then does.
+      if (source === f) [f.caught, target.caught] = [target, f];
       if (!reaction && !timeline) {
         target.facing = facing === 1 ? -1 : 1;
         continue;

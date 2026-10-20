@@ -90,7 +90,10 @@ export const playing = (f: Fighter) =>
 
 // Enters a source action (at `offset`, as a jump does) as a command does,
 // then runs its records through `age` without moving anyone, so a test can
-// start a move mid-timeline.
+// start a move mid-timeline. Entered between steps, its first tick skips the
+// hit test (the next step runs its second first), so a box living on that
+// tick alone never meets: those tests enter through the command (TTRO's and
+// ASTROMAN's CC).
 export function enter(
   match: Match,
   f: Fighter,

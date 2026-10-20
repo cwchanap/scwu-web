@@ -174,10 +174,12 @@ describe('GON (21 GON.PLAYER)', () => {
       damage: 0,
       taken: 12,
     });
-    // KURENCOUNTER holds 200 (PC 6091) for KUREN GET (384).
+    // KURENCOUNTER holds 200 (PC 6091) for KUREN GET (384), whose op 0x14
+    // seizes the striker (PC 6219) and takes 110 (PC 6258); response 43
+    // flies it off bodiless, past the 30 of *KUREN LEND EXPLOR (379).
     expect(counter({ musashi: true }, 50)).toMatchObject({
       mine: [376, 384, '384+37', 'idle'],
-      damage: 140,
+      damage: 110,
     });
     // EX short Counter holds 300 (PC 5399) for >>EX IORI3-2 GET (264).
     expect(counter({ iori: true }, 10, true)).toMatchObject({
