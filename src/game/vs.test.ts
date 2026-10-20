@@ -878,6 +878,38 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: '39+11',
   },
+  // Its global 1 = 1000 test (PC 443) passes over 開始時 yowai. Round 1 (34,
+  // PC 448): image 327 for 50 ticks, demo speak rp (38) from + 5 in two
+  // calls (PCs 488, 490), then images 284 to 287, 384 ticks in all, past
+  // FIGHT. From round 2 image 123 for 18 ticks (PC 449), then DEMO STAND
+  // (28) from + 2 twice (PC 450).
+  {
+    who: 'zenka',
+    start: 30,
+    round1: 34,
+    banner: 71,
+    image: 113,
+    charge: 47,
+    demo: [
+      [99, 113],
+      [100, 123],
+      [118, 113],
+      [138, 114],
+      [148, 115],
+      [158, 116],
+      [178, 117],
+      [185, 118],
+      [191, 119],
+      [198, 120],
+      [205, 121],
+      [213, 122],
+      [223, 123],
+      [234, 113],
+      [339, 123],
+      [349, 123],
+    ],
+    idle: [485, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
