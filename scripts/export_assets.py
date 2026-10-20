@@ -1032,11 +1032,6 @@ SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway
 # YINAN's throws) and RARIO grow, YARA and 1UP (65–67: his mushrooms).
 OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
 
-# The fighters besides Ryuko whose 開始時 a VS round plays from the start.
-# ponytail: ported one at a time; the match keeps the Br. intro for a pairing
-# with any other.
-VS_STARTS = {"zoma", "kiki", "chung", "amiro", "anmc", "giant", "suneo", "yo", "sin", "lizard", "kay", "dido", "sakuya", "alex", "sou", "hiso", "erus", "feng", "sean", "gon", "kate", "remu", "rear", "gigi", "sww", "ogi", "ziro", "masa", "times", "zenka", "zmega", "alpha", "shinz", "zaku", "pachelo", "golf", "asura", "ttro", "astroman", "yinan", "aya", "rario", "training"}
-
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",
           "crouchTimeStopGuard", "airTimeStopGuard")
@@ -3821,13 +3816,16 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     moves = sorted({e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]})
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The scripted reactions, every response's hit effect and every object
-    # the clips spawn; the moves, and the guard reactions whose op 0x24
-    # enters COUNTER HIT.
+    # the clips spawn; the moves, the guard reactions whose op 0x24 enters
+    # COUNTER HIT, and the 開始時 a VS round plays. DoraEmon's jumps to Start
+    # KO (PC 338), whose 38 + 18 spawns itself each tick until the objects
+    # fill the engine's 1023 slots (0x406570); the select screen never offers
+    # him in VS single (his flag is 0), so his isn't exported.
     guards = [name for name in GUARDS if not name.startswith("air")]
     own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
-                              *sorted(own_timelines), *([tables["start"]] if key in VS_STARTS else [])]]
+                              *sorted(own_timelines), *([tables["start"]] if key != "dora" else [])]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his

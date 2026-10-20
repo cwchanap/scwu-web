@@ -1526,9 +1526,9 @@ export class Match {
 
   // VS single places the players at 390 and 890 source pixels (0x408ac3),
   // and each set-up enters its 開始時 (+0x759c, 0x412180), which plays the
-  // VS intro as a script from the round's first step. ponytail: until every
-  // fighter's 開始時 is exported, a pairing with one that isn't plays the
-  // authored Br. intro.
+  // VS intro as a script from the round's first step. DoraEmon, whom VS
+  // single never offers, exports none: a pairing with him plays the authored
+  // Br. intro.
   private entrants(): [Fighter, Fighter] {
     const starts = this.characters.map((who) => CHARACTERS[who].start);
     if (!this.vs || this.characters.some((who, i) => !exported(starts[i], who)))

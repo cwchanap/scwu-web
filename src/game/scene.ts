@@ -123,6 +123,9 @@ const idleVM = (f: Fighter, seed?: number) =>
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
+  // Whether the select screen chose the pair: its Vs. CPU battles take the
+  // VS paths (global 3 at 50), as VS single's do.
+  private chosen = false;
   private stage: Stage = 'court';
   private wantedStage = this.stage;
   match = new Match(
@@ -349,6 +352,7 @@ export class TrainingScene extends Phaser.Scene {
     if (!select.done) return;
     if (select instanceof Title) return this.openSelect();
     [this.fighter, this.opponent] = select.done;
+    this.chosen = true;
     this.palettes = battlePalettes(select.palettes);
     this.select = null;
     this.selectTrack?.stop();
@@ -402,10 +406,12 @@ export class TrainingScene extends Phaser.Scene {
   }
   setFighter(who: Who) {
     this.fighter = who;
+    this.chosen = false;
     this.reset(this.match.mode);
   }
   setOpponent(who: Who) {
     this.opponent = who;
+    this.chosen = false;
     this.reset(this.match.mode);
   }
   // A stage's images load when it is first picked; the current one plays on
@@ -435,6 +441,7 @@ export class TrainingScene extends Phaser.Scene {
       randomSeed(),
       [this.fighter, this.opponent],
       this.stage,
+      this.chosen && mode === 'cpu',
     );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();

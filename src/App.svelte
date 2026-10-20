@@ -2224,7 +2224,9 @@
           keeps you just under 30% for desperation moves. Vs. CPU is the
           original game's CPU, playing the opponent's own moves, specials and
           supers. Reduce their health to zero, or lead on health when time runs
-          out. Changing modes, fighters or the stage starts a fresh match.
+          out. A Vs. CPU match the select screen starts plays the original's VS
+          intros and VS finishers. Changing modes, fighters or the stage starts
+          a fresh match.
         </p>
         <p>
           The match pauses when you leave the window. Press <kbd>P</kbd> to
