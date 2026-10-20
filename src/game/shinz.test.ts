@@ -106,9 +106,10 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
   });
 
   it('cancels P into K and the buttons into specials through their windows (op 0x1e, PCs 2215, 2234)', () => {
-    // K pressed before P's first hit, or after its second.
+    // K pressed in P's first stop (13 to 27, Ryuko's reaction stepping
+    // first), or after its second.
     expect(
-      play(presses({ 0: { punch: true }, 10: { kick: true } })),
+      play(presses({ 0: { punch: true }, 24: { kick: true } })),
     ).toMatchObject({ mine: [181, 182, 'idle'], damage: 40 });
     expect(
       play(presses({ 0: { punch: true }, 50: { kick: true } })),

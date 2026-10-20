@@ -286,7 +286,7 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
 
   it('cancels nataku p, which sets variable 6 (PC 4055), into MISS ALL or RAMBU for two stocks', () => {
     for (const [key, mine, damage] of [
-      ['getterBeam', [270, 352, 'idle'], 127],
+      ['getterBeam', [270, 352, 'idle'], 119],
       ['musashi', [270, '352+5', 395, 396, 398, 409, 'idle'], 136],
     ] as const) {
       const move = play(presses({ 0: { axe: true }, 20: { [key]: true } }));

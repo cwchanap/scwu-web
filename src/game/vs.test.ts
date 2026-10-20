@@ -2096,10 +2096,12 @@ describe("Chung's ZA finishers (global 3 > 0)", () => {
   // Each swaps op 0x15's life for a box: the move entered, its ZA form, the
   // gap, EX mode, and the life Ryuko has left without and with VS. P3 Hit
   // ZA's kind-2 box spans two displays (PCs 2451–2452) and re-arms at each
-  // (0x41257d), so it strikes twice for 35; en300 end ZA's two boxes strike
+  // (0x41257d), but strikes once for P3 Hit's 35: its op 0x14 releases
+  // Ryuko at the first, after his step (held behind Chung, 0x4f to 0x51),
+  // so the hit test still finds him held. en300 end ZA's two boxes strike
   // for the 50 and 120 its op 0x15s take.
   it.each([
-    ['P3 Hit ZA (187, PC 2431)', 185, 187, 80, false, [475, 440]],
+    ['P3 Hit ZA (187, PC 2431)', 185, 187, 80, false, [475, 475]],
     ['Chuck hit ZA (223, PC 3086)', 221, 223, 80, false, [470, 470]],
     ['EX chuck Hit ZA (227, PC 3159)', 221, 227, 80, true, [470, 470]],
     ['Orochi hit ZA (252, PC 3600)', 250, 252, 130, false, [470, 470]],
@@ -2207,8 +2209,8 @@ describe("Giant's VS finishers", () => {
         if (ryuko.action === 'stun') return [branches.has('221'), t];
       }
     };
-    expect(flies(false)).toEqual([true, 903]);
-    expect(flies(true)).toEqual([false, 863]);
+    expect(flies(false)).toEqual([true, 904]);
+    expect(flies(true)).toEqual([false, 864]);
   });
 });
 

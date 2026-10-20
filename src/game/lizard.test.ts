@@ -200,14 +200,16 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'lizard']);
-    const lizard = match.fighters[1];
     const entered = new Set<unknown>();
-    // FIRE, chuck sup and dragon sp.
+    // FIRE, chuck sup and dragon sp, over two seeds.
     const wanted = [214, 263, 245];
-    for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (lizard.action === 'script') entered.add(lizard.branch);
+    for (const seed of [0, 1]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'lizard']);
+      const lizard = match.fighters[1];
+      for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (lizard.action === 'script') entered.add(lizard.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

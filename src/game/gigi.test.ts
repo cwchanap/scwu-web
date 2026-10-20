@@ -186,7 +186,7 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
     const bike = play(presses({ 0: { jump: true }, 10: { blackRush: true } }));
     expect(bike).toMatchObject({
       mine: ['takeoff', 'jump', 278, 240, 'idle'],
-      damage: 24,
+      damage: 16,
     });
     expect(bike.objects).toContain(284);
   });

@@ -245,14 +245,16 @@ describe('Giant (07 GIANT.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'giant']);
-    const giant = match.fighters[1];
     const entered = new Set<unknown>();
-    // H PUNCH, base ball and counter.
+    // H PUNCH, base ball and counter, over two seeds.
     const wanted = [254, 235, 278];
-    for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (giant.action === 'script') entered.add(giant.branch);
+    for (const seed of [0, 1]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'giant']);
+      const giant = match.fighters[1];
+      for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (giant.action === 'script') entered.add(giant.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

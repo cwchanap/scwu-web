@@ -269,11 +269,13 @@ describe('Hit Up launcher', () => {
           { guard: outcome === 'block' },
         );
         actions.add(playing(match.fighters[0]));
+        // The guard reaction, struck (priority 79), steps before Ryuko (81)
+        // and stops him before his own step counts it down.
         if (tick === 16 && outcome === 'block') {
           expect(match.fighters[0]).toMatchObject({
             action: 'script',
             branch: RYUKO.hitUp,
-            hitStop: 10,
+            hitStop: 9,
           });
           expect(match.fighters[1]).toMatchObject({
             action: 'blockHeavy',
@@ -463,7 +465,8 @@ describe('recovered neutral and round animations', () => {
         hitStop: 13,
         hp: LIFE - 30,
       });
-      expect(attacker.hitStop).toBe(13);
+      // The victim steps first (79 to 81), so Ryuko's step has spent one.
+      expect(attacker.hitStop).toBe(12);
       const startX = target.x;
       ticks(match, 13 + 6);
       expect(target).toMatchObject({ action: 'sweep', age: 6 });
@@ -877,8 +880,9 @@ describe('fighter clip spawns (op 0x04)', () => {
       match.step();
     }
     // Spawned in the step where the target stood, before the motion pass
-    // slides the target on; the dust first moves after its first step.
-    expect(dust()).toMatchObject([{ z: 0x51, slot: -1, age: -1, x }]);
+    // slides the target on; the dust first moves after its first step. Just
+    // in front of the target, which the contact put at 0x4f (0x40f355).
+    expect(dust()).toMatchObject([{ z: 0x50, slot: -1, age: -1, x }]);
   });
 
   it('flashes the court behind the fighters on a KO (59 + 9, PC 600)', () => {
@@ -914,14 +918,15 @@ describe('fighter clip spawns (op 0x04)', () => {
       match.step();
     match.step({ punch: true });
     while (!match.effects.some((e) => e.clip === 395)) match.step();
-    // Punch 2's dust, flags 0 (PC 2394), takes slot 0 behind Ryuko.
+    // Punch 2's dust, flags 0 (PC 2394), takes slot 0 behind Ryuko, whom
+    // punch 1's contact put at 0x51 (0x40f33a).
     expect(f).toMatchObject({
       action: 'script',
       branch: RYUKO.punch2,
       age: 13,
     });
     expect(match.effects.filter((e) => e.clip === 395)).toMatchObject([
-      { owner: 0, slot: 0, z: 0x4f },
+      { owner: 0, slot: 0, z: 0x50 },
     ]);
   });
 
@@ -975,13 +980,14 @@ describe('fighter clip spawns (op 0x04)', () => {
         }
     }
     // Flag 4 puts each just behind its spawner, 20, 30 and 40 source pixels
-    // on: the smoke is 0x51 (flags 5), so the puffs share the fighters' 0x50
-    // and draw after them.
+    // on: the smoke is 0x50 (flags 5, just in front of Ryuko, whom the
+    // DST's last op 0x07 put behind its victim at 0x4f), so the puffs share
+    // his 0x4f and draw after him.
     expect(puffs).toEqual(
       [20, 30, 40].map((x, i) => ({
         age: 10 + 5 * i,
         dx: f.facing * x * 1.5,
-        z: 0x50,
+        z: 0x4f,
       })),
     );
   });
@@ -1736,7 +1742,13 @@ describe('recovered cancels', () => {
       f.hp = hp;
       match.step({ iori: true });
       while (!f.contact) match.step();
+      // The victim, struck (0x4f), steps before Ryuko (0x51), so its
+      // reaction stops him before he reads the press, which stays in the
+      // window until the stop runs out.
       match.step({ [control]: true });
+      expect(named(f)).toBe('iori');
+      while (f.hitStop) match.step();
+      match.step();
       expect({ ...f, action: named(f) }).toMatchObject({ action, stock: left });
       // Action 254 and 265 spawn GENGAI! (253); NO SUPER does not.
       expect(match.effects.some((e) => e.clip === 253)).toBe(
@@ -1754,6 +1766,8 @@ describe('recovered cancels', () => {
       match.step({ iori: true });
       while (!f.contact) match.step();
       match.step({ [control]: true });
+      while (f.hitStop) match.step();
+      match.step();
       expect(named(f)).toBe('iori');
     }
     const whiff = new Match();
@@ -1778,6 +1792,10 @@ describe('recovered cancels', () => {
       strike(match, f, RYUKO.airPunch);
       match.step();
       expect(f.contact).toBe(true);
+      // The victim's reaction, stepping first (struck, 0x4f), stops Ryuko
+      // (0x51); his window opens again when the stop runs out.
+      match.step();
+      while (f.hitStop) match.step();
       return { match, f };
     }
     const kick = airPunch();
@@ -1932,9 +1950,11 @@ describe('recovered power gauge', () => {
     match.step({ axe: true });
     for (let i = 0; i < 100 && target.action === 'idle'; i++) match.step();
     // Response 50 → FB (110) adds 10 to the thrower (PC 1442), then 75 adds
-    // 5 and 3 (PC 790) and stops both fighters 15 ticks (PC 791, 0x4136ae).
+    // 5 and 3 (PC 790) and stops both fighters 15 ticks (PC 791, 0x4136ae):
+    // the target, struck (0x4f), steps before the thrower (0x50), whose step
+    // spends one.
     expect(target).toMatchObject({ action: 'hitHeavy', power: 5, hitStop: 15 });
-    expect(attacker).toMatchObject({ power: 13, hitStop: 15 });
+    expect(attacker).toMatchObject({ power: 13, hitStop: 14 });
     const thrower = new Match();
     thrower.fighters[1].x = thrower.fighters[0].x + 100;
     // The grab box at age 7 queues Chuck Hit, entered a tick later, whose
@@ -2415,21 +2435,22 @@ describe('IORI chain', () => {
       const [f, target] = match.fighters;
       f.x = 440;
       ticks(match, 22, { iori: true });
-      // Stage one has no hit handler, so it steps once more before the
-      // reaction it queued enters and stops it.
+      // The victim, struck (0x4f), steps before Ryuko (0x51), so the
+      // reaction the contact queued enters and stops him before his step,
+      // which spends one.
       match.step();
       expect({ ...f, action: named(f) }).toMatchObject({
         action: 'iori',
-        age: 22,
-        hitStop: 15,
+        age: 21,
+        hitStop: 14,
       });
       const positions = [f.x, target.x];
       ticks(match, early ? 1 : 11);
       match.step({ iori: true });
-      ticks(match, early ? 13 : 3);
-      expect(f).toMatchObject({ age: 22, hitStop: 0 });
+      ticks(match, early ? 12 : 2);
+      expect(f).toMatchObject({ age: 21, hitStop: 0 });
       expect([f.x, target.x]).toEqual(positions);
-      ticks(match, 6);
+      ticks(match, 7);
       expect({ ...f, action: named(f) }).toMatchObject({
         action: 'iori',
         age: 28,
@@ -3883,8 +3904,9 @@ describe('prototype training rules', () => {
         const contacts: number[] = [];
         ticks(match, 24, { drill: true }, { guard: guarded });
         contacts.push(match.ticks);
-        // The drill has no hit handler, so Ryuko steps once more as the
-        // reaction the contact queued enters and stops them both.
+        // The target, struck (0x4f), steps before Ryuko (0x51), so the
+        // reaction the contact queued enters and stops them both, Ryuko
+        // before his step, which spends one.
         match.step({}, { guard: guarded });
         expect(target.action).toBe(guarded ? 'blockHeavy' : 'hitHeavy');
         const frozen = match.fighters.map(({ y, vx, vy, age, airAge }) => ({
@@ -3897,8 +3919,9 @@ describe('prototype training rules', () => {
         const centre = f.x + target.x;
         let gap = (target.x - f.x) * facing;
         const hp = target.hp;
-        // The tick each stop runs out moves (0x412390, 0x40f963).
-        for (let tick = 0; tick < (guarded ? 9 : 14); tick++) {
+        // The tick each stop runs out moves (0x412390, 0x40f963): Ryuko's
+        // a tick before the target's.
+        for (let tick = 0; tick < (guarded ? 8 : 13); tick++) {
           match.step({}, { guard: guarded });
           expect(
             match.fighters.map(({ y, vx, vy, age, airAge }) => ({
@@ -3922,10 +3945,11 @@ describe('prototype training rules', () => {
           if (hitEffects(match).some((e) => e.age === -1)) {
             contacts.push(match.ticks);
             if (contacts.length === 6) {
-              // The finisher uses response 18 / action 80: 13 ticks, not 15.
+              // The finisher uses response 18 / action 80: 13 ticks, not 15,
+              // the first spent by the step it stops.
               match.step({}, { guard: guarded });
               const age = f.age;
-              ticks(match, guarded ? 10 : 13, {}, { guard: guarded });
+              ticks(match, guarded ? 9 : 12, {}, { guard: guarded });
               expect(f.age).toBe(age);
               match.step({}, { guard: guarded });
               expect(f.age).toBe(age + 1);
@@ -4536,9 +4560,10 @@ describe('prototype training rules', () => {
             expect(impact.clip === 370).toBe(guarded);
             // From age 13 the drill's forward push box, (44, −74) ±(38, 86),
             // shoves the target ahead of the lunge: 34.5 before the first
-            // strike, then 40.5 between strikes, all landing 163.6 apart.
+            // strike, then 47.25 between strikes (Ryuko's stop runs out a
+            // tick before the target's), all landing 163.6 apart.
             expect((target.x - targetX) * facing).toBeCloseTo(
-              34.5 + 40.5 * (contacts.length - 1),
+              34.5 + 47.25 * (contacts.length - 1),
               3,
             );
             expect((target.x - f.x) * facing).toBeCloseTo(163.6, 0);
@@ -4643,10 +4668,10 @@ describe('prototype training rules', () => {
     // Spawned at age 16, the axe sets its box at its first step and meets
     // the target at once, queuing impact 230 and the airborne reaction 76
     // for their next steps. Its other stop (0x4136ae) pauses the thrower
-    // too, who has stepped by then.
+    // too: the target, struck (0x4f), steps before him (0x50).
     expect(f).toMatchObject({ age: 17, hits: 1, hitStop: 0 });
     match.step({ axe: true });
-    expect(f).toMatchObject({ age: 18, hits: 1, hitStop: 15 });
+    expect(f).toMatchObject({ age: 17, hits: 1, hitStop: 14 });
     expect(axes(match).map((e) => e.clip)).toEqual([230]);
     ticks(match, 30);
     expect(f).toMatchObject({ age: 33, hits: 1 });
@@ -5199,11 +5224,13 @@ describe('prototype training rules', () => {
     expect(player.action).not.toBe('win');
     // The lose action replaces FB's reaction (0x40e84b), so it neither
     // credits the thrower (PC 1442) nor stops anyone; KO Normal adds 10 to
-    // the thrower (PC 607), then holds both 40 at its age 5 (PC 611).
+    // the thrower (PC 607), then holds both 40 at its age 5 (PC 611). The
+    // KO drops the target to 0x3c (0x40e8cd), so it steps first, and the
+    // thrower's step spends one of the 10.
     expect(player.power).toBe(0);
-    expect([player.hitStop, target.hitStop]).toEqual([10, 0]);
+    expect([player.hitStop, target.hitStop]).toEqual([9, 0]);
     ticks(match, 5);
-    expect([player.hitStop, target.hitStop]).toEqual([45, 40]);
+    expect([player.hitStop, target.hitStop]).toEqual([44, 40]);
     // It finishes the throw before taking its result back in neutral.
     while (named(player) === 'axeThrow') {
       expect(player.age).toBeLessThan(animationDuration(RYUKO.axeThrow));
@@ -6232,14 +6259,15 @@ describe('EX mode', () => {
     for (let tick = 0; tick < 100 && target.hp === LIFE; tick++) match.step();
     // The hit queues the reaction and the shot's handler for their next
     // steps. Response 50 → FB (110) credits the striker 10 power (PC 1442)
-    // and enters 75, whose stop reaches Ryuko too (0x4136ae).
+    // and enters 75, whose stop reaches Ryuko too (0x4136ae) before his step
+    // (the target, struck, is 0x4f).
     match.step();
     expect(target).toMatchObject({
       hp: LIFE - 30,
       action: 'hitHeavy',
       hitStop: 15,
     });
-    expect(f).toMatchObject({ power: 13, hitStop: 15 });
+    expect(f).toMatchObject({ power: 13, hitStop: 14 });
     // The hit handler (slot 2) enters 235, a blank display for ten ticks.
     expect(ball).toMatchObject({ clip: 235, age: 0, box: null });
     ticks(match, 9);
@@ -6378,6 +6406,9 @@ describe('EX mode', () => {
         while (!f.contact) match.step();
       }
       match.step({ getterBeam: true });
+      // The reaction stops Ryuko first (see super-cancels IORI).
+      while (f.hitStop) match.step();
+      if (iori) match.step();
       // EFS (331) checks variable 6 (PC 4918) for EFS SC (332), which spawns
       // GENGAI! (253) itself.
       expect({ ...f, action: named(f) }).toMatchObject({ action, stock: left });

@@ -145,8 +145,10 @@ describe('REMU (23 REMU.PLAYER)', () => {
         }),
       ),
     ).toMatchObject({
-      mine: [198, 199, 200, 191, 192, 'land', 'idle'],
-      damage: 75,
+      // K2's lunge resumes a tick before Ryuko's slide (struck, he steps
+      // first and spends his stop a tick later), so P3's grab falls short.
+      mine: [198, 199, 200, 191, '202+13', 'turn', 'idle'],
+      damage: 35,
     });
     expect(byKey({ throw: true }, { gap: 60 })).toMatchObject({
       mine: [223, 224, 'idle'],

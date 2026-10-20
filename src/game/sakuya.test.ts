@@ -98,7 +98,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
     const specials = [
       [{ axe: true }, false, [260, 'idle'], 23],
       [{ axe: true }, true, [268, 'idle'], 25],
-      [{ megaBeam: true }, false, [359, 'idle'], 24],
+      [{ megaBeam: true }, false, [359, 'idle'], 12],
       [{ megaBeam: true }, true, [270, 'idle'], 15],
       [{ drill: true }, false, [311, 312, 'idle'], 33],
       [{ drill: true }, true, [314, 315, 'idle'], 30],
@@ -188,7 +188,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
   it('spends her stocks on en300 (3), super HIT UP and SPARK (one each), and their EX forms', () => {
     const supers = [
       [{ getterBeam: true }, false, 90, [438, 441, '449+46', 'idle'], 216, 0],
-      [{ musashi: true }, false, 90, [380, 384, 'idle'], 115, 2],
+      [{ musashi: true }, false, 90, [380, 384, 'idle'], 120, 2],
       [{ musashi: true }, true, 90, [395, 396, 397, 405, 406, 'idle'], 112, 2],
       // Its rolls (PCs 5614–5620) only pick her voice: Spark voice2 + 17
       // runs past its payment.

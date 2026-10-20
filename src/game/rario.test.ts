@@ -113,8 +113,10 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
       damage: 15,
     });
     // P's window takes levels 22–50 (PC 1753), K's only 30–50 (PC 1770).
+    // P strikes at 13 and Ryuko's reaction, stepping first (struck, 0x4f),
+    // stops him to 27, so a button press counts from 20.
     expect(
-      play(presses({ 0: { punch: true }, 10: { kick: true } })),
+      play(presses({ 0: { punch: true }, 24: { kick: true } })),
     ).toMatchObject({ mine: [158, 159, 'idle'], damage: 33 });
     expect(
       play(presses({ 0: { kick: true }, 12: { punch: true } })).mine,

@@ -285,8 +285,10 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     // the next step.
     expect(ryuko.action).toBe('superHeld');
     expect(zoma.branch).toBe(201);
-    steps({}, 43);
-    // PC 2806 applies response 41: Ryuko's 132, launched at its age 6.
+    steps({}, 44);
+    // PC 2806 applies response 41: Ryuko's 132, launched at its age 6. The
+    // op 0x07 before it put Ryuko behind (0x4f), so he steps before Zoma
+    // and enters it a tick on.
     expect(ryuko.action).toBe('chuckToss');
     for (let t = 0; t < 40 && !match.effects.some((e) => e.clip === 202); t++)
       steps({});
@@ -406,9 +408,9 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     for (let t = 0; t < 400 && ryuko.hp === 510; t++) steps({});
     steps({});
     // A bomb (227) falls on the second mark: response 50, 20. Its stop
-    // holds Zoma too (0x4136ae).
+    // holds Zoma too (0x4136ae), before his step (Ryuko, struck, is 0x4f).
     expect(ryuko).toMatchObject({ action: 'hitHeavy', hp: 490 });
-    expect(zoma.hitStop).toBe(15);
+    expect(zoma.hitStop).toBe(14);
     while (zoma.hitStop) steps({});
     for (let k = 0; k < 4; k++) {
       steps({ dst: true });

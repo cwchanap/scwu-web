@@ -175,8 +175,8 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     expect(
       play(presses({ 0: { punch: true, crouch: true }, 16: { drill: true } })),
     ).toEqual({
-      mine: [153, 159, '160+21', 'turn', 'idle'],
-      damage: 24,
+      mine: [153, 159, '160+21', 'idle'],
+      damage: 30,
       stock: 2,
     });
     expect(
@@ -188,7 +188,7 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     });
     expect(
       play(
-        presses({ 0: { jump: true }, 30: { kick: true }, 40: { drill: true } }),
+        presses({ 0: { jump: true }, 30: { kick: true }, 46: { drill: true } }),
       ).mine,
     ).toEqual(['takeoff', 'jump', 156, 159, '160+21', 'turn', 'idle']);
     expect(

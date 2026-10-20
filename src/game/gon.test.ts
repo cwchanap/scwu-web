@@ -217,8 +217,11 @@ describe('GON (21 GON.PLAYER)', () => {
   });
 
   it("cancels DRILL into Super heart or KURENCOUNTER through SC SUPER (355), for two stocks, as DRILL's variable 6 at 100 allows (PCs 5089, 5725, 6083)", () => {
+    // DRILL strikes at 34, and Ryuko's reaction, stepping first (struck,
+    // 0x4f), stops GON to 48: Super heart's command still holds a press
+    // from 20 when he steps again.
     const cancel = (key: Input) =>
-      play(presses({ 0: { iori: true }, 15: key }));
+      play(presses({ 0: { iori: true }, 25: key }));
     const heart = cancel({ changeAttack: true });
     expect([heart.mine, heart.damage, heart.gon.stock]).toEqual([
       [325, 355, 'idle'],

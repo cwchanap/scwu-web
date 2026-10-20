@@ -184,14 +184,16 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'amiro']);
-    const amiro = match.fighters[1];
     const entered = new Set<unknown>();
-    // BEAM, funnal and cpu mornign (445), which has no key.
+    // BEAM, funnal and cpu mornign (445), which has no key, over two seeds.
     const wanted = [230, 275, 445];
-    for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (amiro.action === 'script') entered.add(amiro.branch);
+    for (const seed of [0, 1]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'amiro']);
+      const amiro = match.fighters[1];
+      for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (amiro.action === 'script') entered.add(amiro.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

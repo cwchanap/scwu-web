@@ -67,11 +67,14 @@ export const initialStatus: GameStatus = {
 };
 const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t1, t2 };
-// A viewport object behind the fighters (the KO flash, z 15 like action 43)
-// sits over the court. Within its band a higher z draws in front: ANMC P's
-// EN300 cut-in (305, z 50) over its background (304, z 49).
+// The draw walks the priority lists lowest first, the players' slots before
+// any object's within one (0x404df1). A viewport object behind the fighters
+// (the KO flash, z 15 like action 43) sits over the court. Within its band a
+// higher z draws in front: ANMC P's EN300 cut-in (305, z 50) over its
+// background (304, z 49).
+const worldDepth = (z: number, slot: number) => 1 + (z + slot / 4) / 1000;
 const effectDepth = (e: Effect) =>
-  (e.z >= FIGHTER_Z ? (e.screen ? 5 : 4) : e.screen ? 0.6 : 1) + e.z / 1000;
+  e.screen ? (e.z >= FIGHTER_Z ? 5 : 0.6) + e.z / 1000 : worldDepth(e.z, 2);
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
@@ -772,13 +775,6 @@ export class TrainingScene extends Phaser.Scene {
           (GROUND + f.y) / ART_SCALE,
           (pose.held ? holder : f).facing === -1,
         );
-        // Op 0x07 flag bit 0 draws the held victim behind its holder.
-        const behind =
-          f.action === 'superHeld'
-            ? ((f.held?.flags ?? 0) & 1) !== 0
-            : undefined;
-        // A KO (0x40e8cd) drops the fighter to z 0x3c, behind the other
-        // fighter and the objects drawn behind it.
         this.paint(
           sprite,
           pose,
@@ -786,9 +782,7 @@ export class TrainingScene extends Phaser.Scene {
           f.who,
           this.palettes[i],
         )
-          .setDepth(
-            f.hp === 0 ? 0.9 : behind === undefined ? 2 : behind ? 1 : 3,
-          )
+          .setDepth(worldDepth(f.z, i))
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
         const { shown } = f.black;
@@ -847,7 +841,7 @@ export class TrainingScene extends Phaser.Scene {
             ...sample,
             who: actor.who,
             palette: this.paletteOf(actor.who, owner),
-            depth: depth - 0.1,
+            depth: depth - 1e-4,
             screen: object?.screen ?? false,
             color: afterimageColor(
               trail,

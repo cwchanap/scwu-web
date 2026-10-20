@@ -95,10 +95,13 @@ describe('Yo (09 YO.PLAYER)', () => {
       // whose op 0x14 sends them off in Chuck Yo (response 73, PC 3294);
       // its wall handler (PC 3291) enters 239 + 15 at the wall, which
       // launches them with response 43 and takes 99 (PCs 3309–3310).
-      // The flight drifts back past her (raw −100), so she turns.
+      // The flight drifts back past her (raw −100), so she turns. Struck
+      // (0x4f), they step before her (0x51) and enter the box's own
+      // reaction for a tick before 239's op 0x14 replaces it.
       expect(mine.slice(0, 4)).toEqual([238, 239, '239+15', 'turn']);
       expect(theirs).toEqual([
         'idle',
+        'rushAirHit',
         'chuckYo',
         'flySideWall',
         'fly',
