@@ -821,6 +821,32 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (37, PC 364): 250 ticks of displays. From round 2 demo act (29)
+  // from + 6 (PC 365), then from its start (PC 366).
+  {
+    who: 'ogi',
+    start: 34,
+    round1: 37,
+    banner: 59,
+    image: 116,
+    charge: 42,
+    demo: [
+      [99, 116],
+      [100, 118],
+      [105, 119],
+      [110, 120],
+      [170, 121],
+      [210, 122],
+      [215, 115],
+      [220, 116],
+      [240, 120],
+      [300, 121],
+      [340, 122],
+      [345, 115],
+      [349, 115],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1369,6 +1395,8 @@ function finish(
     enter(match, striker, input);
   const seen: string[] = [];
   const branches = new Set<string>();
+  // The striker's objects, by clip.
+  const fx = new Set<string>();
   for (let t = 0; t < 3000; t++) {
     // An air move, entered `air` ticks into a jump.
     if (t === air) enter(match, striker, input as number);
@@ -1386,8 +1414,9 @@ function finish(
     );
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
+    for (const e of match.effects) if (!e.owner) fx.add(String(e.clip));
   }
-  return { seen, hp: target.hp, branches };
+  return { seen, hp: target.hp, branches, fx };
 }
 type FinishOptions = {
   held?: number;
@@ -2106,5 +2135,39 @@ describe("SWW's ZA finisher (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual([490, 490]);
+  });
+});
+
+describe("OGI's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. K3 (196), the third link of
+  // his chain (op 0x24, PCs 2482, ...), is entered here; at life 150 or
+  // below K3 hit takes EVIL K3 (199, PC 2686). ponytail: > SCC NHIT ADD hit
+  // up and ADD CHUCK want op 0x24 commands in > SCC NHIT2 (PCs 4619,
+  // 4620); their ZA forms (291, 295) are untested.
+  it.each([
+    ['K3 hit ZA (198, PC 2733)', 196, 198, {}, [470, 470]],
+    ['Evil K3-3 ZA (204, PC 2862)', 196, 204, { life: 100 }, [460, 460]],
+    ['Chuck hit ZA (226, PC 3253)', { throw: true }, 226, {}, [490, 490]],
+    ['> SCC NHIT NON ADD ZA (289, PC 4648)', 277, 289, {}, [410, 410]],
+    ['SCC FAR hit3 ZA (309, PC 5124)', 297, 309, {}, [410, 410]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'ogi', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'ogi', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+
+  it("explodes SCC far start's shot as *EFF SHOT EXPLOR ZA (307, PC 5053)", () => {
+    const shots = (vs: boolean) => {
+      const { fx } = finish(vs, 80, 297, { who: 'ogi' });
+      return [fx.has('306'), fx.has('307')];
+    };
+    expect([shots(false), shots(true)]).toEqual([
+      [true, false],
+      [false, true],
+    ]);
   });
 });
