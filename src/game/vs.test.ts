@@ -313,6 +313,32 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (35, PC 356): 214 ticks of displays, its EX check (PC 403),
+  // 26 more, then image 113 through 開始時 BR + 16 in EX mode (PC 410) or
+  // 194, 10 ticks. From round 2 image 620 for 2 ticks (PC 357), Demo stand
+  // (49) twice (PC 358), the EX check (PC 359), then twice more (PC 360):
+  // 621, 622, 624, 623, 622 and 620 for 13, 10, 6, 13, 12, 8.
+  {
+    who: 'suneo',
+    start: 32,
+    round1: 35,
+    banner: 63,
+    image: 621,
+    charge: 42,
+    demo: [
+      [99, 621],
+      [100, 620],
+      [102, 621],
+      [115, 622],
+      [125, 624],
+      [131, 623],
+      [144, 622],
+      [156, 620],
+      [164, 621],
+      [349, 620],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -502,6 +528,40 @@ describe("Giant's EX checks", () => {
   });
 });
 
+describe("G Suneo's EX checks", () => {
+  // Down held at Round 1's check (PC 403) enters 'change character' (41),
+  // which sets variable 0 to 100 and rejoins at PC 405; Round 1 then shows
+  // image 113 through 開始時 BR + 16 (PC 410). Between round 2's Demo
+  // stands (PC 359) it enters 41 + 3, whose Demo stands play DEMO STAND2
+  // (48), as their check of variable 0 jumps there inside each call (PC
+  // 513).
+  it('in round 1, at Round 1 + 214', () => {
+    expect(exCheck('suneo', false, 313)).toEqual([
+      '35',
+      false,
+      [139, 117, 118, 194],
+    ]);
+    expect(exCheck('suneo', false, 314)).toEqual([
+      '34+16',
+      true,
+      [139, 117, 118, 113],
+    ]);
+  });
+
+  it('from round 2, between the Demo stands', () => {
+    expect(exCheck('suneo', true, 225)).toEqual([
+      '32',
+      false,
+      [621, 622, 624, 623, 620],
+    ]);
+    expect(exCheck('suneo', true, 226)).toEqual([
+      '41+3',
+      true,
+      [113, 114, 115, 116, 117, 118],
+    ]);
+  });
+});
+
 // `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
 // (held `held` ticks) or entering source action `input`: Ryuko's actions in
 // order, the striker's branches and the life Ryuko has left.
@@ -509,7 +569,7 @@ function finish(
   vs: boolean,
   gap: number,
   input: Input | number,
-  { held = 1, who = 'ryuko', ex = false }: FinishOptions = {},
+  { held = 1, who = 'ryuko', ex = false, life }: FinishOptions = {},
 ) {
   const match = new Match('practice', false, 0, [who, 'ryuko'], 'court', vs);
   const [striker, target] = match.fighters;
@@ -518,6 +578,8 @@ function finish(
   striker.stock = 3;
   // EX mode: variable 0 at 100.
   if (ex) striker.variables[0] = 100;
+  // A desperation super's op 0x11 wants low life.
+  if (life) striker.hp = life;
   if (typeof input === 'number') enter(match, striker, input);
   const seen: string[] = [];
   const branches = new Set<string>();
@@ -528,7 +590,12 @@ function finish(
   }
   return { seen, hp: target.hp, branches };
 }
-type FinishOptions = { held?: number; who?: Who; ex?: boolean };
+type FinishOptions = {
+  held?: number;
+  who?: Who;
+  ex?: boolean;
+  life?: number;
+};
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
   // Each ZA form swaps its op 0x15 life loss for an attack box (op 0x18),
@@ -714,5 +781,32 @@ describe("Giant's VS finishers", () => {
     };
     expect(flies(false)).toEqual([true, 903]);
     expect(flies(true)).toEqual([false, 863]);
+  });
+});
+
+describe("G Suneo's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. CHUCK enters CHUCK HIT NEW, or
+  // CHUCK HIT in EX mode; HH Start (345) wants life below 150 (op 0x11, PC
+  // 5436).
+  it.each([
+    [
+      'CHUCK HIT NEW ZA (229, PC 3341)',
+      { throw: true },
+      229,
+      false,
+      0,
+      [490, 490],
+    ],
+    ['CHUCK HIT ZA (230, PC 3377)', { throw: true }, 230, true, 0, [490, 490]],
+    ['HH hit 2 ZA (348, PC 5545)', 345, 348, false, 100, [260, 260]],
+  ] as const)('%s', (_, move, za, ex, life, hp) => {
+    const options = { held: 9, who: 'suneo', ex, life } as const;
+    const br = finish(false, 80, move, options);
+    const vs = finish(true, 80, move, options);
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
