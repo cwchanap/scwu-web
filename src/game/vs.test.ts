@@ -763,6 +763,36 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (33, PC 327): 169 ticks of displays, its EX check (PC 361),
+  // then Demo stand (28) from + 1. From round 2 image 122 for 7 ticks (PC
+  // 328), Demo stand from + 2 twice (PC 329), the EX check (PC 330), then
+  // Demo stand from + 1 (PC 331): 113 for 15, 114 to 119 for 10 each, 122
+  // for 6.
+  {
+    who: 'gigi',
+    start: 30,
+    round1: 33,
+    banner: 53,
+    image: 113,
+    charge: 37,
+    demo: [
+      [99, 113],
+      [100, 122],
+      [107, 113],
+      [122, 114],
+      [132, 115],
+      [142, 116],
+      [152, 117],
+      [162, 118],
+      [172, 119],
+      [182, 122],
+      [188, 113],
+      [269, 113],
+      [344, 122],
+      [349, 122],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1235,6 +1265,22 @@ describe("GON's EX checks", () => {
       true,
       [734, 735, 736, 737, 738, 739, 740, 741, 733],
     ]);
+  });
+});
+
+describe("GIGI's EX checks", () => {
+  // Down held at Round 1's check (PC 361) or after round 2's Demo stands
+  // (PC 330) enters 開始時 2P + 13 (31), which sets variable 0 to 100 (PC
+  // 345) and calls Demo stand from + 1, as each path does next.
+  const images = [113, 114, 115, 116, 117, 118, 119, 122];
+  it('in round 1, at Round 1 + 169', () => {
+    expect(exCheck('gigi', false, 268)).toEqual(['33', false, images]);
+    expect(exCheck('gigi', false, 269)).toEqual(['31+13', true, images]);
+  });
+
+  it('from round 2, after two Demo stands', () => {
+    expect(exCheck('gigi', true, 268)).toEqual(['30', false, images]);
+    expect(exCheck('gigi', true, 269)).toEqual(['31+13', true, images]);
   });
 });
 
@@ -1970,6 +2016,33 @@ describe("REAR's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s strikes for what op 0x15 takes', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'rear' });
     const vs = finish(true, 80, move, { held: 9, who: 'rear' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("GIGI's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; P3 hit ZA's two (PCs 2643,
+  // 2660) strike front and back. P3 (185) is the third link of P's chain
+  // (op 0x24, PCs 2540, 2712), entered here; Air dragon, Dragon's air form,
+  // takes Jump Att air in EX mode.
+  it.each([
+    ['P3 hit ZA (188, PC 2581)', 185, 188, {}, [470, 470]],
+    ['Chuck hit ZA (211, PC 3067)', { throw: true }, 211, {}, [475, 475]],
+    [
+      'Jump Att hit ZA (258, PC 3957)',
+      242,
+      258,
+      { ex: true, air: 5 },
+      [470, 470],
+    ],
+    ['S Chuck finish ZA (314, PC 4923)', 308, 314, {}, [410, 410]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'gigi', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'gigi', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
