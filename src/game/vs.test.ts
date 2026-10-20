@@ -571,6 +571,34 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // 開始時 jumps into 開始時 1P (32, PC 296), the template from + 8. Round 1
+  // (35, PC 317): 145 ticks of displays, its EX check (PC 357), images 258
+  // and 341, then stand demo (28) from + 1. From round 2 image 115 for 10
+  // ticks (PC 318), stand demo from + 2 twice (PC 319), the EX check (PC
+  // 320), then stand demo from + 1 (PC 321): 116, 117, 118 and 115 for 15,
+  // 15, 20, 30.
+  {
+    who: 'erus',
+    start: 31,
+    copy: '32+8',
+    round1: 35,
+    banner: 57,
+    image: 116,
+    charge: 40,
+    demo: [
+      [99, 116],
+      [100, 115],
+      [110, 116],
+      [125, 117],
+      [140, 118],
+      [160, 115],
+      [190, 116],
+      [270, 116],
+      [320, 115],
+      [349, 115],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -961,6 +989,24 @@ describe("SOU's EX checks", () => {
   });
 });
 
+describe("ERUS's EX checks", () => {
+  // Down held at Round 1's check (PC 357) enters 'EX Ch' + 3 (39), which
+  // sets variable 0 to 10 and rejoins at PC 358; after round 2's stand
+  // demos (PC 320) it enters 'EX Ch', which rejoins at PC 321. His stand
+  // demo has no EX form.
+  it('in round 1, at Round 1 + 145', () => {
+    const images = [258, 341, 116, 117, 118, 115];
+    expect(exCheck('erus', false, 244)).toEqual(['35', false, images]);
+    expect(exCheck('erus', false, 245)).toEqual(['39+3', true, images]);
+  });
+
+  it('from round 2, after two stand demos', () => {
+    const images = [116, 117, 118, 115];
+    expect(exCheck('erus', true, 269)).toEqual(['31', false, images]);
+    expect(exCheck('erus', true, 270)).toEqual(['39', true, images]);
+  });
+});
+
 // `who` as player 1, `gap` from Ryuko, with three stocks, after `input`
 // (held `held` ticks) or entering source action `input`: Ryuko's actions in
 // order, the striker's branches and the life Ryuko has left.
@@ -976,6 +1022,7 @@ function finish(
     down,
     victim,
     press,
+    air,
   }: FinishOptions = {},
 ) {
   const match = new Match('practice', false, 0, [who, 'ryuko'], 'court', vs);
@@ -995,19 +1042,24 @@ function finish(
     );
     match.step();
   }
-  if (typeof input === 'number') enter(match, striker, input);
+  if (typeof input === 'number' && air === undefined)
+    enter(match, striker, input);
   const seen: string[] = [];
   const branches = new Set<string>();
   for (let t = 0; t < 3000; t++) {
+    // An air move, entered `air` ticks into a jump.
+    if (t === air) enter(match, striker, input as number);
     match.step(
       typeof input !== 'number' && t < held
         ? input
         : t === press?.[0]
           ? press[1]
-          : {},
-      // The victim's input on its first ticks: a jump into an anti-air, a
-      // strike into a counter.
-      victim && t < 2 ? victim : undefined,
+          : air !== undefined && t < 1
+            ? { jump: true }
+            : {},
+      // The victim's input for two ticks: a jump into an anti-air, a strike
+      // into a counter.
+      victim && t >= victim[0] && t < victim[0] + 2 ? victim[1] : undefined,
     );
     if (seen.at(-1) !== target.action) seen.push(target.action);
     if (striker.action === 'script') branches.add(String(striker.branch));
@@ -1020,9 +1072,10 @@ type FinishOptions = {
   ex?: boolean;
   life?: number;
   down?: boolean;
-  victim?: Input;
+  victim?: readonly [number, Input];
+  air?: number;
   // A press at a tick, for a follow-up's op 0x24.
-  press?: [number, Input];
+  press?: readonly [number, Input];
 };
 
 describe("Ryuko's ZA finishers (global 3 > 0)", () => {
@@ -1354,7 +1407,7 @@ describe("KAY's ZA finishers (global 3 > 0)", () => {
       'Matriel hit ZA (282, PC 4617)',
       280,
       282,
-      { victim: { jump: true } },
+      { victim: [0, { jump: true }] },
       [470, 470],
     ],
     ['Kaoru hit ZA (342, PC 5690)', 339, 342, {}, [410, 410]],
@@ -1392,7 +1445,7 @@ describe("SAKUYA's ZA finishers (global 3 > 0)", () => {
       'New Counter get2 ZA (323, PC 5012)',
       318,
       323,
-      { victim: { punch: true } },
+      { victim: [0, { punch: true }] },
       [470, 470],
     ],
   ] as const)('%s', (_, move, za, options, hp) => {
@@ -1460,6 +1513,60 @@ describe("HISO's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'hiso' });
     const vs = finish(true, 80, move, { held: 9, who: 'hiso' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("ERUS's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes, chuck hit ZA's 25 where the
+  // Br. form takes 30 (PC 3066). In EX mode the TELPs take their CCs (PCs
+  // 3932, 3968, ...), air fire start EX Air Chuck (PC 4598) and en300
+  // START EX EN3. CC PK, the air moves and LIZARD FLY strike a jumping
+  // victim. ponytail: CC K Hit Fin ZA enters at CC K Hit (269), as CC K's
+  // box sits 9923 below it (PC 4152) and nothing found reaches its hit.
+  const jumping = [0, { jump: true }] as [number, Input];
+  it.each([
+    ['chuck hit ZA (215, PC 3064)', { throw: true }, 215, {}, [480, 485]],
+    ['CC P Hit ZA (266, PC 4087)', 260, 266, { ex: true }, [485, 485]],
+    ['CC K Hit Fin ZA (272, PC 4284)', 269, 272, {}, [485, 485]],
+    [
+      'CC PK Hit ZA (280, PC 4452)',
+      262,
+      280,
+      { ex: true, victim: jumping },
+      [485, 485],
+    ],
+    [
+      'EXAIRC HIT ZA (299, PC 4720)',
+      291,
+      299,
+      { ex: true, air: 5, victim: jumping },
+      [490, 490],
+    ],
+    ['scc HIT ZA (372, PC 6106)', 369, 372, {}, [430, 430]],
+    [
+      'Air CC hit ZA (382, PC 6292)',
+      375,
+      382,
+      { air: 5, victim: jumping },
+      [450, 450],
+    ],
+    [
+      'lizard fly att hit ZA (391, PC 6427)',
+      387,
+      391,
+      { victim: [40, { jump: true }] as [number, Input] },
+      [430, 430],
+    ],
+    ['EN300 hit ZA (406, PC 6647)', 399, 406, {}, [349, 349]],
+    ['EX EN3 Hit ZA (509, PC 9029)', 399, 509, { ex: true }, [370, 370]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'erus', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'erus', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
