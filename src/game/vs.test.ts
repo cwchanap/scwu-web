@@ -150,14 +150,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
   it("plays each fighter's own, or the Br. intro if one has none exported", () => {
     const mixed = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true);
     expect(mixed.fighters.map((f) => f.branch)).toEqual([30, 28]);
-    const other = new Match(
-      'cpu',
-      true,
-      0,
-      ['zoma', 'training'],
-      'court',
-      true,
-    );
+    const other = new Match('cpu', true, 0, ['zoma', 'dora'], 'court', true);
     expect(other.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
   });
 });
@@ -168,7 +161,8 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // row: those actions and images, round 2's images by age, the ticks to idle
 // in rounds 1 and 2, how far round 1's action walks, and the action it runs
 // out of when that action jumps on, with a seed whose rolls both take it,
-// the timeline the round copy jumps to, and how many VS CHARGEs each has.
+// the timeline the round copy jumps to, and how many VS CHARGEs each has,
+// and the timeline round 2 runs if not the 開始時's own.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -183,6 +177,7 @@ const TEMPLATE: {
   seed?: number;
   copy?: ObjectKey;
   charges?: number;
+  later?: ObjectKey;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -1184,6 +1179,33 @@ const TEMPLATE: {
     idle: [351, 321],
     ends: '27+19',
   },
+  // RARIO's, but VS CHANGE (30, PC 234), whose body box sits 9900 below it,
+  // stands for Black, OP super Charge and VS CHARGE. Round 2 runs + 11, the
+  // jump's target (PC 226), which he exports on its own.
+  {
+    who: 'training',
+    start: 24,
+    round1: 27,
+    banner: 31,
+    image: 115,
+    charge: 30,
+    demo: [
+      [107, 115],
+      [108, 116],
+      [113, 117],
+      [118, 118],
+      [123, 119],
+      [131, 118],
+      [139, 117],
+      [147, 116],
+      [155, 115],
+      [312, 116],
+      [319, 116],
+    ],
+    idle: [351, 321],
+    ends: '27+18',
+    later: '24+11',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1202,6 +1224,7 @@ describe.each(TEMPLATE)(
     seed = 0,
     copy = `${start}+9`,
     charges = 1,
+    later = start,
   }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
       const match = vsMatch(who, seed);
@@ -1255,17 +1278,23 @@ describe.each(TEMPLATE)(
       const [p1, p2] = match.fighters;
       steps(match, 6);
       expect([p1.branch, at(p1), at(p2), banners(match, banner)]).toEqual([
-        start,
+        later,
         370,
         910,
         [],
       ]);
       const ages: [number, number][] = [[29, 0], [30, image], ...demo];
+      // A round 2 timeline of its own starts where the 開始時 jumps to it,
+      // past its five blank ticks.
+      const from = later === start ? 0 : 5;
       expect(
-        ages.map(([age]) => [age, animationFrame(start, age, who).image]),
+        ages.map(([age]) => [
+          age,
+          animationFrame(later, age - from, who).image,
+        ]),
       ).toEqual(ages);
       steps(match, idle[1] - 7);
-      expect([p1.branch, p2.branch]).toEqual([start, start]);
+      expect([p1.branch, p2.branch]).toEqual([later, later]);
       match.step();
       expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
     });
