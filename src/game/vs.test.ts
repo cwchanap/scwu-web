@@ -708,6 +708,37 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (36, PC 362) leaps off, calls OP movie rp (40), rolls which
+  // images to show (PCs 396, 399), then drops on image 140 until it lands
+  // in + 44 (PC 430), 295 ticks in, running out 35 later, past FIGHT. From
+  // round 2 image 116 for 38 ticks (PC 363), then stand demo (30) from + 4
+  // four times (PC 364): 115 to 119 for 5 each but 12, then 118, 117 and
+  // 116 for 7.
+  {
+    who: 'remu',
+    start: 33,
+    round1: 36,
+    banner: 57,
+    image: 115,
+    charge: 41,
+    demo: [
+      [99, 115],
+      [100, 116],
+      [138, 115],
+      [143, 116],
+      [148, 117],
+      [153, 118],
+      [158, 119],
+      [170, 118],
+      [177, 117],
+      [184, 116],
+      [191, 115],
+      [343, 116],
+      [349, 116],
+    ],
+    idle: [431, 351],
+    ends: '36+44',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1869,6 +1900,37 @@ describe("KATE's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'kate' });
     const vs = finish(true, 80, move, { held: 9, who: 'kate' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("REMU's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. P3 (191) is the third link of
+  // P's chain (op 0x24, PCs 2606, 2611), entered here. Phsy lend ZA takes
+  // no life: *phsy eff lend (320) keeps its 119 box, its global 3 test (PC
+  // 4675) passing over the 30 box that replaces it on the Br. path.
+  // NANAMI start (329) wants life below 156 (op 0x11, PC 4745) and sets
+  // variable 4 to 100 (PC 4757), so a strike takes his hit reactions into
+  // NANAMI hit (332, PCs 809, 829, ...). GOLD HAND AIR is EN300's air form.
+  it.each([
+    ['P3 FIN ZA (195, PC 2712)', 191, 195, {}, [470, 470]],
+    ['Chuck hit ZA (225, PC 3360)', { throw: true }, 225, {}, [470, 470]],
+    ['Phsy lend ZA (322, PC 4697)', 317, 322, {}, [390, 390]],
+    [
+      'MINAMI hit2 ZA (334, PC 4855)',
+      329,
+      334,
+      { life: 100, victim: [0, { punch: true }] },
+      [421, 421],
+    ],
+    ['GH hit4 ZA (357, PC 5281)', 346, 357, { air: 5 }, [289, 289]],
+  ] as const)('%s', (_, move, za, options, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'remu', ...options });
+    const vs = finish(true, 80, move, { held: 9, who: 'remu', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
