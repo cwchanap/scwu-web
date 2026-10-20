@@ -1035,7 +1035,7 @@ OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
 # The fighters besides Ryuko whose 開始時 a VS round plays from the start.
 # ponytail: ported one at a time; the match keeps the Br. intro for a pairing
 # with any other.
-VS_STARTS = {"zoma", "kiki", "chung", "amiro", "anmc", "giant", "suneo", "yo", "sin", "lizard", "kay", "dido", "sakuya", "alex", "sou", "hiso", "erus", "feng", "sean", "gon", "kate", "remu"}
+VS_STARTS = {"zoma", "kiki", "chung", "amiro", "anmc", "giant", "suneo", "yo", "sin", "lizard", "kay", "dido", "sakuya", "alex", "sou", "hiso", "erus", "feng", "sean", "gon", "kate", "remu", "rear"}
 
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",

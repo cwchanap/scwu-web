@@ -739,6 +739,30 @@ const TEMPLATE: {
     idle: [431, 351],
     ends: '36+44',
   },
+  // Round 1 (34, PC 318): 250 ticks of displays. From round 2 images 117
+  // and 116 for 35 and 20 ticks (PCs 319, 320), then STAND DEMO (29) three
+  // times (PC 321): 115, 116, 117 and 116 for 15, 15, 15, 20.
+  {
+    who: 'rear',
+    start: 31,
+    round1: 34,
+    banner: 56,
+    image: 115,
+    charge: 40,
+    demo: [
+      [99, 115],
+      [100, 117],
+      [135, 116],
+      [155, 115],
+      [170, 116],
+      [185, 117],
+      [200, 116],
+      [220, 115],
+      [330, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1931,6 +1955,21 @@ describe("REMU's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, options, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'remu', ...options });
     const vs = finish(true, 80, move, { held: 9, who: 'remu', ...options });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("REAR's ZA finishers (global 3 > 0)", () => {
+  it.each([
+    ['Chuck hit ZA (209, PC 2952)', { throw: true }, 209, [485, 485]],
+    ['Viper hit ZA (256, PC 3733)', 250, 256, [409, 409]],
+  ] as const)('%s strikes for what op 0x15 takes', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'rear' });
+    const vs = finish(true, 80, move, { held: 9, who: 'rear' });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
