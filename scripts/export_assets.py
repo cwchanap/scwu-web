@@ -4103,11 +4103,11 @@ def export_sounds(c, prefix, indices):
 
 def kgt_timeline(p, action):
     """A KGT lettering's displays, following op 0x0a jumps until op 0x05 or its end: each
-    with the op 0x23 blit mode in force and the op 0x03 sounds just before it, and the
+    with the op 0x23 blit mode (and mode 4's fade, r[5]) in force and the op 0x03 sounds just before it, and the
     header's r[1:3], the wait the round manager counts for it (0x4068e0). A jump
     back to a record already run ends it, with `loop` the frame it repeats from."""
     current, pc = action, p.action(action).start
-    frames, sounds, mode, seen, loop = [], [], 0, {}, None
+    frames, sounds, mode, fade, seen, loop = [], [], 0, 0, {}, None
     for _ in range(1000):
         if pc >= p.action(current).end or p.records[pc][0] == 0x05:
             break
@@ -4123,10 +4123,11 @@ def kgt_timeline(p, action):
         if record[0] == 0x03:
             sounds.append(u16(record, 2))
         elif record[0] == 0x23:
-            mode = record[1]
+            mode, fade = record[1], record[5] if record[1] == 4 else 0
         elif record[0] == 0x0c:
             f = display_record(p, pc)
-            frame = dict(pc=pc, image=f["image"], duration=f["duration"], dx=f["dx"], dy=f["dy"], mode=mode)
+            frame = dict(pc=pc, image=f["image"], duration=f["duration"], dx=f["dx"], dy=f["dy"], mode=mode,
+                         **({"fade": fade} if fade else {}))
             frames.append(dict(frame, sounds=sounds) if sounds else frame)
             sounds = []
         pc += 1
@@ -4155,7 +4156,19 @@ def export_ui():
     calls = dict(start=wait(13), logo=kgt_timeline(p, 115), rounds=[kgt_timeline(p, 15 + i) for i in range(5)],
                  fight=kgt_timeline(p, 25), transition=dict(kgt_timeline(p, 116), wait=wait(14)),
                  results=dict(win=wait(30), perfect=wait(27), draw=wait(32)))
-    timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"]]
+    # KGT 13's VS path (global 3 isn't 0, PC 72): in round 1 (PC 73) it spawns VS L, VS R, V and S
+    # (118, 119, 122, 123, PCs 82-85), and from round 2 demo black (117, PC 76), the logo for 110
+    # ticks and its wipe; each at its spawn record's place (r[8:12]) and z (r[13]). Their op 0x1f
+    # loops wait on global 15 = 10, which 13 clears (PC 69). ponytail: 13's own displays, the
+    # halves joined (199) and the logo (182), sit under these and are left out.
+    def spawned(pc):
+        record = p.records[pc]
+        timeline = kgt_timeline(p, u16(record, 2))
+        return dict(timeline, z=record[13], frames=[dict(f, dx=f["dx"] + s16(record, 8), dy=f["dy"] + s16(record, 10))
+                                                   for f in timeline["frames"]])
+    calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)])
+    timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"],
+                 *calls["vs"]["first"], *calls["vs"]["later"]]
     # The select screen (object type 10, 0x406fc0) reads the system block the
     # loader copies from the file's tail to 0x435474: the players' names, 256
     # bytes each, the action words from 0x4451c2 (13, 14, 15, ... the round

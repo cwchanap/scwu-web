@@ -6,11 +6,13 @@ import type { Match } from './match';
 import ui from './generated/ui.json';
 
 // A KGT lettering: displays (image, ticks, top-left dx/dy in the 640 × 480
-// screen, op 0x23 blit mode) with the sounds just before each, the wait the
-// round manager counts for it, and the display a jump back repeats from.
+// screen, op 0x23 blit mode and mode 4's fade) with the sounds just before
+// each, the wait the round manager counts for it, the display a jump back
+// repeats from, and the z an object KGT 13 spawns has.
 type Lettering = {
   wait: number;
   loop?: number;
+  z?: number;
   frames: {
     pc: number;
     image: number;
@@ -18,6 +20,7 @@ type Lettering = {
     dx: number;
     dy: number;
     mode: number;
+    fade?: number;
     sounds?: number[];
   }[];
 };
@@ -27,6 +30,7 @@ const { ko, calls } = ui as unknown as {
     start: number;
     rounds: Lettering[];
     results: Record<'win' | 'perfect' | 'draw', number>;
+    vs: Record<'first' | 'later', Lettering[]>;
   } & Record<'logo' | 'fight' | 'transition', Lettering>;
 };
 export const KO_TICKS = ko.frames.reduce(
@@ -66,14 +70,21 @@ function letteringFrame({ frames, loop }: Lettering, age: number) {
 export const koFrame = (age: number) => letteringFrame(ko, age);
 
 // The letterings a match shows, by age: in Vs. CPU the round-start logo wipe
-// (13's 115), the round's 'DRESS' and 'SHOW TIME'; then every result's KO
+// (13's 115), or on the VS path its VS splash in round 1 and demo black
+// after, the round's 'DRESS' and 'SHOW TIME'; then every result's KO
 // lettering (26, or 28, 29, 32 and 33, which jump to it), and before another
 // round 14's logo wipe back in (116). A match lasts at most five rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
+  const opening = match.vs
+    ? calls.vs[match.round === 1 ? 'first' : 'later']
+    : [calls.logo];
   if (match.calls)
     shown.push(
-      [calls.logo, match.roundTicks],
+      ...opening.map((lettering): [Lettering, number] => [
+        lettering,
+        match.roundTicks,
+      ]),
       [calls.rounds[match.round - 1], match.roundTicks - DRESS_TICK],
       [calls.fight, match.roundTicks - FIGHT_TICK],
     );
@@ -296,6 +307,7 @@ export function createHud(scene: Phaser.Scene) {
     .setScrollFactor(0)
     .setOrigin(0.5)
     .setDepth(101);
+  // Four at once: the VS splash's VS L, VS R, V and S.
   const shown = [0, 1, 2, 3].map(() =>
     image(97, 0, 0).setDepth(110).setVisible(false),
   );
@@ -340,10 +352,14 @@ export function createHud(scene: Phaser.Scene) {
       if (finite) digit.setTexture(`ui-${47 + Number(value[i]) * 5}`);
     });
     infinity.setVisible(!finite);
-    // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds.
-    const current = letterings(match).flatMap(
-      (lettering) => letteringFrame(...lettering) ?? [],
-    );
+    // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds, 4 fades
+    // by r[5] of 32. KGT 13's objects draw by their z among the screen
+    // objects (scene.ts's effectDepth), under the fighters' VS 1P banners.
+    // ponytail: V's and S's mode 0 brightening (PCs 916–922) is left out.
+    const current = letterings(match).flatMap(([lettering, age]) => {
+      const frame = letteringFrame(lettering, age);
+      return frame ? [{ ...frame, z: lettering.z }] : [];
+    });
     shown.forEach((sprite, i) => {
       const frame = current.at(i);
       sprite.setVisible(!!frame);
@@ -351,8 +367,15 @@ export function createHud(scene: Phaser.Scene) {
         sprite
           .setTexture(`ui-${frame.image}`)
           .setPosition(frame.dx * scale, frame.dy * scale)
+          .setDepth(frame.z === undefined ? 110 : 5 + frame.z / 1000)
           .setBlendMode(frame.mode === 2 ? 'ADD' : 'NORMAL')
-          .setAlpha(frame.mode === 1 ? 0.5 : 1);
+          .setAlpha(
+            frame.mode === 1
+              ? 0.5
+              : frame.mode === 4
+                ? 1 - (frame.fade ?? 0) / 32
+                : 1,
+          );
     });
   };
 }

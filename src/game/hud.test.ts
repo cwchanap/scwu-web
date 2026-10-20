@@ -60,8 +60,16 @@ it('exports every HUD and lettering texture at its original dimensions', () => {
     expect(png.readUInt32BE(16)).toBe(image.width);
     expect(png.readUInt32BE(20)).toBe(image.height);
   }
-  const { logo, rounds, fight, transition } = ui.calls;
-  for (const { frames } of [ui.ko, logo, ...rounds, fight, transition])
+  const { logo, rounds, fight, transition, vs } = ui.calls;
+  for (const { frames } of [
+    ui.ko,
+    logo,
+    ...rounds,
+    fight,
+    transition,
+    ...vs.first,
+    ...vs.later,
+  ])
     for (const frame of frames) {
       expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
       expect(frame.duration).toBeGreaterThan(0);
@@ -105,9 +113,11 @@ it('calls the Vs. CPU round: DRESS 1, then SHOW TIME and control', () => {
     [351, [7, 3]],
     [631, [2, 8]],
   ]);
-  // And the select screen's decided cursors' 9 (KGT PCs 555, 591) and the
-  // title cursor's 10 (KGT PC 498).
-  expect(ui.sounds.map((s) => s.index)).toEqual([1, 2, 3, 4, 5, 7, 8, 9, 10]);
+  // And the select screen's decided cursors' 9 (KGT PCs 555, 591), the
+  // title cursor's 10 (KGT PC 498) and VS L's 12 (KGT PC 863).
+  expect(ui.sounds.map((s) => s.index)).toEqual([
+    1, 2, 3, 4, 5, 7, 8, 9, 10, 12,
+  ]);
 });
 
 it("waits out the results, then calls round 2 with 'DRESS 2' (KGT 16, sound 4)", () => {
@@ -131,5 +141,45 @@ it("waits out the results, then calls round 2 with 'DRESS 2' (KGT 16, sound 4)",
   expect(heard).toEqual([
     [1, [1]],
     [2, [7, 4]],
+  ]);
+});
+
+it("opens a VS round with KGT 13's VS splash, then demo black (117)", () => {
+  // VS L, VS R, V and S where 13 spawns them (PCs 82–85), at z 0x7b.
+  const { first, later } = ui.calls.vs;
+  expect(
+    first.map(({ z, frames: [frame] }) => [z, frame.image, frame.dx, frame.dy]),
+  ).toEqual([
+    [0x7b, 191, 0, 0],
+    [0x7b, 192, 206, 0],
+    [0x7b, 193, 300, 140],
+    [0x7b, 194, 270, 280],
+  ]);
+  // The halves hold 150 ticks, then slide apart over 23; V and S fade out
+  // by 10 and 20 of 32 (PCs 934, 936) over their last 10.
+  expect(first.map(({ frames }) => frames.at(-1)!.dx)).toEqual([
+    -440, 646, 300, 270,
+  ]);
+  expect(
+    first[2].frames
+      .slice(-3)
+      .map((frame) => ('fade' in frame ? frame.fade : 0)),
+  ).toEqual([0, 10, 20]);
+  // From round 2 the logo holds 110 ticks, then wipes away over 39.
+  expect(later.map(({ z, frames }) => [z, frames[0].image])).toEqual([
+    [0x7f, 182],
+  ]);
+  const match = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true);
+  const heard: [number, number, number[]][] = [];
+  while (match.round === 1 || match.roundTicks < DRESS_TICK) {
+    if (match.round === 1 && match.roundTicks === FIGHT_TICK)
+      match.fighters[1].hp = 0;
+    match.step();
+    const sounds = letteringSounds(match);
+    if (sounds.length) heard.push([match.round, match.roundTicks, sounds]);
+  }
+  // VS L's slide plays 12 in round 1 only; demo black is silent.
+  expect(heard.filter(([, , sounds]) => sounds.includes(12))).toEqual([
+    [1, 150, [12]],
   ]);
 });
