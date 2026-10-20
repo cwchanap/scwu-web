@@ -1106,6 +1106,32 @@ const TEMPLATE: {
     idle: [424, 361],
     seed: 1,
   },
+  // Its image is 4007; PC 582 sets variable 2 to 1 after OP super Charge.
+  // Round 1 (42, PC 585): PW, two Rinzis, WW and Yonan (PCs 641–645),
+  // image 4007 for 240 ticks, its EX check (PC 648), images 4006 and 4000.
+  // From round 2 Demo Stand (36) from + 1 (PC 586), the EX check (PC 587)
+  // and Demo Stand again (PC 588): 4000 for 85, then 4001 to 4005 for 8.
+  {
+    who: 'yinan',
+    start: 38,
+    round1: 42,
+    banner: 73,
+    image: 4007,
+    charge: 58,
+    demo: [
+      [99, 4007],
+      [100, 4000],
+      [185, 4001],
+      [193, 4002],
+      [201, 4003],
+      [209, 4004],
+      [217, 4005],
+      [225, 4000],
+      [342, 4005],
+      [349, 4005],
+    ],
+    idle: [351, 351],
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -1806,6 +1832,31 @@ describe("ALPHA's Round 1 rolls", () => {
     expect([p1.action, p2.action]).toEqual(['script', 'idle']);
     steps(match, 70);
     expect(p1.action).toBe('idle');
+  });
+});
+
+describe("YINAN's EX checks", () => {
+  // Down held at Round 1's check (PC 648) enters 開始時 SELECT + 8 (40),
+  // which sets variable 0 to 100 (PC 609) and shows his EX images; between
+  // round 2's Demo Stands (PC 587) + 6, which sets it (PC 607) and jumps
+  // back to 開始時 + 25, where Demo Stand's test of variable 0 (PC 543)
+  // plays the EX images.
+  it('in round 1, at Round 1 + 240', () => {
+    expect(exCheck('yinan', false, 339)).toEqual(['42', false, [4006, 4000]]);
+    expect(exCheck('yinan', false, 340)).toEqual(['40+8', true, [4006, 4636]]);
+  });
+
+  it('from round 2, between Demo Stands', () => {
+    expect(exCheck('yinan', true, 224)).toEqual([
+      '38',
+      false,
+      [4000, 4001, 4002, 4003, 4004, 4005],
+    ]);
+    expect(exCheck('yinan', true, 225)).toEqual([
+      '40+6',
+      true,
+      [4636, 4637, 4638, 4639, 4640, 4641, 4642, 4643, 4644, 4645],
+    ]);
   });
 });
 
@@ -2764,6 +2815,41 @@ describe("ASTROMAN's ZA finishers (global 3 > 0)", () => {
   ] as const)('%s', (_, move, za, hp) => {
     const br = finish(false, 80, move, { held: 9, who: 'astroman' });
     const vs = finish(true, 80, move, { held: 9, who: 'astroman' });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("YINAN's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; Chuck hit ZA's op 0x15 takes
+  // 1 more (PC 4378). Chuck hit is his EX mode's (PC 4339 takes Chuck hit
+  // Nor for variable 0 = 0); R100 and R300 want desperation life.
+  it.each([
+    [
+      'Chuck hit ZA (254, PC 4362)',
+      { throw: true },
+      254,
+      80,
+      { ex: true },
+      [480, 480],
+    ],
+    ['Doge Chuck Hit ZA (399, PC 7296)', 396, 399, 80, {}, [490, 490]],
+    ['Venom Doll Hit ZA (457, PC 8479)', 452, 457, 80, {}, [460, 460]],
+    ['R100 Hit 2 ZA (526, PC 10201)', 519, 526, 400, { life: 100 }, [430, 430]],
+    [
+      'R300 Yinan Fin ZA (556, PC 10929)',
+      532,
+      556,
+      80,
+      { life: 100 },
+      [280, 280],
+    ],
+  ] as const)('%s', (_, move, za, gap, options, hp) => {
+    const br = finish(false, gap, move, { held: 9, who: 'yinan', ...options });
+    const vs = finish(true, gap, move, { held: 9, who: 'yinan', ...options });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
