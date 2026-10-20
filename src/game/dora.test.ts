@@ -419,9 +419,13 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
+    // 421's box 9870 down meets Ryuko's object 39, 9900 down, into its hit
+    // handler 421 + 28 (0x40f010 tests every box against objects' bodies).
     for (const [seed, wanted] of [
-      [0, [286, 283, 204, 421, 245, 284, 241, 305, 327, 338]],
+      [0, [286, 283, 204, 421, '421+28', 245, 284, 241, 338]],
       [1, [252, 254, 356, 296]],
+      [4, [305]],
+      [5, [327]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'dora']);
       const dora = match.fighters[1];

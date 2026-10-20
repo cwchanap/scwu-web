@@ -4872,6 +4872,67 @@ describe('prototype training rules', () => {
     });
   });
 
+  describe("+0xdef9 holding an object a fighter's box met", () => {
+    // YINAN's 21 leaves 21 + 22 where he stood, with his bodies (x 0).
+    const clone = (match: Match, x: number) => {
+      const e = object('21+22', 1, { who: 'yinan', x });
+      match.effects = [e];
+      return e;
+    };
+
+    it('seizes the object with op 0x14, not the player', () => {
+      const match = new Match('practice', false, 0, ['ryuko', 'yinan']);
+      const [ryuko, yinan] = match.fighters;
+      // An earlier contact joined the two.
+      [ryuko.caught, yinan.caught] = [yinan, ryuko];
+      ryuko.y = -100;
+      enter(match, ryuko, RYUKO.airDrill, 22);
+      yinan.x = ryuko.x + 600;
+      const e = clone(match, ryuko.x + 150);
+      // The spin's box meets the clone's body (0x40f2da, 0x40f2e0), whose
+      // owner it joins to Ryuko, and queues 209 + 12.
+      ticks(match, 2);
+      expect(playing(ryuko)).toBe('209+12');
+      expect(ryuko.caught).toBe(e);
+      expect(yinan.caught).toBe(ryuko);
+      // After its 8-tick stop (op 0x1a), 209 + 12's op 0x14 (x 100, y -20,
+      // flags 1) places the clone facing Ryuko, and leaves YINAN be.
+      const x = yinan.x;
+      let at = { x: 0, y: 0 };
+      while (ryuko.age < 1) {
+        at = { x: ryuko.x, y: ryuko.y };
+        match.step();
+      }
+      expect([e.x, e.y, e.facing]).toEqual([
+        at.x + 150,
+        at.y - 30,
+        -ryuko.facing,
+      ]);
+      expect([yinan.x, yinan.held]).toEqual([x, null]);
+    });
+
+    it('stops it for good with op 0x07 (+0x40 at -1)', () => {
+      const match = new Match('practice', false, 0, ['ryuko', 'yinan']);
+      const [ryuko, yinan] = match.fighters;
+      const e = clone(match, ryuko.x + 200);
+      e.vx = 3;
+      ryuko.caught = e;
+      // K3 hit's op 0x07 at age 5 (x 60, flags 5) takes it with Ryuko's
+      // facing, zeroing its motion.
+      enter(match, ryuko, RYUKO.throw, 5);
+      expect([e.x, e.facing, e.vx, e.hitStop]).toEqual([
+        ryuko.x + 90,
+        ryuko.facing,
+        0,
+        -1,
+      ]);
+      const { x, age } = e;
+      ticks(match, 4);
+      expect([e.x, e.age, e.hitStop]).toEqual([x, age, -1]);
+      expect(yinan.held).toBe(null);
+    });
+  });
+
   it('keeps projectiles playing when the round ends', () => {
     const match = new Match();
     match.fighters[1].hp = 16;

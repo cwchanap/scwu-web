@@ -1092,12 +1092,11 @@ export interface Fighter {
   // ('body', 0x40f8a4) or an object following it ('object', 0x40f8ac).
   reaction: number;
   striker: 'body' | 'object' | null;
-  // +0xdef9: the other player a contact of either one's own box last joined
-  // this one to (0x40f2da, 0x40f2e0). Only the round's setup clears it
-  // (0x411f7c), so ops 0x07 and 0x14 reach that player long after.
-  // ponytail: a fighter's box meeting an object's body records the object;
-  // the port leaves those meetings out.
-  caught: Fighter | null;
+  // +0xdef9: what a contact of a player's own box last joined this one to
+  // (0x40f2da, 0x40f2e0): the other player, or the object whose body its box
+  // met. Only the round's setup clears it (0x411f7c), so ops 0x07 and 0x14
+  // reach it long after.
+  caught: Fighter | Effect | null;
   // Distance the walls stopped this tick, and player +0xdf49: x the next
   // motion step adds (0x40fa09).
   stopped: number;
@@ -2263,6 +2262,22 @@ export class Match {
           return this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       case 'hold':
+        // On an object they place it as they would the player, op 0x07
+        // zeroing its motion (0x412f66) and stopping it for good (+0x40 at
+        // -1, which only the step reads, 0x412397), then skip the player's
+        // pose and response (0x412f72, 0x41310f). ponytail: the priorities
+        // both ops give it (0x41f130) are left out, as the fighters' are.
+        if (self.caught && 'clip' in self.caught) {
+          this.placeHeld(self, self.caught, event);
+          Object.assign(self.caught, {
+            vx: 0,
+            vy: 0,
+            ax: 0,
+            gravity: 0,
+            hitStop: -1,
+          });
+          break;
+        }
         if (!this.struck(self, other)) break;
         other.held = {
           pose: event.pose,
@@ -2277,6 +2292,10 @@ export class Match {
         this.placeHeld(self, other);
         break;
       case 'apply': {
+        if (self.caught && 'clip' in self.caught) {
+          this.placeHeld(self, self.caught, event);
+          break;
+        }
         // REAR's 255 applies Chuck OGI BALL (response 62, Ryuko's 138),
         // which the victim plays from its own timeline (ownTimeline).
         const own = responsesOf(other.who)[event.response];
@@ -2460,20 +2479,26 @@ export class Match {
   }
 
   // Ops 0x07 (0x412e93) and 0x14 (0x413057) reach the player this one's
-  // last contact joined it to (+0xdef9), held or not: DST juggles its tossed
-  // victim, and GON's Kuren under seizes whoever struck him.
+  // last contact joined it to (+0xdef9), held, KO'd or not: DST juggles its
+  // tossed victim, and GON's Kuren under seizes whoever struck him.
   private struck(self: Fighter, target: Fighter) {
     return (
       this.catchHeld(target) ||
-      (self.caught === target && target.hp > 0 && Boolean(markHeld(target)))
+      (self.caught === target && Boolean(markHeld(target)))
     );
   }
 
   // Ops 0x07 and 0x14, and a flag-0x10 hold's motion step, place the victim
   // from the holder past walls and floor alike; its own motion step then
   // clamps it to the walls (settle).
-  private placeHeld(holder: Fighter, target: Fighter) {
-    const held = target.held;
+  private placeHeld(
+    holder: Fighter,
+    target: Fighter | Effect,
+    held: Pick<
+      NonNullable<Fighter['held']>,
+      'flags' | 'x' | 'y'
+    > | null = 'clip' in target ? null : target.held,
+  ) {
     if (!held) return;
     target.x = holder.x + holder.facing * held.x * 1.5;
     target.y = holder.y + held.y * 1.5;
@@ -2756,26 +2781,29 @@ export class Match {
     ];
   }
 
-  // 0x40f010 tests every object's boxes against the other side's bodies. In
-  // Ryuko's data objects meet only 2000 pixels down: an axe's box and body
-  // (PCs 3290–3291), the beams' boxes (270, 277), B G's lunge box (292) and
-  // its stage-wide bodies (303). An object victim (+0x15a 1) only fires the
-  // striker's hit handler (0x40f36a, taken up next tick) and marks it as
-  // having hit (0x40f31c), which 0x40f010 checks only before the striker's
-  // pass: axes break into 230 without damage, stop or effect, even held by
-  // the freeze; B G's lunge enters 294; a beam, which sets no handler, waits
-  // for its next box. The lunge records the axe as caught (+0xdef9,
-  // 0x40f2e0), but only grab-entered actions and Air Drill's hit branch hold
-  // or toss with ops 0x07/0x14, so the axe flies on.
+  // 0x40f010 tests every box of every object, fighters' too, against the
+  // other side's objects' bodies. Ryuko's objects meet 2000 pixels down: an
+  // axe's box and body (PCs 3290–3291), the beams' boxes (270, 277), B G's
+  // lunge box (292) and its stage-wide bodies (303). His Black and OP super
+  // Charge (39) follows him with a body 9900 down for AYA's 257 and 258 and
+  // DoraEmon's 421 to strike, and YINAN's dash leaves 21 + 22 standing with
+  // his bodies. An object victim (+0x15a 1)
+  // only fires the striker's hit handler (0x40f36a, taken up next tick) and
+  // marks it as having hit (0x40f31c), which 0x40f010 checks only before the
+  // striker's pass: axes break into 230 without damage, stop or effect, even
+  // held by the freeze; B G's lunge enters 294; a beam, which sets no
+  // handler, waits for its next box. The lunge records the axe as caught
+  // (+0xdef9, 0x40f2e0), but only grab-entered actions and Air Drill's hit
+  // branch hold or toss with ops 0x07/0x14, so the axe flies on.
   private objectHits(frozen: boolean[]) {
     type At = { x: number; y: number; facing: -1 | 1; owner: number };
-    const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>][] = [];
-    const strikers: [At, (ScriptBox | null)[], () => void][] = [];
+    const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>, Effect][] = [];
+    const strikers: [At, (ScriptBox | null)[], (met: Effect) => void][] = [];
     // An object yet to step shows nothing.
     for (const e of this.effects.filter((e) => e.age >= 0)) {
       const at = { ...this.origin(e), facing: e.facing, owner: e.owner };
       for (const body of animationFrame(e.clip, e.age, e.who).body ?? [])
-        if (body.kind & 6) bodies.push([at, body]);
+        if (body.kind & 6) bodies.push([at, body, e]);
       // Every slot: ALEX's REF OBJ (265) strikes 2000 pixels down from slot
       // 0 (PC 3842).
       if (!e.connected)
@@ -2792,31 +2820,33 @@ export class Match {
       if (f.connected || frozen[owner]) return;
       strikers.push([
         { ...f, owner },
-        f.boxes,
-        () => {
+        [f.box, ...f.boxes],
+        (met) => {
           f.connected = true;
+          // 0x40f2c2: the player's box joins it to the object, and the
+          // object's owner to the player; a later victim (slot order) wins.
+          [f.caught, this.fighters[met.owner].caught] = [met, f];
           if (f.onHit && !f.pending) f.pending = { key: f.onHit };
         },
       ]);
     });
-    return strikers
-      .filter(([a, boxes]) =>
-        boxes.some(
-          (box) =>
-            box &&
-            bodies.some(
-              ([b, body]) =>
-                a.owner !== b.owner &&
-                Math.abs(
-                  a.x + a.facing * box.x * 1.5 - b.x - b.facing * body.x * 1.5,
-                ) <
-                  (box.w + body.w) * 1.5 &&
-                Math.abs(a.y + box.y * 1.5 - b.y - body.y * 1.5) <
-                  (box.h + body.h) * 1.5,
-            ),
-        ),
-      )
-      .map(([, , fire]) => fire);
+    return strikers.flatMap(([a, boxes, fire]) => {
+      const met = bodies.filter(
+        ([b, body]) =>
+          a.owner !== b.owner &&
+          boxes.some(
+            (box) =>
+              box &&
+              Math.abs(
+                a.x + a.facing * box.x * 1.5 - b.x - b.facing * body.x * 1.5,
+              ) <
+                (box.w + body.w) * 1.5 &&
+              Math.abs(a.y + box.y * 1.5 - b.y - body.y * 1.5) <
+                (box.h + body.h) * 1.5,
+          ),
+      );
+      return met.length ? [() => fire(met.at(-1)![2])] : [];
+    });
   }
 
   // An authored partner's input. The CPU's word starts as 0x4146d0 records
@@ -3253,9 +3283,9 @@ export class Match {
         this.branchTo(e, key);
         continue;
       }
-      // A stopped object skips its script step (0x412390).
-      if (e.hitStop > 0) {
-        e.hitStop--;
+      // A stopped object skips its script step (0x412390), for good at -1.
+      if (e.hitStop) {
+        if (e.hitStop > 0) e.hitStop--;
         continue;
       }
       // 0x41241c: an object falling to the floor (y 920) stops there, and

@@ -361,9 +361,12 @@ describe('AYA (42 AYA.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
+    // 258's box 9000 down meets Ryuko's object 39, 9900 down, into its hit
+    // handler 258 + 27 (0x40f010 tests every box against objects' bodies).
     for (const [seed, wanted] of [
-      [0, [239, 282, 258, 259, 267, 273, 230]],
-      [1, [227, 228, 257, 211, 212, 267, 282]],
+      [0, [239, 282, 258, '258+27', 267, 230]],
+      [1, [227, 228, 257, 211, 212, 259, 267, 282]],
+      [2, [273]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'aya']);
       const aya = match.fighters[1];
