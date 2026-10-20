@@ -965,7 +965,9 @@ describe.each(TEMPLATE)(
   },
 );
 
-describe("MASA's VS 開始時 (44)", () => {
+// MASA's PCs; 3-TIMES's 開始時 is the same at PCs 268, 271, 316, 319, 270,
+// 276, 279, 280, 668, 292, 389, 313 and 294.
+describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
   // 開始時 spawns itself from + 7 (PC 349), whose global 3 = 50 test takes
   // 開始時 D50 (47, PC 352): in round 1 it sets variables 14 and 0 to 10
   // (PCs 397, 400), his Alpha form. 開始時 jumps into 開始時 1P (45, PC 351),
@@ -975,7 +977,7 @@ describe("MASA's VS 開始時 (44)", () => {
   // dash and cross, Black, image 113 for 70 ticks and OP super Charge, then
   // OP (53, PC 373), which plays OP Alpha (54, PC 473) for variable 0.
   it('takes his Alpha form and plays OP Alpha in round 1', () => {
-    const match = vsMatch('masa');
+    const match = vsMatch(who);
     const [p1, p2] = match.fighters;
     steps(match, 4);
     expect([p1.variables[0], p1.variables[14]]).toEqual([10, 10]);
@@ -1010,7 +1012,7 @@ describe("MASA's VS 開始時 (44)", () => {
   // banners: image 113 for 70 ticks, image 115 for 16 (PC 375), then DEMO
   // STAND (32) from + 9: 113, 114 and 115 for 10, 13, 3.
   it('plays his normal round 2', () => {
-    const match = vsMatch('masa');
+    const match = vsMatch(who);
     while (match.roundTicks < FIGHT_TICK) match.step();
     match.fighters[1].hp = 0;
     while (match.round === 1) match.step();
@@ -1032,7 +1034,7 @@ describe("MASA's VS 開始時 (44)", () => {
       [349, 115],
     ];
     expect(
-      ages.map(([age]) => [age, animationFrame(44, age, 'masa').image]),
+      ages.map(([age]) => [age, animationFrame(44, age, who).image]),
     ).toEqual(ages);
     steps(match, 344);
     expect([p1.branch, p2.branch]).toEqual([44, 44]);
@@ -2333,6 +2335,18 @@ describe("MASA's VS finishers (global 3 > 0)", () => {
     const br = finish(false, 80, 340, { who: 'masa' });
     const vs = finish(true, 80, 340, { who: 'masa' });
     expect([br.branches.has('346'), vs.branches.has('346')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([310, 310]);
+  });
+});
+
+describe("3-TIMES's VS finisher (global 3 > 0)", () => {
+  it('SUN GO HIT2 takes EN3 Stop (272) only in VS (PC 3827)', () => {
+    const br = finish(false, 80, 268, { who: 'times' });
+    const vs = finish(true, 80, 268, { who: 'times' });
+    expect([br.branches.has('272'), vs.branches.has('272')]).toEqual([
       false,
       true,
     ]);
