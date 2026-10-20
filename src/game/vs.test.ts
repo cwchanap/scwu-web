@@ -519,6 +519,34 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (37, PC 373) hops on image 306 (PCs 405–413), holding it until
+  // it lands in + 10, 159 ticks in: its EX check (PC 415), images 124 and
+  // 123, then DEMO stand (29) from + 1. From round 2 image 116 for 34 ticks
+  // (PC 374), DEMO stand from + 2 twice (PC 375), the EX check (PC 376),
+  // then DEMO stand from + 1 (PC 377): 115, 116, 117 and 116 for 20, 12,
+  // 20, 20.
+  {
+    who: 'sou',
+    start: 34,
+    round1: 37,
+    banner: 59,
+    image: 115,
+    charge: 42,
+    demo: [
+      [99, 115],
+      [100, 116],
+      [134, 115],
+      [154, 116],
+      [166, 117],
+      [186, 116],
+      [206, 115],
+      [278, 115],
+      [330, 116],
+      [349, 116],
+    ],
+    idle: [351, 351],
+    ends: '37+10',
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -878,6 +906,34 @@ describe("ALEX's EX checks", () => {
   it('from round 2, between the DEMO stands', () => {
     expect(exCheck('alex', true, 245)).toEqual(['30', false, [117, 116, 115]]);
     expect(exCheck('alex', true, 246)).toEqual(['39+3', true, [363, 364, 365]]);
+  });
+});
+
+describe("SOU's EX checks", () => {
+  // Down held as Round 1 lands (PC 415) enters 'Change Character' (41),
+  // which sets variable 0 to 10 and rejoins at PC 416; after round 2's DEMO
+  // stands (PC 376) it enters + 3, which rejoins at PC 377. DEMO stand from
+  // + 1 then tests variable 0 (PC 309) and plays DEMO stand 2 (30).
+  it('in round 1, as Round 1 lands', () => {
+    expect(exCheck('sou', false, 258)).toEqual([
+      '37+10',
+      false,
+      [124, 123, 115, 116, 117],
+    ]);
+    expect(exCheck('sou', false, 259)).toEqual([
+      '41',
+      true,
+      [124, 123, 349, 350, 351, 352, 353, 354],
+    ]);
+  });
+
+  it('from round 2, after two DEMO stands', () => {
+    expect(exCheck('sou', true, 277)).toEqual(['34', false, [115, 116, 117]]);
+    expect(exCheck('sou', true, 278)).toEqual([
+      '41+3',
+      true,
+      [349, 350, 351, 352, 353, 354],
+    ]);
   });
 });
 
@@ -1340,5 +1396,32 @@ describe("ALEX's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("SOU's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes. Chuck takes ex Chuck hit and
+  // Rangeki Start EX SLASH SUP (456, PC 7115) in EX mode; Beast FIN hit
+  // takes BA Stop (418) for global 3 = 0 (PC 6751), so only the Br. path
+  // plays it.
+  it.each([
+    ['Chuck hit ZA (218, PC 2943)', { throw: true }, 218, false, [495, 495]],
+    ['ex Chuck hit ZA (220, PC 2977)', { throw: true }, 220, true, [495, 495]],
+    ['beast att3 ZA (415, PC 6718)', 403, 415, false, [300, 300]],
+    ['>EX SLASH HIT Land ZA (460, PC 7452)', 444, 460, true, [410, 410]],
+  ] as const)('%s', (_, move, za, ex, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'sou', ex });
+    const vs = finish(true, 80, move, { held: 9, who: 'sou', ex });
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+
+  it('plays BA Stop (418) only outside VS', () => {
+    const stop = (vs: boolean) =>
+      finish(vs, 80, 403, { who: 'sou' }).branches.has('418');
+    expect([stop(false), stop(true)]).toEqual([true, false]);
   });
 });
