@@ -9,8 +9,8 @@ import { enter, named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
-const vsMatch = (who: Who = 'ryuko') =>
-  new Match('cpu', true, 0, [who, who], 'court', true);
+const vsMatch = (who: Who = 'ryuko', seed = 0) =>
+  new Match('cpu', true, seed, [who, who], 'court', true);
 const steps = (match: Match, ticks: number, input: Input = {}) => {
   for (let t = 0; t < ticks; t++) match.step(input);
 };
@@ -167,7 +167,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // then in round 1 the action the round copy jumps to, from its start. Each
 // row: those actions and images, round 2's images by age, the ticks to idle
 // in rounds 1 and 2, how far round 1's action walks, and the action it runs
-// out of when that action jumps on.
+// out of when that action jumps on, with a seed whose rolls both take it.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -178,7 +178,8 @@ const TEMPLATE: {
   demo: [number, number][];
   idle: [number, number];
   walk?: number;
-  ends?: number;
+  ends?: number | string;
+  seed?: number;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -439,6 +440,30 @@ const TEMPLATE: {
     idle: [351, 351],
     walk: -5 * speed(2250) + 56 * speed(200),
   },
+  // Round 1 (34, PC 343): 250 ticks of displays, unless its roll takes op2
+  // (below). From round 2 image 113 for 14 ticks (PC 344), then Demo Stand
+  // (29) twice (PC 345): 113, 114, 115, 114 and 113 for 50, 5, 8, 5, 50.
+  {
+    who: 'dido',
+    start: 31,
+    round1: 34,
+    banner: 58,
+    image: 113,
+    charge: 36,
+    demo: [
+      [99, 113],
+      [163, 113],
+      [164, 114],
+      [169, 115],
+      [177, 114],
+      [182, 113],
+      [282, 114],
+      [300, 113],
+      [349, 113],
+    ],
+    idle: [351, 351],
+    seed: 1,
+  },
 ];
 
 describe.each(TEMPLATE)(
@@ -454,9 +479,10 @@ describe.each(TEMPLATE)(
     idle,
     walk = 0,
     ends = round1,
+    seed = 0,
   }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
-      const match = vsMatch(who);
+      const match = vsMatch(who, seed);
       const [p1, p2] = match.fighters;
       steps(match, 5);
       expect([p1.branch, p2.branch]).toEqual([start, start]);
@@ -500,7 +526,7 @@ describe.each(TEMPLATE)(
     });
 
     it('plays its round 2 images where round 1 has the banners', () => {
-      const match = vsMatch(who);
+      const match = vsMatch(who, seed);
       while (match.roundTicks < FIGHT_TICK) match.step();
       match.fighters[1].hp = 0;
       while (match.round === 1) match.step();
@@ -711,6 +737,24 @@ describe("KAY's EX checks", () => {
   it('from round 2, between the Demo stands', () => {
     expect(exCheck('kay', true, 231)).toEqual(['30', false, demo]);
     expect(exCheck('kay', true, 232)).toEqual(['36', true, demo]);
+  });
+});
+
+describe("DIDO's Round 1 roll", () => {
+  // Round 1 opens with an op 0x20 roll (PC 377) that may take op2 (44): its
+  // displays, a hop (PCs 500–511) held on image 400 until it lands in op2
+  // + 26, then image 113 for 10 ticks. Each fighter rolls for itself: seed
+  // 0's take op2 for player 1 and Round 1 for player 2.
+  it('takes op2 for one fighter and Round 1 for the other', () => {
+    const match = vsMatch('dido');
+    const [p1, p2] = match.fighters;
+    steps(match, 101);
+    expect([named(p1), named(p2)]).toEqual(['44', '34']);
+    steps(match, 240);
+    expect([named(p1), named(p2)]).toEqual(['44+26', '34']);
+    steps(match, 10);
+    expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
+    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
   });
 });
 
@@ -1113,5 +1157,17 @@ describe("KAY's ZA finishers (global 3 > 0)", () => {
       true,
     ]);
     expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("DIDO's ZA finisher (global 3 > 0)", () => {
+  it('Chuck hit ZA (227, PC 3237) strikes for what op 0x15 takes', () => {
+    const br = finish(false, 80, { throw: true }, { held: 9, who: 'dido' });
+    const vs = finish(true, 80, { throw: true }, { held: 9, who: 'dido' });
+    expect([br.branches.has('227'), vs.branches.has('227')]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual([480, 480]);
   });
 });
