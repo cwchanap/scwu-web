@@ -164,8 +164,8 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // The 開始時 the other fighters share with Ryuko's: VS 1P twice, the dash
 // and cross, an image held 70 ticks while Black and OP super Charge spawn,
 // then in round 1 the action the round copy jumps to, from its start. Each
-// row: those actions and images, round 2's images by age, and the ticks to
-// idle in rounds 1 and 2.
+// row: those actions and images, round 2's images by age, the ticks to idle
+// in rounds 1 and 2, and how far round 1's action walks.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -175,6 +175,7 @@ const TEMPLATE: {
   charge: number;
   demo: [number, number][];
   idle: [number, number];
+  walk?: number;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -339,11 +340,36 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
+  // Round 1 (35, PC 350) steps back at −2000 for 5 ticks and walks in at
+  // 110 for 90 (PCs 374–385), 255 ticks in all. From round 2 image 117 for
+  // 5 ticks (PC 351), then Demo Stand (29) seven times (PC 352): 113 to 117
+  // for 7 ticks each.
+  {
+    who: 'yo',
+    start: 32,
+    round1: 35,
+    banner: 55,
+    image: 113,
+    charge: 39,
+    demo: [
+      [99, 113],
+      [100, 117],
+      [105, 113],
+      [112, 114],
+      [119, 115],
+      [126, 116],
+      [133, 117],
+      [140, 113],
+      [349, 117],
+    ],
+    idle: [356, 351],
+    walk: -5 * speed(2000) + 90 * speed(110),
+  },
 ];
 
 describe.each(TEMPLATE)(
   "$who's VS 開始時 ($start)",
-  ({ who, start, round1, banner, image, charge, demo, idle }) => {
+  ({ who, start, round1, banner, image, charge, demo, idle, walk = 0 }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
       const match = vsMatch(who);
       const [p1, p2] = match.fighters;
@@ -380,7 +406,7 @@ describe.each(TEMPLATE)(
       expect([named(p1), named(p2)]).toEqual([`${round1}`, `${round1}`]);
       match.step();
       expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
-      expect(at(p1)).toBeCloseTo(370 + cross, 6);
+      expect(at(p1)).toBeCloseTo(370 + cross + walk, 6);
       while (match.roundTicks < FIGHT_TICK - 1) match.step();
       expect(match.fighters.map((f) => [f.stock, f.power])).toEqual([
         [0, 0],
@@ -803,6 +829,24 @@ describe("G Suneo's ZA finishers (global 3 > 0)", () => {
     const options = { held: 9, who: 'suneo', ex, life } as const;
     const br = finish(false, 80, move, options);
     const vs = finish(true, 80, move, options);
+    expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
+      false,
+      true,
+    ]);
+    expect([br.hp, vs.hp]).toEqual(hp);
+  });
+});
+
+describe("Yo's ZA finishers (global 3 > 0)", () => {
+  // Each box strikes for what op 0x15 takes; Press Hit ZA's op 0x15 then
+  // takes 1 more (PC 3328).
+  it.each([
+    ['Chuck hit ZA (203, PC 2713)', { throw: true }, 203, [475, 475]],
+    ['Zombi hit ZA (221, PC 3009)', 218, 221, [475, 475]],
+    ['Press Hit ZA (240, PC 3308)', 238, 240, [410, 409]],
+  ] as const)('%s', (_, move, za, hp) => {
+    const br = finish(false, 80, move, { held: 9, who: 'yo' });
+    const vs = finish(true, 80, move, { held: 9, who: 'yo' });
     expect([br.branches.has(`${za}`), vs.branches.has(`${za}`)]).toEqual([
       false,
       true,
