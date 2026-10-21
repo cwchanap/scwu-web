@@ -8,7 +8,7 @@ import {
   script,
 } from './animations';
 import type { Action } from './animations';
-import { exMode, Match, STAGE_WIDTH } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { enter } from './testing';
 
@@ -71,11 +71,8 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
   it('drives in on her car in her Vs. intro, Round BR (33)', () => {
     const match = new Match('cpu', true, 0, ['amiro', 'zoma']);
     const amiro = match.fighters[0];
-    // Raw 600 for 32 ticks (PC 367), then 60 for 15 (PC 372).
-    expect(STAGE_WIDTH / 2 - 180 - amiro.x).toBeCloseTo(
-      (600 * 32 + 60 * 15) * VELOCITY,
-      6,
-    );
+    // The round's set-up places her at 390 source pixels (0x408ac3).
+    expect(amiro.x).toBe(390 * 1.5);
     match.step();
     // PC 364: her car (35) follows her in slot 9 (op 0x04 flags 0x21).
     expect(match.effects.find((e) => e.clip === 35)).toMatchObject({
@@ -93,7 +90,8 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
     expect(match.effects.map((e) => e.clip)).not.toContain(35);
     for (let t = 115; t < 198; t++) match.step({ crouch: true });
     expect(amiro.action).toBe('idle');
-    expect(amiro.x).toBeCloseTo(STAGE_WIDTH / 2 - 180, 6);
+    // Raw 600 for 32 ticks (PC 367), then 60 for 15 (PC 372).
+    expect(amiro.x - 390 * 1.5).toBeCloseTo((600 * 32 + 60 * 15) * VELOCITY, 6);
     // PC 382 enters EX CHANGE (39) + 3 while down is held.
     expect(exMode(amiro)).toBe(true);
   });

@@ -9,7 +9,7 @@ import {
 } from './animations';
 import type { Action } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match, STAGE_WIDTH } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -256,7 +256,7 @@ describe('ALEX (15 ALEX.PLAYER)', () => {
       expect([alex.stock, alex.power]).toEqual([1, 98]);
       match.step(crouch ? { crouch } : {});
       expect([alex.x, alex.stock, exMode(alex)]).toEqual([
-        STAGE_WIDTH / 2 - 180,
+        390 * 1.5,
         2,
         crouch,
       ]);

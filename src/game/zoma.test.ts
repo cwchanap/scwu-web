@@ -550,13 +550,14 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
         (age) => animationFrame('intro', age, 'zoma').image,
       ),
     ).toEqual([280, 281, 282, 283, 287, 284, 285, 286, 286]);
-    expect(zoma).toMatchObject({ action: 'intro', x: 1140 });
+    expect(zoma).toMatchObject({ action: 'intro', x: 890 * 1.5 });
     // Start N has no op 0x16, so down held through it starts no EX mode.
     for (let t = 0; t < 199; t++) match.step({}, { crouch: true });
     expect([ryuko.action, zoma.action]).toEqual(['idle', 'intro']);
-    expect([ryuko.x, zoma.x]).toEqual([780, 1140]);
+    expect(ryuko.x).toBeCloseTo(390 * 1.5 + 50 * 200 * (655 / 65536) * 1.5, 6);
+    expect(zoma.x).toBe(890 * 1.5);
     match.step({}, { crouch: true });
-    expect(zoma).toMatchObject({ action: 'idle', x: 1140, variables: {} });
+    expect(zoma).toMatchObject({ action: 'idle', x: 890 * 1.5, variables: {} });
   });
 
   it("enters a command the CPU writes, with its step's direction (0x411644)", () => {

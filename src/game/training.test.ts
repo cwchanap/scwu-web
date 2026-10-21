@@ -199,12 +199,17 @@ describe('TRAINING (48 TRAINING.PLAYER)', () => {
     expect(animationDuration('intro', 'training')).toBe(320);
     const match = new Match('cpu', true, 0, ['training', 'zoma']);
     const training = match.fighters[0];
-    let ticks = 0;
+    const xs: number[] = [];
     while (training.action === 'intro') {
       match.step({});
-      ticks++;
+      xs.push(training.x / 1.5);
     }
-    expect([ticks, training.stock, training.y]).toEqual([320, 0, 0]);
+    expect([xs.length, training.stock, training.y]).toEqual([320, 0, 0]);
+    // From 390 source pixels (0x408ac3) the dash back (PC 229) meets the
+    // camera's left bound at once, 50 in from its scroll of 320; the dash in
+    // (PC 231) then carries him 15 ticks at raw 2870.
+    expect(xs[5]).toBe(320 + 50);
+    expect(xs[29] - xs[14]).toBeCloseTo(15 * 2870 * (655 / 65536), 6);
     expect(
       [0, 29, 30, 99, 100, 319].map(
         (age) => animationFrame('intro', age, 'training').image,
@@ -246,7 +251,7 @@ describe('TRAINING (48 TRAINING.PLAYER)', () => {
   it('plays his own CPU table in Vs. CPU', () => {
     const wanted = [10, 139, 140];
     const entered = new Set<unknown>();
-    for (const seed of [0, 1, 2]) {
+    for (const seed of [0, 4]) {
       const match = new Match('cpu', true, seed, ['ryuko', 'training']);
       const training = match.fighters[1];
       for (let t = 0; t < 6000 && !wanted.every((b) => entered.has(b)); t++) {

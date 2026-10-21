@@ -270,7 +270,7 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
     // jump (PC 2460).
     for (const [seed, wanted] of [
       [0, [160, 157, 223, 162, 224]],
-      [1, [162, 224, 223, '155+11']],
+      [9, [162, 224, 223, '155+11']],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'golf']);
       const golf = match.fighters[1];

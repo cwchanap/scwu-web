@@ -700,8 +700,8 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
   it('plays her own CPU table in Vs. CPU', () => {
     // Her CPU's own CPU Driver Far (658) and its ARX-7 (660).
     for (const [seed, wanted] of [
-      [0, [337, 658, '660+3', 661, 411, 394, 252]],
-      [1, [658, 212, 213, 214, 216, 276, 249]],
+      [19, [337, 658, '660+3', 661, 394, 252, 212, 213, 214, 216, 276]],
+      [4, [411, 249]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'yinan']);
       const yinan = match.fighters[1];

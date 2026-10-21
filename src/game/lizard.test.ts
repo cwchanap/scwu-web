@@ -8,7 +8,7 @@ import {
   LIZARD_LANDING,
 } from './animations';
 import { faceImage } from './hud';
-import { Match, STAGE_WIDTH } from './match';
+import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -154,7 +154,7 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     ]);
   });
 
-  it('leaps in from above in his Vs. intro, landing into OP lend at LIZARD_LANDING where the others stand, charged with two stocks', () => {
+  it('leaps in from above in his Vs. intro, landing into OP lend at LIZARD_LANDING, charged with two stocks', () => {
     expect([LIZARD_LANDING, animationDuration('intro', 'lizard')]).toEqual([
       166, 216,
     ]);
@@ -175,7 +175,13 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     // Up 80 source pixels in two ticks (PC 372), down past the floor in 62.
     expect(at[4][1]).toBeCloseTo(-79.96, 2);
     expect(at[165][1]).toBeCloseTo(-9.23, 2);
-    expect(at[166]).toEqual([STAGE_WIDTH / 2 - 180, 0]);
+    // From 390 source pixels (0x408ac3), raw 400 through the leap.
+    expect(at[166]).toEqual([
+      Math.round(
+        390 * 1.5 + (LIZARD_LANDING - 104) * 400 * (655 / 65536) * 1.5,
+      ),
+      0,
+    ]);
     expect(lizard.action).toBe('idle');
     // OP super Charge (42, PC 369) takes 300 power, borrowing stocks down to
     // none (0x40e6f0), then calls 43 a hundred times for 2 each (PC 481).

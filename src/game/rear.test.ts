@@ -199,8 +199,8 @@ describe('REAR (24 REAR.PLAYER)', () => {
     ]);
     const match = new Match('cpu', true, 0, ['rear', 'zoma']);
     const rear = match.fighters[0];
-    // 780 less the glide's 539.85, which the camera's left bound stops.
-    expect(rear.x).toBeCloseTo(240.15, 2);
+    // The round's set-up places him at 390 source pixels (0x408ac3).
+    expect(rear.x).toBe(390 * 1.5);
     const heights: number[] = [];
     const xs: number[] = [];
     while (rear.action === 'intro') {
@@ -213,8 +213,9 @@ describe('REAR (24 REAR.PLAYER)', () => {
     expect(heights[6]).toBeCloseTo(-139.923, 3);
     expect(heights[33]).toBeCloseTo(-85.953, 3);
     expect([heights[49] < 0, heights[50]]).toEqual([true, 0]);
-    expect(xs[0]).toBe(285);
-    expect(rear.x).toBeCloseTo(824.85, 2);
+    // The glide carries him 539.85 on.
+    expect(xs[0]).toBe(390 * 1.5);
+    expect(rear.x).toBeCloseTo(390 * 1.5 + 539.85, 2);
     // OP super Charge (41) runs on past it.
     for (let t = 0; t < 30; t++) match.step({});
     expect(rear.stock).toBe(2);

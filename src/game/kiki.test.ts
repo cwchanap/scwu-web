@@ -195,9 +195,12 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
         (age) => animationFrame('intro', age, 'kiki').image,
       ),
     ).toEqual([273, 274, 275, 276, 277, 278, 278]);
-    expect(kiki).toMatchObject({ action: 'intro', x: 1140 });
+    // The round's set-up places them at 390 and 890 source pixels
+    // (0x408ac3); Ryuko walks 50 ticks at raw 200 (PC 339).
+    expect(kiki).toMatchObject({ action: 'intro', x: 890 * 1.5 });
     for (let t = 0; t < 200; t++) match.step({}, { crouch: true });
-    expect([ryuko.x, kiki.x]).toEqual([780, 1140]);
+    expect(ryuko.x).toBeCloseTo(390 * 1.5 + 50 * 200 * VELOCITY, 6);
+    expect(kiki.x).toBe(890 * 1.5);
     expect(kiki).toMatchObject({ action: 'idle', variables: {} });
   });
 

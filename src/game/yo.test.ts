@@ -182,15 +182,16 @@ describe('Yo (09 YO.PLAYER)', () => {
   it('rides in on her robot in her Vs. intro, then calls Demo Stand three times', () => {
     const match = new Match('cpu', true, 0, ['yo', 'zoma']);
     const yo = match.fighters[0];
-    // Round 1 + 5: raw 110 for six 15-tick displays (PCs 378–385).
-    expect(STAGE_WIDTH / 2 - 180 - yo.x).toBeCloseTo(110 * 90 * VELOCITY, 6);
+    // The round's set-up places her at 390 source pixels (0x408ac3).
+    expect(yo.x).toBe(390 * 1.5);
     expect(animationDuration('intro', 'yo')).toBe(115 + 3 * 35);
     for (let t = 0; t < 115; t++) match.step({ crouch: true });
     // PC 388 spawns RObort (31), which drives off.
     expect(match.effects.map((e) => e.clip)).toContain(31);
     for (let t = 115; t < 220; t++) match.step({ crouch: true });
     expect(yo.action).toBe('idle');
-    expect(yo.x).toBeCloseTo(STAGE_WIDTH / 2 - 180, 6);
+    // Round 1 + 5: raw 110 for six 15-tick displays (PCs 378–385).
+    expect(yo.x - 390 * 1.5).toBeCloseTo(110 * 90 * VELOCITY, 6);
     // No --TYPE CHANGE-- and no intro check: she has no EX mode.
     expect(exMode(yo)).toBe(false);
   });

@@ -422,10 +422,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     // 421's box 9870 down meets Ryuko's object 39, 9900 down, into its hit
     // handler 421 + 28 (0x40f010 tests every box against objects' bodies).
     for (const [seed, wanted] of [
-      [0, [286, 283, 204, 421, '421+28', 245, 284, 241, 338]],
-      [1, [252, 254, 356, 296]],
-      [4, [305]],
-      [5, [327]],
+      [17, [283, 421, '421+28', 245, 284, 241, 338, 252, 254, 296]],
+      [37, [286, 356, 327]],
+      [2, [305]],
+      [15, [204]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'dora']);
       const dora = match.fighters[1];

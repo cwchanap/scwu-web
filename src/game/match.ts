@@ -412,20 +412,16 @@ const reactionPower = (f: Fighter): [number, number] =>
 // under gravity 90 (PC 431) until he lands (REMU_LANDING). REAR's 開始時 BR
 // (33) rises at −2000 for 7 ticks (PC 345), glides at 1000/200 for 27 (PC
 // 375), then slows by 50 under gravity 60 (PC 380) until he lands
-// (REAR_LANDING); ponytail: his glide is longer than the camera's window
-// allows from where it would have to start, so its left bound (clampX) moves
-// him 30 source pixels on at the first step, and he lands that much nearer
-// the middle. ZIRO's 開始時 BR (38) rises at −20000 for eight ticks (PC 445),
+// (REAR_LANDING). ZIRO's 開始時 BR (38) rises at −20000 for eight ticks (PC 445),
 // waits 48, then falls at 2000 under gravity 30 (PC 459) until he lands
 // (ZIRO_LANDING). DoraEmon's Round 1 (34) rises at −50 for 27 ticks (PC
 // 381) after its first 100, stops (PC 393) and falls under gravity 50 (PC
 // 398) until he lands (DORA_LANDING). RARIO's Round 1 (27) hops at −1000
 // with gravity 30 (PC 246) after its first 44 ticks, hangs 50 (PC 248) and
-// hops again with gravity 80 (PC 251) until he lands (RARIO_LANDING). The
-// others' have no op 0x01, so they start where these end. ponytail:
-// TRAINING's 開始時 (24) dashes back at −10000 and in at 2870 on blank
-// displays (PCs 229–231), which would leave him 430 source pixels from the
-// left bound wherever he starts; it plays in place.
+// hops again with gravity 80 (PC 251) until he lands (RARIO_LANDING).
+// TRAINING's 開始時 (24) dashes back at −10000 for 10 ticks after its first
+// 5 (PC 229), into the camera's left bound (clampX), then in at 2870 for 15
+// (PC 231) on blank displays. The others' have no op 0x01.
 type Runs = [number, number, number?, number?, number?][];
 const INTRO_MOTION: Partial<Record<Who, Runs>> = {
   ryuko: [[50, 200]],
@@ -442,6 +438,11 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [LIZARD_LANDING - 104, 400, -1000, 60],
   ],
   kay: [[56, 200]],
+  training: [
+    [5, 0],
+    [10, -10000],
+    [15, 2870],
+  ],
   sou: [
     [2, 0, -7000, -10000],
     [SOU_LANDING - 2, 0, 300],
@@ -517,14 +518,6 @@ const runVelocity = (runs: Runs = [], age: number) => {
   }
   return [0, 0];
 };
-const introWalk = (who: Who) =>
-  (INTRO_MOTION[who] ?? []).reduce(
-    (x, [ticks, vx, , , ax = 0]) =>
-      x +
-      ticks * vx * SOURCE_VELOCITY_SCALE +
-      ((ticks * (ticks + 1)) / 2) * ax * SOURCE_ACCELERATION_SCALE,
-    0,
-  );
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
 // The KOs that launch straight up and sink without sliding (moveKO).
@@ -1518,10 +1511,11 @@ const stageObjects = (stage: Stage) =>
     }),
   );
 
-// Authored start: both walk-ins end 360 pixels apart around the stage center.
+// Every round set-up places the players at 390 and 890 source pixels
+// (0x408a2e, 0x408ac3), and their Br. intros move them from there.
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
-  { ...fighter(STAGE_WIDTH / 2 - 180 - introWalk(a), 1, a), action: 'intro' },
-  { ...fighter(STAGE_WIDTH / 2 + 180 + introWalk(b), -1, b), action: 'intro' },
+  { ...fighter(390 * 1.5, 1, a), action: 'intro' },
+  { ...fighter(890 * 1.5, -1, b), action: 'intro' },
 ];
 
 export class Match {

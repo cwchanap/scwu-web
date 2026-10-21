@@ -3,7 +3,7 @@ import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
-import { Match, STAGE_WIDTH } from './match';
+import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -181,11 +181,7 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     const match = new Match('cpu', true, 0, ['dido', 'zoma']);
     const dido = match.fighters[0];
     while (dido.action === 'intro') match.step({});
-    expect([dido.x, dido.stock, dido.power]).toEqual([
-      STAGE_WIDTH / 2 - 180,
-      2,
-      0,
-    ]);
+    expect([dido.x, dido.stock, dido.power]).toEqual([390 * 1.5, 2, 0]);
   });
 
   it('wins after a call of Demo Stand (PC 681), holding image 330, and draws holding 382', () => {

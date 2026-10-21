@@ -499,8 +499,10 @@ describe('recovered neutral and round animations', () => {
     ).toEqual([353, 356, 358, 359, 295, 364, 365, 295, 295]);
     expect(match.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
     ticks(match, 50, { punch: true, right: true });
-    expect(player.x).toBeCloseTo(780, 3);
-    expect(cpu.x).toBeCloseTo(1140, 3);
+    // From 390 and 890 source pixels (0x408ac3), each raw 200 for 50 ticks.
+    const walk = 50 * 200 * (655 / 65536) * 1.5;
+    expect(player.x).toBeCloseTo(390 * 1.5 + walk, 3);
+    expect(cpu.x).toBeCloseTo(890 * 1.5 - walk, 3);
     ticks(match, 148, { punch: true });
     expect(player).toMatchObject({ action: 'intro', x: player.x });
     expect(match).toMatchObject({ ticks: 0, seconds: 60 });

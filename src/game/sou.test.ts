@@ -9,7 +9,7 @@ import {
   SOU_LANDING,
 } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match, STAGE_WIDTH } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -281,11 +281,7 @@ describe('SOU (16 SOU.PLAYER)', () => {
       // second stock the tick after.
       expect([Math.round(top), landed, sou.stock]).toEqual([-480, 109, 1]);
       match.step(crouch ? { crouch } : {});
-      expect([sou.x, sou.stock, exMode(sou)]).toEqual([
-        STAGE_WIDTH / 2 - 180,
-        2,
-        crouch,
-      ]);
+      expect([sou.x, sou.stock, exMode(sou)]).toEqual([390 * 1.5, 2, crouch]);
     }
   });
 

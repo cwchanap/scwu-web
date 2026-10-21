@@ -9,7 +9,7 @@ import {
 } from './animations';
 import type { Action } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match, STAGE_WIDTH } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -271,7 +271,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
       const sakuya = match.fighters[0];
       while (sakuya.action === 'intro') match.step(crouch ? { crouch } : {});
       expect([sakuya.x, sakuya.stock, exMode(sakuya)]).toEqual([
-        STAGE_WIDTH / 2 - 180,
+        390 * 1.5,
         2,
         crouch,
       ]);

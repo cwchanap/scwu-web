@@ -9,7 +9,7 @@ import {
   KAY_WIN_HOP,
 } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match, STAGE_WIDTH } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -242,7 +242,8 @@ describe('KAY (12 KAY.PLAYER)', () => {
     const match = new Match('cpu', true, 0, ['kay', 'zoma']);
     const kay = match.fighters[0];
     while (kay.age < 56) match.step({});
-    expect(kay.x).toBeCloseTo(STAGE_WIDTH / 2 - 180, 6);
+    // From 390 source pixels (0x408ac3), raw 200 for 56 ticks.
+    expect(kay.x - 390 * 1.5).toBeCloseTo(56 * 200 * (655 / 65536) * 1.5, 6);
     while (kay.action === 'intro') match.step({});
     for (let t = 0; t < 100; t++) match.step({});
     expect([kay.stock, kay.power]).toEqual([2, 0]);
