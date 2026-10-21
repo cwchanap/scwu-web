@@ -157,13 +157,15 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
   });
 
   it('strikes in the air, by variable 1 in his 2 and D forms', () => {
-    expect(play(presses({ 0: { jump: true }, 30: { punch: true } }))).toEqual({
+    // His jump rises at raw −1500 under gravity 60 (PC 67), over Ryuko
+    // until its fall.
+    expect(play(presses({ 0: { jump: true }, 50: { punch: true } }))).toEqual({
       mine: ['takeoff', 'jump', 172, 16, 'idle'],
       damage: 30,
       stock: 3,
       healed: 0,
     });
-    expect(play(presses({ 0: { jump: true }, 30: { kick: true } }))).toEqual({
+    expect(play(presses({ 0: { jump: true }, 50: { kick: true } }))).toEqual({
       mine: ['takeoff', 'jump', 176, 16, 'idle'],
       damage: 30,
       stock: 3,
@@ -174,8 +176,8 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
       play(
         presses({
           0: { jump: true },
-          30: { punch: true },
-          60: { drill: true },
+          50: { punch: true },
+          80: { drill: true },
         }),
       ),
     ).toEqual({
@@ -545,8 +547,8 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
   it('plays his own CPU table in Vs. CPU', () => {
     // His CPU's own CPU D F (306), as well as his moves.
     for (const [seed, wanted] of [
-      [19, [205, 201, 306, 164, 170, 181, 188, 193, 216, 213, 167]],
-      [1, [175]],
+      [23, [205, 201, 306, 164, 170, 181, 188, 193, 213, 167, 175]],
+      [20, [216]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'astroman']);
       const astroman = match.fighters[1];

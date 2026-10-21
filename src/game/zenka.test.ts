@@ -279,7 +279,7 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 1, ['ryuko', 'zenka']);
+    const match = new Match('cpu', false, 0, ['ryuko', 'zenka']);
     const zenka = match.fighters[1];
     const entered = new Set<unknown>();
     // Her CPU's own CPU DJ and cpu chuck, whose hit runs into CHUCK ADD ATT

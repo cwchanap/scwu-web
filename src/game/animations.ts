@@ -536,13 +536,38 @@ function landed(flight: Pose[], landing: Pose[], age: number) {
   ]);
 }
 
+const waits = (frames: Pose[]) =>
+  frames.map(({ duration }) =>
+    duration > 0 && duration < 1000 ? duration : 1,
+  );
+// A player's up, forward and back jumps, the default-action table's words
+// 3–5 (+0x7580, 0x4110f0): each takeoff, the displays before its op 0x01
+// launches it (AMIRO's up jump three, 11 ticks), then its air poses up to the
+// first that waits for the landing (a zero duration, 0x412800): ALPHA's 132
+// (PC 56).
+function jumpClips(who: Who, loop: boolean | number = false) {
+  const [takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack] = (
+    ['jump', 'jumpForward', 'jumpBack'] as const
+  ).flatMap((name, i) => {
+    const frames = fighterClips[who][name];
+    const launch = script(CHARACTERS[who].jumps[i], who).events.find(
+      (event) => event.op === 'motion',
+    )!.t;
+    let n = 0;
+    for (let t = 0; t < launch; n++) t += frames[n].duration;
+    const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
+    const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
+    return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
+  });
+  return { takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack };
+}
+
 // Neutral, guard, victim and result clips, which the match drives itself.
 // Zero/very long source displays wait for gameplay; give them explicit end behavior.
 export const animations = {
   walk: clip(clips.walk, true),
   backwalk: clip(clips.backwalk, true),
-  takeoff: clip(clips.jump.slice(0, 1)),
-  jump: clip(clips.jump.slice(1), false, [13, 5, 15, 1]),
+  ...jumpClips('ryuko'),
   land: clip(clips.land),
   crouchEnter: clip(clips.crouchEnter),
   crouch: clip(clips.crouch, true),
@@ -687,10 +712,6 @@ export type Action = 'idle' | 'script' | AnimatedAction;
 export type Shown = Exclude<Action, 'script'> | ObjectKey;
 // A display of 0 or 1000-odd ticks waits for gameplay (landing or a jump
 // back to itself): play it as one held tick.
-const waits = (frames: Pose[]) =>
-  frames.map(({ duration }) =>
-    duration > 0 && duration < 1000 ? duration : 1,
-  );
 // A player's guard clips; with `ex`, ANMC P's EX forms (export_fighter).
 const guardAnimations = (
   z: Record<string, Pose[]>,
@@ -725,13 +746,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
   const table: Partial<Record<AnimatedAction, Clip>> = {
     walk: clip(z.walk, true),
     backwalk: clip(z.backwalk, true),
-    takeoff: clip(z.jump.slice(0, 1)),
     // TTRO's J RP (7) loops its two poses (PC 86) until he lands.
-    jump: clip(
-      z.jump.slice(1),
-      who === 'ttro' ? 0 : false,
-      waits(z.jump.slice(1)),
-    ),
+    ...jumpClips(who, who === 'ttro' ? 0 : false),
     land: clip(z.land),
     crouchEnter: clip(z.crouchEnter),
     // Action 19 holds a single zero-length display.

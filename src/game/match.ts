@@ -912,8 +912,17 @@ export const exMode = (f: Fighter) => {
   return ex !== undefined && f.variables[0] === ex.value;
 };
 // What a fighter shows: under 'script', its source action's timeline.
+const JUMP_CLIPS = [
+  ['takeoff', 'jump'],
+  ['takeoffForward', 'jumpForward'],
+  ['takeoffBack', 'jumpBack'],
+] as const;
 const shown = (f: Fighter): Shown =>
-  f.action === 'script' ? f.branch! : f.action;
+  f.action === 'script'
+    ? f.branch!
+    : f.action === 'takeoff' || f.action === 'jump'
+      ? JUMP_CLIPS[f.jump][Number(f.action === 'jump')]
+      : f.action;
 // Each player's engine states by number (the export's `neutral`), which a
 // handler enters as the port's actions, and their moves' levels (header r[2]).
 const NEUTRAL = Object.fromEntries(
@@ -1041,6 +1050,8 @@ export interface Fighter {
   action: Action;
   age: number;
   airAge: number;
+  // The jump the takeoff entered: 0 up, 1 forward, 2 back (jumpClips).
+  jump: 0 | 1 | 2;
   hitStop: number;
   // The input word op 0x1a's stop saved (+0x4dfd83), while its flag
   // (+0x4dfd7f) holds.
@@ -1386,6 +1397,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   action: 'idle',
   age: 0,
   airAge: 0,
+  jump: 0,
   hitStop: 0,
   stopInput: null,
   connected: false,
@@ -1461,10 +1473,13 @@ function motion(
   if (!(event.flags & 16))
     actor.gravity = set(actor.gravity, event.ay * SOURCE_ACCELERATION_SCALE);
 }
+// Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
+// ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
+// under 100.
 function launchJump(f: Fighter) {
-  // Actions 4–6 choose neutral or directional velocity at takeoff.
-  f.vy = -(f.vx === 0 ? 1450 : 1400) * SOURCE_VELOCITY_SCALE;
-  f.gravity = JUMP_GRAVITY;
+  const { events } = script(CHARACTERS[f.who].jumps[f.jump], f.who);
+  const launch = events.find((event) => event.op === 'motion');
+  if (launch?.op === 'motion') motion(f, launch);
   f.airAge = 0;
 }
 
@@ -1771,6 +1786,7 @@ export class Match {
     branch?: ObjectKey | null,
   ) {
     if (f.action === action && !restart) return;
+    if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
     if (action === 'down')
       this.pause(this.fighters[1 - this.fighters.indexOf(f)], 10);
@@ -3283,9 +3299,9 @@ export class Match {
     this.recoverKnockdown(f);
     if (f.action === 'knockdown' || f.action === 'bounceDown') return;
     if (f.action === 'takeoff') {
-      if (f.age < animationDuration('takeoff', f.who)) return;
-      // Action 4's op 0x01 follows its takeoff display (PC 54), so the jump
-      // moves on this tick.
+      if (f.age < animationDuration(JUMP_CLIPS[f.jump][0], f.who)) return;
+      // A jump's op 0x01 follows its takeoff displays (Ryuko's PC 54), so
+      // the jump moves on this tick.
       launchJump(f);
       this.action(f, 'jump');
       f.moving = 'velocity';
@@ -3332,9 +3348,11 @@ export class Match {
     }
     // Authored: a fresh press jumps from the ground, where the source's
     // 0x410dc0 jumps while up is held.
+    // Up enters the default-action table's up jump, with forward or back
+    // its forward or back one (0x4110f0).
     if (input.jump && !previous.jump && !airborne) {
       this.action(f, 'takeoff');
-      f.vx = direction * 400 * SOURCE_VELOCITY_SCALE;
+      f.jump = !direction ? 0 : direction === f.facing ? 1 : 2;
       return;
     }
     // Authored: a key's command enters once. Back in the free state, its

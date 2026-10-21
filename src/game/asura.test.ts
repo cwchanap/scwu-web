@@ -138,14 +138,13 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       damage: 15,
       stock: 2,
     });
-    // ponytail: the port's back jump doesn't run action 7, which sets
-    // variable 0 to 10 (PC 74), so air tatu never enters air tatu back
-    // (158, PC 1877).
+    // The back jump (7) sets variable 0 to 10 (PC 74), so air tatu turns
+    // back into air tatu back (158, PC 1877).
     expect(
       play(presses({ 0: { jump: true, left: true }, 10: { drill: true } }), {
         gap: 200,
       }).mine,
-    ).toEqual(['takeoff', 'jump', 159, '160+21', 'idle']);
+    ).toEqual(['takeoff', 'jump', 158, '160+21', 'idle']);
   });
 
   it('cancels on a hit through his windows (op 0x1e, PCs 1715, 1741, 1767, 1840, 1893)', () => {

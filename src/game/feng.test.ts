@@ -222,7 +222,7 @@ describe('OS FENG (19 OS FENG.PLAYER)', () => {
     });
   });
 
-  it('falls straight from AIR FIRE after a jump, but forward after a High Jump (variable 13 at 10, PC 4331)', () => {
+  it('falls from AIR FIRE by the jump before: straight, forward, back, or forward after a High Jump (variable 13, PCs 4330–4332)', () => {
     const jump = play(presses({ 0: { jump: true }, 15: { axe: true } }), {
       gap: 400,
     });
@@ -234,6 +234,18 @@ describe('OS FENG (19 OS FENG.PLAYER)', () => {
       'land',
       'idle',
     ]);
+    // His forward and back jumps (6, 7) set variable 13 to 10 and −10 (PCs
+    // 90, 105), into AIR FIRE F (303, PC 4331) and AIR FIRE B (304, PC
+    // 4332).
+    for (const [way, fire] of [
+      [{ right: true }, 303],
+      [{ left: true }, 304],
+    ] as const)
+      expect(
+        play(presses({ 0: { jump: true, ...way }, 15: { axe: true } }), {
+          gap: 400,
+        }).mine,
+      ).toEqual(['takeoff', 'jump', 298, fire, 'land', 'idle']);
     // Dash F's op 0x24 takes up within 5 ticks into High Jump (5, PC 203).
     const high = play(
       (t) =>

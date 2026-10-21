@@ -5282,6 +5282,57 @@ describe('prototype training rules', () => {
     expect(match.fighters[0].action).toBe('idle');
   });
 
+  it("takes each fighter's own up, forward and back jump (+0x7580, 0x4110f0)", () => {
+    // Player 1's image and position after each tick of a jump taken `way`.
+    const jump = (who: Who, way: Input = {}, ticks = 30) => {
+      const match = new Match('practice', false, 0, [who, 'ryuko']);
+      const f = match.fighters[0];
+      match.fighters[1].x = f.x + 400;
+      const seen: [number, number, number][] = [];
+      for (let t = 0; t < ticks; t++) {
+        match.step(t ? {} : { jump: true, ...way });
+        seen.push([fighterPose(f).image, f.x / 1.5, f.y / 1.5]);
+      }
+      return seen;
+    };
+    const VELOCITY = 655 / 65536;
+    const images = (seen: [number, number, number][]) =>
+      seen.map(([image]) => image);
+    // AMIRO's up jump (4) launches after three displays, 11 ticks in (PC
+    // 60); her forward one (5) after three shorter, 8 ticks in, at raw 400
+    // (PC 77).
+    const up = jump('amiro');
+    expect(images(up).slice(0, 12)).toEqual([
+      ...Array(5).fill(139),
+      ...Array(3).fill(128),
+      ...Array(3).fill(129),
+      130,
+    ]);
+    expect([up[10][2], up[11][2] < 0]).toEqual([0, true]);
+    const forward = jump('amiro', { right: true });
+    expect(images(forward).slice(0, 9)).toEqual([
+      127, 127, 128, 128, 128, 129, 129, 129, 130,
+    ]);
+    expect(forward[8][1] - forward[7][1]).toBeCloseTo(400 * VELOCITY, 6);
+    // Her back jump (6) turns at its second air pose, 135 (PC 99).
+    expect(images(forward).slice(20, 22)).toEqual([130, 131]);
+    expect(images(jump('amiro', { left: true })).slice(20, 22)).toEqual([
+      130, 135,
+    ]);
+    // 3-TIMES's rises at raw −1650 under gravity 100 (PC 36).
+    expect(jump('times')[3][2]).toBeCloseTo(
+      (-1650 * 655 + 100 * 393) / 65536,
+      6,
+    );
+    // ALPHA's holds 132, a display with no duration (PC 56), until he
+    // lands.
+    const alpha = jump('alpha', {}, 80);
+    const landing = alpha.findIndex(([, , y], t) => t > 8 && y === 0);
+    expect(images(alpha).slice(18, landing)).toEqual(
+      Array(landing - 18).fill(132),
+    );
+  });
+
   it('enters crouch, plays a low attack, and stands up on release', () => {
     const match = new Match();
     match.step({ crouch: true });
