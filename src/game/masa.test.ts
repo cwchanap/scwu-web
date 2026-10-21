@@ -241,6 +241,75 @@ describe('MASA (29 MASA.PLAYER)', () => {
     expect(faceImage(-1, 'masa')).toBe(2001);
   });
 
+  it('picks his win voice by its chain of rolls (PCs 862–880), then stamps into Win Motion (95)', () => {
+    const voices = [0, 1, 2, 3, 4, 5].map((seed) => {
+      const match = new Match('practice', false, seed, ['masa', 'ryuko']);
+      const [masa, ryuko] = match.fighters;
+      ryuko.hp = 0;
+      ryuko.action = 'koLand';
+      match.winner = 'player';
+      const cued: [number, number][] = [];
+      const images: unknown[] = [];
+      for (let t = 0; t < 210; t++) {
+        match.step();
+        for (const { owner, index } of match.sounds)
+          if (owner === 0) cued.push([t, index]);
+        if (t === 60 || t === 200 || t === 203)
+          images.push(masa.entered?.image);
+      }
+      return [cued, images];
+    });
+    // Each roll falls through to its sound or branches on to the next, the
+    // last to 36 (PC 880), and jumps to Win Motion, whose stamp shakes the
+    // screen and sounds 60 (PCs 885–886); rolled or not, he loops images
+    // 450–451.
+    const loop = [448, 450, 451];
+    expect(voices).toEqual([
+      [
+        [
+          [52, 31],
+          [70, 60],
+        ],
+        loop,
+      ],
+      [
+        [
+          [52, 33],
+          [70, 60],
+        ],
+        loop,
+      ],
+      [
+        [
+          [52, 34],
+          [70, 60],
+        ],
+        loop,
+      ],
+      [
+        [
+          [52, 30],
+          [70, 60],
+        ],
+        loop,
+      ],
+      [
+        [
+          [52, 29],
+          [70, 60],
+        ],
+        loop,
+      ],
+      [
+        [
+          [52, 29],
+          [70, 60],
+        ],
+        loop,
+      ],
+    ]);
+  });
+
   it('plays his own CPU table in Vs. CPU', () => {
     const entered = new Set<unknown>();
     // His CPU's own CPU 3Fire, CPU 3HIT and CPU SR, and SC Super's RAMBU

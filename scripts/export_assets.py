@@ -2759,8 +2759,9 @@ FIGHTERS = {
             "airInatuma",
         },
         # Results: 勝ち (94) calls DEMO STAND (32) twice (PC 861), rolls a voice
-        # (PCs 862–880) and jumps to Win Motion (95, PC 881), which loops
-        # images 450–451 from PC 889 (PC 891); the draw (105) calls 32 twice
+        # (PCs 862–880, resultScripts) and jumps to Win Motion (95, PC 881),
+        # which loops images 450–451 from PC 889 (PC 891); it plays flattened,
+        # then that loop. The draw (105) calls 32 twice
         # (PC 1006) and holds image 122 (PC 1008). Each first enters DEMO air
         # (33) while airborne (op 0x16, PCs 860, 1005). The darkening panel,
         # Black (75). The Vs. intro: 開始時 (44) jumps to 開始時 BR (52) for
@@ -2770,8 +2771,8 @@ FIGHTERS = {
         # 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
         # flattened. ponytail: 開始時's test of global 10 for 10 (PC 347), into
         # 開始時 SELECT (51), isn't played.
-        actions=dict(win=95, winStand=32, winLoop=(95, 7), draw=105, black=75, intro=(52, 4)),
-        flat={"intro"},
+        actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75, intro=(52, 4)),
+        flat={"intro", "win"},
         # 2001: the HUD face action 117 shows (PC 1056); 139: *name (106, PC
         # 1012).
         image_ids={2001, 139},

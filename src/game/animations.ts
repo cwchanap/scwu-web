@@ -512,11 +512,7 @@ const winStands = (who: Who) =>
     ? 4
     : who === 'training'
       ? 3
-      : who === 'kate' ||
-          who === 'remu' ||
-          who === 'rear' ||
-          who === 'masa' ||
-          who === 'times'
+      : who === 'kate' || who === 'remu' || who === 'rear' || who === 'times'
         ? 2
         : 1;
 // And each draw: TRAINING's three times (PC 446).
@@ -939,15 +935,14 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
     // sound and *ef win (PCs 657–658), and ZIRO's 勝ち (66) image 142 from PC
     // 765 (PC 766), past his sound (PC 764); its rand % 3 > 1 (PC 758) into
-    // randon win1 (51) rolls in the match (rollResult). MASA's 勝ち (94) calls
-    // DEMO STAND (32) twice (PC 861) and jumps to Win Motion (95, PC 881),
-    // which loops images 450–451 from PC 889 (PC 891); his draw (105) calls
-    // 32 twice too (PC 1006).
+    // randon win1 (51) rolls in the match (rollResult). MASA's 勝ち (94)
+    // plays flattened, calling DEMO STAND (32) twice (PC 861) and jumping to
+    // Win Motion (95, PC 881), then loops images 450–451 from PC 889 (PC
+    // 891); his draw (105) calls 32 twice too (PC 1006).
     // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
     // his stance from PC 789 (PC 792), and his draw (104) calls 32 twice
-    // too (PC 907); the rolls that pick his voice (PCs 770–788) roll in the
-    // match (rollResult). ponytail: MASA's (PCs 862–880) aren't played, as
-    // his clip starts at Win Motion. ZENKA's 勝ち (77) plays flattened,
+    // too (PC 907). The rolls that pick their voices (PCs 862–880; 770–788)
+    // roll in the match (rollResult). ZENKA's 勝ち (77) plays flattened,
     // holding image 283 (PC 799). Z-MEGA's 勝ち (65) calls DEMO stand (30)
     // once (PC 619) and loops image 319 from PC 623 (PC 626), and his draw
     // (73) loops image 201 from PC 717 (PC 719). ALPHA's 勝ち (82) calls demo
@@ -983,8 +978,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
               who === 'hiso' ||
               who === 'erus' ||
               who === 'feng' ||
-              who === 'zenka'
-              ? z.win
+              who === 'zenka' ||
+              who === 'masa'
+              ? [...z.win, ...(z.winLoop ?? [])]
               : z.winRp
                 ? [
                     ...z.winStand,
@@ -999,9 +995,11 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
                     ...z.win,
                     ...(z.winLoop ?? []),
                   ],
-            z.winLoop
-              ? z.winStand.length * winStands(who) + z.win.length
-              : false,
+            who === 'masa'
+              ? z.win.length
+              : z.winLoop
+                ? z.winStand.length * winStands(who) + z.win.length
+                : false,
             // OS FENG's holds its last pose with a zero-length display (PC
             // 734), as AYA's does (PC 605).
             who === 'feng'
