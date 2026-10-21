@@ -146,8 +146,10 @@ export type SourceEvent =
       value: number;
       action: number;
       offset: number;
-      // A forward skip in an inlined call.
+      // A forward skip in an inlined call, over the tick's next `skip` events
+      // when it reaches its target within the tick.
       called?: boolean;
+      skip?: number;
       // Below selector 0x40, the object's own variable, set or added to
       // first, or set to the round.
       pre?: { value: number; add: boolean; round?: boolean };
@@ -222,6 +224,7 @@ export type SourceEvent =
       steps: number[];
     }
   | { op: 'freeze'; add: number; set?: boolean }
+  | { op: 'global0'; value: number }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
   | { op: 'variable'; index: number; value: number }

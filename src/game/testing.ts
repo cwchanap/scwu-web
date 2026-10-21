@@ -206,3 +206,37 @@ export function brIntro(
   }
   return { match, f, path, images, heights, sounds, objects, ticks };
 }
+
+// LIZARD's chuck sup on side `side`, catching `victim` at 1 life as it jumps:
+// the victim's path until the round can end, and the sounds and screen
+// objects of the tick it took its seventh.
+export function chuckKO(side: number, victim: Who) {
+  const match = new Match(
+    'practice',
+    false,
+    3,
+    side ? [victim, 'lizard'] : ['lizard', victim],
+  );
+  const lizard = match.fighters[side];
+  const other = match.fighters[1 - side];
+  other.x = lizard.x + 90 * lizard.facing;
+  other.hp = 1;
+  lizard.stock = 3;
+  const step = (mine: Input, theirs: Input) =>
+    side ? match.step(theirs, mine) : match.step(mine, theirs);
+  step({}, {});
+  step({}, {});
+  const path: unknown[] = [];
+  let entry = {};
+  for (let t = 0; t < 3000 && !match.resultReady; t++) {
+    step(t ? {} : { musashi: true }, t === 50 ? { jump: true } : {});
+    if (path.at(-1) === playing(other)) continue;
+    path.push(playing(other));
+    if (path.length === 7)
+      entry = {
+        sounds: match.sounds,
+        screen: match.effects.filter((e) => e.screen).map((e) => e.clip),
+      };
+  }
+  return { match, path, entry };
+}

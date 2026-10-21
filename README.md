@@ -197,25 +197,25 @@ And Giant's:
 
 And G Suneo's:
 
-| Input                          | G Suneo's move                                                                                                        |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| J / K                          | P1 / K1; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                    |
-| P3 / K3                        | A rushing punch that hurls the opponent into the screen's edge / a leaping kick that strikes again and again          |
-| Down + J / K                   | A rising punch / a sliding sweep                                                                                      |
-| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                    |
-| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                 |
-| H                              | Hit Up                                                                                                                |
-| O                              | Chuck: a grab, a hop back and a leaping throw that spins the opponent away                                            |
-| Blocking with a stock: H       | COUNTER HIT                                                                                                           |
-| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): her K2, crouching and air attacks, Hit Up, chuck and specials take other forms |
-| U, or →↓↘ K                    | DRILL KNIEE: a rising knee, also in the air (in EX mode, in the air, a diving knee)                                   |
-| I, or ↓→ J                     | FIRE BALL: a shot that speeds up, which a super can cancel for 2 stocks                                               |
-| F, or ↓← J                     | G DRIVER: a drill lance thrust that hurls the opponent into the screen's edge (in EX mode a strike that shocks them)  |
-| G, or ↓← K                     | BIKE: a leap on a golden lion, also in the air (in EX mode a kick and a wheel that strikes again and again)           |
-| 1, or K K ← J K                | hh, below 30% health: a screen-wide shock, then a long beating, 3 stocks                                              |
-| 2, or →↓←→↓← J                 | GP: a grab, then a beating out of sight before a launch, 1 stock                                                      |
-| 3, or ↓→↓→ K                   | en300: a shock, then a hammer, 3 stocks                                                                               |
-| 4, or ↓→↓→ J                   | BP: a flying fist that strikes three times, 1 stock (BP EVIL, a ring, below 30% health)                               |
+| Input                          | G Suneo's move                                                                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                              |
+| P3 / K3                        | A rushing punch that hurls the opponent into the screen's edge / a leaping kick that strikes again and again                    |
+| Down + J / K                   | A rising punch / a sliding sweep                                                                                                |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                              |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                           |
+| H                              | Hit Up                                                                                                                          |
+| O                              | Chuck: a grab, a hop back and a leaping throw that spins the opponent away                                                      |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                     |
+| E, or ↓ ↓ H                    | Enter or leave EX mode (half a stock): her K2, crouching and air attacks, Hit Up, chuck and specials take other forms           |
+| U, or →↓↘ K                    | DRILL KNIEE: a rising knee, also in the air (in EX mode, in the air, a diving knee)                                             |
+| I, or ↓→ J                     | FIRE BALL: a shot that speeds up, which a super can cancel for 2 stocks                                                         |
+| F, or ↓← J                     | G DRIVER: a drill lance thrust that hurls the opponent into the screen's edge (in EX mode a strike that shocks them)            |
+| G, or ↓← K                     | BIKE: a leap on a golden lion, also in the air (in EX mode a kick and a wheel that strikes again and again)                     |
+| 1, or K K ← J K                | hh, below 30% health: a screen-wide shock, then a long beating, 3 stocks; a KO by it makes the opponent vanish in a faint flash |
+| 2, or →↓←→↓← J                 | GP: a grab, then a beating out of sight before a launch, 1 stock; a KO by it makes the opponent vanish in a faint flash         |
+| 3, or ↓→↓→ K                   | en300: a shock, then a hammer, 3 stocks; a KO by it makes the opponent vanish in a faint flash                                  |
+| 4, or ↓→↓→ J                   | BP: a flying fist that strikes three times, 1 stock (BP EVIL, a ring, below 30% health)                                         |
 
 And Yo's, most in a costume:
 
@@ -265,24 +265,24 @@ And SIN's, in another guise for most moves:
 
 And LIZARD's, in a different mecha or armor for most moves:
 
-| Input                          | LIZARD's move                                                                                                                       |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| J / K                          | P1 / K1; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                  |
-| P2 / P3                        | A purple mecha's blade slash / an orange-armored shield bash                                                                        |
-| K2 / K3                        | A red mecha's spinning kick / a winged white mecha's blade                                                                          |
-| Down + J / K                   | A purple mecha's prone rifle shot / a black mecha's low swipe that knocks the opponent down                                         |
-| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                  |
-| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                               |
-| H                              | Hit Up: a black mecha's rising lance                                                                                                |
-| O                              | Chuck: a blue-armored grab that spins the opponent away                                                                             |
-| Blocking with a stock: H       | COUNTER HIT                                                                                                                         |
-| U, or →↓↘ J                    | Cross: a red mecha raises a pillar of red light that ends in a cross                                                                |
-| I, or ↓→ J                     | FIRE: a blue-armored blast of red lightning                                                                                         |
-| F, or ↓← K                     | jump att: a purple mecha's leaping grab and throw, also in the air                                                                  |
-| 1, or ↓←↓→ J                   | HIDDEN, below 30% health: a rush into a fanged maw's bite, 1 stock (FIRE otherwise)                                                 |
-| 2, or ↓→↓← J                   | chuck sup: a purple mecha's leap that catches an airborne opponent, swallows them in a giant striped sphere and drops them, 1 stock |
-| 3, or ↓→↓→ K                   | dragon sp: a leap in a black slab's disguise; a hit calls a flight of white winged beasts down on the opponent, 1 stock             |
-| 4, or ↓←↓← J                   | en300: a pale spirit's orb that bursts into a dome of light, 3 stocks                                                               |
+| Input                          | LIZARD's move                                                                                                                                                                              |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| J / K                          | P1 / K1; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                                                                         |
+| P2 / P3                        | A purple mecha's blade slash / an orange-armored shield bash                                                                                                                               |
+| K2 / K3                        | A red mecha's spinning kick / a winged white mecha's blade                                                                                                                                 |
+| Down + J / K                   | A purple mecha's prone rifle shot / a black mecha's low swipe that knocks the opponent down                                                                                                |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                                                         |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                                                      |
+| H                              | Hit Up: a black mecha's rising lance                                                                                                                                                       |
+| O                              | Chuck: a blue-armored grab that spins the opponent away                                                                                                                                    |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                                                                |
+| U, or →↓↘ J                    | Cross: a red mecha raises a pillar of red light that ends in a cross                                                                                                                       |
+| I, or ↓→ J                     | FIRE: a blue-armored blast of red lightning                                                                                                                                                |
+| F, or ↓← K                     | jump att: a purple mecha's leaping grab and throw, also in the air                                                                                                                         |
+| 1, or ↓←↓→ J                   | HIDDEN, below 30% health: a rush into a fanged maw's bite, 1 stock (FIRE otherwise)                                                                                                        |
+| 2, or ↓→↓← J                   | chuck sup: a purple mecha's leap that catches an airborne opponent, swallows them in a giant striped sphere and drops them, 1 stock; a KO by it makes the opponent vanish in a faint flash |
+| 3, or ↓→↓→ K                   | dragon sp: a leap in a black slab's disguise; a hit calls a flight of white winged beasts down on the opponent, 1 stock                                                                    |
+| 4, or ↓←↓← J                   | en300: a pale spirit's orb that bursts into a dome of light, 3 stocks                                                                                                                      |
 
 And KAY's, dressed as a different angel or mecha for most moves:
 
@@ -407,26 +407,26 @@ And SOU's, a boy in a white headband dressed as a black-armored mecha or a helme
 
 And HISO's, a boy in a red sleeveless top dressed as a different character for most moves, with no EX mode:
 
-| Input                          | HISO's move                                                                                   |
-| ------------------------------ | --------------------------------------------------------------------------------------------- |
-| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3            |
-| P2 / P3                        | A suited man's pointing jab / a girl in glasses swinging a vacuum cleaner's toothed hose      |
-| K2 / K3                        | A clown-faced boy's thrown rock / a muscled brawler's punch                                   |
-| Down + J / K                   | A samurai's sword slash / the brawler's punch                                                 |
-| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                            |
-| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                         |
-| H                              | Hit Up: an uppercut                                                                           |
-| O                              | Chuck: the clown-faced boy's grab and sliding kick                                            |
-| Blocking with a stock: H       | COUNTER HIT                                                                                   |
-| U, or →↓↘ J                    | Dragon p: a samurai's rising sword slashes, also in the air                                   |
-| I, or ↓→ J                     | FIRE: the clown-faced boy's thrown card                                                       |
-| F, or ↓← J                     | bannaku: a headbanded knife fighter's dashing slash; a super cancels it for two stocks        |
-| G, or →↓← K                    | counter: a stance with a phone; struck in it, a machine-gun man fires back                    |
-| 5, or ↓→ K                     | striker: a gunwoman behind him fires a shot that holds whoever it meets still (HISO stop)     |
-| 1, or ↓←↓← K                   | FISH: a suited man's red book looses a fish spirit that seizes the opponent up close, 1 stock |
-| 2, or ↓→↓→ K                   | en300: a shirtless, tattooed man calls a dark giant, 3 stocks                                 |
-| 3, or ↓←↓← J                   | fly arm: the clown-faced boy's flying fists up close, 1 stock                                 |
-| 4, or ↓→↓→ J                   | S Shoot: a blue-coated boy's palm blast, 1 stock                                              |
+| Input                          | HISO's move                                                                                                                                          |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                                   |
+| P2 / P3                        | A suited man's pointing jab / a girl in glasses swinging a vacuum cleaner's toothed hose                                                             |
+| K2 / K3                        | A clown-faced boy's thrown rock / a muscled brawler's punch                                                                                          |
+| Down + J / K                   | A samurai's sword slash / the brawler's punch                                                                                                        |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                                   |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                                |
+| H                              | Hit Up: an uppercut                                                                                                                                  |
+| O                              | Chuck: the clown-faced boy's grab and sliding kick                                                                                                   |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                                          |
+| U, or →↓↘ J                    | Dragon p: a samurai's rising sword slashes, also in the air                                                                                          |
+| I, or ↓→ J                     | FIRE: the clown-faced boy's thrown card                                                                                                              |
+| F, or ↓← J                     | bannaku: a headbanded knife fighter's dashing slash; a super cancels it for two stocks                                                               |
+| G, or →↓← K                    | counter: a stance with a phone; struck in it, a machine-gun man fires back                                                                           |
+| 5, or ↓→ K                     | striker: a gunwoman behind him fires a shot that holds whoever it meets still (HISO stop)                                                            |
+| 1, or ↓←↓← K                   | FISH: a suited man's red book looses a fish spirit that seizes the opponent up close, 1 stock; a KO by it makes the opponent vanish in a faint flash |
+| 2, or ↓→↓→ K                   | en300: a shirtless, tattooed man calls a dark giant, 3 stocks                                                                                        |
+| 3, or ↓←↓← J                   | fly arm: the clown-faced boy's flying fists up close, 1 stock                                                                                        |
+| 4, or ↓→↓→ J                   | S Shoot: a blue-coated boy's palm blast, 1 stock                                                                                                     |
 
 And ERUS's, a blond figure in a black coat and white bandeau dressed as a different character for most moves, who calls helpers in EX mode:
 
@@ -480,26 +480,26 @@ And OS FENG's, a blue-haired boy in glasses and a red vest dressed as a differen
 
 And SEAN's, a bald old monk in green robes and prayer beads who calls up a different character for most moves:
 
-| Input                          | SEAN's move                                                                                                     |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                              |
-| P2 / P3                        | A blue-haired girl's triple strike / a red-haired fighter's dive                                                |
-| K2 / K3                        | A white-armoured figure's exploding seal / a dark-clad swordsman's vortex dash                                  |
-| Down + J / K                   | A cloaked figure's sweep / a horned figure's low kick                                                           |
-| In the air: J / K              | A spiky-haired swordsman's dive / a kick from a figure in a white hood                                          |
-| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                              |
-| ↑ while dashing forward        | High Jump                                                                                                       |
-| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                           |
-| H                              | Hit Up: a lunging swing of his sleeve                                                                           |
-| O                              | Chuck: a chubby pigtailed figure's long tongue                                                                  |
-| Blocking with a stock: H       | COUNTER HIT                                                                                                     |
-| U, or →↓↘ J                    | Dragon: a small red-robed man's crescent; a super cancels it for two stocks                                     |
-| I, or ↓→ J                     | whip attack: an eye-patched man's five whips                                                                    |
-| F, or ↓→ K                     | Whip attack K: the same whips, farther off                                                                      |
-| G, or ↓← K                     | CC: an elf-eared hooded figure's red card makes the opponent vanish; in the air it catches only an airborne one |
-| 2, or ↓←↓← J                   | SCC: an old man in yellow robes whose grab reaches across the screen, 1 stock                                   |
-| 3, or ↓→↓→ J                   | S Shoot: the dark-clad swordsman's crescent wave, 1 stock (at 150 life or less, a stronger one)                 |
-| 1, or ↓→↓→ K                   | en300: a rider on a yellow beast calls down lightning, 3 stocks                                                 |
+| Input                          | SEAN's move                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| J / K                          | P1 / K1: a jab / a kick; on a hit or block, J or K again for P2 / K2, then P3 / K3                                                   |
+| P2 / P3                        | A blue-haired girl's triple strike / a red-haired fighter's dive                                                                     |
+| K2 / K3                        | A white-armoured figure's exploding seal / a dark-clad swordsman's vortex dash                                                       |
+| Down + J / K                   | A cloaked figure's sweep / a horned figure's low kick                                                                                |
+| In the air: J / K              | A spiky-haired swordsman's dive / a kick from a figure in a white hood                                                               |
+| Shift or → →; Shift + ← or ← ← | Dash forward; back                                                                                                                   |
+| ↑ while dashing forward        | High Jump                                                                                                                            |
+| ↑ in the air, or → → / ← ←     | Double jump; air dash                                                                                                                |
+| H                              | Hit Up: a lunging swing of his sleeve                                                                                                |
+| O                              | Chuck: a chubby pigtailed figure's long tongue                                                                                       |
+| Blocking with a stock: H       | COUNTER HIT                                                                                                                          |
+| U, or →↓↘ J                    | Dragon: a small red-robed man's crescent; a super cancels it for two stocks                                                          |
+| I, or ↓→ J                     | whip attack: an eye-patched man's five whips                                                                                         |
+| F, or ↓→ K                     | Whip attack K: the same whips, farther off                                                                                           |
+| G, or ↓← K                     | CC: an elf-eared hooded figure's red card makes the opponent vanish; in the air it catches only an airborne one                      |
+| 2, or ↓←↓← J                   | SCC: an old man in yellow robes whose grab reaches across the screen, 1 stock; a KO by it makes the opponent vanish in a faint flash |
+| 3, or ↓→↓→ J                   | S Shoot: the dark-clad swordsman's crescent wave, 1 stock (at 150 life or less, a stronger one)                                      |
+| 1, or ↓→↓→ K                   | en300: a rider on a yellow beast calls down lightning, 3 stocks                                                                      |
 
 And GON's, a brown-haired boy with goggles on his head, an orange shirt and a blue vest who puts on a different creature's costume for most moves:
 

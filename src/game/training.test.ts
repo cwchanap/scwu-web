@@ -12,7 +12,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { brIntro } from './testing';
+import { brIntro, chuckKO } from './testing';
 
 // TRAINING as player 1, `gap` from Ryuko as player 2.
 function trainingPlayer(gap = 90, seed = 3) {
@@ -194,6 +194,26 @@ describe('TRAINING (48 TRAINING.PLAYER)', () => {
     expect([landed, training.x - launchX]).toEqual([129, 0]);
     expect(peak).toBeCloseTo(-446.245, 3);
     expect(animationDuration('koLand', 'training')).toBe(66);
+  });
+
+  it('flies off from make hikari, gets up at 0 life and takes his lose action again', () => {
+    // His make hikari (39) sets variable 3 to 30, spawns his lose action's
+    // last display (35 + 4) and cues sound 4, then its op 0x11 jumps to FLY
+    // NO HIT (70) at any life (PC 441). Back in neutral the KO'd loser takes
+    // result 2, his lose action, into KO NORMAL 2nd (37) for variable 3 = 30.
+    const { match, path, entry } = chuckKO(0, 'training');
+    expect(path.slice(6)).toEqual([
+      70,
+      'knockdown',
+      'getUp',
+      'koAgain',
+      'koLand',
+    ]);
+    expect(entry).toEqual({
+      sounds: [{ owner: 1, index: 4 }],
+      screen: ['35+4'],
+    });
+    expect(match.resultReady).toBe(true);
   });
 
   it('shows his VS banners, dashes unseen, stands and leaps through his round 1 Vs. intro (PCs 224, 238)', () => {

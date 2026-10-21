@@ -25,6 +25,7 @@ import type {
   Pose,
   Quake,
   Shown,
+  ScriptEvent,
   SourceEvent,
   TrailSpec,
 } from './animations';
@@ -1468,6 +1469,9 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
+  // Global 0 (0x4456b0): at 10, which LIZARD's, HISO's, SEAN's and G Suneo's
+  // lethal blows hold for their strike's tick, a KO enters make hikari.
+  global0 = 0;
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
   // This tick's op 0x03 cues: each fighter's sound table (+0x221c) and index.
@@ -1645,7 +1649,7 @@ export class Match {
     // Authored: after the lettering, wait for each fighter to take its result
     // or lie KO'd, as moves now run on past the round's end; a KO timeline
     // (KO_TIMELINES) once it stops moving on the floor: ZIRO's in ko DOWN3,
-    // or standing in Random lose.
+    // or standing in Random lose; or vanished there in make hikari.
     return (
       this.winner !== null &&
       this.matchOver &&
@@ -1654,7 +1658,8 @@ export class Match {
         (f) =>
           f.action === 'win' ||
           f.action === 'draw' ||
-          (f.action === 'koLand' && (!f.branch || settled(f))),
+          (f.action === 'koLand' && (!f.branch || settled(f))) ||
+          (f.action === 'script' && f.hp === 0 && settled(f)),
       )
     );
   }
@@ -1878,7 +1883,6 @@ export class Match {
   private recoverKnockdown(f: Fighter) {
     if (
       (f.action === 'knockdown' || f.action === 'bounceDown') &&
-      f.hp > 0 &&
       f.age >= animationDuration(f.action, f.who)
     )
       this.action(f, 'getUp');
@@ -2159,13 +2163,15 @@ export class Match {
         ? (actor.locals[selector] ?? 0)
         : selector === 0x86
           ? this.freeze
-          : selector === 0x83
-            ? this.vs
-              ? 50
-              : 0
-            : selector === 0x8e
-              ? 0
-              : (self.variables[selector & 0x3f] ?? 0);
+          : selector === 0x80
+            ? this.global0
+            : selector === 0x83
+              ? this.vs
+                ? 50
+                : 0
+              : selector === 0x8e
+                ? 0
+                : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -2291,6 +2297,9 @@ export class Match {
         break;
       case 'freeze':
         this.freeze = (event.set ? 0 : this.freeze) + event.add;
+        break;
+      case 'global0':
+        this.global0 = event.value;
         break;
       // Action 0 clears the slot (0x40f6e6 tests it): LIZARD's SHOOT OBJ
       // EXPLO (290) clears its own (PCs 3940–3942) before it strikes. Slot 5
@@ -2552,14 +2561,27 @@ export class Match {
   }
 
   // A roll or test in a call jumps within the called action, rejoining this
-  // path at its next display (Giant's super base ball picks a ball, PC 5358;
-  // ALPHA's No super rp skips its power, PC 4475): the target's records up
-  // to there replace this tick's rest.
+  // path at its next display (Giant's super base ball picks a ball, PC 5358):
+  // the target's records up to there replace this tick's rest. A test whose
+  // target comes within the tick passes over the tick's events up to it
+  // instead (ALPHA's No super rp skips its power, PC 4475).
   private rejoin(
     actor: Fighter | Effect,
     owner: number,
-    event: { action: number; offset: number },
+    event: Extract<SourceEvent, { op: 'test' | 'random' }>,
   ) {
+    if ('skip' in event && event.skip !== undefined) {
+      const tick = eventsAt(
+        'clip' in actor ? actor.clip : timeline(actor),
+        actor.age,
+        actor.who,
+      );
+      const at = tick.indexOf(event as ScriptEvent);
+      if (at < 0) throw new Error(`Skip outside its tick: ${actor.who}`);
+      for (const next of tick.slice(at + 1 + event.skip))
+        if (this.runEvent(actor, owner, next)) break;
+      return true;
+    }
     for (const next of script(sourceKey(event.action, event.offset), actor.who)
       .events) {
       if (next.t) break;
@@ -3168,6 +3190,20 @@ export class Match {
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
     const { action, stop, attackerStop, power, own } = pending;
+    // The lose action jumps to make hikari (63) while global 0 is 10 (PC
+    // 590), after deleting objects 7–9 and clearing variables 6, 8 and 14.
+    if (action === 'down' || action === 'koAgain') {
+      const lose = script(twin(f.who, LOSE), f.who).events;
+      const jump = lose.find(
+        (e): e is Extract<ScriptEvent, { op: 'test' }> =>
+          e.op === 'test' && e.selector === 0x80 && this.passes(f, f, e),
+      );
+      if (jump) {
+        for (const event of lose.slice(0, lose.indexOf(jump)))
+          this.runEvent(f, this.fighters.indexOf(f), event);
+        return this.enterSource(f, jump.action, jump.offset);
+      }
+    }
     // Giant's reactions open by testing his counter's variable 4 (PCs 723,
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.
@@ -3282,7 +3318,13 @@ export class Match {
       this.fall(f);
     }
     // Back in neutral once the round is decided, 0x410ff1 enters the result's
-    // action instead of reading commands; airborne, the fall reads them.
+    // action instead of reading commands; airborne, the fall reads them. A
+    // loser KO'd takes 2, the lose action (0x40948b): TRAINING's make hikari
+    // flies him off (PC 441) and he gets up at 0 life.
+    if (this.winner && !airborne && f.hp === 0) {
+      this.queue(f, knockedOut(true));
+      return this.enterPending(f, other);
+    }
     if (this.winner && !airborne) {
       this.action(f, this.result(f));
       this.rollResult(f);
@@ -3377,13 +3419,8 @@ export class Match {
     // records before the roll; past it lies the sound the branch skips (75,
     // 76 and 80, PCs 795, 820, 910). A KO (+0x75a0, 0x40e83e) enters the
     // lose action 59 first: it deletes objects 7–9 and clears variables 6, 8
-    // and 14, then jumps to KO Normal (PC 591). With global 0 at 10 it would
-    // enter 'make hikari' (63) instead (PC 590). The title menu writes
-    // global 0 only to 1 (KGT 78, PC 497). ponytail: LIZARD's chuck hit
-    // lend writes 10 for its strike's tick (PCs 3703, 3712), as HISO's Fish
-    // hit and FISH HIT BIG do (PCs 4483–4488, 4557–4562), so as player 2
-    // their lethal strikes would send the victim there; the port keeps KO
-    // Normal.
+    // and 14, then jumps to KO Normal (PC 591), or with global 0 at 10 to
+    // make hikari (63, PC 590; enterPending).
     const roll = f.branch && rolls(f.who)[f.action];
     const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered

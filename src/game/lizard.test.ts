@@ -6,7 +6,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { brIntro } from './testing';
+import { brIntro, chuckKO } from './testing';
 
 // LIZARD as player 1, `gap` from a standing opponent.
 function lizardPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -104,6 +104,30 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
       mine: [263, 264, 273, 'idle'],
       damage: 60,
     });
+  });
+
+  it('sends the victim of a lethal chuck hit lend into make hikari, on either side (global 0 = 10, PCs 3703, 3712)', () => {
+    for (const side of [0, 1]) {
+      const { match, path, entry } = chuckKO(side, 'ryuko');
+      // KO'd at priority 0x3c, the victim steps before LIZARD clears global
+      // 0, so its lose action jumps to make hikari (63, PC 590), which
+      // passes global 3 = 0 to 63 + 5 (PC 651) and lands into 63 + 12.
+      expect(path).toEqual([
+        'idle',
+        'takeoff',
+        'jump',
+        'superHeld',
+        'vanish',
+        'rushAirHit',
+        '63+5',
+        '63+12',
+      ]);
+      expect(entry).toEqual({
+        sounds: [24, 16].map((index) => ({ owner: 1 - side, index })),
+        screen: ['59+9'],
+      });
+      expect(match.resultReady).toBe(true);
+    }
   });
 
   it('calls his birds with dragon sp: its rising probe meets the opponent with no response and calls them there', () => {

@@ -89,8 +89,8 @@ def decode_event(record):
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 12 (EX Fire
     # 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit, which only the Team VS actions
-    # set) and globals 6 (the freeze) and 14 (the stage's track, which each 開始時 BR tests for
-    # 0); other tests keep their fall-through path.
+    # set) and globals 0 (10 sends a KO to make hikari), 6 (the freeze) and 14 (the stage's
+    # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -106,8 +106,11 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
-                                                                              0x47, 0x4c, 0x4d, 0x4f, 0x83, 0x86, 0x8e):
+                                                                              0x47, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
+                                                                              0x8e):
         return test_event(record)
+    if op == 0x1f and record[4] == 0x80 and record[5] == 1:  # global 0 = r[7:9]: at 10 a KO enters make hikari
+        return dict(op="global0", value=s16(record, 7))
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
     if op == 0x1f and record[4] >> 6 == 1 and record[5] == 1:  # player variable r[4] & 0x3f = r[7:9]
@@ -210,6 +213,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     0x25 events run just before it, for reactions drawn from their timelines.
     """
     frames, events, bodies, pending = [], [], {}, []
+    # Forward skips within a call yet to reach their target: (event index, action, target PC, depth).
+    skips = []
     # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
     # its own action, as Zoma's run loops, starts with those its earlier records set.
     for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
@@ -224,6 +229,10 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     result = dict(loop=-1, end="end", next=None)
     for _ in range(20000):
         a = p.action(action)
+        for mark in [m for m in skips if m[1:] == (action, pc, len(stack))]:
+            # Reached within its tick, the skip passes over the events since.
+            events[mark[0]]["skip"] = len(events) - mark[0] - 1
+            skips.remove(mark)
         if pc >= a.end and not stack and action in endless:
             # Running out of the pass returns into the next.
             pc = a.start + next(r[4] for r in p.records[a.start:a.end] if r[0] == 0x09 and u16(r, 2) == action)
@@ -253,6 +262,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
         if op in (0x07, 0x14):
             bodies = {}
         if op == 0x0c:
+            skips = []
             frame = display_record(p, pc)
             image = c.images[frame["image"]]
             frame = with_body(dict(frame, width=image.width, height=image.height, t=t), bodies)
@@ -350,9 +360,11 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             elif event and stack and event["op"] == "test" and event["action"] == action and (
                     pc == p.action(action).end - 1 <= p.action(action).start + event["offset"]):
                 event = None
-            # A test that skips forward within the called action rejoins the
-            # fall-through, as its rolls do (below): ALPHA's No super rp skips
-            # its power while variable 12 is 0 (PC 4475).
+            # A test that skips forward within the called action passes over
+            # the events up to its target, when it reaches it within the tick
+            # (`skip`), or rejoins the fall-through as its rolls do (below):
+            # ALPHA's No super rp skips its power while variable 12 is 0 (PC
+            # 4475), and his HP 2 its drain while global 3 is below 40 (PC 1220).
             elif event and stack and event["op"] == "test" and event["action"] == action and (
                     p.action(action).start + event["offset"] > pc):
                 event = dict(event, called=True)
@@ -367,6 +379,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 event = dict(event, called=True)
             if event:
                 events.append(dict(event, t=t))
+                if event.get("called") and event["op"] == "test":
+                    skips.append((len(events) - 1, action, p.action(action).start + event["offset"], len(stack)))
             if event and event["op"] in POSE_EVENTS:
                 pending.append(event)
         pc += 1
@@ -582,7 +596,7 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None, endl
     for (index, _), script in scripts.items():
         for event in script["events"]:
             rejoin = next((f["pc"] for f in script["frames"] if f["t"] >= event["t"]), None)
-            if event.get("called") and scripts[event["action"], event["offset"]]["frames"][0]["pc"] != rejoin:
+            if event.get("called") and "skip" not in event and scripts[event["action"], event["offset"]]["frames"][0]["pc"] != rejoin:
                 sys.exit(f"Action {index}'s {event['op']} in a call doesn't rejoin its path; refusing to export.")
     return {f"{i}+{o}" if o else str(i): s for (i, o), s in sorted(scripts.items())}
 
