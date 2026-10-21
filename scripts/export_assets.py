@@ -2754,8 +2754,8 @@ FIGHTERS = {
         # display (PC 453), spawns Black and OP super Charge (71, PCs
         # 455–456) and enters OP normal (65) + 3 (PC 458), which calls TVS S
         # 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
-        # flattened. ponytail: 開始時's test of global 10 for 10 (PC 347), into
-        # 開始時 SELECT (51), isn't played.
+        # flattened. 開始時's test of global 10 for 10 (PC 347), into
+        # 開始時 SELECT (51), never passes: no script sets global 10 to 10.
         actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75),
         flat={"win"},
         # 2001: the HUD face action 117 shows (PC 1056); 139: *name (106, PC
@@ -2844,8 +2844,8 @@ FIGHTERS = {
         # 0, jumps past its display (PC 369), spawns Black and OP super Charge
         # (71, PCs 371–372) and enters OP normal (65) + 2 (PC 374), which
         # fades him in and calls DEMO STAND 7 times (PC 525); it plays
-        # flattened. ponytail: 開始時's test of global 10 for 10 (PC 266),
-        # into 開始時 SELECT (51), isn't played.
+        # flattened. 開始時's test of global 10 for 10 (PC 266),
+        # into 開始時 SELECT (51), never passes: no script sets global 10 to 10.
         actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75),
         # 2001: the HUD face action 114 shows (PC 953); 139: *name (105, PC
         # 913).
@@ -2925,9 +2925,9 @@ FIGHTERS = {
         # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 427), which,
         # for global 14 = 0, jumps past its display (PC 464), spawns Black and
         # OP super Charge (49, PCs 466–467), calls demo speak rp ten times
-        # (PC 470) and takes his stance. ponytail:
-        # 開始時's test of global 10 for 10 (PC 428), into 開始時 BR + 2,
-        # isn't played.
+        # (PC 470) and takes her stance. 開始時's test of global 10 for 10
+        # (PC 428), into 開始時 BR + 2, never passes: no script sets global
+        # 10 to 10.
         actions=dict(win=77, winStand=28, draw=84, black=54),
         flat={"win"},
         # 2001: the HUD face action 92 shows (PC 934); 333: *name (85, PC
@@ -3006,8 +3006,8 @@ FIGHTERS = {
         # Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC 367),
         # which, for global 14 = 0, jumps past its display (PC 402), spawns
         # Black and OP super Charge (48, PCs 404–405) and enters Round 1 (36) +
-        # 2 (PC 407). ponytail: 開始時's test of global 10 for
-        # 10 (PC 368), into 開始時 BR + 2, isn't played.
+        # 2 (PC 407). 開始時's test of global 10 for 10 (PC 368), into 開始時
+        # BR + 2, never passes: no script sets global 10 to 10.
         actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52),
         # 2001: the HUD face action 82 shows (PC 767); 322: *name (74, PC
         # 723).
@@ -3073,8 +3073,8 @@ FIGHTERS = {
         # (PC 426), which, for global 14 = 0, jumps past its display (PC
         # 464), spawns Black and OP super Charge (54, PCs 466–467) and enters
         # OP2 (30) + 2 (PC 469), or for its rand % 3 > 1 (PC 463) Round 1 (35)
-        # + 4 (PC 475). ponytail: 開始時's test of
-        # global 10 for 10 (PC 427), into 開始時 BR + 14, isn't played.
+        # + 4 (PC 475). 開始時's test of global 10 for 10 (PC 427), into
+        # 開始時 BR + 14, never passes: no script sets global 10 to 10.
         actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59),
         # 2001: the HUD face action 108 shows (PC 1333); 576: *name (99, PC
         # 1289).
@@ -3137,8 +3137,8 @@ FIGHTERS = {
         # 開始時 BR (33) for global 3 = 0 (PC 300), which, for global 14 = 0,
         # jumps past its display (PC 336), spawns Black and OP super Charge
         # (46, PCs 338–339) and enters Round 1 (34) + 2 (PC 342); it plays
-        # flattened. ponytail: 開始時's test of global 10 for 10 (PC 301),
-        # into 開始時 BR + 2, isn't played.
+        # flattened. 開始時's test of global 10 for 10 (PC 301),
+        # into 開始時 BR + 2, never passes: no script sets global 10 to 10.
         actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50),
         # 2001: the HUD face action 84 shows (PC 846); 323: *name (75, PC
         # 787).
@@ -3200,8 +3200,8 @@ FIGHTERS = {
         # spawns Black and OP super Charge (44, PCs 312–313) and, past its
         # tests of globals 4 and 5 (PCs 316–320), which character select sets
         # to 0 (CHAR SELECT.DEMO, PCs 7–8), enters Round 1 (39, PC 321).
-        # ponytail: 開始時's test of global 10 for 10 (PC
-        # 277), into Single Start (75), isn't played.
+        # 開始時's test of global 10 for 10 (PC
+        # 277), into Single Start (75), never passes: no script sets global 10 to 10.
         actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 645); 139: *name (68, PC
         # 609).
@@ -3263,8 +3263,8 @@ FIGHTERS = {
         # jumps to 開始時 BR (38) for global 3 = 0 (PC 286), which spawns
         # Black and OP super Charge (44, PCs 322–323) and, past its tests of
         # globals 4 and 5 (PCs 326–329), enters Round 1 (39, PC 330).
-        # ponytail: 開始時's test of global 10 for 10 (PC
-        # 287), into BR Start (75), isn't played.
+        # 開始時's test of global 10 for 10 (PC
+        # 287), into BR Start (75), never passes: no script sets global 10 to 10.
         actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 652); 149: *name (68, PC
         # 617).
