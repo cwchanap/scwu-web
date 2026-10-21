@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SUNEO_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
-import { enter } from './testing';
+import { brIntro, enter } from './testing';
 
 // G Suneo as player 1, `gap` from a standing opponent.
 function suneoPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -198,18 +193,25 @@ describe('G Suneo (08 G SUNEO.PLAYER)', () => {
     ]);
   });
 
-  it('enters EX mode with down held as her Vs. intro checks it (PC 403)', () => {
+  it('enters EX mode with down held as her Vs. intro checks it (PC 403), ending on 開始時 BR + 16 (PC 410)', () => {
     // 開始時 BR's two 2-tick displays (PCs 382, 384) come first.
-    expect([SUNEO_INTRO_EX_TICK, animationDuration('intro', 'suneo')]).toEqual([
-      168, 204,
-    ]);
-    const match = new Match('cpu', true, 0, ['suneo', 'zoma']);
-    const suneo = match.fighters[0];
-    const { x } = suneo;
-    for (let t = 0; t < 204; t++) match.step({ crouch: t >= 150 });
-    // Round 1 (35) has no op 0x01. change character (41) sets variable 0
-    // (PC 463) and jumps back (PC 464).
-    expect([suneo.action, suneo.x, exMode(suneo)]).toEqual(['idle', x, true]);
+    expect(animationDuration('34+7', 'suneo')).toBe(204);
+    for (const crouch of [false, true]) {
+      // After 開始時's (32) blank display; change character (41) sets
+      // variable 0 (PC 463) and jumps back (PC 464), and Round 1's test of it
+      // (PC 410) then ends on BR's last pose (34 + 16, PC 390), 113 in
+      // place of 194.
+      const { path, ticks, f, images } = brIntro('suneo', 0, (t) =>
+        crouch && t >= 150 ? { crouch: true } : {},
+      );
+      expect([path, ticks, f.x, exMode(f), images.at(-1)]).toEqual([
+        [32, '34+7', ...(crouch ? [41, '34+16'] : [])],
+        206,
+        390 * 1.5,
+        crouch,
+        crouch ? 113 : 194,
+      ]);
+    }
   });
 
   it('wins with Demo stand (49), then win talk (67) seven times', () => {

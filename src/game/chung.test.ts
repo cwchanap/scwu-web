@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  CHUNG_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { enter, pose } from './testing';
+import { brIntro, enter, pose } from './testing';
 
 const VELOCITY = (655 / 65536) * 1.5;
 const raw = (f: Fighter) => [f.vx / f.facing / VELOCITY, f.vy / VELOCITY];
@@ -234,29 +229,23 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
 
   it('enters EX mode with down held as his Vs. intro checks it (PC 338)', () => {
     // ROUND 1 then calls Demo stand once.
-    expect(CHUNG_INTRO_EX_TICK).toBe(150);
-    expect(animationDuration('intro', 'chung')).toBe(200);
-    const match = new Match('cpu', true, 0, ['chung', 'ryuko']);
-    const chung = match.fighters[0];
-    const images: number[] = [];
-    for (let t = 0; t < 200; t++) {
-      match.step({ crouch: true });
-      images[chung.age] = fighterPose(chung).image;
-    }
-    expect([chung.action, exMode(chung)]).toEqual(['idle', true]);
+    expect(animationDuration('32+3', 'chung')).toBe(200);
+    // After 開始時's (30) blank display, ROUND 1's check comes 150 ticks in.
+    const ex = (down: number) =>
+      brIntro('chung', 0, (t) => (t >= down ? { crouch: true } : {}));
+    const { images, f, ticks } = ex(0);
+    expect([ticks, f.action, exMode(f)]).toEqual([202, 'idle', true]);
     // There Demo stand jumps to Demo stand EX (28, PC 259): images 372–374
     // (PCs 271–274) in place of 113–115.
-    expect([150, 162, 175, 188].map((age) => images[age])).toEqual([
+    expect([151, 163, 176, 189].map((t) => images[t])).toEqual([
       372, 373, 374, 373,
     ]);
     expect(
       [150, 165, 175, 190].map(
-        (age) => animationFrame('intro', age, 'chung').image,
+        (age) => animationFrame('32+3', age, 'chung').image,
       ),
     ).toEqual([113, 114, 115, 114]);
-    const late = new Match('cpu', true, 0, ['chung', 'ryuko']);
-    for (let t = 0; t < 200; t++) late.step({});
-    expect(exMode(late.fighters[0])).toBe(false);
+    expect([151, 152].map((down) => exMode(ex(down).f))).toEqual([true, false]);
   });
 
   it('wins with Demo stand (27), then smoke behind a blank display (PCs 543–548)', () => {

@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // ASURA as player 1, `gap` from a standing Ryuko as player 2.
 function asuraPlayer(gap = 90) {
@@ -274,20 +275,14 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro, 開始時 BR (28)', () => {
-    expect(animationDuration('intro', 'asura')).toBe(242);
-    const match = new Match('cpu', true, 0, ['asura', 'zoma']);
-    const asura = match.fighters[0];
-    let ticks = 0;
-    while (asura.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, asura.stock]).toEqual([242, 2]);
+    expect(animationDuration(28, 'asura')).toBe(242);
+    const { path, ticks, f } = brIntro('asura');
+    expect([path, ticks, f.stock]).toEqual([[26, 28], 244, 2]);
     // Round 1 (29) shows nothing for 50 ticks, then his stance, and calls
     // demo stand three times (PC 263).
     expect(
       [0, 49, 50, 68, 80, 98, 106, 241].map(
-        (age) => animationFrame('intro', age, 'asura').image,
+        (age) => animationFrame(28, age, 'asura').image,
       ),
     ).toEqual([0, 0, 113, 114, 115, 113, 113, 114]);
   });

@@ -3,32 +3,7 @@ import {
   animationDuration,
   animationFrame,
   clipPose,
-  AMIRO_INTRO_EX_TICK,
-  ANMC_INTRO_EX_TICK,
-  CHUNG_INTRO_EX_TICK,
-  GIANT_INTRO_EX_TICK,
-  SUNEO_INTRO_EX_TICK,
-  SIN_INTRO_EX_TICK,
-  KAY_INTRO_EX_TICK,
-  SAKUYA_INTRO_EX_TICK,
-  ALEX_INTRO_EX_TICK,
-  SOU_INTRO_EX_TICK,
-  ERUS_INTRO_EX_TICK,
-  FENG_INTRO_EX_TICK,
-  GIGI_INTRO_EX_TICK,
-  SWW_INTRO_EX_TICK,
-  SOU_LANDING,
-  SEAN_LANDING,
-  GON_LANDING,
-  REMU_LANDING,
-  REAR_LANDING,
-  ZIRO_LANDING,
   DORA_LANDING,
-  RARIO_LANDING,
-  ZIRO_INTRO_EX_TICK,
-  YINAN_INTRO_EX_TICK,
-  LIZARD_LANDING,
-  INTRO_EX_TICK,
   entryColor,
   eventsAt,
   scriptTick,
@@ -390,98 +365,16 @@ const OWN_REACTION_POWER: Partial<
 };
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
-// The intros' op 0x01 runs, as [ticks, raw vx, vy, gravity] from the clip's
-// start: action 33 walks at 200 until PC 339, after its first 50 ticks;
-// Amiro's Round BR (33) drives in at 600 after its first display (PC 367),
-// then at 60 (PC 372); Yo's Round 1 (35) rides in at 110 from PC 378 until
-// PC 385. LIZARD's 開始時 BR (33) rises at −4000 for two ticks (PC 372),
-// stops (PC 374), then leaps at 400/−1000 with gravity 60 (PC 377) until he
-// lands (LIZARD_LANDING). KAY's Round 1 (33) walks at 200 from PC 356 to PC
-// 365. SOU's 開始時 BR (36) rises at −7000 with gravity −10000 for two ticks
-// (PC 401), then falls at 300 (PC 410) until he lands (SOU_LANDING).
-// SEAN's 開始時 BR (35) rises at −20000 for four ticks (PC 367), then falls
-// at 500 (PC 391) until he lands (SEAN_LANDING). GON's Round 1 (39) leaps
-// at −1400 with gravity 60 (PC 452) after its first 103 ticks until he lands
-// (GON_LANDING). REMU's 開始時 BR (35) rises at −6000 with gravity −10000
-// for two ticks (PC 388), sinks at 400 (PC 403) for 70, holds (PC 405),
-// soars under gravity −3000 (PC 425) for 10, holds 10 (PC 428) and falls
-// under gravity 90 (PC 431) until he lands (REMU_LANDING). REAR's 開始時 BR
-// (33) rises at −2000 for 7 ticks (PC 345), glides at 1000/200 for 27 (PC
-// 375), then slows by 50 under gravity 60 (PC 380) until he lands
-// (REAR_LANDING). ZIRO's 開始時 BR (38) rises at −20000 for eight ticks (PC 445),
-// waits 48, then falls at 2000 under gravity 30 (PC 459) until he lands
-// (ZIRO_LANDING). DoraEmon's Round 1 (34) rises at −50 for 27 ticks (PC
-// 381) after its first 100, stops (PC 393) and falls under gravity 50 (PC
-// 398) until he lands (DORA_LANDING). RARIO's Round 1 (27) hops at −1000
-// with gravity 30 (PC 246) after its first 44 ticks, hangs 50 (PC 248) and
-// hops again with gravity 80 (PC 251) until he lands (RARIO_LANDING).
-// TRAINING's 開始時 (24) dashes back at −10000 for 10 ticks after its first
-// 5 (PC 229), into the camera's left bound (clampX), then in at 2870 for 15
-// (PC 231) on blank displays. The others' have no op 0x01.
-type Runs = [number, number, number?, number?, number?][];
-const INTRO_MOTION: Partial<Record<Who, Runs>> = {
-  ryuko: [[50, 200]],
-  amiro: [
-    [2, 0],
-    [32, 600],
-    [15, 60],
-  ],
-  yo: [[90, 110]],
-  lizard: [
-    [2, 0],
-    [2, 0, -4000],
-    [100, 0],
-    [LIZARD_LANDING - 104, 400, -1000, 60],
-  ],
-  kay: [[56, 200]],
-  training: [
-    [5, 0],
-    [10, -10000],
-    [15, 2870],
-  ],
-  sou: [
-    [2, 0, -7000, -10000],
-    [SOU_LANDING - 2, 0, 300],
-  ],
-  sean: [
-    [4, 0, -20000],
-    [SEAN_LANDING - 4, 0, 500],
-  ],
-  gon: [
-    [103, 0],
-    [GON_LANDING - 103, 0, -1400, 60],
-  ],
-  remu: [
-    [2, 0, -6000, -10000],
-    [70, 0, 400],
-    [93, 0],
-    [10, 0, 0, -3000],
-    [10, 0],
-    [REMU_LANDING - 185, 0, 0, 90],
-  ],
-  rear: [
-    [7, 0, -2000],
-    [27, 1000, 200],
-    [REAR_LANDING - 34, 800, 200, 60, -50],
-  ],
-  ziro: [
-    [8, 0, -20000],
-    [48, 0],
-    [ZIRO_LANDING - 56, 0, 2000, 30],
-  ],
-  dora: [
-    [100, 0],
-    [27, 0, -50],
-    [81, 0],
-    [DORA_LANDING - 208, 0, 0, 50],
-  ],
-  rario: [
-    [44, 0],
-    [25, 0, -1000, 30],
-    [50, 0],
-    [RARIO_LANDING - 119, 0, -1000, 80],
-  ],
-};
+// DoraEmon's Br. intro's op 0x01 runs, as [ticks, raw vy, gravity] from the
+// clip's start: Round 1 (34) rises at −50 for 27 ticks (PC 381) after its
+// first 100, stops (PC 393) and falls under gravity 50 (PC 398) until he
+// lands (DORA_LANDING).
+const DORA_MOTION = [
+  [100, 0, 0],
+  [27, -50, 0],
+  [81, 0, 0],
+  [DORA_LANDING - 208, 0, 50],
+];
 // The win's and draw's timelines when they roll, test or move
 // (export_fighter).
 const RESULT_SCRIPTS = Object.fromEntries(
@@ -490,17 +383,16 @@ const RESULT_SCRIPTS = Object.fromEntries(
     'resultScripts' in data ? data.resultScripts : {},
   ]),
 ) as Record<Who, Partial<Record<'win' | 'draw', ObjectKey>>>;
-// A run's velocity at `age`, its accelerations added before each move.
-const runVelocity = (runs: Runs = [], age: number) => {
-  for (const [ticks, vx, vy = 0, ay = 0, ax = 0] of runs) {
+// His fall at `age`, its gravity added before each move.
+const doraFall = (age: number) => {
+  for (const [ticks, vy, ay] of DORA_MOTION) {
     if (age < ticks)
-      return [
-        vx * SOURCE_VELOCITY_SCALE + (age + 1) * ax * SOURCE_ACCELERATION_SCALE,
-        vy * SOURCE_VELOCITY_SCALE + (age + 1) * ay * SOURCE_ACCELERATION_SCALE,
-      ];
+      return (
+        vy * SOURCE_VELOCITY_SCALE + (age + 1) * ay * SOURCE_ACCELERATION_SCALE
+      );
     age -= ticks;
   }
-  return [0, 0];
+  return 0;
 };
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
@@ -842,7 +734,7 @@ const timeline = (f: Fighter) => f.branch!;
 // Op 0x1f player variable 0 at 10: Ryuko's EX mode, which EX Ch (204, PC
 // 2867) sets and NOR Ch (205, PC 2880) clears; Chung's at 100, set by TO EX
 // (229, PC 3191) and cleared by TO NOR (230, PC 3204). Zoma's counts his
-// bombs. Each intro's op 0x16 jumps while down is held when the tick comes:
+// bombs. Each intro's op 0x16 jumps while down is held as it checks:
 // Ryuko's to 'Chage Character' (37), Chung's (PC 338) to Change EX (35),
 // which set it and jump back. Amiro's at 100 too, set by EX Ch (214, PC 3287)
 // and cleared by NOR Ch (215, PC 3300); her intro's (PC 382) enters EX
@@ -874,7 +766,7 @@ const timeline = (f: Fighter) => f.branch!;
 // enters OP TYPE CHANGE (52), which sets it (PC 582) and jumps back (35 +
 // 19, PC 583). GON's at 100, set by Type to EX (247, PC 3701) and cleared
 // by Type to Normal (248, PC 3714), which the first enters while it is set
-// (PC 3698); his intro's (PC 466), as he lands (GON_LANDING), enters TYPE
+// (PC 3698); his intro's (PC 466), as he lands, enters TYPE
 // CHANGE (49), which sets it (PC 542) and jumps back (39 + 28, PC 543).
 // GIGI's Change form at 100, set by Change (216, PC 3125) and cleared by
 // Change ex (217, PC 3137), which the first enters while it is set (PC
@@ -887,30 +779,30 @@ const timeline = (f: Fighter) => f.branch!;
 // 3770), which the first enters while it is set (PC 3754); his intro's (PC
 // 486), 68 ticks after he lands, enters Change EX (43), which sets it (PC
 // 548) and jumps back (39 + 35, PC 549).
-export const EX_MODE: Partial<Record<Who, { value: number; intro: number }>> = {
-  ryuko: { value: 10, intro: INTRO_EX_TICK },
-  chung: { value: 100, intro: CHUNG_INTRO_EX_TICK },
-  amiro: { value: 100, intro: AMIRO_INTRO_EX_TICK },
-  anmc: { value: 100, intro: ANMC_INTRO_EX_TICK },
-  giant: { value: 100, intro: GIANT_INTRO_EX_TICK },
-  suneo: { value: 100, intro: SUNEO_INTRO_EX_TICK },
-  sin: { value: 10, intro: SIN_INTRO_EX_TICK },
-  kay: { value: 100, intro: KAY_INTRO_EX_TICK },
-  sakuya: { value: 100, intro: SAKUYA_INTRO_EX_TICK },
-  alex: { value: 100, intro: ALEX_INTRO_EX_TICK },
-  sou: { value: 10, intro: SOU_INTRO_EX_TICK },
-  erus: { value: 10, intro: ERUS_INTRO_EX_TICK },
-  feng: { value: 100, intro: FENG_INTRO_EX_TICK },
-  gon: { value: 100, intro: GON_LANDING },
-  gigi: { value: 100, intro: GIGI_INTRO_EX_TICK },
-  sww: { value: 100, intro: SWW_INTRO_EX_TICK },
-  ziro: { value: 100, intro: ZIRO_INTRO_EX_TICK },
-  yinan: { value: 100, intro: YINAN_INTRO_EX_TICK },
+export const EX_MODE: Partial<Record<Who, number>> = {
+  ryuko: 10,
+  chung: 100,
+  amiro: 100,
+  anmc: 100,
+  giant: 100,
+  suneo: 100,
+  sin: 10,
+  kay: 100,
+  sakuya: 100,
+  alex: 100,
+  sou: 10,
+  erus: 10,
+  feng: 100,
+  gon: 100,
+  gigi: 100,
+  sww: 100,
+  ziro: 100,
+  yinan: 100,
 };
 // Zoma, Kiki and Yo have none, whatever their variable 0 holds.
 export const exMode = (f: Fighter) => {
   const ex = EX_MODE[f.who];
-  return ex !== undefined && f.variables[0] === ex.value;
+  return ex !== undefined && f.variables[0] === ex;
 };
 // What a fighter shows: under 'script', its source action's timeline.
 const JUMP_CLIPS = [
@@ -1547,21 +1439,6 @@ const stageObjects = (stage: Stage) =>
 
 // Every round set-up places the players at 390 and 890 source pixels
 // (0x408a2e, 0x408ac3), and their Br. intros move them from there.
-// The 開始時 BR paths that roll, into another path or only a voice: DIDO's
-// (PC 360), SAKUYA's (PCs 380, 403), OS FENG's (PC 360), OGI's (PC 381),
-// ZIRO's (PC 428) and ALPHA's (PC 463) into others, GON's (PC 456), REMU's
-// (PCs 396, 399) and ASTROMAN's (PC 402) into another voice.
-const SCRIPTED_INTROS = new Set<Who>([
-  'dido',
-  'sakuya',
-  'feng',
-  'ogi',
-  'ziro',
-  'alpha',
-  'gon',
-  'remu',
-  'astroman',
-]);
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
   { ...fighter(390 * 1.5, 1, a), action: 'intro' },
   { ...fighter(890 * 1.5, -1, b), action: 'intro' },
@@ -1633,24 +1510,17 @@ export class Match {
       : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
   }
 
-  // VS single places the players at 390 and 890 source pixels (0x408ac3),
-  // and each set-up enters its 開始時 (+0x759c, 0x412180), which plays the
-  // VS intro as a script from the round's first step. DoraEmon, whom VS
-  // single never offers, exports none: a pairing with him plays the authored
-  // Br. intro. Otherwise global 3 is 0 and 開始時 jumps to 開始時 BR, which
-  // plays as a script for the players whose BR path rolls (SCRIPTED_INTROS);
-  // the others play it as a clip.
+  // Each set-up enters each player's 開始時 (+0x759c, 0x412180), which plays
+  // as a script from the round's first step: VS single's intro for global 3
+  // = 50, and otherwise its jump to 開始時 BR, the Br. intro. DoraEmon's
+  // exports none (his BR first jumps into a scene with SEAN), so he plays
+  // the authored Br. intro clip, whatever the mode.
   private entrants(): [Fighter, Fighter] {
     const fighters = introFighters(this.characters);
-    const starts = this.characters.map((who) => CHARACTERS[who].start);
-    const scripted = this.characters.map(
-      (who, i) =>
-        exported(starts[i], who) && (this.vs || SCRIPTED_INTROS.has(who)),
-    );
-    if (this.vs && !scripted.every(Boolean)) return fighters;
-    fighters.forEach((f, i) => {
-      if (!scripted[i]) return;
-      this.action(f, 'script', true, starts[i]);
+    fighters.forEach((f) => {
+      const start = CHARACTERS[f.who].start;
+      if (!exported(start, f.who)) return;
+      this.action(f, 'script', true, start);
       f.age = -1;
     });
     return fighters;
@@ -3736,19 +3606,13 @@ export class Match {
           if (!this.land(f) && !this.moveScripted(f)) this.action(f, 'idle');
           continue;
         }
+        // DoraEmon's Br. intro clip.
         if (f.action !== 'intro') continue;
         f.age++;
-        // EX_MODE: Zoma's, Kiki's and Yo's intros have no such check.
-        const ex = EX_MODE[f.who];
-        if (f.age === ex?.intro && [player, opponent][i]?.crouch)
-          f.variables[0] = ex.value;
-        const [vx, vy] = runVelocity(INTRO_MOTION[f.who], f.age - 1);
-        f.x = clampX(f.x + f.facing * vx);
         // Past the floor, the fall lands (0x41187f).
-        f.y = Math.min(0, f.y + vy);
+        f.y = Math.min(0, f.y + doraFall(f.age - 1));
         this.enter(f, i);
-        if (f.age >= animationDuration('intro', f.who, exMode(f)))
-          this.action(f, 'idle');
+        if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
       }
       // History keeps recording, so a button held through the intro must be
       // pressed again once control begins.

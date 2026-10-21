@@ -6,6 +6,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import type { Action } from './animations';
+import { brIntro } from './testing';
 
 // HISO as player 1, `gap` from a standing opponent as player 2.
 function hisoPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -251,17 +252,19 @@ describe('HISO (17 HISO.PLAYER)', () => {
     ]);
   });
 
-  it('stands through his 200-tick Vs. intro from 開始時 BR + 3 (PC 332)', () => {
-    expect(animationDuration('intro', 'hiso')).toBe(200);
+  it('stands through his Vs. intro from 開始時 BR + 3 (PC 332)', () => {
+    expect(animationDuration('32+3', 'hiso')).toBe(200);
     expect(
-      [0, 10, 60, 199].map((age) => animationFrame('intro', age, 'hiso').image),
+      [0, 10, 60, 199].map((age) => animationFrame('32+3', age, 'hiso').image),
     ).toEqual([414, 415, 419, 414]);
-    const match = new Match('cpu', true, 0, ['hiso', 'zoma']);
-    const hiso = match.fighters[0];
-    const x = hiso.x;
-    while (hiso.action === 'intro') match.step({});
     // OP super Charge (38, PC 333) charges two stocks.
-    expect([hiso.x, hiso.stock]).toEqual([x, 2]);
+    const { path, ticks, f } = brIntro('hiso');
+    expect([path, ticks, f.x, f.stock]).toEqual([
+      [30, '32+3'],
+      202,
+      390 * 1.5,
+      2,
+    ]);
   });
 
   it('wins holding image 436 (PC 603), draws holding 201, and shows face 2001', () => {

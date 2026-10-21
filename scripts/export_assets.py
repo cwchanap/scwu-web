@@ -543,9 +543,8 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         # A timeline's last jump enters its target, unless played as a clip
         # from its start (the match enters a reaction at any offset): ZENKA's
-        # J cancel jumps into her jump + 22 (PC 3187). LIZARD's Round 1 ends
-        # in OP lend (36, PC 392), his Br. intro's clip, which the match
-        # can't name; ZIRO's KO down past its roll into its own + 16 (PC 830).
+        # J cancel jumps into her jump + 22 (PC 3187), and ZIRO's KO down past
+        # its roll into its own + 16 (PC 830).
         if script["end"] == "jump" and (script["next"] not in played or named is not None and script["next"] not in named or
                                         script["offset"] and (script["next"] not in reactions or script["next"] == index)):
             queue.append((script["next"], script["offset"]))
@@ -1067,8 +1066,10 @@ GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", 
 # Each other player: its file and hash; the engine's own states, from its
 # default-action table (+0x757a) and its jumps' landing handler (slot 1); its
 # twins of Ryuko's victim actions, and those that differ beyond their
-# numbering and layout; its result, darkening and intro actions; and the
-# images its HUD face (+0x75a6) and *name action show.
+# numbering and layout; its result and darkening actions; and the images
+# its HUD face (+0x75a6) and *name action show. Each note on a Vs. intro
+# records its 開始時 path, which the match plays as a script (entrants),
+# DoraEmon's aside.
 FIGHTERS = {
     "zoma": dict(
         source=("02 ZOMA", "bfc7a239fb33782fac6ff6c6ff22a2f50d0d8abc59c2182052e9cc32a422ff0e"),
@@ -1106,9 +1107,8 @@ FIGHTERS = {
         # super darkening panel, image 1009 (action 40). The Vs. intro: 28
         # jumps to 開始時 BR (30) + 3 (PCs 265, 301), which spawns Black and OP
         # super Charge (36, PCs 303–304) and jumps to Start N (31) + 2 (PC
-        # 306), as Ryuko's 32 to 33 + 4; it plays flattened.
-        actions=dict(win=56, winStand=41, draw=63, black=40, intro=(30, 3)),
-        flat={"intro"},
+        # 306), as Ryuko's 32 to 33 + 4.
+        actions=dict(win=56, winStand=41, draw=63, black=40),
         # 2001: the HUD face action 71 shows; 340: the name *name (64) shows.
         image_ids={2001, 340},
     ),
@@ -1145,9 +1145,8 @@ FIGHTERS = {
         # Her darkening panel, image 1009 (action 42). The Vs. intro: 30
         # jumps to 32 for global 3 = 0 (PC 283), past its display for global
         # 14 = 0 (PC 318), spawns Black and OP super Charge (38, PCs 320–321),
-        # then jumps to Round 1 (33) + 2 (PC 323); it plays flattened.
-        actions=dict(win=56, winStand=28, winRp=57, draw=64, black=42, intro=(32, 3)),
-        flat={"intro"},
+        # then jumps to Round 1 (33) + 2 (PC 323).
+        actions=dict(win=56, winStand=28, winRp=57, draw=64, black=42),
         # 2001: the HUD face action 71 shows (PC 666); 217: *name (65, PC 627).
         image_ids={2001, 217},
     ),
@@ -1188,10 +1187,8 @@ FIGHTERS = {
         # once (PC 628). Her darkening panel, image 1009 (action 43). The Vs.
         # intro, as Kiki's: 30 jumps to 32 (PC 287), past its display (PC
         # 324), spawns Black and OP super Charge (39, PCs 326–327), then jumps
-        # to ROUND 1 (33) + 2 (PC 329); it plays flattened, through ROUND 1's
-        # call of Demo stand.
-        actions=dict(win=57, winStand=27, draw=64, black=43, intro=(32, 3)),
-        flat={"intro"},
+        # to ROUND 1 (33) + 2 (PC 329), which calls Demo stand.
+        actions=dict(win=57, winStand=27, draw=64, black=43),
         # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
         # 675–692), as Ryuko's; 375: *name (65, PC 635).
         image_ids={2000, 2001, 2002, 375},
@@ -1239,10 +1236,8 @@ FIGHTERS = {
         # 1009 (action 45). The Vs. intro: 29 jumps to 31 for global 3 = 0 (PC
         # 307), past its display for global 14 = 0 (PC 345), spawns Black and
         # OP super Charge (41, PCs 347–348), then jumps to Round BR (33, PC
-        # 350), which drives her in on her car; it plays flattened, through
-        # Round BR's call of Demo stand.
-        actions=dict(win=59, winStand=27, draw=66, black=45, intro=(31, 3)),
-        flat={"intro"},
+        # 350), which drives her in on her car and calls Demo stand.
+        actions=dict(win=59, winStand=27, draw=66, black=45),
         # 2000–2002: the HUD faces action 75 shows, cycling in EX mode (PCs
         # 786–803), as Ryuko's; 427: *name (67, PC 746).
         image_ids={2000, 2001, 2002, 427},
@@ -1290,9 +1285,8 @@ FIGHTERS = {
         # (action 45). The Vs. intro: 32 jumps to 開始時 BR (34) for global 3 = 0
         # (PC 310), past its display for global 14 = 0 (PC 348), spawns Black
         # and OP SUPER CHARGE (41, PCs 350–351), then jumps to Round 1 (35) + 2
-        # (PC 353); it plays flattened.
-        actions=dict(win=59, winStand=30, draw=68, black=45, intro=(34, 3)),
-        flat={"intro"},
+        # (PC 353).
+        actions=dict(win=59, winStand=30, draw=68, black=45),
         # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
         # 717–735), as Ryuko's; 183: *name (69, PC 682).
         image_ids={2000, 2001, 2002, 183},
@@ -1346,9 +1340,8 @@ FIGHTERS = {
         # panel, image 1009 (action 43). The Vs. intro, as Kiki's: 30 jumps to
         # 32 for global 3 = 0 (PC 268), past its display for global 14 = 0 (PC
         # 305), spawns Black and OP super Charge (39, PCs 307–308), then jumps
-        # to Round 1 (33) + 2 (PC 310); it plays flattened.
-        actions=dict(win=60, winStand=28, winLoop=(60, 9), draw=67, black=43, intro=(32, 3)),
-        flat={"intro"},
+        # to Round 1 (33) + 2 (PC 310).
+        actions=dict(win=60, winStand=28, winLoop=(60, 9), draw=67, black=43),
         # 2000–2002: the HUD faces action 74 shows, cycling in EX mode (PCs
         # 690–707), as Ryuko's; 349: *name (68, PC 652).
         image_ids={2000, 2001, 2002, 349},
@@ -1408,11 +1401,9 @@ FIGHTERS = {
         # (PC 337), past its displays for global 14 = 0 (PC 375) to two 2-tick
         # displays (PCs 382, 384) around its spawn of OP obj (30, PC 383),
         # spawns Black and OP super Charge (43, PCs 386–387), then jumps to
-        # Round 1 (35) + 3 (PC 389); it plays flattened. ponytail: in EX mode,
-        # BR's last pose (34 + 16, PC 390), which Round 1 enters for variable 0
-        # = 100 (PC 410), isn't played.
-        actions=dict(win=66, winStand=49, winRp=67, draw=75, black=47, intro=(34, 7)),
-        flat={"intro"},
+        # Round 1 (35) + 3 (PC 389), which in EX mode ends on BR's last pose (34
+        # + 16, PC 390) for variable 0 = 100 (PC 410).
+        actions=dict(win=66, winStand=49, winRp=67, draw=75, black=47),
         # 2000–2002 and 2006: the HUD faces action 81 shows, cycling 2002,
         # 2006, 2000 and 2006 in EX mode (PCs 845–863); 601: *name (76, PC 808).
         image_ids={2000, 2001, 2002, 2006, 601},
@@ -1457,9 +1448,8 @@ FIGHTERS = {
         # (34) for global 3 = 0 (PC 331), past its display for global 14 = 0
         # (PC 367), spawns Black and OP super Charge (40, PCs 369–370), then
         # jumps to Round 1 (35) + 5 (PC 372), which walks in (PC 378) and calls
-        # Demo Stand three times (PC 392); it plays flattened.
-        actions=dict(win=58, winStand=29, draw=65, black=44, intro=(34, 3)),
-        flat={"intro"},
+        # Demo Stand three times (PC 392).
+        actions=dict(win=58, winStand=29, draw=65, black=44),
         # 2001: the HUD face action 73 shows (PC 728); 390: *name (66, PC 688).
         image_ids={2001, 390},
     ),
@@ -1508,9 +1498,8 @@ FIGHTERS = {
         # 46). The Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0
         # (PC 349), past its display for global 14 = 0 (PC 388), spawns Black
         # and OP super Charge (42, PCs 390–391), then jumps to Round 1 (36) + 2
-        # (PC 393), which calls STAND DEMO 2 once (PC 404); it plays flattened.
-        actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46, intro=(35, 3)),
-        flat={"intro"},
+        # (PC 393), which calls STAND DEMO 2 once (PC 404).
+        actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46),
         # 2000–2002 and 2006: the HUD faces action 73 shows, cycling as G
         # Suneo's in EX mode (PCs 756–774); 368: *name (70, PC 721).
         image_ids={2000, 2001, 2002, 2006, 368},
@@ -1554,7 +1543,7 @@ FIGHTERS = {
         # (action 46). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for
         # global 3 = 0 (PC 329), past its display for global 14 = 0 (PC 365);
         # it leaps in and lands into OP lend (36, slot 1 at PC 383).
-        actions=dict(win=60, winStand=29, draw=68, black=46, intro=(33, 3), introLand=36),
+        actions=dict(win=60, winStand=29, draw=68, black=46),
         flat={"win"},
         # 2001: the HUD face action 73 shows (PC 764); 217: *name (69, PC 727).
         image_ids={2001, 217},
@@ -1619,9 +1608,9 @@ FIGHTERS = {
         # 開始時 BR (32) for global 3 = 0 (PC 307), past its display for
         # global 14 = 0 (PC 345), spawns OP super Charge (39, PC 348) and
         # jumps to Round 1 (33) + 5 (PC 350), which walks in (PC 356) and
-        # calls Demo stand twice (PC 368); both play flattened.
-        actions=dict(win=57, winStand=28, draw=65, black=43, intro=(32, 3)),
-        flat={"win", "intro"},
+        # calls Demo stand twice (PC 368).
+        actions=dict(win=57, winStand=28, draw=65, black=43),
+        flat={"win"},
         # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
         # 727–745), as Ryuko's; 464: *name (66, PC 688).
         image_ids={2000, 2001, 2002, 464},
@@ -1664,12 +1653,11 @@ FIGHTERS = {
         # 1009 (action 41). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33)
         # for global 3 = 0 (PC 324), which rolls rand % 3 > 1 (PC 360), then
         # skips its display for global 14 = 0 (PC 361), spawns OP super
-        # Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC 366); both
-        # play flattened. The match plays the intro from 開始時
-        # (SCRIPTED_INTROS): the roll's other third hops through op2 (44, PC
+        # Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC 366); the
+        # win plays flattened. The roll's other third hops through op2 (44, PC
         # 372).
-        actions=dict(win=61, winStand=29, draw=68, black=41, intro=(33, 4)),
-        flat={"win", "intro"},
+        actions=dict(win=61, winStand=29, draw=68, black=41),
+        flat={"win"},
         # 2001: the HUD face action 76 shows (PC 817); 258: *name (69, PC 777).
         image_ids={2001, 258},
     ),
@@ -1732,13 +1720,11 @@ FIGHTERS = {
         # (36) jumps to 開始時 BR (39) for global 3 = 0 (PC 338), which rolls rand
         # % 4 > 1 (PC 380), then skips its display for global 14 = 0 (PC 381),
         # spawns Black (55) and OP super Charge (51, PCs 383–384) and jumps to
-        # Round 1 (40) + 3 (PC 386); both play flattened; the win's roll into
-        # random win2 (70, PC 686) rolls in the match (resultScripts).
-        # The match plays the intro from 開始時 (SCRIPTED_INTROS), its rolls'
-        # other paths, to Random OP3 (45, PC 380) and RANDOM OP1 (41, PC
-        # 403), included.
-        actions=dict(win=69, winStand=31, draw=78, black=55, intro=(39, 4)),
-        flat={"win", "intro"},
+        # Round 1 (40) + 3 (PC 386), or to Random OP3 (45, PC 380), and Round 1's
+        # roll enters RANDOM OP1 (41, PC 403); the win plays flattened, and its
+        # roll into random win2 (70, PC 686) rolls in the match (resultScripts).
+        actions=dict(win=69, winStand=31, draw=78, black=55),
+        flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX
         # mode (PCs 847–861), as G Suneo's; 445: *name (79, PC 805).
         image_ids={2000, 2001, 2002, 2006, 445},
@@ -1801,10 +1787,10 @@ FIGHTERS = {
         # 開始時 BR (32) for global 3 = 0 (PC 287), which skips its display
         # for global 14 = 0 (PC 325), spawns chicken (37), Black (45) and OP
         # super Charge (41, PCs 334–336) and jumps to Round 1 (33) + 4 (PC
-        # 338); both play flattened. The win's roll, which picks a sound, rolls
+        # 338); the win plays flattened, and its roll, which picks a sound, rolls
         # in the match (resultScripts).
-        actions=dict(win=59, winStand=27, draw=67, black=45, intro=(32, 9)),
-        flat={"win", "intro"},
+        actions=dict(win=59, winStand=27, draw=67, black=45),
+        flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 75 shows, cycling in EX
         # mode (PCs 737–750), as G Suneo's; 362: *name (68, PC 694).
         image_ids={2000, 2001, 2002, 2006, 362},
@@ -1855,11 +1841,11 @@ FIGHTERS = {
         # which for global 14 = 0 (PC 392) rises past its display (PC 401),
         # jumps back to spawn Black (47) and OP super Charge (43, PCs
         # 397–398), then to Round 1 (37) + 5 (PC 400), which falls (PC 410)
-        # and lands into 37 + 10 (slot 1, PC 409); all play flattened.
+        # and lands into 37 + 10 (slot 1, PC 409); the win plays flattened.
         # The win's roll, to RANDOM WIN (48, PC 644), rolls in the match
         # (resultScripts).
-        actions=dict(win=62, winStand=29, draw=70, black=47, intro=(36, 10), introLand=(37, 10)),
-        flat={"win", "intro", "introLand"},
+        actions=dict(win=62, winStand=29, draw=70, black=47),
+        flat={"win"},
         # 2000–2002: the HUD faces action 79 shows, cycling in EX mode (PCs
         # 788–806), as Ryuko's; 329: *name (71, PC 748).
         image_ids={2000, 2001, 2002, 329},
@@ -1932,9 +1918,9 @@ FIGHTERS = {
         # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 294), which
         # skips its display for global 14 = 0 (PC 330), spawns Black (42) and
         # OP super Charge (38, PCs 332–333) and jumps to Round 1 (33) + 2 (PC
-        # 335); both play flattened.
-        actions=dict(win=58, winStand=27, draw=65, black=42, intro=(32, 3)),
-        flat={"win", "intro"},
+        # 335); the win plays flattened.
+        actions=dict(win=58, winStand=27, draw=65, black=42),
+        flat={"win"},
         # 2001: the HUD face action 76 shows (PC 736), as DIDO's; 445: *name
         # (66, PC 693).
         image_ids={2001, 445},
@@ -1999,11 +1985,11 @@ FIGHTERS = {
         # (action 45). The Vs. intro: 開始時 (31) jumps to 開始時 BR (34) for
         # global 3 = 0 (PC 294), which for global 14 = 0 (PC 336) jumps past
         # its display (PC 344) to spawn Black (45) and OP super Charge (41,
-        # PCs 340–341), then to Round 1 (35) + 3 (PC 343); both play
-        # flattened. The win's roll, to Random WIN (46, PC 604), rolls in the
+        # PCs 340–341), then to Round 1 (35) + 3 (PC 343); the win plays
+        # flattened, and its roll, to Random WIN (46, PC 604), rolls in the
         # match (resultScripts), as does the draw's hop (PCs 701–707).
-        actions=dict(win=60, winStand=28, draw=67, black=45, intro=(34, 9)),
-        flat={"win", "intro"},
+        actions=dict(win=60, winStand=28, draw=67, black=45),
+        flat={"win"},
         # 2000–2002: the HUD faces action 77 shows, cycling in EX mode (PCs
         # 757–773), as SOU's; 366: *name (68, PC 714).
         image_ids={2000, 2001, 2002, 366},
@@ -2058,11 +2044,10 @@ FIGHTERS = {
         # (32) jumps to 開始時 BR (34) for global 3 = 0 (PC 322), which rolls
         # rand % 3 > 1 (PC 360), then skips its display for global 14 = 0 (PC
         # 361), spawns Black (51) and OP super Charge (47, PCs 363–364) and
-        # jumps to Round 1 (35) + 3 (PC 366); both play flattened. The match
-        # plays the intro from 開始時 (SCRIPTED_INTROS): the roll's other third
-        # runs through OP2 (43, PC 372).
-        actions=dict(win=67, winStand=28, draw=75, black=51, intro=(34, 4)),
-        flat={"win", "intro"},
+        # jumps to Round 1 (35) + 3 (PC 366); the win plays flattened. The
+        # roll's other third runs through OP2 (43, PC 372).
+        actions=dict(win=67, winStand=28, draw=75, black=51),
+        flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 85 shows, cycling in EX
         # mode (PCs 884–901), as G Suneo's; 449: *name (76, PC 843).
         image_ids={2000, 2001, 2002, 2006, 449},
@@ -2125,10 +2110,8 @@ FIGHTERS = {
         # for global 3 = 0 (PC 330), which rises (PC 367) and, for global 14
         # = 0, jumps past its display (PCs 369–371) to spawn Black (45) and OP
         # super Charge (41, PCs 372–373), then to Round 1 (36) + 5 (PC 375),
-        # which falls (PC 391) and lands into 36 + 15 (slot 1, PC 390); both
-        # play flattened.
-        actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45, intro=(35, 0), introLand=(36, 15)),
-        flat={"intro", "introLand"},
+        # which falls (PC 391) and lands into 36 + 15 (slot 1, PC 390).
+        actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45),
         # 2001: the HUD face action 75 shows (PC 756); 247: *name (67, PC 715).
         image_ids={2001, 247},
     ),
@@ -2195,13 +2178,9 @@ FIGHTERS = {
         # 395), which skips its display for global 14 = 0 (PC 433), spawns
         # Black (48) and OP super Charge (44, PCs 435–436) and jumps to Round 1
         # (39) + 2 (PC 438), which leaps (PC 452) and lands into 39 + 25 (slot
-        # 1, PC 451); both play flattened. The win's roll, to RANDOM WIN (68,
-        # PC 693), rolls in the match (resultScripts). The match plays the
-        # intro from 開始時 (SCRIPTED_INTROS), its roll (PC 456) picking its
-        # voice.
-        actions=dict(win=65, winStand=31, winLoop=(65, 8), draw=75, black=48, intro=(38, 3),
-                     introLand=(39, 25)),
-        flat={"intro", "introLand"},
+        # 1, PC 451), with a roll (PC 456) that picks its voice. The win's roll,
+        # to RANDOM WIN (68, PC 693), rolls in the match (resultScripts).
+        actions=dict(win=65, winStand=31, winLoop=(65, 8), draw=75, black=48),
         # 2000–2002 and 2006: the HUD faces action 82 shows, cycling in EX
         # mode (PCs 884–897), as OS FENG's; 654: *name (76, PC 842).
         image_ids={2000, 2001, 2002, 2006, 654},
@@ -2280,11 +2259,10 @@ FIGHTERS = {
         # 開始時 BR (32) for global 3 = 0 (PC 297), which skips its display
         # for global 14 = 0 (PC 333), spawns Black (42) and OP super Charge
         # (38, PCs 335–336) and jumps to Round 1 (33) + 2 (PC 338), which
-        # calls sTAND demo once (PC 353); it plays flattened. The win's roll,
+        # calls sTAND demo once (PC 353). The win's roll,
         # to RANDOM WIN (44, PC 603), and its second (PC 613), which only picks
         # its voice, roll in the match (resultScripts).
-        actions=dict(win=58, winStand=27, winLoop=(58, 18), draw=65, black=42, intro=(32, 3)),
-        flat={"intro"},
+        actions=dict(win=58, winStand=27, winLoop=(58, 18), draw=65, black=42),
         # 2001: the HUD face action 76 shows (PC 754), as HISO's; 276: *name
         # (66, PC 711).
         image_ids={2001, 276},
@@ -2358,12 +2336,9 @@ FIGHTERS = {
         # 10 for global 14 = 0 (PC 379), rises (PC 388), spawns Black (46)
         # and OP super Charge (42, PCs 384–385) and jumps to Round 1 (36) + 5
         # (PC 387), which calls OP movie rp (40) fifteen times (PCs 404–406)
-        # and lands into 36 + 44 (slot 1, PC 430); both play flattened.
-        # The match plays the intro from 開始時 (SCRIPTED_INTROS), its rolls
-        # (PCs 396, 399) picking its voice.
-        actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46, intro=(35, 10),
-                     introLand=(36, 44)),
-        flat={"intro", "introLand"},
+        # and lands into 36 + 44 (slot 1, PC 430), with rolls (PCs 396, 399)
+        # that pick its voice.
+        actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46),
         # 2001: the HUD face action 76 shows (PC 792), as KATE's; 428: *name
         # (69, PC 752).
         image_ids={2001, 428},
@@ -2435,10 +2410,8 @@ FIGHTERS = {
         # for global 14 = 0 (PC 336), rises unseen (PC 345), spawns Black (45)
         # and OP super Charge (41, PCs 341–342) and jumps to Round BR (36, PC
         # 344), which glides in (PCs 375, 380) and lands into 36 + 9 (slot 1,
-        # PC 374), calling STAND DEMO twice (PC 386); both play flattened.
-        actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45, intro=(33, 10),
-                     introLand=(36, 9)),
-        flat={"intro", "introLand"},
+        # PC 374), calling STAND DEMO twice (PC 386).
+        actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45),
         # 2001: the HUD face action 75 shows (PC 726); 387: *name (67, PC
         # 685).
         image_ids={2001, 387},
@@ -2495,10 +2468,8 @@ FIGHTERS = {
         # panel, Black (42). The Vs. intro: 開始時 (30) jumps to 開始時 BR (32)
         # for global 3 = 0 (PC 308), past its display for global 14 = 0 (PC
         # 348), spawns Black and OP super Charge (38, PCs 350–351), then jumps
-        # to Round 1 (33) + 2 (PC 353), which calls Demo stand once (PC 362);
-        # it plays flattened.
-        actions=dict(win=56, winStand=28, winLoop=(56, 7), draw=63, black=42, intro=(32, 3)),
-        flat={"intro"},
+        # to Round 1 (33) + 2 (PC 353), which calls Demo stand once (PC 362).
+        actions=dict(win=56, winStand=28, winLoop=(56, 7), draw=63, black=42),
         # 2000–2002: the HUD faces action 72 shows, cycling in his Change form
         # (PCs 730–746), as Ryuko's in EX mode; 328: *name (68, PC 694).
         image_ids={2000, 2001, 2002, 328},
@@ -2567,10 +2538,8 @@ FIGHTERS = {
         # The Vs. intro, as GIGI's: 開始時 (30) jumps to 開始時 BR (32) for
         # global 3 = 0 (PC 279), past its display for global 14 = 0 (PC 317),
         # spawns Black and OP super Charge (39, PCs 319–320), then jumps to
-        # Round 1 (33) + 2 (PC 322), which calls Demo stand once (PC 334); it
-        # plays flattened.
-        actions=dict(win=57, winStand=28, winLoop=(57, 5), draw=64, black=43, intro=(32, 3)),
-        flat={"intro"},
+        # Round 1 (33) + 2 (PC 322), which calls Demo stand once (PC 334).
+        actions=dict(win=57, winStand=28, winLoop=(57, 5), draw=64, black=43),
         # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
         # 690–705), as GIGI's; 399: *name (65, PC 649).
         image_ids={2000, 2001, 2002, 399},
@@ -2626,11 +2595,8 @@ FIGHTERS = {
         # 14 = 0 (PC 382), spawns Black and OP super Charge (43, PCs 384–385)
         # and jumps to Round 1 (37) + 4 (PC 387), which spawns *OP obj (33)
         # twice (PCs 401–402) and calls OP motion RP (41) 14 times (PC 403);
-        # it plays flattened. The match plays the intro from 開始時
-        # (SCRIPTED_INTROS): the roll's other half jumps to RANDON OP1 (31) +
-        # 2 (PC 393), as long.
-        actions=dict(win=62, winStand=29, winLoop=(62, 23), draw=69, black=47, intro=(36, 4)),
-        flat={"intro"},
+        # the roll's other half jumps to RANDON OP1 (31) + 2 (PC 393), as long.
+        actions=dict(win=62, winStand=29, winLoop=(62, 23), draw=69, black=47),
         # 2001: the HUD face action 77 shows (PC 789); 648: *name (70, PC
         # 749).
         image_ids={2001, 648},
@@ -2695,15 +2661,11 @@ FIGHTERS = {
         # 0 (PC 390), which rolls rand % 6 > 3 (PC 428) and, for global 14 = 0,
         # jumps to 38 + 18 (PC 429): it rises (PC 445), spawns Black and OP
         # super Charge (45, PCs 434–435) and enters Round 1 (39) + 6 (PC 438),
-        # which falls (PC 459) and lands into 39 + 11 (slot 1, PC 458); both
-        # play flattened. The match plays the intro from 開始時
-        # (SCRIPTED_INTROS): the roll's other third enters RANDOM OP1 (31) + 2
-        # (PC 444). His KO down rolls (PCs 828, 834) and runs on into
+        # which falls (PC 459) and lands into 39 + 11 (slot 1, PC 458); the
+        # roll's other third enters RANDOM OP1 (31) + 2 (PC 444). His KO down rolls (PCs 828, 834) and runs on into
         # ko DOWN2, ko down 2 fly and ko DOWN3 (71–73), which the match plays
         # from its timeline.
-        actions=dict(win=66, winStand=30, winLoop=(66, 10), draw=78, drawLoop=32, black=49, intro=(38, 18),
-                     introLand=(39, 11)),
-        flat={"intro", "introLand"},
+        actions=dict(win=66, winStand=30, winLoop=(66, 10), draw=78, drawLoop=32, black=49),
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX mode
         # (PCs 994–1008); 478: *name (79, PC 952).
         image_ids={2000, 2001, 2002, 2006, 478},
@@ -2794,8 +2756,8 @@ FIGHTERS = {
         # 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
         # flattened. ponytail: 開始時's test of global 10 for 10 (PC 347), into
         # 開始時 SELECT (51), isn't played.
-        actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75, intro=(52, 4)),
-        flat={"intro", "win"},
+        actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75),
+        flat={"win"},
         # 2001: the HUD face action 117 shows (PC 1056); 139: *name (106, PC
         # 1012).
         image_ids={2001, 139},
@@ -2884,8 +2846,7 @@ FIGHTERS = {
         # fades him in and calls DEMO STAND 7 times (PC 525); it plays
         # flattened. ponytail: 開始時's test of global 10 for 10 (PC 266),
         # into 開始時 SELECT (51), isn't played.
-        actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75, intro=(52, 4)),
-        flat={"intro"},
+        actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75),
         # 2001: the HUD face action 114 shows (PC 953); 139: *name (105, PC
         # 913).
         image_ids={2001, 139},
@@ -2964,11 +2925,11 @@ FIGHTERS = {
         # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 427), which,
         # for global 14 = 0, jumps past its display (PC 464), spawns Black and
         # OP super Charge (49, PCs 466–467), calls demo speak rp ten times
-        # (PC 470) and takes his stance; it plays flattened. ponytail:
+        # (PC 470) and takes his stance. ponytail:
         # 開始時's test of global 10 for 10 (PC 428), into 開始時 BR + 2,
         # isn't played.
-        actions=dict(win=77, winStand=28, draw=84, black=54, intro=(32, 3)),
-        flat={"win", "intro"},
+        actions=dict(win=77, winStand=28, draw=84, black=54),
+        flat={"win"},
         # 2001: the HUD face action 92 shows (PC 934); 333: *name (85, PC
         # 891).
         image_ids={2001, 333},
@@ -3045,10 +3006,9 @@ FIGHTERS = {
         # Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC 367),
         # which, for global 14 = 0, jumps past its display (PC 402), spawns
         # Black and OP super Charge (48, PCs 404–405) and enters Round 1 (36) +
-        # 2 (PC 407); it plays flattened. ponytail: 開始時's test of global 10 for
+        # 2 (PC 407). ponytail: 開始時's test of global 10 for
         # 10 (PC 368), into 開始時 BR + 2, isn't played.
-        actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52, intro=(35, 3)),
-        flat={"intro"},
+        actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52),
         # 2001: the HUD face action 82 shows (PC 767); 322: *name (74, PC
         # 723).
         image_ids={2001, 322},
@@ -3112,12 +3072,10 @@ FIGHTERS = {
         # The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3 = 0
         # (PC 426), which, for global 14 = 0, jumps past its display (PC
         # 464), spawns Black and OP super Charge (54, PCs 466–467) and enters
-        # OP2 (30) + 2 (PC 469); it plays flattened. The match plays the
-        # intro from 開始時 (SCRIPTED_INTROS): 開始時 BR's rand % 3 > 1 (PC
-        # 463) enters Round 1 (35) + 4 (PC 475). ponytail: 開始時's test of
+        # OP2 (30) + 2 (PC 469), or for its rand % 3 > 1 (PC 463) Round 1 (35)
+        # + 4 (PC 475). ponytail: 開始時's test of
         # global 10 for 10 (PC 427), into 開始時 BR + 14, isn't played.
-        actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59, intro=(33, 4)),
-        flat={"intro"},
+        actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59),
         # 2001: the HUD face action 108 shows (PC 1333); 576: *name (99, PC
         # 1289).
         image_ids={2001, 576},
@@ -3181,8 +3139,7 @@ FIGHTERS = {
         # (46, PCs 338–339) and enters Round 1 (34) + 2 (PC 342); it plays
         # flattened. ponytail: 開始時's test of global 10 for 10 (PC 301),
         # into 開始時 BR + 2, isn't played.
-        actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50, intro=(33, 3)),
-        flat={"intro"},
+        actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50),
         # 2001: the HUD face action 84 shows (PC 846); 323: *name (75, PC
         # 787).
         image_ids={2001, 323},
@@ -3242,11 +3199,10 @@ FIGHTERS = {
         # (36) jumps to 開始時 BR (38) for global 3 = 0 (PC 276), which
         # spawns Black and OP super Charge (44, PCs 312–313) and, past its
         # tests of globals 4 and 5 (PCs 316–320), which character select sets
-        # to 0 (CHAR SELECT.DEMO, PCs 7–8), enters Round 1 (39, PC 321); it
-        # plays flattened. ponytail: 開始時's test of global 10 for 10 (PC
+        # to 0 (CHAR SELECT.DEMO, PCs 7–8), enters Round 1 (39, PC 321).
+        # ponytail: 開始時's test of global 10 for 10 (PC
         # 277), into Single Start (75), isn't played.
-        actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55, intro=38),
-        flat={"intro"},
+        actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 645); 139: *name (68, PC
         # 609).
         image_ids={2001, 139},
@@ -3306,11 +3262,10 @@ FIGHTERS = {
         # 609). The darkening panel, Black (55). The Vs. intro: 開始時 (36)
         # jumps to 開始時 BR (38) for global 3 = 0 (PC 286), which spawns
         # Black and OP super Charge (44, PCs 322–323) and, past its tests of
-        # globals 4 and 5 (PCs 326–329), enters Round 1 (39, PC 330); it
-        # plays flattened. ponytail: 開始時's test of global 10 for 10 (PC
+        # globals 4 and 5 (PCs 326–329), enters Round 1 (39, PC 330).
+        # ponytail: 開始時's test of global 10 for 10 (PC
         # 287), into BR Start (75), isn't played.
-        actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55, intro=38),
-        flat={"intro"},
+        actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 652); 149: *name (68, PC
         # 617).
         image_ids={2001, 149},
@@ -3359,9 +3314,9 @@ FIGHTERS = {
         # (43). The Vs. intro: 開始時 (26) jumps to 開始時 BR (28) for global 3
         # = 0 (PC 205), which spawns Black and OP super Charge (32, PCs
         # 239–240) and enters Round 1 (29, PC 242), which calls demo act
-        # three times (PC 262); it plays flattened.
-        actions=dict(win=(44, 3), winStand=24, winLoop=24, draw=51, drawLoop=51, black=43, intro=28),
-        flat={"intro", "win", "musicAttack"},
+        # three times (PC 262).
+        actions=dict(win=(44, 3), winStand=24, winLoop=24, draw=51, drawLoop=51, black=43),
+        flat={"win", "musicAttack"},
         # 2001: the HUD face action 56 shows (PC 511); 155: *name (52, PC
         # 475).
         image_ids={2001, 155},
@@ -3413,9 +3368,9 @@ FIGHTERS = {
         # The Vs. intro: 開始時 (26) jumps to 開始時 BR (28) for global 3 = 0
         # (PC 207), which spawns Black and OP super Charge (32, PCs 241–242)
         # and enters Round 1 (29, PC 244), which calls demo stand three times
-        # (PC 263); it plays flattened.
-        actions=dict(win=44, winStand=24, winLoop=(44, 4), draw=44, drawLoop=(44, 4), black=43, intro=28),
-        flat={"intro", "draw"},
+        # (PC 263).
+        actions=dict(win=44, winStand=24, winLoop=(44, 4), draw=44, drawLoop=(44, 4), black=43),
+        flat={"draw"},
         # 2001: the HUD face action 56 shows (PC 511); 137: *name (52, PC
         # 479).
         image_ids={2001, 137},
@@ -3454,13 +3409,13 @@ FIGHTERS = {
         # (43). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3
         # = 0 (PC 279), which, for global 14 = 0, jumps past its display (PC
         # 314), spawns Black and OP super Charge (39, PCs 316–317) and enters
-        # Round 1 (34) + 2 (PC 319), which calls DEMO ACT twice (PC 333); it
-        # plays flattened. 勝ち's rand % 3 > 1 (PC 537), into WIN 2 (58),
+        # Round 1 (34) + 2 (PC 319), which calls DEMO ACT twice (PC 333).
+        # 勝ち's rand % 3 > 1 (PC 537), into WIN 2 (58),
         # rolls in the match (resultScripts).
-        actions=dict(win=57, winStand=29, winLoop=(57, 11), draw=65, drawLoop=(65, 5), black=43, intro=(33, 3)),
+        actions=dict(win=57, winStand=29, winLoop=(57, 11), draw=65, drawLoop=(65, 5), black=43),
         # His jumps (4) leave their takeoff for J RP (7, PC 55), so the jump
         # plays flattened too.
-        flat={"intro", "jump"},
+        flat={"jump"},
         # 2001: the HUD face action 71 shows (PC 674); 170: *name (66, PC
         # 636).
         image_ids={2001, 170},
@@ -3502,12 +3457,10 @@ FIGHTERS = {
         # Black (43). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3
         # = 0 (PC 359), which, for global 14 = 0, jumps past its display (PC
         # 394), spawns Black and OP super Charge (39, PCs 396–397) and enters
-        # Round 1 (34) + 2 (PC 399); it plays flattened. 勝ち's rand % 3 > 1 (PC
-        # 632), which only picks its voice, rolls in the match (resultScripts).
-        # The match plays the intro from 開始時 (SCRIPTED_INTROS), Round 1's
-        # roll (PC 402) picking its voice.
-        actions=dict(win=57, winStand=29, winLoop=(57, 18), draw=64, drawLoop=(64, 8), black=43, intro=(33, 3)),
-        flat={"intro"},
+        # Round 1 (34) + 2 (PC 399), whose roll (PC 402) picks its voice. 勝ち's
+        # rand % 3 > 1 (PC 632), which only picks its voice, rolls in the match
+        # (resultScripts).
+        actions=dict(win=57, winStand=29, winLoop=(57, 18), draw=64, drawLoop=(64, 8), black=43),
         # 2001: the HUD face action 69 shows (PC 769); 170: VS NAME (56, PC
         # 610), since he has no *name.
         image_ids={2001, 170},
@@ -3573,14 +3526,12 @@ FIGHTERS = {
         # Black (57). The Vs. intro: 開始時 (38) jumps to 開始時 BR (41) for global 3
         # = 0 (PC 566), which spawns Black and OP super Charge (59, PCs
         # 614–615) and her four friends (PCs 616–620) and, for global 14 = 0,
-        # jumps past its display (PC 621) to Round 1 (42) + 7 (PC 624); it
-        # plays flattened (animations.ts drops the display). 勝ち's rand % 6 > 3
+        # jumps past its display (PC 621) to Round 1 (42) + 7 (PC 624). 勝ち's rand % 6 > 3
         # rolls into Win 2 (82) and Win 3 (90) (PCs 906–907) roll in the match
         # (resultScripts), which takes each win's test of variable 0 = 100 into
         # its EX form (PCs 909, 957, 1048), and the draw's into Stop (97, PC
         # 1163).
-        actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57, intro=41),
-        flat={"intro"},
+        actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57),
         # 2001, 2002, 2007 and 2008: the HUD faces action 104 shows (PCs
         # 1240–1254); 349: *name (99, PC 1197).
         image_ids={2001, 2002, 2007, 2008, 349},
@@ -3618,10 +3569,8 @@ FIGHTERS = {
         # 開始時 BR (34) for global 3 = 0 (PC 315), which spawns Black and OP
         # super Charge (52, PCs 361–362) and, for global 14 = 0 (PC 363),
         # jumps past its display (PC 364) to its fader, Round 1 (35, PC 366)
-        # and 開始時 + 23 (PC 368), which calls Demo Stand once (PC 340); it
-        # plays flattened (animations.ts drops the display).
-        actions=dict(win=74, winStand=29, draw=92, drawLoop=(92, 3), black=50, intro=34),
-        flat={"intro"},
+        # and 開始時 + 23 (PC 368), which calls Demo Stand once (PC 340).
+        actions=dict(win=74, winStand=29, draw=92, drawLoop=(92, 3), black=50),
         # 2001: the HUD face action 100 shows (PC 747); 349: *name (93, PC
         # 705).
         image_ids={2001, 349},
@@ -3738,10 +3687,8 @@ FIGHTERS = {
         # global 14 = 0, jumps past its display (PC 229), spawns Black and OP
         # super Charge (32, PCs 231–232) and enters Round 1 (27) + 3 (PC
         # 234), which hops (PC 246), hangs (PC 248) and hops again (PC 251),
-        # landing into Round 1 + 19 (slot 1, PC 250); both play flattened.
-        actions=dict(win=50, winStand=22, winLoop=(50, 6), draw=57, drawLoop=(57, 6), black=36, intro=(26, 3),
-                     introLand=(27, 19)),
-        flat={"intro", "introLand"},
+        # landing into Round 1 + 19 (slot 1, PC 250).
+        actions=dict(win=50, winStand=22, winLoop=(50, 6), draw=57, drawLoop=(57, 6), black=36),
         # 2001: the HUD face action 63 shows (PC 584); 235: *name (58, PC
         # 546).
         image_ids={2001, 235},
@@ -3785,12 +3732,13 @@ FIGHTERS = {
         # 450 (PC 451). Each first enters DEMO air (23) while airborne (op
         # 0x16, PCs 365, 445). He has no Black, and nothing of his darkens.
         # The Vs. intro: 開始時 (24) has no BR to jump to, as its op 0x1f on
-        # global 3 sets nothing and tests nothing (r[5] 0, PC 220); past its
-        # VS banners (PC 226) it dashes back and in on blank displays (PCs
-        # 229–232), spawns VS CHANGE (30, PC 234), stands 70 ticks (PC 235)
-        # and calls Demo stand four times (PC 240). It plays flattened.
-        actions=dict(win=34, winStand=22, winLoop=(34, 6), draw=40, drawLoop=(40, 6), intro=24),
-        flat={"intro"},
+        # global 3 sets nothing and tests nothing (r[5] 0, PC 220). In round 1
+        # (PC 224) it shows its VS banners (31, PCs 227–228); it dashes back
+        # and in on blank displays (PCs 229–232), spawns VS CHANGE (30, PC
+        # 234) and stands 70 ticks (PC 235), then in round 1 (PC 238) enters
+        # Round 1 (27), which leaps and lands into 27 + 18 (slot 1, PC 275),
+        # and otherwise calls Demo stand four times (PC 240).
+        actions=dict(win=34, winStand=22, winLoop=(34, 6), draw=40, drawLoop=(40, 6)),
         # 2001: the HUD face action 44 shows (PC 472).
         image_ids={2001},
     ),
@@ -4012,12 +3960,6 @@ def main():
     # enters by its timeline.
     actions.update(jumpForward=tables["jumps"][1], jumpBack=tables["jumps"][2])
     clips = pose_clips(p, c, {**actions, "fall": tables["fall"]}, image_ids)
-    # Her Vs. intro: 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC
-    # 286), which jumps past its display for global 14 = 0 (PC 323), spawns
-    # Black and OP super Charge (39, PCs 325–326) and jumps to Round 1 (33) +
-    # 4 (PC 328), past its blank repositioning displays; it plays flattened.
-    clips["intro"] = flatten(p, c, 32, offset=3)["frames"]
-    image_ids.update(f["image"] for f in clips["intro"] if f["image"] not in (0, 8191))
     # Her moves play from their timelines, as Zoma's do: the actions of her
     # command entries, each with its level (header r[2]).
     entries = tables["commands"]["entries"]

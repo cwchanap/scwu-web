@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // GOLF as player 1, `gap` from a standing Ryuko as player 2.
 function golfPlayer(gap = 90) {
@@ -221,20 +222,14 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro, 開始時 BR (28)', () => {
-    expect(animationDuration('intro', 'golf')).toBe(271);
-    const match = new Match('cpu', true, 0, ['golf', 'zoma']);
-    const golf = match.fighters[0];
-    let ticks = 0;
-    while (golf.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, golf.stock]).toEqual([271, 2]);
+    expect(animationDuration(28, 'golf')).toBe(271);
+    const { path, ticks, f } = brIntro('golf');
+    expect([path, ticks, f.stock]).toEqual([[26, 28], 273, 2]);
     // Round 1 (29) shows nothing for 50 ticks, then fades his stance in (PCs
     // 245–261) and calls demo act three times (PC 262).
     expect(
       [0, 49, 50, 68, 80, 98, 106, 270].map(
-        (age) => animationFrame('intro', age, 'golf').image,
+        (age) => animationFrame(28, age, 'golf').image,
       ),
     ).toEqual([0, 0, 113, 114, 115, 114, 113, 114]);
   });

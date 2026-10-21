@@ -12,6 +12,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // TRAINING as player 1, `gap` from Ryuko as player 2.
 function trainingPlayer(gap = 90, seed = 3) {
@@ -195,26 +196,24 @@ describe('TRAINING (48 TRAINING.PLAYER)', () => {
     expect(animationDuration('koLand', 'training')).toBe(66);
   });
 
-  it('dashes unseen, stands and calls Demo stand four times through his Vs. intro', () => {
-    expect(animationDuration('intro', 'training')).toBe(320);
-    const match = new Match('cpu', true, 0, ['training', 'zoma']);
-    const training = match.fighters[0];
-    const xs: number[] = [];
-    while (training.action === 'intro') {
-      match.step({});
-      xs.push(training.x / 1.5);
-    }
-    expect([xs.length, training.stock, training.y]).toEqual([320, 0, 0]);
-    // From 390 source pixels (0x408ac3) the dash back (PC 229) meets the
-    // camera's left bound at once, 50 in from its scroll of 320; the dash in
-    // (PC 231) then carries him 15 ticks at raw 2870.
-    expect(xs[5]).toBe(320 + 50);
-    expect(xs[29] - xs[14]).toBeCloseTo(15 * 2870 * (655 / 65536), 6);
-    expect(
-      [0, 29, 30, 99, 100, 319].map(
-        (age) => animationFrame('intro', age, 'training').image,
-      ),
-    ).toEqual([0, 0, 115, 115, 115, 116]);
+  it('shows his VS banners, dashes unseen, stands and leaps through his round 1 Vs. intro (PCs 224, 238)', () => {
+    const { path, ticks, f, heights, images, objects } = brIntro('training');
+    // 開始時 (24) copies the round into its variables 1 and 15 and, in round
+    // 1, jumps to 24 + 9, spawning his VS banners (31, PCs 227–228), and
+    // after its stand to Round 1 (27), which leaps (PC 271) and hops (PC
+    // 276) as RARIO's does, landing into 27 + 18 (slot 1, PC 275).
+    expect([path, ticks, f.stock, f.y]).toEqual([
+      [24, '24+9', 27, '27+18'],
+      351,
+      0,
+      0,
+    ]);
+    expect([...objects].slice(0, 2)).toEqual([31, '31+9']);
+    expect([heights[324] > 0, heights[325]]).toEqual([true, 0]);
+    // Unseen through the dash, then his stand (PC 235) and Round 1's 220.
+    expect([0, 29, 30, 99, 154].map((t) => images[t])).toEqual([
+      0, 0, 115, 115, 220,
+    ]);
   });
 
   it('wins and draws after three Demo stands', () => {

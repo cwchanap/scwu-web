@@ -1,16 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SEAN_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { RYUKO, strike } from './testing';
+import { brIntro, RYUKO, strike } from './testing';
 
 // SEAN as player 1, `gap` from a standing opponent as player 2.
 function seanPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -200,29 +195,21 @@ describe('SEAN (20 SEAN.PLAYER)', () => {
     expect(branches).toEqual(new Set([null, '82+25']));
   });
 
-  it('rises out of sight and falls into his 200-tick Vs. intro, landing at 164 (PC 390)', () => {
-    expect([animationDuration('intro', 'sean'), SEAN_LANDING]).toEqual([
-      200, 164,
-    ]);
-    const match = new Match('cpu', true, 0, ['sean', 'zoma']);
-    const sean = match.fighters[0];
-    const x = sean.x;
-    const heights: number[] = [];
-    while (sean.action === 'intro') {
-      match.step({});
-      heights.push(sean.y);
-    }
-    // 800 source pixels up after four ticks, back down on the 164th.
+  it('rises out of sight and falls into his Vs. intro, landing as the fall reaches the floor (PC 390)', () => {
+    const { path, ticks, f, match, heights } = brIntro('sean');
+    // After 開始時's (33) blank display, 800 source pixels up in four
+    // ticks; 開始時 BR + 6 loops its fall (PC 397) until it reaches the
+    // floor, into Round 1 + 15 (slot 1, PC 390).
     expect(Math.min(...heights)).toBeCloseTo(-1199.341, 3);
-    expect([heights[162] < 0, heights[163], sean.x]).toEqual([true, 0, x]);
-    // OP super Charge (41, PC 373), spawned four ticks in, calls its RP a
-    // hundred times for 2 power each, two ticks apart: two stocks three
-    // ticks after the intro.
+    expect([heights[163] < 0, heights[164], f.x]).toEqual([true, 0, 390 * 1.5]);
+    expect([path, ticks]).toEqual([[33, 35, '35+6', '36+15'], 202]);
+    // OP super Charge (41, PC 373) calls its RP a hundred times for 2 power
+    // each, two ticks apart: two stocks three ticks after the intro.
     match.step({});
     match.step({});
-    expect(sean.stock).toBe(1);
+    expect(f.stock).toBe(1);
     match.step({});
-    expect(sean.stock).toBe(2);
+    expect(f.stock).toBe(2);
   });
 
   it('wins looping images 243 and 244 (PC 623), vanishes out of his draw, and shows face 2001', () => {

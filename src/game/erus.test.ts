@@ -1,15 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  ERUS_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
-import { enter } from './testing';
+import { brIntro, enter } from './testing';
 import type { Fighter, Input } from './match';
 import type { Action } from './animations';
 
@@ -261,24 +256,21 @@ describe('ERUS (18 ERUS.PLAYER)', () => {
     expect([erus.action, erus.power - power]).toEqual(['blockStop', 0]);
   });
 
-  it('stands through her 202-tick Vs. intro from 開始時 BR + 9 (PC 344), turning EX with down at 97 (PC 357)', () => {
-    expect([animationDuration('intro', 'erus'), ERUS_INTRO_EX_TICK]).toEqual([
-      202, 97,
-    ]);
+  it('stands through her Vs. intro from 開始時 BR + 9 (PC 344), turning EX with down at 97 (PC 357)', () => {
+    expect(animationDuration('34+9', 'erus')).toBe(202);
     expect(
-      [0, 97, 110, 201].map(
-        (age) => animationFrame('intro', age, 'erus').image,
-      ),
+      [0, 97, 110, 201].map((age) => animationFrame('34+9', age, 'erus').image),
     ).toEqual([340, 258, 341, 115]);
     for (const down of [false, true]) {
-      const match = new Match('cpu', true, 0, ['erus', 'zoma']);
-      const erus = match.fighters[0];
-      const x = erus.x;
-      for (let t = 0; erus.action === 'intro'; t++)
-        match.step(down && t > 90 && t < 100 ? { crouch: true } : {});
+      // 開始時 jumps at once, with no blank display.
+      const { path, ticks, f } = brIntro('erus', 0, (t) =>
+        down && t > 90 && t < 100 ? { crouch: true } : {},
+      );
       // OP super Charge (41, PC 341) charges two stocks.
-      expect([erus.x, erus.stock, erus.variables[0] ?? 0]).toEqual([
-        x,
+      expect([path, ticks, f.x, f.stock, f.variables[0] ?? 0]).toEqual([
+        ['34+9', ...(down ? ['39+3'] : [])],
+        203,
+        390 * 1.5,
         2,
         down ? 10 : 0,
       ]);

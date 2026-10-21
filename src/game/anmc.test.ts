@@ -3,7 +3,6 @@ import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import {
   animationDuration,
   animationFrame,
-  ANMC_INTRO_EX_TICK,
   BLACK,
   pushboxes,
 } from './animations';
@@ -183,13 +182,11 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
   });
 
   it('enters EX mode with down held as his Vs. intro checks it (PC 363)', () => {
-    expect([ANMC_INTRO_EX_TICK, animationDuration('intro', 'anmc')]).toEqual([
-      156, 200,
-    ]);
+    expect(animationDuration('34+3', 'anmc')).toBe(200);
     const match = new Match('cpu', true, 0, ['anmc', 'zoma']);
     const anmc = match.fighters[0];
     const { x } = anmc;
-    for (let t = 0; t < 200; t++) match.step({ crouch: t >= 150 });
+    for (let t = 0; t < 202; t++) match.step({ crouch: t >= 150 });
     // Round 1 (35) has no op 0x01: he stands where he starts.
     expect([anmc.action, anmc.x, exMode(anmc)]).toEqual(['idle', x, true]);
   });

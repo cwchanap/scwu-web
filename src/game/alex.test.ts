@@ -1,17 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  ALEX_INTRO_EX_TICK,
-  animationDuration,
-  animationFrame,
-  BLACK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // ALEX as player 2, `gap` from a standing opponent as player 1.
 function alexPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -237,29 +233,27 @@ describe('ALEX (15 ALEX.PLAYER)', () => {
   });
 
   it('opens his Vs. intro from 開始時 BR + 9, charged with two stocks, in EX mode with down held (PC 356)', () => {
-    expect([ALEX_INTRO_EX_TICK, animationDuration('intro', 'alex')]).toEqual([
-      101, 200,
-    ]);
+    expect(animationDuration('32+9', 'alex')).toBe(200);
     // PC 333, then Round 1 (33) from PC 343: images 323–331 and 158, then
     // 333, 158, 334 and 335.
     expect(
       [0, 2, 12, 101, 121, 129, 199].map(
-        (age) => animationFrame('intro', age, 'alex').image,
+        (age) => animationFrame('32+9', age, 'alex').image,
       ),
     ).toEqual([0, 323, 324, 333, 158, 334, 335]);
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['alex', 'zoma']);
-      const alex = match.fighters[0];
-      while (alex.action === 'intro') match.step(crouch ? { crouch } : {});
+      // After 開始時's (30) blank display; Round 1's check (PC 356) enters EX
+      // change (39) for down.
+      const { path, ticks, f, match } = brIntro('alex', 0, () => ({ crouch }));
+      expect([path, ticks]).toEqual([
+        [30, '32+9', ...(crouch ? [39] : [])],
+        202,
+      ]);
       // OP super Charge, spawned 2 ticks in (PC 336), adds its last 2 power
       // (42, PC 434) the tick after.
-      expect([alex.stock, alex.power]).toEqual([1, 98]);
-      match.step(crouch ? { crouch } : {});
-      expect([alex.x, alex.stock, exMode(alex)]).toEqual([
-        390 * 1.5,
-        2,
-        crouch,
-      ]);
+      expect([f.stock, f.power]).toEqual([1, 98]);
+      match.step({ crouch });
+      expect([f.x, f.stock, exMode(f)]).toEqual([390 * 1.5, 2, crouch]);
     }
   });
 

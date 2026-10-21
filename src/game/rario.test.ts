@@ -12,6 +12,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // RARIO as player 1, `gap` from Ryuko as player 2.
 function rarioPlayer(gap = 90, seed = 3) {
@@ -293,22 +294,21 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
   });
 
   it('hops twice through his Vs. intro, charging two stocks', () => {
-    expect(animationDuration('intro', 'rario')).toBe(200);
-    const match = new Match('cpu', true, 0, ['rario', 'zoma']);
-    const rario = match.fighters[0];
-    let ticks = 0;
-    while (rario.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, rario.stock, rario.y]).toEqual([200, 2, 0]);
-    // Round 1's crouch, the hop, the hang, the second hop's wait for
-    // landing, then Round 1 + 19.
-    expect(
-      [0, 24, 44, 119, 174, 175, 185].map(
-        (age) => animationFrame('intro', age, 'rario').image,
-      ),
-    ).toEqual([220, 223, 224, 169, 169, 139, 140]);
+    const { path, ticks, f, heights, images } = brIntro('rario');
+    // The second hop's fall passes the floor on its 56th move, and the
+    // landing (0x41187f) enters Round 1 + 19 (slot 1, PC 250) a tick later.
+    expect([path, ticks, f.stock, f.y]).toEqual([
+      [24, '26+3', '27+19'],
+      202,
+      2,
+      0,
+    ]);
+    expect([heights[175] > 0, heights[176]]).toEqual([true, 0]);
+    // After 開始時's (24) blank display: Round 1's crouch, the hop, the
+    // hang, the second hop's wait for landing, then Round 1 + 19.
+    expect([1, 25, 45, 120, 175, 176, 186].map((t) => images[t])).toEqual([
+      220, 223, 224, 169, 169, 139, 140,
+    ]);
   });
 
   it('wins after Demo stand, looping three poses, and draws holding image 227', () => {

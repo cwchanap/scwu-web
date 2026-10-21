@@ -4,6 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // 3-TIMES as player 1, `gap` from a standing Ryuko as player 2.
 function timesPlayer(gap = 90) {
@@ -188,19 +189,13 @@ describe('3-TIMES (30 3-TIMES.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro, OP normal + 2 (PC 374)', () => {
-    expect(animationDuration('intro', 'times')).toBe(208);
-    const match = new Match('cpu', true, 0, ['times', 'zoma']);
-    const times = match.fighters[0];
-    let ticks = 0;
-    while (times.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, times.stock]).toEqual([208, 2]);
+    expect(animationDuration('52+4', 'times')).toBe(208);
+    const { path, ticks, f } = brIntro('times');
+    expect([path, ticks, f.stock]).toEqual([[44, '52+4'], 210, 2]);
     // A 26-tick fade in, then DEMO STAND seven times (PC 525).
     expect(
       [0, 10, 23, 26, 36, 49, 207].map(
-        (age) => animationFrame('intro', age, 'times').image,
+        (age) => animationFrame('52+4', age, 'times').image,
       ),
     ).toEqual([113, 114, 115, 113, 114, 115, 115]);
   });

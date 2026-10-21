@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  KAY_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // KAY as player 1, `gap` from a standing opponent.
 function kayPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -235,27 +231,29 @@ describe('KAY (12 KAY.PLAYER)', () => {
   });
 
   it('walks in from Round 1 + 5 at raw 200 (PC 356) and calls Demo stand twice, charged with two stocks', () => {
-    expect([KAY_INTRO_EX_TICK, animationDuration('intro', 'kay')]).toEqual([
-      82, 200,
-    ]);
-    const match = new Match('cpu', true, 0, ['kay', 'zoma']);
-    const kay = match.fighters[0];
-    while (kay.age < 56) match.step({});
+    expect(animationDuration('32+3', 'kay')).toBe(200);
+    const { path, ticks, f, match } = brIntro('kay');
     // From 390 source pixels (0x408ac3), raw 200 for 56 ticks.
-    expect(kay.x - 390 * 1.5).toBeCloseTo(56 * 200 * (655 / 65536) * 1.5, 6);
-    while (kay.action === 'intro') match.step({});
+    expect([path, ticks]).toEqual([[30, '32+3'], 202]);
+    expect(f.x - 390 * 1.5).toBeCloseTo(56 * 200 * (655 / 65536) * 1.5, 6);
     for (let t = 0; t < 100; t++) match.step({});
-    expect([kay.stock, kay.power]).toEqual([2, 0]);
+    expect([f.stock, f.power]).toEqual([2, 0]);
   });
 
   it('enters EX CH (36) with down held as Round 1’s op 0x16 checks (PC 367)', () => {
-    const held = new Match('cpu', true, 0, ['kay', 'zoma']);
-    for (let t = 0; t < KAY_INTRO_EX_TICK; t++) held.step({ crouch: true });
-    expect(exMode(held.fighters[0])).toBe(true);
-    const late = new Match('cpu', true, 0, ['kay', 'zoma']);
-    for (let t = 0; t <= KAY_INTRO_EX_TICK; t++)
-      late.step({ crouch: t === KAY_INTRO_EX_TICK });
-    expect(exMode(late.fighters[0])).toBe(false);
+    // After 開始時's (30) blank display, 82 ticks into Round 1 + 5.
+    expect(
+      [82, 83, 84].map((down) => {
+        const { path, f } = brIntro('kay', 0, (t) =>
+          t === down ? { crouch: true } : {},
+        );
+        return [path.at(-1), exMode(f)];
+      }),
+    ).toEqual([
+      ['32+3', false],
+      [36, true],
+      ['32+3', false],
+    ]);
   });
 
   it('hops in his win (PC 579), landing into 57 + 10, then rolls his voice (PCs 588–596) into WIN RP (58)', () => {

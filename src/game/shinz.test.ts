@@ -4,6 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // SHIN-Z as player 1, `gap` from a standing Ryuko as player 2.
 function shinzPlayer(gap = 90) {
@@ -264,21 +265,15 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
   });
 
   it('charges five stocks through his Vs. intro, 開始時 BR + 3 (PC 338)', () => {
-    expect(animationDuration('intro', 'shinz')).toBe(258);
-    const match = new Match('cpu', true, 0, ['shinz', 'zoma']);
-    const shinz = match.fighters[0];
-    let ticks = 0;
-    while (shinz.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
+    expect(animationDuration('33+3', 'shinz')).toBe(258);
     // OP super Charge (46) clears his power and adds 500 (PCs 521–522):
     // five of his six stocks (+0x7cb2).
-    expect([ticks, shinz.stock]).toEqual([258, 5]);
+    const { path, ticks, f } = brIntro('shinz');
+    expect([path, ticks, f.stock]).toEqual([[31, '33+3'], 260, 5]);
     // Round 1 (34) + 2 (PC 342).
     expect(
       [0, 159, 160, 170, 178, 257].map(
-        (age) => animationFrame('intro', age, 'shinz').image,
+        (age) => animationFrame('33+3', age, 'shinz').image,
       ),
     ).toEqual([183, 183, 177, 176, 175, 175]);
   });
@@ -305,8 +300,8 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     // His CPU's own CPU DASH J and AKUMA SP, and CPU J CUT into Shin SAMA K
     // air add (PC 4243).
     for (const [seed, wanted] of [
-      [4, [318, 236]],
-      [6, [319, 206]],
+      [9, [318, 236]],
+      [14, [319, 206]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'shinz']);
       const shinz = match.fighters[1];

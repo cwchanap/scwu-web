@@ -5,7 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { enter } from './testing';
+import { brIntro, enter } from './testing';
 
 // MASA as player 1, `gap` from a standing opponent as player 2.
 function masaPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -213,18 +213,12 @@ describe('MASA (29 MASA.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro, OP normal + 3 (PC 458)', () => {
-    expect(animationDuration('intro', 'masa')).toBe(200);
-    const match = new Match('cpu', true, 0, ['masa', 'zoma']);
-    const masa = match.fighters[0];
-    let ticks = 0;
-    while (masa.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, masa.stock]).toEqual([200, 2]);
+    expect(animationDuration('52+4', 'masa')).toBe(200);
+    const { path, ticks, f } = brIntro('masa');
+    expect([path, ticks, f.stock]).toEqual([[44, '52+4'], 202, 2]);
     expect(
       [0, 10, 20, 30, 33, 145, 150].map(
-        (age) => animationFrame('intro', age, 'masa').image,
+        (age) => animationFrame('52+4', age, 'masa').image,
       ),
     ).toEqual([118, 448, 449, 450, 451, 447, 113]);
   });

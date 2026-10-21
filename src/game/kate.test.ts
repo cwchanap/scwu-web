@@ -5,6 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // KATE as player 1, `gap` from a standing opponent as player 2.
 function katePlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -275,17 +276,15 @@ describe('KATE (22 KATE.PLAYER)', () => {
     ]);
   });
 
-  it('stands through her 200-tick Vs. intro, charged to two stocks', () => {
-    expect(animationDuration('intro', 'kate')).toBe(200);
-    const match = new Match('cpu', true, 0, ['kate', 'zoma']);
-    const kate = match.fighters[0];
-    const x = kate.x;
-    let ticks = 0;
-    while (kate.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, kate.x, kate.stock]).toEqual([200, x, 2]);
+  it('stands through her Vs. intro, charged to two stocks', () => {
+    expect(animationDuration('32+3', 'kate')).toBe(200);
+    const { path, ticks, f } = brIntro('kate');
+    expect([path, ticks, f.x, f.stock]).toEqual([
+      [30, '32+3'],
+      202,
+      390 * 1.5,
+      2,
+    ]);
   });
 
   it('wins after two calls of sTAND demo, looping images 265 and 266 (PC 620), holds her draw and shows face 2001', () => {

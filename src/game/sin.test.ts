@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SIN_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
-import { exMode, fighterPose, Match } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { enter } from './testing';
+import { brIntro, enter } from './testing';
 
 // SIN as player 1, `gap` from a standing opponent.
 function sinPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -236,27 +231,21 @@ describe('SIN (10 SIN.PLAYER)', () => {
   });
 
   it('rises from his shadow in his Vs. intro, entering EX mode with down held as it checks (PC 403)', () => {
-    expect([SIN_INTRO_EX_TICK, animationDuration('intro', 'sin')]).toEqual([
-      75, 200,
+    expect(animationDuration('35+3', 'sin')).toBe(200);
+    expect(animationFrame('35+3', 75, 'sin').image).toBe(365);
+    // After 開始時's (33) blank display, Round 1's check enters hanshin
+    // change (40); STAND DEMO 2 (30) then jumps to STAND DEMO (29, PC 324):
+    // images 113–117 for 123 ticks (PCs 315–322) in place of 365's 125.
+    const { path, ticks, f, images } = brIntro('sin', 0, (t) =>
+      t >= 60 ? { crouch: true } : {},
+    );
+    expect([path, ticks, f.x, exMode(f)]).toEqual([
+      [33, '35+3', 40],
+      200,
+      390 * 1.5,
+      true,
     ]);
-    const match = new Match('cpu', true, 0, ['sin', 'zoma']);
-    const sin = match.fighters[0];
-    const { x } = sin;
-    for (let t = 0; t < 200; t++) match.step({ crouch: t >= 60 });
-    expect([sin.action, sin.x, exMode(sin)]).toEqual(['idle', x, true]);
-    // STAND DEMO 2 (30) then jumps to STAND DEMO (29, PC 324): images
-    // 113–117 for 123 ticks (PCs 315–322) in place of 365's 125.
-    const ex = new Match('cpu', true, 0, ['sin', 'zoma']);
-    const images: number[] = [];
-    let ticks = 0;
-    for (; ex.fighters[0].action === 'intro'; ticks++) {
-      ex.step({ crouch: ticks >= 60 });
-      images[ex.fighters[0].age] = fighterPose(ex.fighters[0]).image;
-    }
-    expect([ticks, images[75], images[105], images[197]]).toEqual([
-      198, 113, 114, 114,
-    ]);
-    expect(animationFrame('intro', 75, 'sin').image).toBe(365);
+    expect([76, 106, 198].map((t) => images[t])).toEqual([113, 114, 114]);
   });
 
   it('wins with STAND DEMO 2 (30), then loops PCs 617–618 with WIN RP spawned once (PC 616)', () => {

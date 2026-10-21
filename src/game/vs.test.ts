@@ -147,11 +147,11 @@ describe("Ryuko's VS 開始時 (30)", () => {
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
   });
 
-  it("plays each fighter's own, or the Br. intro if one has none exported", () => {
+  it("plays each fighter's own, or DoraEmon's Br. intro, whom it never offers", () => {
     const mixed = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true);
     expect(mixed.fighters.map((f) => f.branch)).toEqual([30, 28]);
     const other = new Match('cpu', true, 0, ['zoma', 'dora'], 'court', true);
-    expect(other.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
+    expect(other.fighters.map((f) => f.action)).toEqual(['script', 'intro']);
   });
 });
 
@@ -161,8 +161,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
 // row: those actions and images, round 2's images by age, the ticks to idle
 // in rounds 1 and 2, how far round 1's action walks, and the action it runs
 // out of when that action jumps on, with a seed whose rolls both take it,
-// the timeline the round copy jumps to, and how many VS CHARGEs each has,
-// and the timeline round 2 runs if not the 開始時's own.
+// the timeline the round copy jumps to, and how many VS CHARGEs each has.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -177,7 +176,6 @@ const TEMPLATE: {
   seed?: number;
   copy?: ObjectKey;
   charges?: number;
-  later?: ObjectKey;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
   // image 114 for 30 ticks (PC 285), then DEMO STAND (41) four times (PC
@@ -385,8 +383,8 @@ const TEMPLATE: {
     idle: [351, 351],
   },
   // Round 1 (34, PC 348): blanks for 200 ticks while OP (35) and OP bkg
-  // (37) spawn, then it jumps into OP lend (36, PC 392), his Br. intro's
-  // landing, 50 more. From round 2 DEMO STAND (29) twice by op 0x0b: from
+  // (37) spawn, then it jumps on into OP lend (36, PC 392), his Br. intro's
+  // landing, 50 more, played inline. From round 2 DEMO STAND (29) twice by op 0x0b: from
   // PC 11 (PC 349), then from its start (PC 350).
   {
     who: 'lizard',
@@ -408,7 +406,6 @@ const TEMPLATE: {
       [349, 121],
     ],
     idle: [351, 351],
-    ends: 36,
   },
   // Round 1 (33, PC 326) steps back at −2250 for 5 ticks, waits 45, walks
   // in at 200 for 56 (PCs 352–365), shows image 113 for 26, checks down
@@ -1204,7 +1201,6 @@ const TEMPLATE: {
     ],
     idle: [351, 321],
     ends: '27+18',
-    later: '24+11',
   },
 ];
 
@@ -1224,7 +1220,6 @@ describe.each(TEMPLATE)(
     seed = 0,
     copy = `${start}+9`,
     charges = 1,
-    later = start,
   }) => {
     it('dashes, crosses and stands, then plays its round 1 action', () => {
       const match = vsMatch(who, seed);
@@ -1278,23 +1273,17 @@ describe.each(TEMPLATE)(
       const [p1, p2] = match.fighters;
       steps(match, 6);
       expect([p1.branch, at(p1), at(p2), banners(match, banner)]).toEqual([
-        later,
+        start,
         370,
         910,
         [],
       ]);
       const ages: [number, number][] = [[29, 0], [30, image], ...demo];
-      // A round 2 timeline of its own starts where the 開始時 jumps to it,
-      // past its five blank ticks.
-      const from = later === start ? 0 : 5;
       expect(
-        ages.map(([age]) => [
-          age,
-          animationFrame(later, age - from, who).image,
-        ]),
+        ages.map(([age]) => [age, animationFrame(start, age, who).image]),
       ).toEqual(ages);
       steps(match, idle[1] - 7);
-      expect([p1.branch, p2.branch]).toEqual([later, later]);
+      expect([p1.branch, p2.branch]).toEqual([start, start]);
       match.step();
       expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
     });
@@ -1965,7 +1954,7 @@ function finish(
   target.x = 500 + gap;
   striker.stock = 3;
   // EX mode: variable 0 at its EX value, or at a value given.
-  if (ex) striker.variables[0] = ex === true ? EX_MODE[who]!.value : ex;
+  if (ex) striker.variables[0] = ex === true ? EX_MODE[who]! : ex;
   // A desperation super's op 0x11 wants low life.
   if (life) striker.hp = life;
   // A victim lying down, as a knockdown leaves it.

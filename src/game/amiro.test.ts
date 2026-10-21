@@ -1,12 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
-import {
-  AMIRO_INTRO_EX_TICK,
-  animationDuration,
-  animationFrame,
-  BLACK,
-  script,
-} from './animations';
+import { animationDuration, animationFrame, BLACK, script } from './animations';
 import type { Action } from './animations';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -73,22 +67,22 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
     const amiro = match.fighters[0];
     // The round's set-up places her at 390 source pixels (0x408ac3).
     expect(amiro.x).toBe(390 * 1.5);
+    // After 開始時's (29) blank display, PC 364: her car (35) follows her in
+    // slot 9 (op 0x04 flags 0x21).
     match.step();
-    // PC 364: her car (35) follows her in slot 9 (op 0x04 flags 0x21).
+    match.step();
     expect(match.effects.find((e) => e.clip === 35)).toMatchObject({
       owner: 0,
       slot: 9,
       follow: expect.anything(),
     });
     // Round BR then calls Demo stand once (PC 388).
-    expect([AMIRO_INTRO_EX_TICK, animationDuration('intro', 'amiro')]).toEqual([
-      63, 198,
-    ]);
-    for (let t = 1; t < 115; t++) match.step({ crouch: t >= 60 });
+    expect(animationDuration('31+3', 'amiro')).toBe(198);
+    for (let t = 2; t < 117; t++) match.step({ crouch: t >= 60 });
     // PCs 375–377: a free copy (35 + 10) replaces it and drives away.
     expect(match.effects.map((e) => e.clip)).toContain('35+10');
     expect(match.effects.map((e) => e.clip)).not.toContain(35);
-    for (let t = 115; t < 198; t++) match.step({ crouch: true });
+    for (let t = 117; t < 200; t++) match.step({ crouch: true });
     expect(amiro.action).toBe('idle');
     // Raw 600 for 32 ticks (PC 367), then 60 for 15 (PC 372).
     expect(amiro.x - 390 * 1.5).toBeCloseTo((600 * 32 + 60 * 15) * VELOCITY, 6);

@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  LIZARD_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // LIZARD as player 1, `gap` from a standing opponent.
 function lizardPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -154,39 +150,30 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     ]);
   });
 
-  it('leaps in from above in his Vs. intro, landing into OP lend at LIZARD_LANDING, charged with two stocks', () => {
-    expect([LIZARD_LANDING, animationDuration('intro', 'lizard')]).toEqual([
-      166, 216,
-    ]);
-    // 開始時 BR (33) from PC 367: unseen at first, the leap's 396 (PC 378),
-    // 132 cut a tick short, then OP lend's 126 (PC 413).
+  it('leaps in from above in his Vs. intro, landing into OP lend, charged with two stocks', () => {
+    // 開始時 BR (33) from PC 367: unseen at first, then the leap's 396 (PC
+    // 378) and 132.
     expect(
-      [0, 104, 165, 166, 215].map(
-        (age) => animationFrame('intro', age, 'lizard').image,
-      ),
-    ).toEqual([0, 396, 132, 126, 125]);
-    const match = new Match('cpu', true, 0, ['lizard', 'zoma']);
-    const lizard = match.fighters[0];
-    const at: Record<number, [number, number]> = {};
-    while (lizard.action === 'intro') {
-      match.step({});
-      at[lizard.age] = [Math.round(lizard.x), lizard.y / 1.5];
-    }
-    // Up 80 source pixels in two ticks (PC 372), down past the floor in 62.
-    expect(at[4][1]).toBeCloseTo(-79.96, 2);
-    expect(at[165][1]).toBeCloseTo(-9.23, 2);
-    // From 390 source pixels (0x408ac3), raw 400 through the leap.
-    expect(at[166]).toEqual([
-      Math.round(
-        390 * 1.5 + (LIZARD_LANDING - 104) * 400 * (655 / 65536) * 1.5,
-      ),
+      [0, 104, 165].map((age) => animationFrame('33+3', age, 'lizard').image),
+    ).toEqual([0, 396, 132]);
+    const { path, ticks, f, match, heights, images } = brIntro('lizard');
+    // Up 80 source pixels in two ticks (PC 372), after 開始時's (31) blank
+    // display; the leap's fall passes the floor on its 62nd move, and the
+    // landing (0x41187f) enters OP lend (36, slot 1 at PC 383) a tick later.
+    expect(heights[5] / 1.5).toBeCloseTo(-79.96, 2);
+    expect(heights[165] / 1.5).toBeCloseTo(-9.23, 2);
+    expect([heights[166] > 0, heights[167], images[167]]).toEqual([
+      true,
       0,
+      126,
     ]);
-    expect(lizard.action).toBe('idle');
+    expect([path, ticks]).toEqual([[31, '33+3', 36], 218]);
+    // From 390 source pixels (0x408ac3), raw 400 through the leap.
+    expect(f.x).toBeCloseTo(390 * 1.5 + 62 * 400 * (655 / 65536) * 1.5, 6);
     // OP super Charge (42, PC 369) takes 300 power, borrowing stocks down to
     // none (0x40e6f0), then calls 43 a hundred times for 2 each (PC 481).
     for (let t = 0; t < 100; t++) match.step({});
-    expect([lizard.stock, lizard.power]).toEqual([2, 0]);
+    expect([f.stock, f.power]).toEqual([2, 0]);
   });
 
   it('wins with DEMO STAND, ten passes of win RP (PC 629) after the sound before them (PC 628), then holds 409', () => {

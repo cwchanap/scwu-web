@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  GIGI_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { StandingVM } from './standing';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // GIGI as player 1, `gap` from a standing opponent as player 2.
 function gigiPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -357,15 +353,16 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro and starts his Change form while down is held at its check (PC 361)', () => {
-    expect([animationDuration('intro', 'gigi'), GIGI_INTRO_EX_TICK]).toEqual([
-      200, 119,
-    ]);
+    expect(animationDuration('32+3', 'gigi')).toBe(200);
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['gigi', 'zoma']);
-      const gigi = match.fighters[0];
-      while (gigi.action === 'intro') match.step({ crouch });
+      // The check jumps to 開始時 2P (31) + 13.
+      const { path, f } = brIntro('gigi', 0, () => ({ crouch }));
       // OP super Charge (38, PC 351) runs alongside.
-      expect([exMode(gigi), gigi.stock]).toEqual([crouch, 2]);
+      expect([path, exMode(f), f.stock]).toEqual([
+        [30, '32+3', ...(crouch ? ['31+13'] : [])],
+        crouch,
+        2,
+      ]);
     }
     expect([0, 40, 80, 120].map((face) => faceImage(face, 'gigi'))).toEqual([
       2002, 2001, 2000, 2001,

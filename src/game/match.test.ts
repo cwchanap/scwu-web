@@ -22,7 +22,6 @@ import {
   animationDuration,
   animationFrame,
   hurtboxes,
-  INTRO_EX_TICK,
   NORMAL_COLOR,
   RESPONSE_EFFECTS,
 } from './animations';
@@ -30,6 +29,7 @@ import { rand } from './standing';
 import { STAGES, type Stage, type Who } from './characters';
 import {
   base,
+  brIntro,
   enter,
   named,
   objects,
@@ -491,25 +491,26 @@ describe('recovered neutral and round animations', () => {
   it('walks both fighters in for the recovered intro, then waits for SHOW TIME', () => {
     const match = new Match('cpu', true);
     const [player, cpu] = match.fighters;
-    expect(animationDuration('intro')).toBe(199);
+    expect(animationDuration('32+3')).toBe(199);
     expect(
       [0, 50, 70, 120, 152, 162, 167, 172, 198].map(
-        (age) => animationFrame('intro', age).image,
+        (age) => animationFrame('32+3', age).image,
       ),
     ).toEqual([353, 356, 358, 359, 295, 364, 365, 295, 295]);
-    expect(match.fighters.map((f) => f.action)).toEqual(['intro', 'intro']);
-    ticks(match, 50, { punch: true, right: true });
+    // 開始時 (30) shows its blank display a tick, then jumps to 開始時 BR + 3.
+    expect(match.fighters.map((f) => f.action)).toEqual(['script', 'script']);
+    ticks(match, 52, { punch: true, right: true });
     // From 390 and 890 source pixels (0x408ac3), each raw 200 for 50 ticks.
     const walk = 50 * 200 * (655 / 65536) * 1.5;
     expect(player.x).toBeCloseTo(390 * 1.5 + walk, 3);
     expect(cpu.x).toBeCloseTo(890 * 1.5 - walk, 3);
     ticks(match, 148, { punch: true });
-    expect(player).toMatchObject({ action: 'intro', x: player.x });
+    expect(player).toMatchObject({ action: 'script', x: player.x });
     expect(match).toMatchObject({ ticks: 0, seconds: 60 });
     match.step({ punch: true });
     expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
     // Round phase 0 lasts until the fight lettering: no commands or clock.
-    ticks(match, FIGHT_TICK - 200, { punch: true });
+    ticks(match, FIGHT_TICK - 202, { punch: true });
     expect(player.action).toBe('idle');
     expect(match).toMatchObject({ roundTicks: FIGHT_TICK - 1, ticks: 0 });
     match.step({ punch: true });
@@ -715,8 +716,8 @@ describe('recovered neutral and round animations', () => {
           exMode(f),
         ]),
       ).toEqual([
-        ['intro', LIFE, 2, 40, false],
-        ['intro', LIFE, stock, power, false],
+        ['script', LIFE, 2, 40, false],
+        ['script', LIFE, stock, power, false],
       ]);
     });
 
@@ -6522,16 +6523,19 @@ describe('EX mode', () => {
   });
 
   it('starts a Vs. CPU round in EX mode for down held at PC 348', () => {
-    expect(INTRO_EX_TICK).toBe(162);
-    const match = new Match('cpu', true);
-    ticks(match, INTRO_EX_TICK - 1, { crouch: true });
-    expect(exMode(match.fighters[0])).toBe(false);
-    match.step({ crouch: true });
-    expect(match.fighters.map(exMode)).toEqual([true, false]);
-    const late = new Match('cpu', true);
-    ticks(late, INTRO_EX_TICK);
-    late.step({ crouch: true });
-    expect(exMode(late.fighters[0])).toBe(false);
+    // After 開始時's (30) blank display, 162 ticks into 開始時 BR + 3.
+    expect(
+      [162, 163, 164].map((down) => {
+        const { f, match } = brIntro('ryuko', 0, (t) =>
+          t === down ? { crouch: true } : {},
+        );
+        return [exMode(f), exMode(match.fighters[1])];
+      }),
+    ).toEqual([
+      [false, false],
+      [true, false],
+      [false, false],
+    ]);
   });
 
   it('fires a tapped EX Fire (231): a 30-damage shot at raw 800 through FB', () => {

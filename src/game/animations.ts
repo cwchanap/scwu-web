@@ -360,119 +360,11 @@ export function heldFrame(
   };
 }
 
-// Action 33's op 0x16 at PC 348 checks down once the display at PC 347 ends;
-// Chung's ROUND 1 checks at PC 338, from PC 332, Amiro's Round BR at PC 382,
-// ANMC P's Round 1 at PC 363, from PC 356, Giant's Round 1 at PC 328,
-// from PC 313, G Suneo's Round 1 at PC 403, from PC 393, SIN's Round 1 at
-// PC 403, from PC 396, KAY's Round 1 at PC 367, from PC 357, before his
-// flattened intro's calls of Demo stand (PCs 286–293), SAKUYA's Round 1 at
-// PC 413, from PC 399, before her call of STAND DEMO (PCs 300–303),
-// ALEX's Round 1 at PC 356, from PC 333, SOU's at PC 415, as he lands
-// (SOU_LANDING), ERUS's Round 1 at PC 357, from PC 344, before her call of
-// stand demo (PCs 265–268), OS FENG's Round 1 at PC 393, from PC 363,
-// GIGI's Round 1 at PC 361, from PC 356, before his flattened intro's call of
-// Demo stand (PCs 288–295), and SWW's Round 1 at PC 330, from PC 325, before
-// his (PCs 258–265). YINAN's Round 1 checks at PC 648, entering 開始時 SELECT
-// (40) + 8 (PC 609), which sets variable 0 to 100.
-// The displays' ticks before `pc`, in order, up to a call into an earlier
-// action, as Chung's, Amiro's and SIN's of their stand demos.
-const ticksBefore = (frames: Pose[], pc: number) => {
-  let total = 0;
-  for (const frame of frames) {
-    if (frame.pc >= pc || frame.pc < frames[0].pc) break;
-    total += frame.duration;
-  }
-  return total;
-};
-export const INTRO_EX_TICK = ticksBefore(clips.intro, 348);
-export const CHUNG_INTRO_EX_TICK = ticksBefore(fighterClips.chung.intro, 338);
-export const AMIRO_INTRO_EX_TICK = ticksBefore(fighterClips.amiro.intro, 382);
-export const ANMC_INTRO_EX_TICK = ticksBefore(fighterClips.anmc.intro, 363);
-export const GIANT_INTRO_EX_TICK = ticksBefore(fighterClips.giant.intro, 328);
-export const SUNEO_INTRO_EX_TICK = ticksBefore(fighterClips.suneo.intro, 403);
-export const SIN_INTRO_EX_TICK = ticksBefore(fighterClips.sin.intro, 403);
-export const KAY_INTRO_EX_TICK = ticksBefore(
-  fighterClips.kay.intro.filter((frame) => frame.pc > 293),
-  367,
-);
-export const SAKUYA_INTRO_EX_TICK = ticksBefore(
-  fighterClips.sakuya.intro.filter((frame) => frame.pc > 303),
-  413,
-);
-export const ALEX_INTRO_EX_TICK = ticksBefore(fighterClips.alex.intro, 356);
-export const ERUS_INTRO_EX_TICK = ticksBefore(
-  fighterClips.erus.intro.filter((frame) => frame.pc > 268),
-  357,
-);
-export const FENG_INTRO_EX_TICK = ticksBefore(fighterClips.feng.intro, 393);
-export const GIGI_INTRO_EX_TICK = ticksBefore(
-  fighterClips.gigi.intro.filter((frame) => frame.pc > 295),
-  361,
-);
-export const SWW_INTRO_EX_TICK = ticksBefore(
-  fighterClips.sww.intro.filter((frame) => frame.pc > 265),
-  330,
-);
-// YINAN's 開始時 BR (41) jumps past its display at PC 622 for global 14 = 0
-// (PC 621) into Round 1 (42) + 7 (PC 624), past the fader between (PC 623),
-// so her spawns (PCs 614–620) run as Round 1's display starts. AYA's (34)
-// jumps past hers at PC 364 (PC 363) to its fader (PC 365), so her spawns
-// (PCs 361–362) run with it.
-const introPastDisplay = (who: 'yinan' | 'aya') => {
-  const [first, skipped, next, ...rest] = fighterClips[who].intro;
-  const events =
-    who === 'aya'
-      ? [...(skipped.events ?? []), ...(next.events ?? [])]
-      : skipped.events;
-  return [first, { ...next, events }, ...rest];
-};
-export const YINAN_INTRO_EX_TICK = ticksBefore(introPastDisplay('yinan'), 648);
-
-// The age LIZARD's intro lands at: the step after his fall passes the floor
-// (0x41187f), 104 ticks before his leap and 62 in the air (introMotion).
-export const LIZARD_LANDING = 166;
-// SOU's, 2 ticks rising at raw vy −7000, gravity −10000 (PC 401), then 107
-// falling at 300 (PC 410) until the fall passes the floor 319 source pixels
-// down, into Round 1 + 10 (slot 1, PC 409).
-export const SOU_LANDING = 109;
-export const SOU_INTRO_EX_TICK = SOU_LANDING;
-// SEAN's, 4 ticks rising unseen at raw vy −20000 (PC 367), then 160 falling
-// at 500 (PC 391) until the fall reaches the floor 800 source pixels down,
-// into Round 1 + 15 (slot 1, PC 390).
-export const SEAN_LANDING = 164;
-// GON's, 103 ticks standing, then leaping at raw vy −1400, gravity 60 (PC
-// 452) until the fall passes the floor on his 77th move, into Round 1 + 25
-// (slot 1, PC 451).
-export const GON_LANDING = 180;
-// REMU's, 2 ticks rising at raw vy −6000, gravity −10000 (PC 388), 70
-// sinking at 400 (PC 403), 93 still (PC 405), 10 rising under gravity −3000
-// (PC 425) and 10 still (PC 428), then falling under gravity 90 (PC 431)
-// until the fall passes the floor on his 61st move, into Round 1 + 44
-// (slot 1, PC 430).
-export const REMU_LANDING = 246;
-// REAR's, 7 ticks rising unseen at raw vy −2000 (PC 345), 27 gliding at
-// 1000/200 (PC 375), then slowing by 50 under gravity 60 (PC 380) until the
-// fall passes the floor on his 17th move, into Round BR + 9 (slot 1, PC
-// 374).
-export const REAR_LANDING = 51;
-// ZIRO's, 8 ticks rising unseen at raw vy −20000 (PC 445), 48 still (PCs
-// 447–437), then falling at 2000 under gravity 30 (PC 459) until the fall
-// passes the floor 1599 source pixels down on his 63rd move, into Round 1 +
-// 11 (slot 1, PC 458).
-export const ZIRO_LANDING = 119;
 // DoraEmon's, 100 ticks still, 27 rising at raw vy −50 (PC 381), 81 still
 // (PC 393), then falling under gravity 50 (PC 398) until the fall reaches
 // the floor 13 source pixels down on his 9th move, into Round 1 + 27 (slot
 // 1, PC 399).
 export const DORA_LANDING = 217;
-// RARIO's, 44 ticks still, 25 hopping at raw vy −1000 under gravity 30 (PC
-// 246), 50 hanging still (PC 248), then hopping again under gravity 80 (PC
-// 251) until the fall passes the floor on his 56th move, into Round 1 + 19
-// (slot 1, PC 250).
-export const RARIO_LANDING = 175;
-// His Round 1 checks down at PC 486, 68 ticks after he lands.
-export const ZIRO_INTRO_EX_TICK =
-  ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
 // How many times each win calls its stand demo: twice, ZAKU's and
 // PAC-HELO's four times, TRAINING's three (PC 366), otherwise once.
 const winStands = (who: Who) =>
@@ -549,9 +441,6 @@ export const animations = {
   // Actions 23/24 display a mirrored mid-turn pose for ten ticks.
   turn: clip(clips.turn),
   crouchTurn: clip(clips.crouchTurn),
-  // Action 32 jumps to action 33 + 4 (PC 328), past its blank repositioning
-  // displays (export_assets.py).
-  intro: clip(clips.intro),
   hitPull: clip(clips.hitPull),
   // Response 5/6 (air punch and kick against a grounded opponent) → action 77.
   jumpHit: clip(clips.jumpHit),
@@ -678,7 +567,8 @@ export const animations = {
   // table, or its two displays run out (holdVictims).
   superHeld: clip(clips.grabbed),
 };
-export type AnimatedAction = keyof typeof animations;
+// 'intro' is DoraEmon's Br. intro, whose 開始時 isn't exported (Match.entrants).
+export type AnimatedAction = keyof typeof animations | 'intro';
 // 'script' runs the source action in the fighter's `branch` from its own
 // timeline: every move, entered by number.
 export type Action = 'idle' | 'script' | AnimatedAction;
@@ -728,92 +618,12 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
-    // Each 開始時 BR from past its global 14 = 0 test, through its spawns of
-    // Black and OP super Charge into Round 1: Zoma's Start N (31) from PC
-    // 309, Kiki's Round 1 (33) from PC 326, Chung's ROUND 1 (33) from PC 332
-    // and its call of Demo stand, ANMC P's Round 1 (35) from PC 356, Giant's
-    // Round 1 (33) from PC 313, G Suneo's 開始時 BR (34) from PC 382, into
-    // Round 1 (35) + 3, HISO's 開始時 BR (32) from PC 332, ERUS's 開始時 BR (34) from PC 344,
-    // OS FENG's 開始時 BR (34) from PC 363, KATE's 開始時 BR (32) from PC
-    // 335, GIGI's 開始時 BR (32) from PC 350 and SWW's from PC 319, past
-    // their global 14 = 0 tests (PCs 348, 317), into Round 1 + 2 and its call
-    // of Demo stand (PCs 362, 334), and OGI's 開始時 BR (36) from PC 384, past
-    // its (PC 382), into Round 1 (37) + 4 and its 14 calls of OP motion RP
-    // (41, PC 403): no op
-    // 0x01, so each stands where they start. Amiro's Round BR (33)
-    // drives in on her car and calls Demo stand, and Yo's Round 1 (35) from
-    // PC 379 rides in on her robot (introMotion), then calls Demo Stand three
-    // times (PC 392); SIN's Round 1 (36) from PC 396 calls STAND DEMO 2 once
-    // (PC 404).
-    // LIZARD's 開始時 BR (33) from PC 367 leaps in (introMotion) and lands at
-    // LIZARD_LANDING into OP lend (36, slot 1 at PC 383), cutting the
-    // display at PC 385 short and the wait at PC 386 out. SOU's 開始時 BR
-    // (36) from PC 401 rises and falls (introMotion), landing out of the wait
-    // at PC 413 at SOU_LANDING into Round 1 + 10, which calls DEMO stand once
-    // (PC 420). SEAN's 開始時 BR (35) rises unseen (PC 368), skips its
-    // display at PC 371 for global 14 = 0 (PC 369), then falls through four
-    // 40-tick loops of PCs 393–396 (PC 397) into Round 1 + 15 at
-    // SEAN_LANDING; the loop's spawns run once. GON's Round 1 (39) from PC
-    // 441 leaps (introMotion) and lands out of the wait at PC 462 at
-    // GON_LANDING into Round 1 + 25. REMU's 開始時 BR (35) from PC 388, past
-    // its global 14 = 0 test (PC 379), rises, sinks through ten calls of OP
-    // movie rp (40) and five more (PCs 404–406), soars and falls
-    // (introMotion), landing out of the wait at PC 433 at REMU_LANDING into
-    // Round 1 + 44. REAR's 開始時 BR (33) from PC 345, past its global 14
-    // = 0 test (PC 336), rises unseen and glides in (introMotion), landing
-    // out of the wait at PC 381 at REAR_LANDING into Round BR + 9, which
-    // calls STAND DEMO twice (PC 386). ZIRO's 開始時 BR (38) from PC 445,
-    // past its roll (PC 428) and global 14 = 0 test (PC 429), rises unseen
-    // and falls into Round 1 + 6 (introMotion), landing out of the wait at PC
-    // 461 at ZIRO_LANDING into Round 1 + 11. ponytail: the roll's other half,
-    // through RANDOM OP1 (31) + 2 (PC 444), isn't played. DoraEmon's 開始時
-    // BR (32) from PC 366 (authored, export_assets.py) runs into Round 1 +
-    // 3, rises and lands out of the wait at PC 400 at DORA_LANDING into Round
-    // 1 + 27. RARIO's 開始時 BR (26) from PC 231, past its global 14 = 0
-    // test (PC 229), runs into Round 1 + 3, hops twice and lands out of the
-    // wait at PC 253 at RARIO_LANDING into Round 1 + 19, whose poses its
-    // flattening runs on into. TRAINING's 開始時 (24), with no BR, dashes
-    // on blank displays (PCs 229–232), stands 70 ticks and calls Demo stand
-    // four times (PC 240).
-    intro:
-      who === 'lizard'
-        ? landed(z.intro.slice(0, -1), z.introLand, LIZARD_LANDING)
-        : who === 'sou' ||
-            who === 'gon' ||
-            who === 'remu' ||
-            who === 'rear' ||
-            who === 'ziro' ||
-            who === 'dora' ||
-            who === 'rario'
-          ? landed(
-              who === 'rario' ? z.intro.slice(0, -z.introLand.length) : z.intro,
-              z.introLand,
-              {
-                sou: SOU_LANDING,
-                gon: GON_LANDING,
-                remu: REMU_LANDING,
-                rear: REAR_LANDING,
-                ziro: ZIRO_LANDING,
-                dora: DORA_LANDING,
-                rario: RARIO_LANDING,
-              }[who],
-            )
-          : who === 'sean'
-            ? landed(
-                [
-                  z.intro[0],
-                  ...z.intro.slice(2),
-                  // The loop's exported replay (6–9), without its spawns.
-                  ...Array<Pose[]>(2).fill(z.intro.slice(6)).flat(),
-                ],
-                z.introLand,
-                SEAN_LANDING,
-              )
-            : clip(
-                who === 'yinan' || who === 'aya'
-                  ? introPastDisplay(who)
-                  : z.intro,
-              ),
+    // DoraEmon's 開始時 BR (32) from PC 366 (authored, export_assets.py)
+    // runs into Round 1 + 3, rises and lands out of the wait at PC 400 at
+    // DORA_LANDING into Round 1 + 27.
+    ...(who === 'dora' && {
+      intro: landed(z.intro, z.introLand, DORA_LANDING),
+    }),
     ...guardAnimations(z),
     hit: clip(z.hit),
     hitHeavy: clip(z.hitHeavy),
@@ -1031,8 +841,8 @@ const TWIN_ANIMATIONS = {
 // (PCs 2566–2567), which only the hidden super's guard reaches; the port
 // draws its images over the normal guard's rules.
 // Demo stands jump to their EX stance while variable 0 holds the EX value
-// (op 0x1f, export_fighter), so in EX mode each call of one in an intro or a
-// result plays that stance: SAKUYA's STAND DEMO plays Skill1 (32, PC 296).
+// (op 0x1f, export_fighter), so in EX mode each call of one in a result
+// plays that stance: SAKUYA's STAND DEMO plays Skill1 (32, PC 296).
 function exStands(who: Exclude<Who, 'ryuko'>) {
   const z = fighterClips[who];
   const stand = new Set(z.winStand.map((frame) => frame.pc));
@@ -1044,15 +854,15 @@ function exStands(who: Exclude<Who, 'ryuko'>) {
           ? []
           : [frame],
     );
-  const { intro, win, draw } = twinAnimations(who, {
+  const { win, draw } = twinAnimations(who, {
     ...z,
     ...Object.fromEntries(
-      ['intro', 'introLand', 'win', 'draw', 'winStand']
+      ['win', 'draw', 'winStand']
         .filter((name) => z[name])
         .map((name) => [name, swap(z[name])]),
     ),
   });
-  return { intro, win, draw };
+  return { win, draw };
 }
 const EX_ANIMATIONS = Object.fromEntries(
   Object.entries(fighterClips)
@@ -1069,12 +879,13 @@ const EX_ANIMATIONS = Object.fromEntries(
 // Object keys name a spawned source object, played from its flattened timeline.
 export const isObject = (
   action: AnimatedAction | ObjectKey,
-): action is ObjectKey => !Object.hasOwn(animations, action);
+): action is ObjectKey =>
+  action !== 'intro' && !Object.hasOwn(animations, action);
 function clipOf(action: AnimatedAction | ObjectKey, who: Container) {
   if (isObject(action)) return objectClip(action, who);
   const found =
     who === 'ryuko'
-      ? animations[action]
+      ? (animations as Partial<Record<AnimatedAction, Clip>>)[action]
       : TWIN_ANIMATIONS[who as Exclude<Who, 'ryuko'>][action];
   if (!found) throw new Error(`${who} has no ${action} clip yet`);
   return found;

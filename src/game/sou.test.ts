@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SOU_INTRO_EX_TICK,
-  SOU_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // SOU as player 1, `gap` from a standing opponent as player 2.
 function souPlayer(gap = 90, opponent: Who = 'ryuko') {
@@ -254,34 +249,34 @@ describe('SOU (16 SOU.PLAYER)', () => {
     expect(stance(10, 144)).toEqual([360, 361, 355, 356, 357, 356, 358, 359]);
   });
 
-  it('drops into his Vs. intro and lands at SOU_LANDING, in EX mode with down held (PC 415)', () => {
-    expect([
-      SOU_LANDING,
-      SOU_INTRO_EX_TICK,
-      animationDuration('intro', 'sou'),
-    ]).toEqual([109, 109, 200]);
-    // 開始時 BR + 10 (PC 402), Round 1 from PC 411 and, landed, from PC 418
-    // with its call of DEMO stand (PC 420).
+  it('drops into his Vs. intro and lands, in EX mode with down held (PC 415)', () => {
+    // 開始時 BR + 10 (PC 402), then Round 1 from PC 411.
     expect(
-      [0, 2, 108, 109, 114, 128, 199].map(
-        (age) => animationFrame('intro', age, 'sou').image,
-      ),
-    ).toEqual([8191, 306, 306, 124, 123, 115, 116]);
+      [0, 2, 108].map((age) => animationFrame('36+10', age, 'sou').image),
+    ).toEqual([8191, 306, 306]);
+    // Landed, Round 1 + 10 from PC 418 with its call of DEMO stand (PC 420).
+    expect(
+      [0, 5, 19, 90].map((age) => animationFrame('37+10', age, 'sou').image),
+    ).toEqual([124, 123, 115, 116]);
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['sou', 'zoma']);
-      const sou = match.fighters[0];
-      let top = 0;
-      let landed = 0;
-      while (sou.action === 'intro') {
-        match.step(crouch ? { crouch } : {});
-        top = Math.min(top, sou.y);
-        if (!landed && sou.age > 2 && sou.y === 0) landed = sou.age;
-      }
-      // 319 source pixels up; OP super Charge (43, PC 398) charges the
-      // second stock the tick after.
-      expect([Math.round(top), landed, sou.stock]).toEqual([-480, 109, 1]);
-      match.step(crouch ? { crouch } : {});
-      expect([sou.x, sou.stock, exMode(sou)]).toEqual([390 * 1.5, 2, crouch]);
+      // After 開始時's (34) blank display; the fall passes the floor 319
+      // source pixels down, and the landing (0x41187f) enters Round 1 + 10
+      // (slot 1, PC 409) a tick later, whose check (PC 415) enters Change
+      // Character (41) for down.
+      const { path, ticks, f, match, heights } = brIntro('sou', 0, () => ({
+        crouch,
+      }));
+      expect(Math.min(...heights) / 1.5).toBeCloseTo(-319.824, 3);
+      expect([heights[109] > 0, heights[110]]).toEqual([true, 0]);
+      expect([path, ticks]).toEqual([
+        [34, '36+10', crouch ? 41 : '37+10'],
+        202,
+      ]);
+      // OP super Charge (43, PC 398) charges the second stock the tick
+      // after.
+      expect(f.stock).toBe(1);
+      match.step({ crouch });
+      expect([f.x, f.stock, exMode(f)]).toEqual([390 * 1.5, 2, crouch]);
     }
   });
 

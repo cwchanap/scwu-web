@@ -544,16 +544,17 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
   it('stands through his Vs. intro (31 + 2) where the round places him', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'zoma']);
     const [ryuko, zoma] = match.fighters;
-    expect(animationDuration('intro', 'zoma')).toBe(200);
+    expect(animationDuration('30+3', 'zoma')).toBe(200);
     expect(
       [0, 40, 48, 63, 73, 113, 123, 131, 199].map(
-        (age) => animationFrame('intro', age, 'zoma').image,
+        (age) => animationFrame('30+3', age, 'zoma').image,
       ),
     ).toEqual([280, 281, 282, 283, 287, 284, 285, 286, 286]);
-    expect(zoma).toMatchObject({ action: 'intro', x: 890 * 1.5 });
+    expect(zoma).toMatchObject({ action: 'script', x: 890 * 1.5 });
     // Start N has no op 0x16, so down held through it starts no EX mode.
-    for (let t = 0; t < 199; t++) match.step({}, { crouch: true });
-    expect([ryuko.action, zoma.action]).toEqual(['idle', 'intro']);
+    // Ryuko's 開始時 BR + 3 runs a tick shorter.
+    for (let t = 0; t < 201; t++) match.step({}, { crouch: true });
+    expect([ryuko.action, zoma.action]).toEqual(['idle', 'script']);
     expect(ryuko.x).toBeCloseTo(390 * 1.5 + 50 * 200 * (655 / 65536) * 1.5, 6);
     expect(zoma.x).toBe(890 * 1.5);
     match.step({}, { crouch: true });

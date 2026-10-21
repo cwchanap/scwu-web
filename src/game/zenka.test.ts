@@ -4,6 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // ZENKA as player 1, `gap` from a standing Ryuko as player 2.
 function zenkaPlayer(gap = 90) {
@@ -244,21 +245,15 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
   });
 
   it('charges four stocks through her Vs. intro, 開始時 BR + 3 (PC 466)', () => {
-    expect(animationDuration('intro', 'zenka')).toBe(384);
-    const match = new Match('cpu', true, 0, ['zenka', 'zoma']);
-    const zenka = match.fighters[0];
-    let ticks = 0;
-    while (zenka.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
+    expect(animationDuration('32+3', 'zenka')).toBe(384);
     // OP super Charge (49) clears her power and adds 400 (PCs 586–587):
     // four of her five stocks (+0x7cb2).
-    expect([ticks, zenka.stock]).toEqual([384, 4]);
+    const { path, ticks, f } = brIntro('zenka');
+    expect([path, ticks, f.stock]).toEqual([[30, '32+3'], 386, 4]);
     // demo speak rp (38) ten times (PC 470), then her stance (284–287).
     expect(
       [0, 15, 30, 299, 300, 334, 383].map(
-        (age) => animationFrame('intro', age, 'zenka').image,
+        (age) => animationFrame('32+3', age, 'zenka').image,
       ),
     ).toEqual([327, 328, 327, 328, 284, 113, 113]);
   });

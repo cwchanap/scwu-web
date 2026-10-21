@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SWW_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // SWW as player 1, `gap` from a standing opponent as player 2.
 function swwPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -332,15 +328,16 @@ describe('SWW (26 SWW.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro and starts in EX mode while down is held at its check (PC 330)', () => {
-    expect([animationDuration('intro', 'sww'), SWW_INTRO_EX_TICK]).toEqual([
-      200, 115,
-    ]);
+    expect(animationDuration('32+3', 'sww')).toBe(200);
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['sww', 'zoma']);
-      const sww = match.fighters[0];
-      while (sww.action === 'intro') match.step({ crouch });
+      // The check enters EX CHANGE (37).
+      const { path, f } = brIntro('sww', 0, () => ({ crouch }));
       // OP super Charge (39, PC 320) runs alongside.
-      expect([exMode(sww), sww.stock]).toEqual([crouch, 2]);
+      expect([path, exMode(f), f.stock]).toEqual([
+        [30, '32+3', ...(crouch ? [37] : [])],
+        crouch,
+        2,
+      ]);
     }
     expect([0, 40, 80, 120].map((face) => faceImage(face, 'sww'))).toEqual([
       2002, 2001, 2000, 2001,

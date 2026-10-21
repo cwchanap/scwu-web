@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // YINAN as player 1, `gap` from Ryuko as player 2, who plays `theirs`.
 function yinanPlayer(gap = 90) {
@@ -642,24 +643,32 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
   });
 
   it('charges two stocks through her Vs. intro, from which ↓ starts EX mode', () => {
-    expect(animationDuration('intro', 'yinan')).toBe(202);
-    const intro = (hold: (t: number) => Input = () => ({})) => {
-      const match = new Match('cpu', true, 0, ['yinan', 'zoma']);
-      const yinan = match.fighters[0];
-      let ticks = 0;
-      while (yinan.action === 'intro') match.step(hold(ticks++));
-      return { ticks, stock: yinan.stock, ex: exMode(yinan) };
+    const intro = (down = -1) => {
+      const { path, ticks, f } = brIntro('yinan', 0, (t) =>
+        t === down ? { crouch: true } : {},
+      );
+      return { path, ticks, stock: f.stock, ex: exMode(f) };
     };
-    expect(intro()).toEqual({ ticks: 202, stock: 2, ex: false });
-    // Round 1's op 0x16 (PC 648) checks down as its 190-tick display ends.
-    expect(intro((t) => (t === 191 ? { crouch: true } : {})).ex).toBe(true);
-    expect(intro((t) => (t === 193 ? { crouch: true } : {})).ex).toBe(false);
+    // 開始時 BR (41) jumps past its display (PC 621) to Round 1 (42) + 7
+    // (PC 624).
+    expect(intro()).toEqual({
+      path: [38, 41, '41+12'],
+      ticks: 204,
+      stock: 2,
+      ex: false,
+    });
+    // Round 1's op 0x16 (PC 648) checks down as its 190-tick display ends,
+    // after 開始時's (38) blank display, entering 開始時 SELECT (40) + 8.
+    expect([192, 193, 194].map((down) => intro(down).ex)).toEqual([
+      false,
+      true,
+      false,
+    ]);
     // 開始時 BR's first display, then Round 1 from PC 647.
-    expect(
-      [0, 1, 2, 191, 192, 197, 198, 201].map(
-        (age) => animationFrame('intro', age, 'yinan').image,
-      ),
-    ).toEqual([4007, 4007, 4007, 4007, 4006, 4006, 4000, 4000]);
+    const { images } = brIntro('yinan');
+    expect([1, 2, 3, 192, 193, 198, 199, 202].map((t) => images[t])).toEqual([
+      4007, 4007, 4007, 4007, 4006, 4006, 4000, 4000,
+    ]);
   });
 
   it('wins after Demo Stand, looping her last two poses, and draws looping from PC 1177', () => {

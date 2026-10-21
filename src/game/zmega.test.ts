@@ -4,6 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // Z-MEGA as player 1, `gap` from a standing Ryuko as player 2.
 function zmegaPlayer(gap = 90) {
@@ -321,21 +322,15 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
   });
 
   it('charges four stocks through his Vs. intro, 開始時 BR + 3 (PC 404)', () => {
-    expect(animationDuration('intro', 'zmega')).toBe(258);
-    const match = new Match('cpu', true, 0, ['zmega', 'zoma']);
-    const zmega = match.fighters[0];
-    let ticks = 0;
-    while (zmega.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
+    expect(animationDuration('35+3', 'zmega')).toBe(258);
     // OP super Charge (48) clears his power and adds 400 (PCs 479–480):
     // four of his five stocks (+0x7cb2).
-    expect([ticks, zmega.stock]).toEqual([258, 4]);
+    const { path, ticks, f } = brIntro('zmega');
+    expect([path, ticks, f.stock]).toEqual([[33, '35+3'], 260, 4]);
     // Round 1 (36) + 2 (PC 407).
     expect(
       [0, 159, 160, 170, 178, 257].map(
-        (age) => animationFrame('intro', age, 'zmega').image,
+        (age) => animationFrame('35+3', age, 'zmega').image,
       ),
     ).toEqual([183, 183, 177, 176, 175, 175]);
   });

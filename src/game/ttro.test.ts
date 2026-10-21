@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // TTRO as player 1, `gap` from a standing Ryuko as player 2.
 function ttroPlayer(gap = 90) {
@@ -348,20 +349,14 @@ describe('TTRO (39 TTRO.PLAYER)', () => {
   });
 
   it('charges two stocks through his Vs. intro, 開始時 BR (33)', () => {
-    expect(animationDuration('intro', 'ttro')).toBe(268);
-    const match = new Match('cpu', true, 0, ['ttro', 'zoma']);
-    const ttro = match.fighters[0];
-    let ticks = 0;
-    while (ttro.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, ttro.stock]).toEqual([268, 2]);
+    expect(animationDuration('33+3', 'ttro')).toBe(268);
+    const { path, ticks, f } = brIntro('ttro');
+    expect([path, ticks, f.stock]).toEqual([[31, '33+3'], 270, 2]);
     // Round 1 (34) + 2 stamps through his stance, then calls DEMO ACT
     // twice (PC 333).
     expect(
       [0, 10, 20, 30, 60, 68, 83, 88, 118, 178, 267].map(
-        (age) => animationFrame('intro', age, 'ttro').image,
+        (age) => animationFrame('33+3', age, 'ttro').image,
       ),
     ).toEqual([159, 160, 159, 160, 159, 158, 123, 113, 114, 113, 114]);
   });

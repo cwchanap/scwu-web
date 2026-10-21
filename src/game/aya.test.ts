@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // AYA as player 1, `gap` from Ryuko as player 2.
 function ayaPlayer(gap = 90) {
@@ -315,21 +316,13 @@ describe('AYA (42 AYA.PLAYER)', () => {
   });
 
   it('charges two stocks through her Vs. intro', () => {
-    expect(animationDuration('intro', 'aya')).toBe(252);
-    const match = new Match('cpu', true, 0, ['aya', 'zoma']);
-    const aya = match.fighters[0];
-    let ticks = 0;
-    while (aya.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, aya.stock]).toEqual([252, 2]);
+    const { path, ticks, f, images } = brIntro('aya');
+    // 開始時 BR (34) jumps past its display at PC 364 (PC 363).
+    expect([path, ticks, f.stock]).toEqual([[31, 34, '34+6'], 254, 2]);
     // 開始時 BR's first display, then 開始時 from PC 335 and Demo Stand.
-    expect(
-      [0, 1, 2, 51, 52, 123, 124, 251].map(
-        (age) => animationFrame('intro', age, 'aya').image,
-      ),
-    ).toEqual([4001, 4001, 4001, 4001, 4002, 4008, 4001, 4005]);
+    expect([1, 2, 3, 52, 53, 124, 125, 252].map((t) => images[t])).toEqual([
+      4001, 4001, 4001, 4001, 4002, 4008, 4001, 4005,
+    ]);
   });
 
   it('wins after Demo Stand, holding her last pose, and draws looping image 201', () => {

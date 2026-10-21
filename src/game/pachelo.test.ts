@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // PAC-HELO as player 1, `gap` from a standing Ryuko as player 2.
 function pacPlayer(gap = 90) {
@@ -237,21 +238,15 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
   });
 
   it('fills his one stock through his Vs. intro, 開始時 BR (38)', () => {
-    expect(animationDuration('intro', 'pachelo')).toBe(259);
-    const match = new Match('cpu', true, 0, ['pachelo', 'zoma']);
-    const pac = match.fighters[0];
-    let ticks = 0;
-    while (pac.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
+    expect(animationDuration(38, 'pachelo')).toBe(259);
     // Its 200 power fills his one stock (+0x7cb2).
-    expect([ticks, pac.stock]).toEqual([259, 1]);
+    const { path, ticks, f } = brIntro('pachelo');
+    expect([path, ticks, f.stock]).toEqual([[36, 38], 261, 1]);
     // Round 1 (39) shows nothing for 50 ticks, then fades his stance in
     // (PCs 333–344) and calls Demo stand five times (PC 345).
     expect(
       [0, 49, 50, 65, 84, 99, 258].map(
-        (age) => animationFrame('intro', age, 'pachelo').image,
+        (age) => animationFrame(38, age, 'pachelo').image,
       ),
     ).toEqual([0, 0, 115, 116, 115, 116, 116]);
   });

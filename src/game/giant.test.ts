@@ -1,12 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  GIANT_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -241,13 +236,11 @@ describe('Giant (07 GIANT.PLAYER)', () => {
   });
 
   it('enters EX mode with down held as his Vs. intro checks it (PC 328)', () => {
-    expect([GIANT_INTRO_EX_TICK, animationDuration('intro', 'giant')]).toEqual([
-      150, 200,
-    ]);
+    expect(animationDuration('32+3', 'giant')).toBe(200);
     const match = new Match('cpu', true, 0, ['giant', 'zoma']);
     const giant = match.fighters[0];
     const { x } = giant;
-    for (let t = 0; t < 200; t++) match.step({ crouch: t >= 140 });
+    for (let t = 0; t < 202; t++) match.step({ crouch: t >= 140 });
     // Round 1 (33) has no op 0x01: he stands where he starts. Chung Style
     // (37) sets variable 0 (PC 367) and jumps back (PC 368).
     expect([giant.action, giant.x, exMode(giant)]).toEqual(['idle', x, true]);

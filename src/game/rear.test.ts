@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  REAR_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // REAR as player 1, `gap` from a standing opponent as player 2.
 function rearPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -193,32 +189,20 @@ describe('REAR (24 REAR.PLAYER)', () => {
     ]);
   });
 
-  it('rises unseen and glides in through his Vs. intro, landing at REAR_LANDING, charged to two stocks', () => {
-    expect([animationDuration('intro', 'rear'), REAR_LANDING]).toEqual([
-      196, 51,
-    ]);
-    const match = new Match('cpu', true, 0, ['rear', 'zoma']);
-    const rear = match.fighters[0];
-    // The round's set-up places him at 390 source pixels (0x408ac3).
-    expect(rear.x).toBe(390 * 1.5);
-    const heights: number[] = [];
-    const xs: number[] = [];
-    while (rear.action === 'intro') {
-      match.step({});
-      heights.push(rear.y / 1.5);
-      xs.push(rear.x);
-    }
-    // 140 source pixels up, 54 down gliding, then back to the floor on the
-    // 51st step.
-    expect(heights[6]).toBeCloseTo(-139.923, 3);
-    expect(heights[33]).toBeCloseTo(-85.953, 3);
-    expect([heights[49] < 0, heights[50]]).toEqual([true, 0]);
+  it('rises unseen and glides in through his Vs. intro, landing into Round BR + 9, charged to two stocks', () => {
+    const { path, ticks, f, match, heights } = brIntro('rear');
+    expect([path, ticks]).toEqual([[31, '33+10', '36+9'], 198]);
+    // After 開始時's (31) blank display, 140 source pixels up, 54 down
+    // gliding; the fall passes the floor on its 17th move, and the landing
+    // (0x41187f) enters Round BR + 9 (slot 1, PC 374) a tick later.
+    expect(heights[7] / 1.5).toBeCloseTo(-139.923, 3);
+    expect(heights[34] / 1.5).toBeCloseTo(-85.953, 3);
+    expect([heights[51] > 0, heights[52]]).toEqual([true, 0]);
     // The glide carries him 539.85 on.
-    expect(xs[0]).toBe(390 * 1.5);
-    expect(rear.x).toBeCloseTo(390 * 1.5 + 539.85, 2);
+    expect(f.x).toBeCloseTo(390 * 1.5 + 539.85, 2);
     // OP super Charge (41) runs on past it.
     for (let t = 0; t < 30; t++) match.step({});
-    expect(rear.stock).toBe(2);
+    expect(f.stock).toBe(2);
   });
 
   it('wins and draws after two calls of STAND DEMO, looping image 384 (PC 596) or holding 386, and shows face 2001', () => {
