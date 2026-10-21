@@ -2008,10 +2008,9 @@ export class Match {
   // own victim reactions (Ryuko's Musashi finish ends in FLY NO HIT, 97;
   // Giant's chuck in his, 101; KAY's Matriel hit Down lands, slot 1 at PC
   // 4637, in his knockdown, 151) play as the port's actions, and any other
-  // source action runs its timeline. ponytail: a reaction entered so skips
-  // its op 0x15 power and op 0x1a stops; a jump past them (Giant's Drop P
-  // lend enters TWIS HIT + 12) skips them in the source too, and
-  // export_fighter checks none goes further, past a display.
+  // source action runs its timeline. A reaction entered so runs its op
+  // 0x15 power and op 0x1a stops; export_fighter checks no offset goes past
+  // its first display.
   private enterSource(f: Fighter, index: number, offset = 0) {
     const ryuko = twinOf(f.who, index) ?? 0;
     const named =
@@ -2023,8 +2022,18 @@ export class Match {
           : ryuko === FLY_SIDE_WALL
             ? 'flySideWall'
             : RESPONSE_REACTIONS[ryuko]?.action);
+    const key = sourceKey(index, offset);
     if (named) {
       this.action(f, named, true);
+      // Its records before its first display run as it is entered
+      // (0x412564): Giant's K3 hit (197) ends in his own HISA (84, PC 2843),
+      // whose op 0x15 credits the opponent 5 and op 0x1a stops both 13 (PCs
+      // 890, 893). An offset past them skips them, as Drop P lend's TWIS
+      // HIT + 12 (90, PC 5137) does.
+      if (exported(key, f.who))
+        for (const event of script(key, f.who).events)
+          if (!event.t && (event.op === 'power' || event.op === 'stop'))
+            this.runEvent(f, this.fighters.indexOf(f), event);
       // Clothes off runs out into FLY NO HIT + 19 (PC 1267), past its
       // displays to its launch (PC 1186), entered at that age
       // (export_fighter checks every player's).
@@ -2034,7 +2043,6 @@ export class Match {
       }
       return;
     }
-    const key = sourceKey(index, offset);
     // A target one past its action's end runs out at once (0x4125ea): DIDO's
     // >HE300 Hit5 lands in en300 hit + 28 (slot 1, PC 5047), so she stands;
     // RARIO 1UP (117) has no display, so its op 0x15 runs and it runs out.

@@ -191,6 +191,24 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     }
   });
 
+  it('runs his own HISA’s stops and power entering it from K3 hit (PCs 890, 893)', () => {
+    // K3 hit's last records credit him 6 three times and 5 (ages 210–220)
+    // and apply TWIS HIT (response 32: 13 stops for each, 5 power to Ryuko
+    // and 3 to him); HISA's op 0x1a adds 13 more to both, and its op 0x15
+    // gives him 5 and Ryuko 3.
+    const { giant, other, steps } = giantPlayer();
+    steps({}, 2);
+    let power: number[] = [];
+    for (let t = 0; giant.action !== 'launchAway'; t++) {
+      if (giant.branch === 197 && giant.age === 207)
+        power = [giant.power, other.power];
+      steps(t % 6 ? {} : { kick: true });
+    }
+    expect(power).toEqual([23, 8]);
+    expect([giant.hitStop, other.hitStop]).toEqual([26, 26]);
+    expect([giant.power, other.power]).toEqual([54, 16]);
+  });
+
   it('drops a punch from the air with base ball (261), landing through 262 and 263', () => {
     const { giant, other, steps } = giantPlayer(150);
     steps({}, 2);
@@ -248,7 +266,7 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     const entered = new Set<unknown>();
     // H PUNCH, base ball and counter, over two seeds.
     const wanted = [254, 235, 278];
-    for (const seed of [0, 1]) {
+    for (const seed of [0, 3]) {
       const match = new Match('cpu', false, seed, ['ryuko', 'giant']);
       const giant = match.fighters[1];
       for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {
