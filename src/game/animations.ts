@@ -913,7 +913,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
     // sound and *ef win (PCs 657–658), and ZIRO's 勝ち (66) image 142 from PC
     // 765 (PC 766), past his sound (PC 764); its rand % 3 > 1 (PC 758) into
-    // randon win1 (51) rolls in the match (rollWin). MASA's 勝ち (94) calls
+    // randon win1 (51) rolls in the match (rollResult). MASA's 勝ち (94) calls
     // DEMO STAND (32) twice (PC 861) and jumps to Win Motion (95, PC 881),
     // which loops images 450–451 from PC 889 (PC 891); his draw (105) calls
     // 32 twice too (PC 1006).
@@ -983,8 +983,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
                 ? waits([...z.winStand, ...z.win])
                 : undefined,
           ),
-    // ZIRO's draw (78) then loops a call of Randon op rp (32, PCs 947–948).
-    // ponytail: its step back at raw −200 (PC 944) isn't played.
+    // ZIRO's draw (78) then loops a call of Randon op rp (32, PCs 947–948);
+    // the match steps it back at raw −200 (PC 944, rollResult).
     draw: clip(
       [
         ...Array<Pose[]>(drawStands(who)).fill(z.winStand).flat(),

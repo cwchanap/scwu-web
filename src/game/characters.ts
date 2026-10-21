@@ -162,8 +162,9 @@ export const CHARACTERS = {
 // (*.d.json.ts), since inferring every fighter's JSON took most of the type
 // check.
 export type FighterData = typeof ryuko & {
-  // The win's timeline when it rolls (export_fighter), or null.
-  winScript: string | null;
+  // The win's and draw's timelines when they roll, test or move
+  // (export_fighter).
+  resultScripts: Partial<Record<'win' | 'draw', string>>;
   twins: Record<string, number>;
   aliases: Record<string, number>;
   counters: Record<string, [number, number, number][]>;

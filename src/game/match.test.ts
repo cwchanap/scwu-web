@@ -576,6 +576,74 @@ describe('recovered neutral and round animations', () => {
     );
     for (const [rolled, branch] of yinan)
       expect(branch).toBe(ex[rolled as keyof typeof ex]);
+    // Z-MEGA's 勝ち tests variable 0 for 100 before its roll (PC 617), into
+    // Win2 (66), which jumps back into 勝ち + 9 115 ticks on (PC 634).
+    const match = new Match('practice', false, 0, ['zmega', 'ryuko']);
+    const [z, ryuko] = match.fighters;
+    z.variables[0] = 100;
+    ryuko.hp = 0;
+    ryuko.action = 'koLand';
+    match.winner = 'player';
+    const shin: unknown[] = [];
+    for (let t = 0; t < 117; t++) {
+      match.step();
+      shin.push(z.branch);
+    }
+    expect([shin[0], shin[114], shin[115], shin[116]]).toEqual([
+      66,
+      66,
+      '65+9',
+      '65+9',
+    ]);
+  });
+
+  it("plays each draw's own op 0x01s, landing handler and tests", () => {
+    // Both draw at once; player 1's branch, x and height after each tick.
+    const draw = (who: Who, ticks: number, ex = false) => {
+      const match = new Match('practice', false, 0, [who, 'ryuko']);
+      const f = match.fighters[0];
+      if (ex) f.variables[0] = 100;
+      match.winner = 'draw';
+      const seen: [unknown, number, number][] = [];
+      for (let t = 0; t < ticks; t++) {
+        match.step();
+        seen.push([f.branch, f.x / 1.5, f.y / 1.5]);
+      }
+      return seen;
+    };
+    const VELOCITY = 655 / 65536;
+    const ACCELERATION = 393 / 65536;
+    // ERUS hops at raw −1200 under gravity 40 124 ticks in (PC 701), hangs
+    // from 134 (PC 703), falls at gravity 50 from 150 (PC 707) and lands
+    // into her handler, 67 + 18 (PC 706).
+    const erus = draw('erus', 180);
+    const hang = -12000 * VELOCITY + 55 * 40 * ACCELERATION;
+    expect(erus[123][2]).toBe(0);
+    expect(erus[133][2]).toBeCloseTo(hang, 6);
+    expect(erus[149][2]).toBeCloseTo(hang, 6);
+    expect(erus[150][2]).toBeCloseTo(hang + 50 * ACCELERATION, 6);
+    expect([erus[176][0], erus[177][0], erus[177][2]]).toEqual([
+      null,
+      '67+18',
+      0,
+    ]);
+    // ZIRO steps back at raw −200 for eight ticks (PCs 944, 946), AMIRO
+    // forward at raw 500 for five (PCs 738, 740).
+    const ziro = draw('ziro', 110);
+    expect(ziro[103][1] - ziro[95][1]).toBeCloseTo(-1600 * VELOCITY, 6);
+    expect(ziro[109][1]).toBe(ziro[103][1]);
+    const amiro = draw('amiro', 95);
+    expect(amiro[87][1] - amiro[82][1]).toBeCloseTo(2500 * VELOCITY, 6);
+    expect(amiro[94][1]).toBe(amiro[87][1]);
+    // In EX mode YINAN's draw tests variable 0 for 100 at 125 ticks into
+    // Stop (97, PC 1163), which jumps back to the draw + 14 (PC 1157).
+    const yinan = draw('yinan', 226, true);
+    expect([yinan[124][0], yinan[125][0], yinan[225][0]]).toEqual([
+      null,
+      97,
+      '98+14',
+    ]);
+    expect(draw('yinan', 126)[125][0]).toBe(null);
   });
 
   it("charges two stocks through each 開始時 BR's OP super Charge", () => {
