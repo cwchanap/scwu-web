@@ -146,9 +146,16 @@ def test_event(record):
                 action=u16(record, 1), offset=record[3])
 
 
-def loops(p, index):
-    """Whether an action ends jumping back into itself."""
-    record = p.records[p.action(index).end - 1]
+def loops(p, index, offset=0):
+    """Whether an action never runs out: it ends jumping back into itself, or from `offset` reaches a
+    0-tick display, which holds (ERUS's ---EX Rber--- + 2, PC 3611)."""
+    a = p.action(index)
+    for pc in range(a.start + offset, a.end):
+        if p.records[pc][0] == 0x0a:
+            break
+        if p.records[pc][0] == 0x0c and display_record(p, pc)["duration"] == 0:
+            return True
+    record = p.records[a.end - 1]
     return record[0] == 0x0a and u16(record, 1) == index
 
 
@@ -328,7 +335,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
         elif op == 0x19:
             bodies = body_boxes(bodies, record)
         elif op == 0x1f and stack and record[4] >> 6 == 1 and not record[5] & 0x83 and record[4] & 0x3f in known \
-                and u16(record, 1) not in {action, *(s[1] for s in stack)} and not loops(p, u16(record, 1)):
+                and u16(record, 1) not in {action, *(s[1] for s in stack)} and not loops(p, u16(record, 1), record[3]):
             # A check in a call of a player variable this path set, jumping out of the call into an
             # action that runs out, takes its jump inside the call, whose end then repeats or returns
             # from it (0x412617): Chung's Change EX sets variable 0 to 100 (PCs 364, 366), so each Demo
@@ -356,10 +363,10 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             # looping back into itself, which never runs out into the call (0x4125ea):
             # KATE's air fire tests variable 8 in each of its 60 hovers (PCs 3179–3180), and its
             # drops loop until landing enters their handler (0x410d50), which ends the call (+0x7c).
-            # ponytail: a 0-tick hold never runs out either, but ERUS's Cerb2 (PC 3420) keeps its
-            # fall-through; add holds when her hounds need it.
+            # A 0-tick hold never runs out either: ERUS's Cerb2 calls 235 + 12 fifteen times (PC
+            # 3419), each testing variable 13 into ---EX Rber--- + 2's run (PC 3422).
             if stack and op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] >> 6 == 1 and loops(
-                    p, u16(record, 1)) and u16(record, 1) not in {action, *(s[1] for s in stack)}:
+                    p, u16(record, 1), record[3]) and u16(record, 1) not in {action, *(s[1] for s in stack)}:
                 event = test_event(record)
             # A skip from a called action's last record past its end returns
             # from the call, as running out does (0x4125ea): YINAN's FB M,
