@@ -1399,9 +1399,9 @@ FIGHTERS = {
         },
         # Responses 69 and 70 (Kiki's En300, ANMC P's jump fire ball) enter his
         # UNCOUNTER DOWN and Air Fire (126, 127), copies of DOWN and J Att
-        # that clear variable 4 where those test it. ponytail: Air Fire's op
-        # 0x01 sets vx −250 where J Att's adds it (PCs 1720, 828), and it
-        # counts no variable 5; it plays as J Att.
+        # that clear variable 4 where those test it. Air Fire's op 0x01 sets
+        # vx −250 where J Att's adds it to the halted victim's 0 (PCs 1720,
+        # 828), and it counts no variable 5; the match plays both copies.
         aliases={126: 79, 127: 77},
         # Results: WIN calls Demo Stand (28) once (PC 553) and loops PCs
         # 560–563 (PC 564); the draw calls 28 once (PC 645). His darkening
@@ -1663,9 +1663,7 @@ FIGHTERS = {
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (124,
         # 125), copies of DOWN and J Att that clear variable 4 where those
-        # test it, as Giant's (126, 127). ponytail: Air Fire's op 0x01 sets
-        # vx −250 where J Att's adds it, and it counts no variable 5; it
-        # plays as J Att.
+        # test it, as Giant's (126, 127), which the match plays as copies.
         aliases={124: 79, 125: 77},
         # Results: 勝ち (57) calls Demo stand (28) once (PC 574), hops (PC
         # 579) and, landing into 57 + 10 (slot 1, PC 578), loops WIN RP (58,
@@ -1779,8 +1777,7 @@ FIGHTERS = {
         },
         # Responses 69 and 70 enter her UNCOUNTER DOWN and Air Fire (139,
         # 140), copies of DOWN and J Att that clear variable 4 where those
-        # test it, as Giant's (126, 127). ponytail: as his, Air Fire plays as
-        # J Att.
+        # test it, as Giant's (126, 127), which the match plays as copies.
         aliases={139: 79, 140: 77},
         # Results: 勝ち (69) calls STAND DEMO (31) once (PC 683) and holds image
         # 436 (PC 692). The draw calls 31 once (PC 796) and holds image 444 (PC
@@ -1845,8 +1842,7 @@ FIGHTERS = {
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (128,
         # 129), copies of DOWN and J Att that clear variable 4 where those
-        # test it, as Giant's (126, 127). ponytail: as his, Air Fire plays as
-        # J Att.
+        # test it, as Giant's (126, 127), which the match plays as copies.
         aliases={128: 79, 129: 77},
         # Results: 勝ち (59) calls DEMO stand (27) once (PC 576), rolls rand %
         # 3 > 1 for its sound (PC 589) and holds image 330 (PC 593). The draw
@@ -1975,8 +1971,7 @@ FIGHTERS = {
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (127,
         # 128), copies of DOWN and J Att that clear variable 4 where those
-        # test it, as Giant's (126, 127). ponytail: as his, Air Fire plays as
-        # J Att.
+        # test it, as Giant's (126, 127), which the match plays as copies.
         aliases={127: 79, 128: 77},
         # Results: 勝ち (58) holds image 436 (PC 603), spawning *WIN OBJ1 and
         # 2 (43, 44, PCs 597, 602). The draw calls Stand Demo (27) once (PC
@@ -2044,7 +2039,7 @@ FIGHTERS = {
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter her UNCOUNTER DOWN and Air Fire (128,
-        # 129), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        # 129), as HISO's, played as copies.
         aliases={128: 79, 129: 77},
         # Results: 勝ち (60) calls stand demo (28) once (PC 603) and holds
         # image 350 (PCs 612–613), spawning SMOKE DASH >> (558, PC 609). The
@@ -2235,7 +2230,7 @@ FIGHTERS = {
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (134,
-        # 135), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        # 135), as HISO's, played as copies.
         aliases={134: 79, 135: 77},
         # Results: 勝ち (65) calls Stand DEMO (31) once (PC 694), shows image 619
         # and loops images 620–623 (PCs 699–707), spawning win word (51, PC
@@ -2317,7 +2312,7 @@ FIGHTERS = {
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter her UNCOUNTER DOWN and Air Fire (127,
-        # 128), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        # 128), as HISO's, played as copies.
         aliases={127: 79, 128: 77},
         # Results: 勝ち (58) calls sTAND demo (27) twice (PC 602), shows
         # images 130 and 265 and loops images 265 and 266 (PCs 618–620); the
@@ -2392,7 +2387,7 @@ FIGHTERS = {
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (129,
-        # 130), as HISO's. ponytail: as his, Air Fire plays as J Att.
+        # 130), as HISO's, played as copies.
         aliases={129: 79, 130: 77},
         # Results: 勝ち (60) calls stand demo (30) twice (PC 647), shows image
         # 137, flies up at raw vy −1450 (PC 651) and loops image 138 (PCs
@@ -2527,7 +2522,7 @@ FIGHTERS = {
             "inatuma", "airInatuma",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (124,
-        # 125), as Giant's. ponytail: as his, Air Fire plays as J Att.
+        # 125), as Giant's, played as copies.
         aliases={124: 79, 125: 77},
         # Results: 勝ち (56) calls Demo stand (28) once (PC 572) and loops
         # image 211 (PC 578); the draw calls 28 twice (PC 659), spawns TIME
@@ -2597,7 +2592,7 @@ FIGHTERS = {
             "inatuma", "airInatuma",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (123,
-        # 124), as Giant's. ponytail: as his, Air Fire plays as J Att.
+        # 124), as Giant's, played as copies.
         aliases={123: 79, 124: 77},
         # Results: 勝ち (57) calls Demo stand (28) once (PC 539) and loops
         # PCs 542–559 (PC 560); the draw calls 28 once (PC 642) and loops
@@ -3903,10 +3898,11 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
     # FB, FBB and FBH that copy hit heavy's, BEAM Stand's and HISA's records,
     # with their own smoke, sounds, rolls and displays, where Ryuko's jump to
-    # hers (PCs 1444, 1446, 1449): the match draws and rolls them as those.
-    copies = [twins[name][1] for name in ("fb", "fbb", "fbh")
-              if any(p.records[pc][0] == 0x0c for pc in range(p.action(twins[name][1]).start,
-                                                               p.action(twins[name][1]).end))]
+    # hers (PCs 1444, 1446, 1449), and the aliases, copies of DOWN and J Att:
+    # the match draws and rolls them as those.
+    copies = [*(twins[name][1] for name in ("fb", "fbb", "fbh")
+                if any(p.records[pc][0] == 0x0c for pc in range(p.action(twins[name][1]).start,
+                                                                 p.action(twins[name][1]).end))), *aliases]
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards), *copies,
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
                               *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],

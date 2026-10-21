@@ -517,10 +517,17 @@ const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 // Stand and HISA (PCs 1444, 1446, 1449). Giant's, KAY's, SAKUYA's, ALEX's,
 // HISO's, ERUS's, GON's, KATE's, REMU's, GIGI's, SWW's, YINAN's and AYA's
 // copy those records instead, with their own smoke, sounds, rolls, displays
-// and power (export_fighter), which the reaction plays.
+// and power, as their UNCOUNTER DOWN and Air Fire copy DOWN and J Att
+// (aliases): the reaction plays the copy (export_fighter's `copies`).
 const FB = 110;
-const COPIES = new Set([FB, 111, 112]);
+const FIRE = new Set([FB, 111, 112]);
 const AIR_HIT_HEAVY = 76;
+const copyOf = (who: Who, own: number) => {
+  const victim = twinOf(who, own) ?? 0;
+  return exported(own, who) && (FIRE.has(victim) || own !== twin(who, victim))
+    ? own
+    : undefined;
+};
 // A copy's op 0x15s: YINAN's FB credits HISA's 13 after its 10 (PC 2068),
 // KAY's FBH only HISA's 3 (PC 1408).
 const copyPower = (f: Fighter) =>
@@ -1024,8 +1031,8 @@ export interface Fighter {
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
   // timeline.
   branch: ObjectKey | null;
-  // The victim's own FB, FBB or FBH this reaction plays (COPIES): drawn,
-  // rolled and entered in place of its clip.
+  // The victim's own copy this reaction plays (copyOf): drawn, rolled and
+  // entered in place of its clip.
   copy: number | null;
   // The cycle of the HUD face (action 70's object variable 0) from EX mode's
   // first tick, or −1.
@@ -3299,12 +3306,7 @@ export class Match {
     // counter records run.
     if (f.y < 0 && own !== undefined && twinOf(f.who, own) === FB)
       [action, own] = ['airHitHeavy', twin(f.who, AIR_HIT_HEAVY)];
-    const copy =
-      own !== undefined &&
-      COPIES.has(twinOf(f.who, own) ?? 0) &&
-      exported(own, f.who)
-        ? own
-        : undefined;
+    const copy = own === undefined ? undefined : copyOf(f.who, own);
     // Giant's reactions open by testing his counter's variable 4 (PCs 723,
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.

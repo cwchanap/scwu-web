@@ -118,8 +118,8 @@ describe('Giant (07 GIANT.PLAYER)', () => {
       ).queue(f, action, 13, 13, 0, own);
     for (const [own, result] of [
       [83, ['script', 279]],
-      // UNCOUNTER DOWN clears it (PC 1679).
-      [126, ['sweep', null]],
+      // UNCOUNTER DOWN clears it (PC 1679) and plays its own records.
+      [126, ['sweep', 126]],
     ] as const) {
       const { match, giant } = giantPlayer();
       giant.variables[4] = 100;

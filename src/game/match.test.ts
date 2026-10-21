@@ -2202,6 +2202,44 @@ describe('recovered power gauge', () => {
     // YINAN's (143) credits the striker HISA's 13 after its 10 (PC 2068).
     expect(fb('yinan').power).toBe(23);
   });
+
+  it('plays a victim’s own UNCOUNTER DOWN and Air Fire (responses 69, 70) in place of DOWN and J Att', () => {
+    // KATE's 229 strikes with 69, ERUS's 292 with 70.
+    const struck = (striker: Who, clip: number, victim: Who) => {
+      const match = new Match('practice', false, 0, [striker, victim]);
+      const [attacker, target] = match.fighters;
+      target.x = attacker.x + 300;
+      spawn(match, 0, clip, { x: target.x - 40, y: 0 });
+      const reactions = new Set<unknown>();
+      const spawned = new Set<unknown>();
+      const sounds: number[] = [];
+      for (let i = 0; i < 60; i++) {
+        match.step();
+        for (const e of match.effects) if (e.owner === 1) spawned.add(e.clip);
+        if (!target.copy) continue;
+        reactions.add(`${target.action} ${target.branch}`);
+        for (const s of match.sounds) if (s.owner === 1) sounds.push(s.index);
+      }
+      return { reactions, spawned, sounds };
+    };
+    // GON's (134, 135) cry 35 (PCs 1821, 1844) where his DOWN cries 33.
+    expect(struck('kate', 229, 'gon')).toMatchObject({
+      reactions: new Set(['sweep 134']),
+      sounds: [35],
+    });
+    expect(struck('erus', 292, 'gon')).toMatchObject({
+      reactions: new Set(['jumpHit 135']),
+      sounds: [35],
+    });
+    // KATE's Air Fire (128) puffs the empty ----smoke---- (332, PC 1768);
+    // YINAN's (155) cries nothing, where her J Att rolls and cries 10 (PCs
+    // 1377–1378).
+    expect(struck('erus', 292, 'kate').spawned).toEqual(new Set([332]));
+    expect(struck('erus', 292, 'yinan')).toMatchObject({
+      reactions: new Set(['jumpHit 155']),
+      sounds: [],
+    });
+  });
 });
 
 describe('recovered supers', () => {
