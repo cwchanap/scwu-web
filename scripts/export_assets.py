@@ -425,11 +425,13 @@ def player_tables(data, c, image_ids):
     # 0x407a2a) while the player's cell is hovered: キャラセレフェイス. A
     # fighter's set-up enters its word 17 (+0x759c, 0x412180): 開始時. Up
     # enters word 3 (+0x7580), with forward word 4 and with back word 5
-    # (0x4110f0).
+    # (0x4110f0); forward alone enters word 1 (+0x757c) and back word 2
+    # (0x4111b3–0x411209).
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
                 commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
-                jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)])
+                jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)],
+                walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)])
 
 
 def jump_target(record):
@@ -3811,8 +3813,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     actions = dict(neutral, **{name: z for name, (_, z) in twins.items() if name not in TIMELINES}, **actions)
     # Its forward and back jumps, which the match draws by the direction
     # taken; TTRO's leave their takeoff for J RP (7) too.
-    if actions["jump"] != tables["jumps"][0]:
-        sys.exit(f"{key}'s jump is no longer its default-action table's; refusing to export.")
+    if [actions["walk"], actions["backwalk"], actions["jump"]] != [*tables["walks"], tables["jumps"][0]]:
+        sys.exit(f"{key}'s walks and jump are no longer its default-action table's; refusing to export.")
     actions.update(jumpForward=tables["jumps"][1], jumpBack=tables["jumps"][2])
     if "jump" in flat:
         flat = {*flat, "jumpForward", "jumpBack"}
@@ -3852,7 +3854,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
-                              *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"]]]
+                              *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],
+                              *tables["walks"]]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -4006,7 +4009,7 @@ def main():
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
                               # 開始時, which a VS round plays from the start.
-                              tables["start"], *tables["jumps"]]]
+                              tables["start"], *tables["jumps"], *tables["walks"]]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.

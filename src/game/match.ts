@@ -1476,6 +1476,15 @@ function motion(
 // Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
 // ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
 // under 100.
+// Forward enters the default-action table's walk and back its back walk
+// (+0x757c, 0x4111b3–0x411209), each moving at its own op 0x01: Ryuko's raw
+// 230 and −180 (PCs 32, 41), 3-TIMES's 350 and −300.
+function walkSpeed(who: Who, back: boolean) {
+  const { events } = script(CHARACTERS[who].walks[Number(back)], who);
+  const launch = events.find((event) => event.op === 'motion');
+  return launch?.op === 'motion' ? launch.vx * SOURCE_VELOCITY_SCALE : 0;
+}
+
 function launchJump(f: Fighter) {
   const { events } = script(CHARACTERS[f.who].jumps[f.jump], f.who);
   const launch = events.find((event) => event.op === 'motion');
@@ -3395,7 +3404,9 @@ export class Match {
       this.action(f, crouched ? 'crouch' : 'crouchEnter');
       return;
     }
-    if (!airborne) f.moving = direction * 2.8;
+    if (!airborne)
+      f.moving =
+        direction && f.facing * walkSpeed(f.who, direction !== f.facing);
     this.action(
       f,
       airborne

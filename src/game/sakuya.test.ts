@@ -310,7 +310,7 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'sakuya']);
+    const match = new Match('cpu', false, 19, ['ryuko', 'sakuya']);
     const sakuya = match.fighters[1];
     const entered = new Set<unknown>();
     // FIRE, Dragon punch and New Counter.

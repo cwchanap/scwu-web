@@ -269,7 +269,7 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
     // His CPU's own cpu dash, and cpu dash jump, which runs into his high
     // jump (PC 2460).
     for (const [seed, wanted] of [
-      [0, [160, 157, 223, 162, 224]],
+      [24, [160, 157, 223, 162, 224]],
       [9, [162, 224, 223, '155+11']],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'golf']);

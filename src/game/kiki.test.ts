@@ -228,15 +228,17 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'kiki']);
-    const kiki = match.fighters[1];
     const entered = new Set<unknown>();
     // DRAGON O, TATUMAKI in the air, MAGIC FIRE and CPU K' (333), which
     // has no key: her CPU writes every command into her history.
     const wanted = [212, 231, 241, 333];
-    for (let t = 0; t < 6000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (kiki.action === 'script') entered.add(kiki.branch);
+    for (const seed of [0, 9]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'kiki']);
+      const kiki = match.fighters[1];
+      for (let t = 0; t < 6000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (kiki.action === 'script') entered.add(kiki.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

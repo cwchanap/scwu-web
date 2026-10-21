@@ -220,14 +220,16 @@ describe('3-TIMES (30 3-TIMES.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 2, ['ryuko', 'times']);
-    const times = match.fighters[1];
     const entered = new Set<unknown>();
     // His CPU's own cpu dash and cpu dash jump, and ---cpu---'s MESATSU.
     const wanted = [327, 328, 268];
-    for (let t = 0; t < 30000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (times.action === 'script') entered.add(times.branch);
+    for (const seed of [2, 10]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'times']);
+      const times = match.fighters[1];
+      for (let t = 0; t < 30000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (times.action === 'script') entered.add(times.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

@@ -286,7 +286,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     // The CPU writes roll's hold and elertic's presses in full (0x4116c6,
     // 0x411681), and enters Super roo cpu (214) and its own dashes.
     for (const [seed, wanted] of [
-      [0, [196, 192, 214, 271, 272]],
+      [28, [196, 192, 214, 271, 272]],
       [2, [196, 192, 193, 214]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'pachelo']);

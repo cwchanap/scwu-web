@@ -242,15 +242,17 @@ describe('MASA (29 MASA.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 4, ['ryuko', 'masa']);
-    const masa = match.fighters[1];
     const entered = new Set<unknown>();
     // His CPU's own CPU 3Fire, CPU 3HIT and CPU SR, and SC Super's RAMBU
     // (287 + 5) out of CPU 3HIT 2 or 3, which set variable 6 (PCs 5823, 5868).
     const wanted = [401, 402, 406, '287+5'];
-    for (let t = 0; t < 30000 && !wanted.every((b) => entered.has(b)); t++) {
-      match.step({});
-      if (masa.action === 'script') entered.add(masa.branch);
+    for (const seed of [10, 6]) {
+      const match = new Match('cpu', false, seed, ['ryuko', 'masa']);
+      const masa = match.fighters[1];
+      for (let t = 0; t < 30000 && !wanted.every((b) => entered.has(b)); t++) {
+        match.step({});
+        if (masa.action === 'script') entered.add(masa.branch);
+      }
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
   });

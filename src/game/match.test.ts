@@ -5895,17 +5895,41 @@ describe('prototype training rules', () => {
     ).toEqual([300, 372]);
   });
 
+  it("walks at each walk's own op 0x01: forward word 1, back word 2 (+0x757c, 0x4111b3–0x411209)", () => {
+    // Raw units a tick, unobstructed.
+    const pace = (who: Who, input: Input) => {
+      const match = new Match('practice', false, 0, [who, 'ryuko']);
+      const [f, other] = match.fighters;
+      other.x = f.x + 300;
+      ticks(match, 5, input);
+      const start = f.x;
+      ticks(match, 20, input);
+      return (f.x - start) / 20 / ((655 / 65536) * 1.5);
+    };
+    // Ryuko's PCs 32 and 41; 3-TIMES's and ALPHA's.
+    expect(
+      [
+        pace('ryuko', { right: true }),
+        pace('ryuko', { left: true }),
+        pace('times', { right: true }),
+        pace('times', { left: true }),
+        pace('alpha', { left: true }),
+      ].map(Math.round),
+    ).toEqual([230, -180, 350, -300, -400]);
+  });
+
   it('moves, clamps to the court, pushes bodies, and lands without auto-jumping', () => {
     const match = new Match();
     ticks(match, 500, { left: true });
     expect(match.fighters[0].x).toBe(FIGHTER_MARGIN);
     ticks(match, 500, { right: true });
-    // Walking shoves the idle opponent along at half the walk, a quarter of
-    // their 3–4 pixel overlap each, the gap swinging with whole pixels.
+    // Walking shoves the idle opponent along at half the walk (raw 230), a
+    // quarter of their 3–4 pixel overlap each, the gap swinging with whole
+    // pixels.
     const [a, b] = match.fighters;
     const start = b.x;
     ticks(match, 20, { right: true });
-    expect((b.x - start) / 20).toBeCloseTo(1.4, 1);
+    expect((b.x - start) / 20).toBeCloseTo((230 * (655 / 65536) * 1.5) / 2, 2);
     expect(b.x - a.x).toBeGreaterThan(84);
     expect(b.x - a.x).toBeLessThan(90);
     match.step({ jump: true });

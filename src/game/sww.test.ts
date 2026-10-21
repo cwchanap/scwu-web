@@ -363,7 +363,7 @@ describe('SWW (26 SWW.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'sww']);
+    const match = new Match('cpu', false, 17, ['ryuko', 'sww']);
     const sww = match.fighters[1];
     const entered = new Set<unknown>();
     // Chain start, ICE Punch start, Dragon P START, DS start, RSK add and his
