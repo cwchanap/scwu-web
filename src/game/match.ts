@@ -1001,8 +1001,9 @@ export interface Fighter {
   // boxes, its objects' too, raises an armed one to 2 (0x40f384), which an
   // op 0x1e mode 1 window needs (0x41194d). A run-out (0x412713) and a
   // window's cancel (0x4119f7) clear it; other action changes keep it.
-  // ponytail: the port clears it entering any neutral action, where a
-  // landing into neutral (0x40e580) keeps it until that action runs out.
+  // ponytail: the port clears it entering any neutral action, where the
+  // free state's moves (0x411a01) and an air reaction's landing (0x4124c3)
+  // keep it until a run-out or the next op 0x18.
   contact: number;
   // The op 0x20 branch this reaction rolled on entry, drawn instead of its
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its

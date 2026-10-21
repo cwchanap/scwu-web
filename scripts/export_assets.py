@@ -3654,10 +3654,9 @@ FIGHTERS = {
             "getUp",
             # SEAN's KO tests, beside an op 0x10 into KO RELOAD (72) with three
             # stocks (PC 775) and a test of global 3 for 10 into KO NORMAL CPU
-            # (70, PC 776), which Vs. play leaves at 0; KO down with a 1-tick
-            # display before its test (PC 975). ponytail: KO RELOAD, which
-            # spends 270 power, darkens and refills his life through Stop (79)
-            # after the round is decided, isn't played.
+            # (70, PC 776), which never passes; KO down with a 1-tick display
+            # before its test (PC 975). The match enters KO RELOAD from the
+            # op 0x10.
             "ko", "down",
             # SEAN's, testing variable 0 for 10 into Start KO 3 (44, PC 763),
             # which only his Start KO intro sets (PC 544), and 13 into make
