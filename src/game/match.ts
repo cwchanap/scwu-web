@@ -22,7 +22,6 @@ import {
   GON_LANDING,
   REMU_LANDING,
   REAR_LANDING,
-  ZIRO_KO,
   ZIRO_LANDING,
   DORA_LANDING,
   RARIO_LANDING,
@@ -491,14 +490,6 @@ const RESULT_SCRIPTS = Object.fromEntries(
     'resultScripts' in data ? data.resultScripts : {},
   ]),
 ) as Record<Who, Partial<Record<'win' | 'draw', ObjectKey>>>;
-// ZIRO's KO down slides at raw −200 for ten ticks (PCs 822–824), then
-// ZIRO_KO: ko DOWN2's flight and ko DOWN3's slide forward.
-const ZIRO_KO_MOTION: Runs = [
-  [10, -200],
-  [ZIRO_KO.launch - 10, 0],
-  [ZIRO_KO.flight, 200, -2400, 90],
-  [10, 200],
-];
 // A run's velocity at `age`, its accelerations added before each move.
 const runVelocity = (runs: Runs = [], age: number) => {
   for (const [ticks, vx, vy = 0, ay = 0, ax = 0] of runs) {
@@ -816,9 +807,33 @@ const ROLLS = Object.fromEntries(
   ]),
 ) as Record<Who, Partial<Record<Action, number>>>;
 const rolls = (who: Who) => ROLLS[who];
+// The KO downs (62) that roll play from their timelines, as results do:
+// ZIRO's (70) slides back at raw −200 for ten ticks (PCs 822–824), rolls
+// its voice (PC 828) and Random lose (75, PC 834); otherwise it runs on
+// into ko DOWN2 (71), which stops both players 13 ticks (PC 858), bursts
+// and launches at raw 200/−2400 (PC 867) into ko down 2 fly (72), landing
+// into ko DOWN3 (73, slot 1, PC 871), which slides at 200 for 10 (PC 890)
+// and lies. ponytail: Random lose stands until struck, arming its box and
+// clash handler (75 + 20) only at age 758 (PCs 909–914); the round ends
+// first (resultReady), so neither runs.
+const KO_DOWN = 62;
+const KO_TIMELINES = new Set(
+  (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+    script(twin(who, KO_DOWN), who).events.some((e) => e.op === 'random'),
+  ),
+);
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
 // A looping script never runs out, so its object lives until deleted.
 const loops = (e: Effect) => script(e.clip, e.who).end === 'loop';
+// A KO timeline has settled on the floor once it won't move again.
+const settled = (f: Fighter) => {
+  const { end, events } = script(f.branch!, f.who);
+  return (
+    end !== 'jump' &&
+    f.y === 0 &&
+    !events.some((e) => e.op === 'motion' && e.t > f.age)
+  );
+};
 // A jump target: an action, or "action+offset" entering mid-action.
 const sourceKey = (action: number, offset: number): ObjectKey =>
   offset ? `${action}+${offset}` : action;
@@ -905,7 +920,7 @@ const JUMP_CLIPS = [
   ['fall', 'fall'],
 ] as const;
 const shown = (f: Fighter): Shown =>
-  f.action === 'script'
+  f.action === 'script' || (f.action === 'koLand' && f.branch)
     ? f.branch!
     : f.action === 'takeoff' || f.action === 'jump'
       ? JUMP_CLIPS[f.jump][Number(f.action === 'jump')]
@@ -1735,8 +1750,9 @@ export class Match {
 
   get resultReady() {
     // Authored: after the lettering, wait for each fighter to take its result
-    // or lie KO'd, as moves now run on past the round's end; ZIRO lies once
-    // his KO's flight lands (ZIRO_KO).
+    // or lie KO'd, as moves now run on past the round's end; a KO timeline
+    // (KO_TIMELINES) once it stops moving on the floor: ZIRO's in ko DOWN3,
+    // or standing in Random lose.
     return (
       this.winner !== null &&
       this.matchOver &&
@@ -1745,8 +1761,7 @@ export class Match {
         (f) =>
           f.action === 'win' ||
           f.action === 'draw' ||
-          (f.action === 'koLand' &&
-            (f.who !== 'ziro' || f.age >= ZIRO_KO.launch + ZIRO_KO.flight)),
+          (f.action === 'koLand' && (!f.branch || settled(f))),
       )
     );
   }
@@ -1862,30 +1877,41 @@ export class Match {
   // hops (PC 701) and lands into its handler (67 + 18, PC 706).
   private rollResult(f: Fighter) {
     const result = f.action === 'win' || f.action === 'draw' ? f.action : null;
-    if (!result) return;
+    const key = result
+      ? (f.branch ?? RESULT_SCRIPTS[f.who][result])
+      : f.action === 'koLand' && f.branch;
+    if (!key || this.resultEvents(f, key, f.age)) return;
+    // Its records at the tick it runs out run before its jump.
     const ran = f.branch && script(f.branch, f.who);
     if (
       ran &&
       ran.end === 'jump' &&
       ran.next !== null &&
-      f.age >= animationDuration(f.branch!, f.who)
+      f.age === animationDuration(f.branch!, f.who) &&
+      this.enterResult(f, sourceKey(ran.next, ran.offset ?? 0))
     )
-      [f.branch, f.age] = [sourceKey(ran.next, ran.offset ?? 0), 0];
-    const key = f.branch ?? RESULT_SCRIPTS[f.who][result];
-    if (!key || this.resultEvents(f, key, f.age)) return;
+      return;
     if (f.vx || f.vy || f.y < 0) f.moving = 'velocity';
   }
 
   // A result timeline's records at `age`; true once one branches.
   private resultEvents(f: Fighter, key: ObjectKey, age: number) {
     const owner = this.fighters.indexOf(f);
-    const shown = script(key, f.who).frames.length > 0;
+    // Its displays carry its sounds; one with none cues them here, as the
+    // drawn branch does those past its last: ZIRO's KO voice (PC 829). A
+    // result's clip carries its own.
+    const { frames, end } = script(key, f.who);
+    const carried = !frames.length
+      ? 0
+      : key === f.branch && end === 'jump'
+        ? animationDuration(key, f.who)
+        : Infinity;
     for (const event of eventsAt(key, age, f.who)) {
-      // Its displays carry its sounds; one with none cues them here.
       if (
         event.op === 'motion' ||
         event.op === 'handler' ||
-        (!shown && event.op === 'sound')
+        event.op === 'stop' ||
+        (event.op === 'sound' && event.t >= carried)
       )
         this.runEvent(f, owner, event);
       if (event.op !== 'random' && event.op !== 'test') continue;
@@ -1927,12 +1953,8 @@ export class Match {
   // and his KO down (54) sinks through the floor in its displays (PCs
   // 509–516) without sliding; TRAINING's alike (PCs 400, 413, 423–430).
   private moveKO(f: Fighter) {
-    if (f.action === 'koLand' && f.who === 'ziro') {
-      if (f.age === ZIRO_KO.burst)
-        for (const g of this.fighters) this.pause(g, 13);
-      const [vx, vy] = runVelocity(ZIRO_KO_MOTION, f.age - 1);
-      f.moving = f.facing * vx;
-      f.y = Math.min(0, f.y + vy);
+    if (f.action === 'koLand' && f.branch) {
+      this.rollResult(f);
       return true;
     }
     if (f.action === 'koLand') {
@@ -2853,7 +2875,11 @@ export class Match {
     }
     // A result lands into its handler, whose records run at once: Z-MEGA's
     // Random win1 (53) into 53 + 4.
-    if (f.action === 'win' || f.action === 'draw') {
+    if (
+      f.action === 'win' ||
+      f.action === 'draw' ||
+      (f.action === 'koLand' && f.branch)
+    ) {
       f.gravity = 0;
       if (f.onLand) [f.branch, f.age, f.onLand] = [f.onLand, 0, 0];
       this.rollResult(f);
@@ -2868,7 +2894,9 @@ export class Match {
     }
     f.gravity = 0.24;
     if (f.action === 'down' || f.action === 'koAgain') {
-      this.action(f, 'koLand');
+      const timeline = KO_TIMELINES.has(f.who) && twin(f.who, KO_DOWN);
+      this.action(f, 'koLand', false, timeline || undefined);
+      if (f.branch) this.rollResult(f);
       return true;
     }
     f.variables[1] = 0;

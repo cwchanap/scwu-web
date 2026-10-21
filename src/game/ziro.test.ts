@@ -6,12 +6,11 @@ import {
   animationFrame,
   BLACK,
   ZIRO_INTRO_EX_TICK,
-  ZIRO_KO,
   ZIRO_LANDING,
 } from './animations';
 import { commanded, entriesOf } from './commands';
 import { faceImage } from './hud';
-import { exMode, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 
 // ZIRO as player 1, `gap` from a standing opponent as player 2.
@@ -326,32 +325,70 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     ]);
   });
 
-  it('gets up from his KO, then bursts and flies into ko DOWN3 (ZIRO_KO)', () => {
-    const { match, ziro, steps } = ziroPlayer(90, 'ryuko');
-    const ryuko = match.fighters[1];
-    ziro.hp = 1;
-    steps({}, 2);
-    steps({}, 1, K);
-    while (ziro.action !== 'koLand') steps({});
-    expect(
-      [0, 60, 140, 150, 180, 228, 234, 322, 400].map(
-        (age) => animationFrame('koLand', age, 'ziro').image,
-      ),
-    ).toEqual([207, 128, 125, 473, 474, 202, 203, 207, 208]);
-    while (ziro.age < ZIRO_KO.burst) steps({});
-    // ko DOWN2's op 0x1a stops both players 13 ticks (PC 858); Ryuko, who
-    // steps after him, has counted one.
-    expect([ziro.hitStop, ryuko.hitStop]).toEqual([13, 12]);
-    let top = 0;
-    while (ziro.age < ZIRO_KO.launch + ZIRO_KO.flight) {
-      expect(match.resultReady).toBe(false);
-      steps({});
-      top = Math.min(top, ziro.y);
-    }
-    // 521 source pixels up at the peak, landing on the 88th move.
-    expect([Math.round(top / 1.5), ziro.y]).toEqual([-521, 0]);
-    while (!match.resultReady) steps({});
-    expect(ziro.action).toBe('koLand');
+  it('rolls his KO voice and Random lose (PCs 828, 834), or bursts and flies into ko DOWN3', () => {
+    const runs = [0, 1, 2].map((seed) => {
+      const { match, ziro, steps } = ziroPlayer(90, 'ryuko', seed);
+      const ryuko = match.fighters[1];
+      ziro.hp = 1;
+      steps({}, 2);
+      steps({}, 1, K);
+      while (ziro.action !== 'koLand') steps({});
+      // Each sound but ko down 2 fly's spin (62), the tick of each branch,
+      // both players' stops as ko DOWN2 cues 44, and the peak.
+      const [cued, path, stops] = [[], [], []] as unknown[][];
+      let top = 0;
+      for (let t = 0; !match.resultReady; t++) {
+        steps({});
+        for (const { owner, index } of match.sounds)
+          if (owner === 0 && index !== 62) cued.push([t, index]);
+        if (path.at(-1) !== ziro.branch) path.push(t, ziro.branch);
+        if (match.sounds.some((s) => s.index === 44))
+          stops.push(ziro.hitStop, ryuko.hitStop);
+        top = Math.min(top, ziro.y);
+      }
+      return {
+        cued,
+        path,
+        stops,
+        top: Math.round(top / 1.5),
+        image: fighterPose(ziro).image,
+      };
+    });
+    // KO down lies 60 ticks, voicing 12 or 29, and gets up flashing red
+    // (473–475); ko DOWN2's op 0x1a stops both 13 ticks (PC 858), Ryuko, who
+    // steps after him, having counted one. He lands 521 source pixels down
+    // into ko DOWN3 (60) and lies; Random lose cues 42 three times and 13 as
+    // it stands in 477.
+    const burst = (voice: number, rolled: string) => ({
+      cued: [
+        [59, voice],
+        [179, 42],
+        [227, 44],
+        [244, 19],
+        [334, 60],
+      ],
+      path: [0, 70, 59, rolled, 334, 73],
+      stops: [13, 12],
+      top: -521,
+      image: 208,
+    });
+    expect(runs).toEqual([
+      burst(12, '70+15'),
+      {
+        cued: [
+          [59, 29],
+          [159, 42],
+          [269, 42],
+          [294, 42],
+          [407, 13],
+        ],
+        path: [0, 70, 59, '70+16', 149, 75],
+        stops: [],
+        top: 0,
+        image: 477,
+      },
+      burst(29, '70+16'),
+    ]);
   });
 
   it('wins after demo act, looping image 142 (PC 766), and draws looping Randon op rp (32, PC 948)', () => {

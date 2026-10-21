@@ -545,9 +545,9 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
         # from its start (the match enters a reaction at any offset): ZENKA's
         # J cancel jumps into her jump + 22 (PC 3187). LIZARD's Round 1 ends
         # in OP lend (36, PC 392), his Br. intro's clip, which the match
-        # can't name.
+        # can't name; ZIRO's KO down past its roll into its own + 16 (PC 830).
         if script["end"] == "jump" and (script["next"] not in played or named is not None and script["next"] not in named or
-                                        script["offset"] and script["next"] not in reactions):
+                                        script["offset"] and (script["next"] not in reactions or script["next"] == index)):
             queue.append((script["next"], script["offset"]))
         for event in script["events"]:
             if event["op"] == "spawn" and event["action"]:
@@ -1050,7 +1050,7 @@ TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", 
 # plays, the lose action that opens every KO and the air guards.
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
-            "airBlockRapid", "airTimeStopGuard", "lose", "ko", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
+            "airBlockRapid", "airTimeStopGuard", "lose", "ko", "down", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
             "airHisoStop", "dstToss"]
 
 # The responses whose reactions only some players' moves reach, which the
@@ -2690,10 +2690,11 @@ FIGHTERS = {
         # jumps to 38 + 18 (PC 429): it rises (PC 445), spawns Black and OP
         # super Charge (45, PCs 434–435) and enters Round 1 (39) + 6 (PC 438),
         # which falls (PC 459) and lands into 39 + 11 (slot 1, PC 458); both
-        # play flattened. His KO down's ko DOWN2, ko down 2 fly and ko DOWN3
-        # (71–73) follow it (ZIRO_KO).
+        # play flattened. His KO down rolls (PCs 828, 834) and runs on into
+        # ko DOWN2, ko down 2 fly and ko DOWN3 (71–73), which the match plays
+        # from its timeline.
         actions=dict(win=66, winStand=30, winLoop=(66, 10), draw=78, drawLoop=32, black=49, intro=(38, 18),
-                     introLand=(39, 11), koBurst=71, koFly=72, koRest=73),
+                     introLand=(39, 11)),
         flat={"intro", "introLand"},
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX mode
         # (PCs 994–1008); 478: *name (79, PC 952).
@@ -4023,7 +4024,7 @@ def main():
     # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 96, 99, 100, 105, 126, 108, 109, 132, 129, 153, 158,
-                              167, 172, 59, 60, 133, 120, 107, 114,
+                              167, 172, 59, 60, 62, 133, 120, 107, 114,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),

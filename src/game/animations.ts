@@ -473,21 +473,6 @@ export const RARIO_LANDING = 175;
 // His Round 1 checks down at PC 486, 68 ticks after he lands.
 export const ZIRO_INTRO_EX_TICK =
   ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
-// ZIRO's KO down (70) lies 60 ticks, gets up and flashes red (PCs
-// 832–850): 228 in all. Then ko DOWN2 (71) stops both players 13 ticks (PC
-// 858), bursts for 6 and launches at raw 200/−2400 under gravity 90 (PC
-// 867) into ko down 2 fly (72), which spins until its 88th move passes the
-// floor, into ko DOWN3 (73, slot 1, PC 871), which slides at 200 for 10
-// (PC 890) and lies.
-export const ZIRO_KO = { burst: 228, launch: 234, flight: 88 };
-// A looping action's poses for `ticks`, as a jump back to its start replays
-// them until a handler cuts in.
-const repeated = (frames: Pose[], ticks: number) => {
-  const out: Pose[] = [];
-  for (let t = 0; t < ticks; t += out[out.length - 1].duration)
-    out.push(frames[out.length % frames.length]);
-  return out;
-};
 // How many times each win calls its stand demo: twice, ZAKU's and
 // PAC-HELO's four times, TRAINING's three (PC 366), otherwise once.
 const winStands = (who: Who) =>
@@ -883,19 +868,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     down: clip(z.ko, false, waits(z.ko)),
     // ASTROMAN's lies on a 0-tick display (PC 694).
     koAgain: clip(z.koAgain, false, waits(z.koAgain)),
-    // ZIRO_KO. ponytail: KO down's rand % 3 > 1 (PC 828) only picks its
-    // sound, and its rand % 4 > 2 (PC 834) into Random lose (75), which
-    // stands until struck, isn't played; the port always bursts.
-    koLand: clip(
-      who === 'ziro'
-        ? [
-            ...z.down,
-            ...z.koBurst,
-            ...repeated(z.koFly, ZIRO_KO.flight),
-            ...z.koRest,
-          ]
-        : z.down,
-    ),
+    // ZIRO's plays from its timeline (KO_TIMELINES).
+    koLand: clip(z.down),
     // WIN and the draw call DEMO STAND once, then hold; Kiki's WIN calls
     // 'win rp' (57) three times before its last display (PC 536) and G
     // Suneo's 'win talk' (67) seven times (PC 707). Giant's loops from PC
