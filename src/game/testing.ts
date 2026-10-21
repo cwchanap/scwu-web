@@ -161,7 +161,7 @@ export function spawn(
       event: object,
     ): void;
   };
-  const spawned = match.effects.length;
+  const before = new Set(match.effects);
   m.spawnObject({ x, y, facing }, owner, {
     flags: slot === undefined ? 5 : 1,
     action: index,
@@ -171,5 +171,5 @@ export function spawn(
     slot: slot ?? 0,
     z: 0,
   });
-  return match.effects[spawned];
+  return match.effects.find((e) => !before.has(e))!;
 }

@@ -101,6 +101,7 @@ const object = (
   z: 0x51,
   owner,
   slot: 0,
+  index: 2,
   screen: false,
   follow: null,
   box: null,
@@ -4720,6 +4721,22 @@ describe('prototype training rules', () => {
     expect(target.hp).toBe(LIFE - 30);
   });
 
+  it('gives a new object the first free slot, and runs a priority in slot order (0x406570)', () => {
+    const match = new Match();
+    const at = { x: 600, y: -300 };
+    const [a, b] = [
+      spawn(match, 0, RYUKO.axe, at),
+      spawn(match, 0, RYUKO.axe, at),
+    ];
+    expect(b.index).toBe(a.index + 1);
+    // Deleting the first frees its slot, which the next object takes, ahead
+    // of the second.
+    match.effects = [b];
+    const c = spawn(match, 0, RYUKO.axe, at);
+    expect(c.index).toBe(a.index);
+    expect(match.effects).toEqual([c, b]);
+  });
+
   it('stops the objects following a stopped fighter, not the others', () => {
     const match = new Match();
     const [f, target] = match.fighters;
@@ -6634,7 +6651,7 @@ describe('stage objects', () => {
     );
     match.layers = match.layers.filter((layer) => layer.clip === 21);
     match.step();
-    const petal = match.layers[1];
+    const petal = match.layers.find((layer) => layer.clip !== 21)!;
     expect(petal).toMatchObject({
       clip: 2,
       who: 'sakuranight',

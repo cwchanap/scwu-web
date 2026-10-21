@@ -1173,6 +1173,8 @@ export interface Effect {
   // Owning fighter, and the owner's object slot (r[12]) it holds, or −1.
   owner: number;
   slot: number;
+  // Its place in the object table (0x4701e0), past the players' 0 and 1.
+  index: number;
   // Op 0x04 flag 0x40: viewport coordinates instead of the stage.
   screen: boolean;
   // Op 0x04 flag 0x20 (+0x28 bit 0x20000000): the parent it keeps to, at the
@@ -1324,6 +1326,7 @@ const newEffect = (
   z: FIGHTER_Z + 1,
   owner: 0,
   slot: -1,
+  index: 2,
   screen: false,
   follow: null,
   box: null,
@@ -1458,8 +1461,15 @@ const stageScroll = (stage: Stage, home: number) => {
 };
 // Round setup (0x408c3f) makes each stage object (0x406610) at the stage's
 // top left, owned by no player; it first steps in the tick's pass.
+// 0x406570: the first slot no live object holds.
+const firstFree = (objects: Effect[]) => {
+  const taken = new Set(objects.map((e) => e.index));
+  let index = 2;
+  while (taken.has(index)) index++;
+  return index;
+};
 const stageObjects = (stage: Stage) =>
-  STAGES[stage].objects.map(({ action, z }) =>
+  STAGES[stage].objects.map(({ action, z }, i) =>
     newEffect({
       clip: action,
       who: stage,
@@ -1467,6 +1477,7 @@ const stageObjects = (stage: Stage) =>
       y: -920 * 1.5,
       z,
       owner: -1,
+      index: 2 + i,
       stage: stageScroll(stage, action),
     }),
   );
@@ -2582,13 +2593,17 @@ export class Match {
       ][event.flags & 3],
       owner,
       slot: registers ? event.slot : -1,
+      index: firstFree([...this.layers, ...this.effects]),
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
       ...(stage && { stage: stageScroll(who as Stage, event.action) }),
     });
-    // 0x406570 runs no script: the object first steps in the next tick's
-    // pass (stepObjects), which lists only the objects alive at its start.
-    (stage ? this.layers : this.effects).push(child);
+    // 0x406570 takes the first free slot and runs no script: the object
+    // first steps in the next tick's pass (stepObjects), which lists only the
+    // objects alive at its start.
+    const list = stage ? this.layers : this.effects;
+    const at = list.findIndex((e) => e.index > child.index);
+    list.splice(at < 0 ? list.length : at, 0, child);
   }
 
   // A player's motion step (0x40fa09–0x40fc9f) adds its transfer (+0xdf49),
@@ -3280,75 +3295,79 @@ export class Match {
   private stepObjects(objects: Effect[]) {
     for (const e of objects) {
       if (!e.stage && !this.effects.includes(e)) continue;
-      // A queued handler comes first, stopped or not (0x412327): an action
-      // change that drops its boxes and, for a fighter's objects (+0x15a 1,
-      // 0x412c00–0x412c4c), every handler (0x40e510): Z-MEGA's *Fire ball 01
-      // (202) that strikes falls on as ***ball hit (201), not into *Fire ball
-      // 02 (203, slot 1).
-      if (e.pending !== undefined) {
-        const key = e.pending;
-        Object.assign(e, {
-          box: null,
-          boxes: [],
-          responses: [],
-          pending: undefined,
-          onLand: e.stage ? e.onLand : undefined,
-        });
-        this.branchTo(e, key);
-        continue;
-      }
-      // A stopped object skips its script step (0x412390), for good at -1.
-      if (e.hitStop) {
-        if (e.hitStop > 0) e.hitStop--;
-        continue;
-      }
-      // 0x41241c: an object falling to the floor (y 920) stops there, and
-      // its landing handler (slot 1) enters its action, dropping its boxes.
-      // A stage object skips this and the world bounds (0x4123cb).
-      if (!e.stage && !e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
-        Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
-        const land = e.onLand;
-        if (land !== undefined) {
-          Object.assign(e, { box: null, boxes: [], onLand: undefined });
-          this.branchTo(e, land);
-          continue;
-        }
-      }
-      // A script without displays never advances, so its events all fire at
-      // its first step (anime beam 296 only spawns 297 and 299).
-      if (++e.age === 0 || e.age < animationDuration(e.clip, e.who) || loops(e))
-        this.fireEffect(e);
-      // A script that runs out after a display runs its last records first
-      // (0x4125ea): LIZARD's dragon up handen (247) spawns call bird (249,
-      // PC 3409). A stage object then restarts its first action (+0x34,
-      // 0x4127b7).
-      else if (
-        e.age === animationDuration(e.clip, e.who) &&
-        !this.fireEffect(e) &&
-        e.stage &&
-        script(e.clip, e.who).end === 'end'
-      )
-        this.branchTo(e, e.stage.home);
-    }
-    // A script that runs out reaches the next action's op 0x00, which
-    // deletes an object (0x41273c, 0x413bc6); 0x4124c9 also culls one that
-    // leaves the world unless it follows a parent.
-    const stepped = new Set(objects);
-    this.effects = this.effects.filter(
-      (e) =>
-        !stepped.has(e) ||
-        ((e.age < animationDuration(e.clip, e.who) || loops(e)) &&
-          (e.follow !== null ||
-            inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))),
-    );
-    // Op 0x05 deletes a stage object too (0x412617), as Sakura Night's
-    // petals (2–5) end; one holding a display stays.
-    this.layers = this.layers.filter(
-      (e) =>
-        !stepped.has(e) ||
+      this.stepObject(e);
+      // A script that runs out reaches the next action's op 0x00, which
+      // deletes an object (0x41273c, 0x413bc6) and frees its slot for the
+      // next spawn; 0x4124c9 also culls one that leaves the world unless it
+      // follows a parent. Op 0x05 deletes a stage object too (0x412617), as
+      // Sakura Night's petals (2–5) end; one holding a display stays.
+      const running =
         e.age < animationDuration(e.clip, e.who) ||
-        script(e.clip, e.who).end !== 'delete',
-    );
+        (e.stage ? script(e.clip, e.who).end !== 'delete' : loops(e));
+      if (e.stage && !running)
+        this.layers = this.layers.filter((layer) => layer !== e);
+      else if (
+        !e.stage &&
+        !(
+          running &&
+          (e.follow !== null ||
+            inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))
+        )
+      )
+        this.effects = this.effects.filter((other) => other !== e);
+    }
+  }
+
+  private stepObject(e: Effect) {
+    // A queued handler comes first, stopped or not (0x412327): an action
+    // change that drops its boxes and, for a fighter's objects (+0x15a 1,
+    // 0x412c00–0x412c4c), every handler (0x40e510): Z-MEGA's *Fire ball 01
+    // (202) that strikes falls on as ***ball hit (201), not into *Fire ball
+    // 02 (203, slot 1).
+    if (e.pending !== undefined) {
+      const key = e.pending;
+      Object.assign(e, {
+        box: null,
+        boxes: [],
+        responses: [],
+        pending: undefined,
+        onLand: e.stage ? e.onLand : undefined,
+      });
+      this.branchTo(e, key);
+      return;
+    }
+    // A stopped object skips its script step (0x412390), for good at -1.
+    if (e.hitStop) {
+      if (e.hitStop > 0) e.hitStop--;
+      return;
+    }
+    // 0x41241c: an object falling to the floor (y 920) stops there, and
+    // its landing handler (slot 1) enters its action, dropping its boxes.
+    // A stage object skips this and the world bounds (0x4123cb).
+    if (!e.stage && !e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
+      Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
+      const land = e.onLand;
+      if (land !== undefined) {
+        Object.assign(e, { box: null, boxes: [], onLand: undefined });
+        this.branchTo(e, land);
+        return;
+      }
+    }
+    // A script without displays never advances, so its events all fire at
+    // its first step (anime beam 296 only spawns 297 and 299).
+    if (++e.age === 0 || e.age < animationDuration(e.clip, e.who) || loops(e))
+      this.fireEffect(e);
+    // A script that runs out after a display runs its last records first
+    // (0x4125ea): LIZARD's dragon up handen (247) spawns call bird (249,
+    // PC 3409). A stage object then restarts its first action (+0x34,
+    // 0x4127b7).
+    else if (
+      e.age === animationDuration(e.clip, e.who) &&
+      !this.fireEffect(e) &&
+      e.stage &&
+      script(e.clip, e.who).end === 'end'
+    )
+      this.branchTo(e, e.stage.home);
   }
 
   private run(player: Input, opponent?: Input) {
@@ -3369,12 +3388,14 @@ export class Match {
     // the tick's start by priority (0x404d0b), the players' slots before any
     // object's within one, so an object a step or a contact spawns first
     // steps in the next tick's pass, and one a player's step moves keeps its
-    // place. ponytail: within a priority it keeps spawn order, where
-    // 0x406570 takes the first free slot.
+    // place; within a priority they go in slot order. ponytail: the HUD's
+    // KGT letterings and the camera hold no slot here, so a slot a lettering
+    // frees goes to no later object first.
     const order = this.fighters[1].z < this.fighters[0].z ? [1, 0] : [0, 1];
     const [first, second] = order.map((i) => this.fighters[i].z);
     const [behind, between, after] = [[], [], []] as Effect[][];
-    for (const e of [...this.layers, ...this.effects].sort((a, b) => a.z - b.z))
+    const objects = [...this.layers, ...this.effects];
+    for (const e of objects.sort((a, b) => a.z - b.z || a.index - b.index))
       (e.z < first ? behind : e.z < second ? between : after).push(e);
     this.stepObjects(behind);
     // After a KO or time-out the round phase stays 1 (only a debug key sets
