@@ -1390,6 +1390,30 @@ describe('recovered victim responses', () => {
     expect(victim.hp).toBeLessThan(LIFE);
   });
 
+  it('spends a damaging box whose response names no reaction (0x40f65b)', () => {
+    // A guard half of 0, as ANMC P's ZA finishers have (234, 240), reports
+    // 'reaction error' and leaves the guard as it is, but marks the striker
+    // as having hit (0x40f31c), so the box has nothing left once the guard
+    // drops.
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 120;
+    enter(
+      match,
+      f,
+      RYUKO.punch,
+      firstStrike('ryuko', RYUKO.punch, 'ryuko').from,
+    );
+    f.responses = [2, 2, 2, 0, 0, 0];
+    Object.assign(victim, { action: 'guard', age: 0 });
+    match.step({}, { guard: true });
+    expect(f.connected).toBe(true);
+    expect(victim).toMatchObject({ action: 'guard', hp: LIFE });
+    victim.action = 'idle';
+    ticks(match, 5);
+    expect(victim).toMatchObject({ action: 'idle', hp: LIFE });
+  });
+
   it('slams any grounded victim of punch 3 into a floor bounce', () => {
     for (const defense of [{}, { guard: true, crouch: true }]) {
       // Response 77 → action 123, including through a crouching guard.

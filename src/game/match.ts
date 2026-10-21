@@ -2774,8 +2774,12 @@ export class Match {
     // 0x40f527: response 0 names no reaction, but a box without damage
     // still meets the victim, turning it and taking the striker's handler
     // (0x40f73c, 0x40f6e6, 0x40f885): LIZARD's dragon up handen (247) so
-    // finds whom his birds strike.
-    if (!reaction && !timeline && (response || box.damage)) return [];
+    // finds whom his birds strike. One with damage reports 'reaction error'
+    // to the debug log (0x40f65b, 0x415190) and leaves the victim as it is,
+    // past the striker's mark and the pair's priorities and +0xdef9: a guard
+    // spends ANMC P's 234, whose guard half is 0. No box names a response
+    // whose victim action is 0 (0x40f640).
+    const error = !reaction && !timeline && box.damage > 0;
     // A guarded contact (the guard half, 0x40f4be) stays one unless the
     // response is unguardable (0x40f544), as a guard half naming a hit is;
     // a hit half naming a guard, YINAN's R300 Hit's time stop (response 80,
@@ -2803,6 +2807,7 @@ export class Match {
         bonus:
           OWN_STRIKER_POWER[target.who]?.[victim] ?? STRIKER_POWER[victim] ?? 0,
         own,
+        error,
       },
     ];
   }
@@ -3522,8 +3527,10 @@ export class Match {
       source,
       bonus,
       own,
+      error,
     } of contacts) {
       source.connected = true;
+      if (error) continue;
       if (!reaction && !timeline) {
         target.facing = facing === 1 ? -1 : 1;
         continue;
@@ -3595,7 +3602,8 @@ export class Match {
     // the contact (0x40f6f1), its hit handler after the motion pass
     // (0x40fffd), each only for a striker with nothing queued, so a reaction
     // takes an interrupted aerial drill whatever the fighters' order.
-    for (const { f, blocked, source } of contacts) {
+    for (const { f, blocked, source, error } of contacts) {
+      if (error) continue;
       if ('clip' in source) this.handle(source, blocked);
       const handler = blocked ? f.onGuard : f.onHit;
       if (source === f && f.action === 'script' && !f.pending && handler)
