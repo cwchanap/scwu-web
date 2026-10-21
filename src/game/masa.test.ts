@@ -370,4 +370,42 @@ describe('MASA (29 MASA.PLAYER)', () => {
     expect(flung).toBe(true);
     expect(masa.hp).toBeLessThan(450);
   });
+
+  it("picks his MUSIC ATTACK's voice by its chain of rolls each 100-tick pass (PCs 2036–2061), as 3-TIMES's (PCs 1936–1961)", () => {
+    const voices = (who: Who) => {
+      const match = new Match('practice', false, 3, ['giant', who]);
+      const [giant, other] = match.fighters;
+      other.x = giant.x + 90;
+      match.step();
+      match.step();
+      match.step({ throw: true });
+      const heard: [number, number][] = [];
+      let start = -1;
+      for (let t = 0; t < 1200; t++) {
+        match.step();
+        if (other.action !== 'musicAttack') continue;
+        if (start < 0) start = t;
+        for (const s of match.sounds)
+          if (s.owner === 1) heard.push([t - start, s.index]);
+      }
+      return heard;
+    };
+    // rand() % 3 > 1 (PC 2036) skips the voice; else rand() % 9 > 1 skips
+    // sound 17 (PC 2040), rand() % 8 > 1 sound 18, ... down to 24.
+    expect(voices('masa')).toEqual([
+      [0, 17],
+      [100, 17],
+      [200, 18],
+      [500, 18],
+      [800, 19],
+    ]);
+    expect(animationDuration('musicAttack', 'masa')).toBe(100);
+    expect(voices('times')).toEqual([
+      [0, 11],
+      [100, 11],
+      [200, 12],
+      [500, 12],
+      [800, 13],
+    ]);
+  });
 });

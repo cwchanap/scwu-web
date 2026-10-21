@@ -1926,17 +1926,28 @@ export class Match {
   // GIANT!! MUSIC ATTACK (133) loops until another action takes the victim,
   // each pass first running its records: Ryuko's rolls rand() % 31 > 1 to
   // jump past its sound (PCs 1803–1807); Giant's spawns love heart (440, PC
-  // 1944).
+  // 1944). MASA's and 3-TIMES's roll rand() % 3 > 1 (PCs 2036, 1936) past a
+  // voice that a chain of rolls picks (PCs 2040–2061, 1940–1961), each pick
+  // jumping on into their call of its two displays.
   private musicAttack(f: Fighter) {
     if (f.action !== 'musicAttack') return false;
     if (f.age % animationDuration('musicAttack', f.who)) return true;
-    const owner = this.fighters.indexOf(f);
-    for (const event of script(twin(f.who, 133), f.who).events) {
-      if (event.t) break;
-      if (event.op !== 'random') this.runEvent(f, owner, event);
-      else if (this.cpu.random() % event.divisor > event.above) break;
-    }
+    this.musicPass(f, twin(f.who, 133));
     return true;
+  }
+
+  // A pass's records, through its rolls and its jumps with no display.
+  private musicPass(f: Fighter, key: ObjectKey): void {
+    const { events, frames, end, next, offset = 0 } = script(key, f.who);
+    for (const event of events) {
+      if (event.t) return;
+      if (event.op !== 'random')
+        this.runEvent(f, this.fighters.indexOf(f), event);
+      else if (this.cpu.random() % event.divisor > event.above)
+        return this.musicPass(f, sourceKey(event.action, event.offset));
+    }
+    if (!frames.length && end === 'jump' && next !== null)
+      this.musicPass(f, sourceKey(next, offset));
   }
 
   // Chuck 消える (143) holds its blank display for 100 ticks, then jumps into

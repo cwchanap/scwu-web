@@ -674,7 +674,13 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     ),
     twistWall: clip([...z.twistWall, ...z.twisting2], z.twistWall.length),
     gonMiss: clip(z.gonMiss),
-    musicAttack: silent(z.musicAttack),
+    // MASA's and 3-TIMES's pass calls its two displays ten times (PCs 2038,
+    // 1938).
+    musicAttack: silent(
+      who === 'masa' || who === 'times'
+        ? Array(10).fill(z.musicAttack).flat()
+        : z.musicAttack,
+    ),
     vanish: clip(z.vanish),
     stun: timeline(108),
     airStun: timeline(109),
