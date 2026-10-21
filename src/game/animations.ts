@@ -153,6 +153,10 @@ export type SourceEvent =
       // A jump back in an inlined call: the target's tick, past the events
       // already at it.
       rewind?: { t: number; skip: number };
+      // A jump out of an inlined call, whose target runs out back into it:
+      // the tick where this pass of the call runs out, past the events
+      // already at it.
+      resume?: { t: number; skip: number };
       // Below selector 0x40, the object's own variable, set or added to
       // first, or set to the round.
       pre?: { value: number; add: boolean; round?: boolean; x?: boolean };

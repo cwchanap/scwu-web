@@ -1132,6 +1132,9 @@ export interface Effect {
   onClash?: ObjectKey;
   // The handler a contact queued (+0x38), which the next step enters.
   pending?: ObjectKey;
+  // Where a check that jumped out of a call returns once its target runs
+  // out (0x4125ea): the timeline, its tick and the events to pass over.
+  resume?: { clip: ObjectKey; t: number; skip: number };
   // A stage object: the action it restarts and its scroll percentages.
   stage?: { home: number; x: number; y: number };
 }
@@ -1821,7 +1824,7 @@ export class Match {
       if (
         event.op === 'random'
           ? this.cpu.random() % event.divisor <= event.above
-          : event.called || !this.passes(f, f, event)
+          : event.called || event.resume || !this.passes(f, f, event)
       )
         continue;
       if (this.enterResult(f, sourceKey(event.action, event.offset)))
@@ -2339,15 +2342,24 @@ export class Match {
       // An object and Zoma take their checks' jumps; Ryuko's are his
       // entry's.
       case 'test':
+        // ponytail: a fighter keeps the fall-through of one that jumps out
+        // of a call, tracking no call to return into; only demo stands'
+        // tests of variable 0 do, which set-up clears before each 開始時,
+        // and results skip them too (resultEvents), drawing their EX stands
+        // from clips (exStands).
+        if (event.resume && !('clip' in actor)) break;
         if (
           ('clip' in actor || actor.action === 'script') &&
           this.passes(self, actor, event)
-        )
+        ) {
+          if (event.resume && 'clip' in actor)
+            actor.resume = { clip: actor.clip, ...event.resume };
           return event.rewind
             ? this.rewind(actor, owner, event.rewind)
             : event.called
               ? this.rejoin(actor, owner, event)
               : this.branchTo(actor, sourceKey(event.action, event.offset));
+        }
         break;
       // Op 0x24 jumps when its steps match in the input history (0x410a50).
       case 'command':
@@ -3604,6 +3616,8 @@ export class Match {
         pending: undefined,
         onLand: e.stage ? e.onLand : undefined,
         onClash: e.stage ? e.onClash : undefined,
+        // It ends any call too (0x410d50), as landing does.
+        resume: undefined,
       });
       this.branchTo(e, key);
       return;
@@ -3620,7 +3634,12 @@ export class Match {
       Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
       const land = e.onLand;
       if (land !== undefined) {
-        Object.assign(e, { box: null, boxes: [], onLand: undefined });
+        Object.assign(e, {
+          box: null,
+          boxes: [],
+          onLand: undefined,
+          resume: undefined,
+        });
         this.branchTo(e, land);
         return;
       }
@@ -3631,15 +3650,27 @@ export class Match {
       this.fireEffect(e);
     // A script that runs out after a display runs its last records first
     // (0x4125ea): LIZARD's dragon up handen (247) spawns call bird (249,
-    // PC 3409). A stage object then restarts its first action (+0x34,
-    // 0x4127b7).
+    // PC 3409). One a check jumped into out of a call then returns into the
+    // call, and a stage object restarts its first action (+0x34, 0x4127b7).
     else if (
       e.age === animationDuration(e.clip, e.who) &&
       !this.fireEffect(e) &&
-      e.stage &&
       script(e.clip, e.who).end === 'end'
-    )
-      this.branchTo(e, e.stage.home);
+    ) {
+      if (e.resume) this.resume(e);
+      else if (e.stage) this.branchTo(e, e.stage.home);
+    }
+  }
+
+  // The call's pass runs out where the check jumped out of it, running that
+  // tick's events from there at once: MASA's #Fly Missile (260) waits out
+  // the freeze in Skill6 (261, PC 3419), then flies on into its next pass.
+  private resume(e: Effect) {
+    const { clip, t, skip } = e.resume!;
+    Object.assign(e, { clip, age: t, resume: undefined });
+    rearm(e, clip, t);
+    for (const next of eventsAt(clip, t, e.who).slice(skip))
+      if (this.runEvent(e, e.owner, next)) break;
   }
 
   private run(player: Input, opponent?: Input) {

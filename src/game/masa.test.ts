@@ -5,7 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro, enter } from './testing';
+import { brIntro, enter, spawn } from './testing';
 
 // MASA as player 1, `gap` from a standing opponent as player 2.
 function masaPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -221,6 +221,40 @@ describe('MASA (29 MASA.PLAYER)', () => {
         (age) => animationFrame('52+4', age, 'masa').image,
       ),
     ).toEqual([118, 448, 449, 450, 451, 447, 113]);
+  });
+
+  it('holds #Fly Missile in Skill6 while frozen, then flies on into its next pass (PC 3419)', () => {
+    // From age 35 #Fly Missile (260) calls a 1-tick pass of itself, whose
+    // last record tests the freeze into Skill6 (261), which runs out back
+    // into the call. Each tick's freeze, the missile's timeline and age,
+    // starred while it holds a box.
+    const flight = (freeze: number) => {
+      const { match, masa, steps } = masaPlayer(600);
+      const missile = spawn(match, 0, 260, { x: masa.x, y: -200 });
+      steps({}, 36);
+      const xs = new Set<number>();
+      const vxs: number[] = [];
+      const ticks = Array.from({ length: 10 }, (_, t) => {
+        if (t === 2) match.freeze = freeze;
+        match.step();
+        if (missile.clip === 261) xs.add(missile.x);
+        vxs.push(missile.vx);
+        return `${match.freeze}:${missile.clip}/${missile.age}${missile.box ? '*' : ''}`;
+      });
+      return { ticks: ticks.join(' '), xs, vxs };
+    };
+    expect(flight(0).ticks).toBe(
+      '0:260/36* 0:260/37* 0:260/38* 0:260/39* 0:260/40* 0:260/41* 0:260/42* 0:260/43* 0:260/44* 0:260/45*',
+    );
+    // It stops, boxless, until the freeze ends, then adds vx 700 (PC 3429)
+    // and the next pass goes on from age 38, adding its own 30 (PC 3412).
+    const frozen = flight(6);
+    expect(frozen.ticks).toBe(
+      '0:260/36* 0:260/37* 5:261/0 4:261/0 3:261/0 2:261/0 1:261/0 0:261/0 0:260/38* 0:260/39*',
+    );
+    expect(frozen.xs.size).toBe(1);
+    expect(frozen.vxs[2]).toBe(0);
+    expect(frozen.vxs[8]).toBeCloseTo((730 * 655 * 1.5) / 65536, 6);
   });
 
   it('wins after DEMO STAND twice, looping images 450–451 (PC 891), and draws holding 122', () => {

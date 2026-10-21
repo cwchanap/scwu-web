@@ -6,7 +6,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { brIntro } from './testing';
+import { brIntro, spawn } from './testing';
 
 // DIDO as player 1 at `x`, `gap` from a standing opponent.
 function didoPlayer(x = 900, gap = 90, opponent: Who = 'ryuko') {
@@ -159,6 +159,22 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
       mine: [307, 310, 312, 'idle'],
       damage: 209,
     });
+  });
+
+  it("sends K2's shots off the stage while en300 hit holds variable 7 at 100, even within their calls (PC 2745)", () => {
+    // K2 obj2 (196) calls a 1-tick pass of itself 40 times, each first
+    // testing variable 7 into Skill7 (198), which flies off at 30000.
+    const shot = (at: number) => {
+      const { match, dido } = didoPlayer(900, 600);
+      const k2 = spawn(match, 0, 196, { x: dido.x, y: -100 });
+      return Array.from({ length: 6 }, (_, t) => {
+        dido.variables[7] = t === at ? 100 : 0;
+        match.step();
+        return match.effects.includes(k2) ? `${k2.clip}/${k2.age}` : 'culled';
+      }).join(' ');
+    };
+    expect(shot(-1)).toBe('196/0 196/1 196/2 196/3 196/4 196/5');
+    expect(shot(3)).toBe('196/0 196/1 196/2 198/0 198/1 culled');
   });
 
   it('stands in action 1 until it runs out (PC 16), with no EX or life check', () => {

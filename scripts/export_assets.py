@@ -231,6 +231,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     skips = []
     # Each record this pass of a call has reached: its tick, and the events already at that tick.
     marks = {}
+    # Tests jumping out of a call, yet to reach where its pass runs out: (event index, depth).
+    returns = []
     # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
     # its own action, as Zoma's run loops, starts with those its earlier records set.
     for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
@@ -259,6 +261,10 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
         if pc >= a.end:
             if not stack:
                 break
+            for mark in [m for m in returns if m[1] == len(stack)]:
+                events[mark[0]]["resume"] = dict(
+                    t=t, skip=next((k for k, e in enumerate(reversed(events)) if e["t"] < t), len(events)))
+                returns.remove(mark)
             ret, called, remaining, caller, entry = stack[-1]
             if remaining > 1:
                 stack[-1] = (ret, called, remaining - 1, caller, entry)
@@ -359,15 +365,13 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 else:
                     known.pop(record[4] & 0x3f, None)
             event = decode_event(record)
-            # A branch can't return to a caller, so a call keeps its checks' fall-through path,
-            # but for an op 0x24 in its caller's last call, whose return runs the caller out as
-            # the branch's end does (0x4125ea): GIGI's Ranbu start calls Ranbu start Fin (297)
-            # last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. A test jumping back
-            # within the called action rewinds (below). ponytail: other checks there keep their
-            # fall-through, five freeze waits (op 0x1f on global 6) jumping to another action that
-            # runs out into the call among them (ALEX's PC 3486, MASA's 3419). It also keeps an
-            # op 0x1f test of a player variable that jumps out of the call into an action
-            # looping back into itself, which never runs out into the call (0x4125ea):
+            # ponytail: a call keeps its op 0x16 and 0x24 checks' fall-through path, their branches
+            # returning into no call, but for an op 0x24 in its caller's last call, whose return
+            # runs the caller out as the branch's end does (0x4125ea): GIGI's Ranbu start calls
+            # Ranbu start Fin (297) last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. Its
+            # op 0x1f tests return into the call (`called`, `rewind`, `resume`, below), and one of
+            # a player variable that jumps out of the call into an action looping back into itself
+            # branches for good, never running out into the call (0x4125ea):
             # KATE's air fire tests variable 8 in each of its 60 hovers (PCs 3179–3180), and its
             # drops loop until landing enters their handler (0x410d50), which ends the call (+0x7c).
             # A 0-tick hold never runs out either: ERUS's Cerb2 calls 235 + 12 fifteen times (PC
@@ -398,7 +402,12 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 # One into its own tick holds there (KATE's PC 4287), from its first event.
                 assert at < t or not skip, f"rewind into its own tick past events at PC {pc}"
                 event = dict(event, rewind=dict(t=at, skip=skip))
-            elif event and stack and event["op"] in ("input", "test", "command") and not (
+            # Any other keeps the call too: its target's run-out returns into it (0x4125ea), where
+            # this pass runs out (`resume`, set there). MASA's #Fly Missile waits out the freeze
+            # in Skill6 (261, PC 3419), which runs out into the call's next pass.
+            elif event and stack and event["op"] == "test":
+                returns.append((len(events), len(stack)))
+            elif event and stack and event["op"] in ("input", "command") and not (
                     event["op"] == "command" and len(stack) == 1 and stack[0][2] == 1
                     and stack[0][0] >= p.action(stack[0][3]).end):
                 event = None
@@ -416,6 +425,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
         pc += 1
     else:
         sys.exit(f"Action {index} did not finish flattening; refusing to export.")
+    if returns:
+        sys.exit(f"Action {index}'s test in a call at {events[returns[0][0]]['t']} never returns; refusing to export.")
     return dict(result, frames=frames, events=events)
 
 
@@ -3917,7 +3928,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     for result in ("win", "draw"):
         index, offset = actions[result] if isinstance(actions[result], tuple) else (actions[result], 0)
         events = flatten(p, c, index, offset=offset)["events"]
-        if any(e["op"] in ("random", "test", "motion", "handler") for e in events):
+        if any(e["op"] in ("random", "test", "motion", "handler") and "resume" not in e for e in events):
             # Its landing handler too, though the result plays as a clip.
             queue += [(index, offset)] + [(e["action"], e["offset"]) for e in events
                                           if e["op"] == "handler" and e["action"]]
