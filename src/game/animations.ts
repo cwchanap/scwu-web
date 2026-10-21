@@ -720,8 +720,7 @@ const guardAnimations = (
 // The other players' neutral, guard, victim and result clips: the engine's
 // own states and the twins of Ryuko's victim actions (export_fighter), shaped
 // like his.
-function twinAnimations(who: Exclude<Who, 'ryuko'>) {
-  const z = fighterClips[who];
+function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
   const timeline = (index: number) => scriptClip(twin(who, index), who);
   const table: Partial<Record<AnimatedAction, Clip>> = {
     walk: clip(z.walk, true),
@@ -914,8 +913,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
     // sound and *ef win (PCs 657–658), and ZIRO's 勝ち (66) image 142 from PC
     // 765 (PC 766), past his sound (PC 764). ponytail: ZIRO's rand % 3 > 1
-    // (PC 758) into randon win1 (51) isn't played, nor demo act's EX stance,
-    // Demo act2 (29, PC 324). MASA's 勝ち (94) calls DEMO STAND (32) twice (PC
+    // (PC 758) into randon win1 (51) isn't played. MASA's 勝ち (94) calls DEMO STAND (32) twice (PC
     // 861) and jumps to Win Motion (95, PC 881), which loops images 450–451
     // from PC 889 (PC 891); his draw (105) calls 32 twice too (PC 1006).
     // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
@@ -1060,10 +1058,40 @@ const TWIN_ANIMATIONS = {
 // ponytail: 'time stop sit EX' (195) also spawns 365 and slides at raw −650
 // (PCs 2566–2567), which only the hidden super's guard reaches; the port
 // draws its images over the normal guard's rules.
+// Demo stands jump to their EX stance while variable 0 holds the EX value
+// (op 0x1f, export_fighter), so in EX mode each call of one in an intro or a
+// result plays that stance: SAKUYA's STAND DEMO plays Skill1 (32, PC 296).
+function exStands(who: Exclude<Who, 'ryuko'>) {
+  const z = fighterClips[who];
+  const stand = new Set(z.winStand.map((frame) => frame.pc));
+  const swap = (frames: Pose[]) =>
+    frames.flatMap((frame) =>
+      frame.pc === z.winStand[0].pc
+        ? z.winStandEx
+        : stand.has(frame.pc)
+          ? []
+          : [frame],
+    );
+  const { intro, win, draw } = twinAnimations(who, {
+    ...z,
+    ...Object.fromEntries(
+      ['intro', 'introLand', 'win', 'draw', 'winStand']
+        .filter((name) => z[name])
+        .map((name) => [name, swap(z[name])]),
+    ),
+  });
+  return { intro, win, draw };
+}
 const EX_ANIMATIONS = Object.fromEntries(
   Object.entries(fighterClips)
-    .filter(([, z]) => z.guardEx)
-    .map(([who, z]) => [who, guardAnimations(z, 'Ex')]),
+    .filter(([, z]) => z.guardEx || z.winStandEx)
+    .map(([who, z]) => [
+      who,
+      {
+        ...(z.guardEx && guardAnimations(z, 'Ex')),
+        ...(z.winStandEx && exStands(who as Exclude<Who, 'ryuko'>)),
+      },
+    ]),
 ) as Partial<Record<Who, Partial<Record<AnimatedAction, Clip>>>>;
 
 // Object keys name a spawned source object, played from its flattened timeline.
@@ -1079,12 +1107,20 @@ function clipOf(action: AnimatedAction | ObjectKey, who: Container) {
   if (!found) throw new Error(`${who} has no ${action} clip yet`);
   return found;
 }
+// `ex`: in EX mode, where the player has an EX form of the clip.
+const exClipOf = (
+  action: AnimatedAction | ObjectKey,
+  who: Container,
+  ex: boolean,
+) =>
+  (ex && EX_ANIMATIONS[who as Who]?.[action as AnimatedAction]) ||
+  clipOf(action, who);
 export function animationDuration(
   action: AnimatedAction | ObjectKey,
   who: Container = 'ryuko',
+  ex = false,
 ) {
-  const found = clipOf(action, who);
-  return found?.duration ?? 0;
+  return exClipOf(action, who, ex)?.duration ?? 0;
 }
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
@@ -1150,16 +1186,13 @@ export function pushboxes(
     .reverse();
 }
 
-// `ex`: in EX mode, where the player has an EX form of the clip.
 export function animationFrame(
   action: AnimatedAction | ObjectKey,
   age: number,
   who: Container = 'ryuko',
   ex = false,
 ): Pose {
-  const found =
-    (ex && EX_ANIMATIONS[who as Who]?.[action as AnimatedAction]) ||
-    clipOf(action, who);
+  const found = exClipOf(action, who, ex);
   if (!found) throw new Error(`Source object ${action} has no displays`);
   const { frames, ticks, loopStart, duration, intro } = found;
   let time = Math.max(0, age);

@@ -541,7 +541,7 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     expect(ryuko.action).toBe('twist');
   });
 
-  it("stands through his Vs. intro (31 + 2) where Ryuko's walk ends", () => {
+  it('stands through his Vs. intro (31 + 2) where the round places him', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'zoma']);
     const [ryuko, zoma] = match.fighters;
     expect(animationDuration('intro', 'zoma')).toBe(200);

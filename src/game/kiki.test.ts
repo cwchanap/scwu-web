@@ -186,7 +186,7 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
     expect(KIKI_IMAGES.has(fighterPose(kiki).image)).toBe(true);
   });
 
-  it("stands through her Vs. intro (33 + 2) where Ryuko's walk ends", () => {
+  it('stands through her Vs. intro (33 + 2) where the round places her', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'kiki']);
     const [ryuko, kiki] = match.fighters;
     expect(animationDuration('intro', 'kiki')).toBe(200);

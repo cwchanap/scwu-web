@@ -238,8 +238,22 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
     expect(animationDuration('intro', 'chung')).toBe(200);
     const match = new Match('cpu', true, 0, ['chung', 'ryuko']);
     const chung = match.fighters[0];
-    for (let t = 0; t < 200; t++) match.step({ crouch: true });
+    const images: number[] = [];
+    for (let t = 0; t < 200; t++) {
+      match.step({ crouch: true });
+      images[chung.age] = fighterPose(chung).image;
+    }
     expect([chung.action, exMode(chung)]).toEqual(['idle', true]);
+    // There Demo stand jumps to Demo stand EX (28, PC 259): images 372–374
+    // (PCs 271–274) in place of 113–115.
+    expect([150, 162, 175, 188].map((age) => images[age])).toEqual([
+      372, 373, 374, 373,
+    ]);
+    expect(
+      [150, 165, 175, 190].map(
+        (age) => animationFrame('intro', age, 'chung').image,
+      ),
+    ).toEqual([113, 114, 115, 114]);
     const late = new Match('cpu', true, 0, ['chung', 'ryuko']);
     for (let t = 0; t < 200; t++) late.step({});
     expect(exMode(late.fighters[0])).toBe(false);

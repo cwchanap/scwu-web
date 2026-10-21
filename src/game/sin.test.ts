@@ -8,7 +8,7 @@ import {
   SIN_INTRO_EX_TICK,
 } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 import { enter } from './testing';
@@ -244,6 +244,19 @@ describe('SIN (10 SIN.PLAYER)', () => {
     const { x } = sin;
     for (let t = 0; t < 200; t++) match.step({ crouch: t >= 60 });
     expect([sin.action, sin.x, exMode(sin)]).toEqual(['idle', x, true]);
+    // STAND DEMO 2 (30) then jumps to STAND DEMO (29, PC 324): images
+    // 113–117 for 123 ticks (PCs 315–322) in place of 365's 125.
+    const ex = new Match('cpu', true, 0, ['sin', 'zoma']);
+    const images: number[] = [];
+    let ticks = 0;
+    for (; ex.fighters[0].action === 'intro'; ticks++) {
+      ex.step({ crouch: ticks >= 60 });
+      images[ex.fighters[0].age] = fighterPose(ex.fighters[0]).image;
+    }
+    expect([ticks, images[75], images[105], images[197]]).toEqual([
+      198, 113, 114, 114,
+    ]);
+    expect(animationFrame('intro', 75, 'sin').image).toBe(365);
   });
 
   it('wins with STAND DEMO 2 (30), then loops PCs 617–618 with WIN RP spawned once (PC 616)', () => {

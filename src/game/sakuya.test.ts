@@ -9,7 +9,7 @@ import {
 } from './animations';
 import type { Action } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 
@@ -269,12 +269,21 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
     for (const crouch of [false, true]) {
       const match = new Match('cpu', true, 0, ['sakuya', 'zoma']);
       const sakuya = match.fighters[0];
-      while (sakuya.action === 'intro') match.step(crouch ? { crouch } : {});
+      const images: number[] = [];
+      while (sakuya.action === 'intro') {
+        images[sakuya.age] = fighterPose(sakuya).image;
+        match.step(crouch ? { crouch } : {});
+      }
       expect([sakuya.x, sakuya.stock, exMode(sakuya)]).toEqual([
         390 * 1.5,
         2,
         crouch,
       ]);
+      // In EX mode STAND DEMO jumps to Skill1 (32, PC 296): images 236–238
+      // for the same 80 ticks (PCs 308–311).
+      expect([120, 140, 160, 185, 199].map((age) => images[age])).toEqual(
+        crouch ? [236, 237, 238, 237, 237] : [117, 115, 115, 116, 116],
+      );
     }
   });
 
@@ -284,6 +293,13 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
         (age) => animationFrame('win', age, 'sakuya').image,
       ),
     ).toEqual([117, 121, 435, 436]);
+    // Skill1 in EX mode, the same 80 ticks.
+    expect(
+      [0, 80, 1000].map(
+        (age) => animationFrame('win', age, 'sakuya', true).image,
+      ),
+    ).toEqual([236, 121, 436]);
+    expect(animationFrame('draw', 0, 'sakuya', true).image).toBe(236);
     expect(animationFrame('draw', 1000, 'sakuya').image).toBe(444);
     expect(BLACK.sakuya.opaque.image).toBe(1009);
     // EX mode cycles the face through 2002, 2006, 2000 and 2006 (PCs

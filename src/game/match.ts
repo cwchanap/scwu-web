@@ -852,9 +852,8 @@ const timeline = (f: Fighter) => f.branch!;
 // jumps to the same calls of Demo stand (30 + 25, PC 408). SAKUYA's at 100,
 // set by TO EX (256, PC 3692) and cleared by TO NOR (257, PC 3705); her
 // intro's (PC 413) enters ex change (49), which sets it (PC 521) and jumps
-// to the same call of STAND DEMO (37 + 24, PC 522). ponytail: there STAND
-// DEMO jumps to Skill1 (32, PC 296), the same 80 ticks in her EX stance,
-// which the flattened intro doesn't follow. ALEX's at 100, set by TO EX (225,
+// to the same call of STAND DEMO (37 + 24, PC 522), which there jumps to
+// Skill1 (32, PC 296), her EX stance (animations.ts). ALEX's at 100, set by TO EX (225,
 // PC 3315) and cleared by TO NORMAL (226, PC 3328); his intro's (PC 356)
 // enters EX change (39), which sets it (PC 412) and jumps back (33 + 18, PC
 // 413). SOU's at 10, set by TYPE CHANGE to EX (222, PC 3006) and cleared by
@@ -3585,7 +3584,8 @@ export class Match {
         // Past the floor, the fall lands (0x41187f).
         f.y = Math.min(0, f.y + vy);
         this.enter(f, i);
-        if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
+        if (f.age >= animationDuration('intro', f.who, exMode(f)))
+          this.action(f, 'idle');
       }
       // History keeps recording, so a button held through the intro must be
       // pressed again once control begins.

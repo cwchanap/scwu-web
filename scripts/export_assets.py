@@ -1383,8 +1383,7 @@ FIGHTERS = {
         # talk' (67) seven times (PC 707), and holds image 416 (PC 709); the
         # draw calls 49 once (PC 798). ponytail: 勝ち's rand % 5 > 3 into
         # Random win (52, PC 696) isn't played, nor its rand % 3 > 1 between
-        # sounds 10 and 11 (PC 702), nor Demo stand's DEMO STAND2 (48) for
-        # variable 0 = 100 (PC 513); the clip takes the fall-through. Her
+        # sounds 10 and 11 (PC 702). Her
         # darkening panel, image 1009 (action 47). The Vs. intro: 開始時 (32)
         # jumps to 開始時 BR (34) for global 3 = 0 (PC 337), past its displays
         # for global 14 = 0 (PC 375) to two 2-tick displays (PCs 382, 384)
@@ -3545,9 +3544,9 @@ FIGHTERS = {
         # and, for global 14 = 0, jumps past its display (PC 621) to Round 1
         # (42) + 7 (PC 624); it plays flattened (animations.ts drops the
         # display). ponytail: 勝ち's rand % 6 > 3 rolls into Win 2 (82) and
-        # Win 3 (90) (PCs 906–907) aren't played, nor her EX results: Demo
-        # Stand's EX stance (35, PC 543), Win 1 EX (81, PC 909) and the draw's
-        # Stop (97, PC 1163), each for variable 0 = 100.
+        # Win 3 (90) (PCs 906–907) aren't played, nor her EX results' own
+        # actions: Win 1 EX (81, PC 909) and the draw's Stop (97, PC 1163),
+        # each for variable 0 = 100.
         actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57, intro=41),
         flat={"intro"},
         # 2001, 2002, 2007 and 2008: the HUD faces action 104 shows (PCs
@@ -3813,6 +3812,13 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                      and u16(r, 9) == 100), None)
         if test:
             actions[name + "Ex"] = u16(test, 1)
+    # Demo stands jump to their EX stance alike while it holds the EX value:
+    # SAKUYA's STAND DEMO to Skill1 (32, PC 296), SIN's and SOU's for 10.
+    if "winStand" in actions:
+        stand = p.action(actions["winStand"])
+        test = next((r for r in p.records[stand.start:stand.end] if r[0] == 0x1f and r[4] == 0x40 and r[5] == 4), None)
+        if test:
+            actions["winStandEx"] = u16(test, 1)
     clips = pose_clips(p, c, actions, image_ids)
     # Clips that play their action's flattened timeline, calls inlined.
     for name in flat:
