@@ -1469,9 +1469,13 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
-  // Global 0 (0x4456b0): at 10, which LIZARD's, HISO's, SEAN's and G Suneo's
-  // lethal blows hold for their strike's tick, a KO enters make hikari.
-  global0 = 0;
+  // Globals 0 (0x4456b0) and 10 (0x4456c4) by index. At global 0 = 10, which
+  // LIZARD's, HISO's, SEAN's and G Suneo's lethal blows hold for their
+  // strike's tick, a KO enters make hikari; ALPHA's KO sets global 10 to
+  // 10000 or 20000. ponytail: each match starts them at 0, where the source
+  // keeps global 10 until the select screen's 2P cursor clears it (KGT PCs
+  // 542, 590).
+  globals: Record<number, number> = {};
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
   // This tick's op 0x03 cues: each fighter's sound table (+0x221c) and index.
@@ -2163,8 +2167,8 @@ export class Match {
         ? (actor.locals[selector] ?? 0)
         : selector === 0x86
           ? this.freeze
-          : selector === 0x80
-            ? this.global0
+          : selector === 0x80 || selector === 0x8a
+            ? (this.globals[selector & 0x3f] ?? 0)
             : selector === 0x83
               ? this.vs
                 ? 50
@@ -2298,8 +2302,8 @@ export class Match {
       case 'freeze':
         this.freeze = (event.set ? 0 : this.freeze) + event.add;
         break;
-      case 'global0':
-        this.global0 = event.value;
+      case 'global':
+        this.globals[event.index] = event.value;
         break;
       // Action 0 clears the slot (0x40f6e6 tests it): LIZARD's SHOOT OBJ
       // EXPLO (290) clears its own (PCs 3940–3942) before it strikes. Slot 5
@@ -3190,13 +3194,16 @@ export class Match {
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
     const { action, stop, attackerStop, power, own } = pending;
-    // The lose action jumps to make hikari (63) while global 0 is 10 (PC
-    // 590), after deleting objects 7–9 and clearing variables 6, 8 and 14.
+    // The lose action takes its first test that passes, after the records
+    // before it: make hikari (63) while global 0 is 10 (PC 590), after
+    // deleting objects 7–9 and clearing variables 6, 8 and 14; Start KO 3
+    // for variable 0 (SHIN-Z's PC 705); ALPHA's KO Boss for global 10 (PC
+    // 1029). Its jump to KO Normal (PC 591) plays as `down`.
     if (action === 'down' || action === 'koAgain') {
       const lose = script(twin(f.who, LOSE), f.who).events;
       const jump = lose.find(
         (e): e is Extract<ScriptEvent, { op: 'test' }> =>
-          e.op === 'test' && e.selector === 0x80 && this.passes(f, f, e),
+          e.op === 'test' && this.passes(f, f, e),
       );
       if (jump) {
         for (const event of lose.slice(0, lose.indexOf(jump)))
@@ -3705,6 +3712,19 @@ export class Match {
     // Applied after both steps, so a double KO holds once.
     for (const f of this.fighters) this.pause(f, this.koStop);
     this.stepObjects(after);
+    // The round controller (type 0xe, 0x4086a0) steps last, at priority
+    // 0x7f: its fight state reads both lives after every step (0x408eda), so
+    // a lose action that restores life on its first step (ALPHA's KO Boss,
+    // PC 1037) is never seen at 0.
+    const [one, two] = this.fighters;
+    if (!this.winner && (!one.hp || !two.hp || this.seconds === 0)) {
+      this.winner =
+        one.hp === two.hp ? 'draw' : one.hp > two.hp ? 'player' : 'opponent';
+      // The result states credit the winner (0x40948a, 0x40955f), and a
+      // draw or double KO both (0x409394, 0x40966b).
+      if (this.winner !== 'opponent') this.wins[0]++;
+      if (this.winner !== 'player') this.wins[1]++;
+    }
     this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
     this.clashBoxes();
     // The hit test meets the fighters and objects where last tick's motion
@@ -3848,14 +3868,6 @@ export class Match {
         striker.pending = { key: striker.onHit };
     }
     this.holdVictims();
-    if (!this.winner && (a.hp === 0 || b.hp === 0 || this.seconds === 0)) {
-      this.winner =
-        a.hp === b.hp ? 'draw' : a.hp > b.hp ? 'player' : 'opponent';
-      // The result states credit the winner (0x40948a, 0x40955f), and a
-      // draw or double KO both (0x409394, 0x40966b).
-      if (this.winner !== 'opponent') this.wins[0]++;
-      if (this.winner !== 'player') this.wins[1]++;
-    }
   }
 }
 

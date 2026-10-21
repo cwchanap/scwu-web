@@ -2820,10 +2820,13 @@ describe('IORI chain', () => {
       vy: 0,
       gravity: 0,
     });
-    match.ticks = 5999;
+    // The slam lands a tick before time-out: the round controller reads the
+    // lives after the steps and before the hit test (0x408e50, 0x40ffc0).
+    match.ticks = 5998;
+    match.step({}, {});
+    expect(match.winner).toBe(null);
     match.step({}, {});
     expect(match.winner).toBe('player');
-    match.step({}, {});
     expect(match.fighters[1].action).toBe('launchDown');
     untilResult(match);
     expect(match.fighters[1]).toMatchObject({ action: 'draw', y: 0 });
@@ -3267,12 +3270,15 @@ describe('prototype training rules', () => {
       f.hp = 7;
     });
     ticks(match, 8, { punch: true }, { punch: true });
-    expect(match.winner).toBe('draw');
     expect(hitEffects(match)).toMatchObject([
       { clip: 339, x: 661.5, age: -1, facing: 1, owner: 0 },
       { clip: 339, x: 528.5, age: -1, facing: -1, owner: 1 },
     ]);
-    ticks(match, 21);
+    // The round controller reads the lives after the next steps.
+    expect(match.winner).toBe(null);
+    match.step();
+    expect(match.winner).toBe('draw');
+    ticks(match, 20);
     expect(hitEffects(match)).toHaveLength(2);
     match.step();
     expect(hitEffects(match)).toHaveLength(0);
@@ -5473,9 +5479,9 @@ describe('prototype training rules', () => {
     const [player, target] = match.fighters;
     target.hp = 1;
     match.step({ axe: true });
+    // The round controller sees the KO after the target's next step.
     for (let tick = 0; tick < 100 && !match.winner; tick++) match.step();
     expect(match.winner).toBe('player');
-    match.step();
     expect(player.action).not.toBe('win');
     // The lose action replaces FB's reaction (0x40e84b), so it neither
     // credits the thrower (PC 1442) nor stops anyone; KO Normal adds 10 to
@@ -5502,9 +5508,11 @@ describe('prototype training rules', () => {
     // 60% of punch 1's 10 on a 120% body box.
     a.hp = b.hp = 7;
     ticks(match, 8, { punch: true }, { punch: true });
+    // Both KOs enter a tick after the trade, and the round controller sees
+    // them then.
+    match.step();
     expect(match.winner).toBe('draw');
-    // Both KOs enter a tick after the trade.
-    ticks(match, 16);
+    ticks(match, 15);
     expect(match.fighters.map((f) => [f.age, f.hitStop])).toEqual([
       [5, 80],
       [5, 80],
@@ -5977,6 +5985,7 @@ describe('prototype training rules', () => {
     });
     ticks(match, 8, { punch: true }, { punch: true });
     expect(match.fighters.map((f) => f.hp)).toEqual([0, 0]);
+    match.step();
     expect(match.winner).toBe('draw');
     const end = match.ticks;
     ticks(match, 50, { kick: true });

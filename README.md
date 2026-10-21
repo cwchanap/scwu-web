@@ -803,6 +803,8 @@ And ALPHA's, a red-haired boy in a chained white suit who takes on four armours 
 | 4, or ↓ ↓ ↓ J                  | NEW EN3: pillars of fire, 3 stocks                                                                                      |
 | 5, or →↓←→↓← K                 | SCC: the knight's grab into a launch and a slam, 1 stock                                                                |
 
+Knocked out with a stock, ALPHA is flung away at 1 life and lies down, then draws his life back while his power drains: to full in practice, to about 150 in a VS match. His next KO that round is final.
+
 And SHIN-Z's, Z-MEGA as Shin Z for good: a white-haired, moustached brawler in a black vest and purple trousers:
 
 | Input                      | SHIN-Z's move                                                                                      |

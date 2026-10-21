@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
-import { faceImage } from './hud';
+import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro } from './testing';
+import { brIntro, named } from './testing';
 
 // ALPHA as player 1, `gap` from a standing Ryuko as player 2.
 function alphaPlayer(gap = 90) {
@@ -280,6 +280,81 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
       ),
     ).toEqual([116, 118, 129, 130, 130]);
     expect(faceImage(-1, 'alpha')).toBe(2001);
+  });
+
+  // ALPHA as player 2 at 1 life with a stock, punched by Ryuko at `punches`:
+  // his actions as [tick, action, life], from `from`.
+  function knockOut(match: Match, punches: number[], ticks: number, from = 0) {
+    const [ryuko, alpha] = match.fighters;
+    alpha.hp = 1;
+    alpha.stock = 1;
+    alpha.x = ryuko.x + 100;
+    const path: [number, string, number][] = [];
+    for (let t = 0; t < ticks; t++) {
+      if (t === punches[1] - 11) {
+        alpha.hp = 1;
+        ryuko.x = alpha.x - 100;
+      }
+      match.step(punches.includes(t) ? J : {}, {});
+      if (t >= from && path.at(-1)?.[1] !== named(alpha))
+        path.push([t, named(alpha), alpha.hp]);
+    }
+    return { ryuko, alpha, path };
+  }
+
+  it('survives a KO with a stock through KO Boss (84), and the next one enters KO Boss N (87)', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
+    // His lose action tests global 10 for 0 or above 200 (PCs 1029–1030),
+    // which only his KO writes, so it enters KO Boss: 450 life and 449 back
+    // (PCs 1037–1038), global 10 = 20000 (PC 1040), and a launch into KO
+    // Boss Down (92, slot 1). The round controller reads the lives after his
+    // step (0x408eda), so the round goes on. 180 ticks later KO Boss Down's
+    // HP 1 (93) calls HP 2 (94) 250 times: 2 life and −1 power a pass, its
+    // −2 passed over for global 3 < 40 (PC 1220).
+    const { alpha, path } = knockOut(match, [3, 701], 1000);
+    expect(path.slice(0, 4)).toEqual([
+      [0, 'idle', 1],
+      [11, '84', 1],
+      [121, '92', 1],
+      [616, 'idle', 500],
+    ]);
+    expect(match.winner).toBe('player');
+    // KO Boss Down set variable 15 to 10 (PC 1146): KO Boss N takes 1000
+    // (PC 1084) and adds 6 to variable 3 (PC 1081) each time it runs out
+    // back into the lose action, until variable 3 passes 30 (PC 1080) into
+    // KO NORMAL (88), whose landing enters KO down (91): global 10 = 10000
+    // (PC 1130).
+    expect(path.slice(4)).toEqual([
+      [709, '87', 0],
+      [715, '88', 0],
+      [825, '91', 0],
+    ]);
+    expect([alpha.stock, alpha.variables[3], alpha.variables[15]]).toEqual([
+      0, 36, 20,
+    ]);
+    expect(match.globals[10]).toBe(10000);
+  });
+
+  it('draws his life back only to desperation in VS single (global 3 = 50)', () => {
+    const match = new Match('cpu', true, 0, ['ryuko', 'alpha'], 'court', true);
+    const [ryuko, alpha] = match.fighters;
+    while (
+      match.roundTicks < FIGHT_TICK ||
+      ![ryuko, alpha].every((f) => f.action === 'idle')
+    )
+      match.step({}, {});
+    // HP 2 takes its 2 back for global 3 ≥ 40 (PC 1221), but at desperation
+    // (150) 0x40e7c0 scales a loss to 60%, 1 (+0x7ca7): he climbs to 151 and
+    // ends on a loss.
+    const { path } = knockOut(match, [3], 700);
+    expect(path).toEqual([
+      [0, 'turn', 1],
+      [10, 'idle', 0],
+      [11, '84', 1],
+      [121, '92', 1],
+      [616, 'idle', 149],
+    ]);
+    expect(match.winner).toBe(null);
   });
 
   it('plays his own CPU table in Vs. CPU', () => {

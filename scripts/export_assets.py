@@ -89,7 +89,7 @@ def decode_event(record):
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 12 (EX Fire
     # 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit, which only the Team VS actions
-    # set) and globals 0 (10 sends a KO to make hikari), 6 (the freeze) and 14 (the stage's
+    # set) and globals 0 (10 sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss) and 14 (the stage's
     # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
@@ -107,10 +107,15 @@ def decode_event(record):
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
                                                                               0x47, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
-                                                                              0x8e):
+                                                                              0x8a, 0x8e):
+        # Only ALPHA's KO writes global 10 (10000, 20000; PCs 1040, 1130), and the select screen's 2P
+        # cursor 0 (KGT PCs 542, 590), so its 257 tests for 10 never pass and keep their fall-through.
+        if record[4] == 0x8a and record[5] >> 2 & 3 == 1 and s16(record, 9) == 10:
+            return None
         return test_event(record)
-    if op == 0x1f and record[4] == 0x80 and record[5] == 1:  # global 0 = r[7:9]: at 10 a KO enters make hikari
-        return dict(op="global0", value=s16(record, 7))
+    # Global 0 = r[7:9] (at 10 a KO enters make hikari) and global 10 (ALPHA's KO Boss).
+    if op == 0x1f and record[4] in (0x80, 0x8a) and record[5] == 1:
+        return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7))
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
     if op == 0x1f and record[4] >> 6 == 1 and record[5] == 1:  # player variable r[4] & 0x3f = r[7:9]

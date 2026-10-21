@@ -1290,12 +1290,14 @@ describe.each(TEMPLATE)(
   },
 );
 
-// MASA's PCs; 3-TIMES's 開始時 is the same at PCs 268, 271, 316, 319, 270,
-// 276, 279, 280, 668, 292, 389, 313 and 294.
+// MASA's PCs; 3-TIMES's 開始時 is the same at PCs 268, 271, 315, 316, 319,
+// 270, 276, 279, 280, 668, 292, 389, 313 and 294.
 describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
   // 開始時 spawns itself from + 7 (PC 349), whose global 3 = 50 test takes
-  // 開始時 D50 (47, PC 352): in round 1 it sets variables 14 and 0 to 10
-  // (PCs 397, 400), his Alpha form. 開始時 jumps into 開始時 1P (45, PC 351),
+  // 開始時 D50 (47, PC 352): in round 1 it sets variable 0 to 10 (PC 400),
+  // his Alpha form, passing over its set of variable 14 (PC 397) while
+  // global 10 is below 9999 (PC 396), as only ALPHA's KO raises it. 開始時
+  // jumps into 開始時 1P (45, PC 351),
   // which in round 1 enters OP Music 1P (46, PC 357) and rejoins at + 5:
   // VS 1P twice, from its start and + 12 (PCs 360, 361), the first taking
   // VS Alpha (88) for global 3 = 50 (PC 760) as variable 0 isn't 0, the
@@ -1305,7 +1307,7 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
     const match = vsMatch(who);
     const [p1, p2] = match.fighters;
     steps(match, 4);
-    expect([p1.variables[0], p1.variables[14]]).toEqual([10, 10]);
+    expect([p1.variables[0], p1.variables[14] ?? 0]).toEqual([10, 0]);
     steps(match, 2);
     expect([named(p1), at(p1), at(p2)]).toEqual(['46', 370, 910]);
     match.step();
@@ -1376,8 +1378,10 @@ describe("SHIN-Z's VS 開始時 (31)", () => {
   // ticks, 177 and 176, then jumps to Start KO 2 (44, PC 417): HP hit and
   // HISA Hit objects, variable 0 set to 10 (PC 502), and op 0x15 takes 1000
   // of his own life (PC 505) before Start KO 3 (45) holds. His lose action
-  // runs at once (0x412327); the round goes to his opponent at FIGHT, the
-  // fight state's first KO check (0x408eda).
+  // runs at once (0x412327) and, for variable 0, jumps back to Start KO 3
+  // (PC 705), whose sounds play again before it holds image 208; the round
+  // goes to his opponent at FIGHT, the fight state's first KO check
+  // (0x408eda).
   it('knocks himself out with Start KO before FIGHT', () => {
     const match = new Match('cpu', true, 0, ['shinz', 'ryuko'], 'court', true);
     const [p1, p2] = match.fighters;
@@ -1396,13 +1400,17 @@ describe("SHIN-Z's VS 開始時 (31)", () => {
     steps(match, 338);
     expect([named(p1), p1.hp, p1.variables[0]]).toEqual(['39', 0, 10]);
     match.step();
-    expect([p1.action, p2.action, match.winner]).toEqual([
-      'down',
-      'idle',
-      null,
+    expect([named(p1), p2.action, match.winner]).toEqual(['45', 'idle', null]);
+    expect(match.sounds).toEqual([
+      { owner: 0, index: 39 },
+      { owner: 0, index: 19 },
     ]);
     while (match.roundTicks < FIGHT_TICK - 1) match.step();
-    expect([p1.action, match.winner]).toEqual(['koLand', null]);
+    expect([named(p1), animationFrame(45, p1.age, 'shinz').image]).toEqual([
+      '45',
+      208,
+    ]);
+    expect(match.winner).toBe(null);
     match.step();
     expect(match.winner).toBe('opponent');
   });
