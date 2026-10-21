@@ -159,6 +159,13 @@ def loops(p, index, offset=0):
     return record[0] == 0x0a and u16(record, 1) == index
 
 
+def calls(p, index, offset=0):
+    """Whether an action makes a call of its own from `offset`, taking the one call record (+0x7c,
+    0x4129a9), so that its run-out ends the action (0x4126de)."""
+    a = p.action(index)
+    return any(r[0] == 0x09 and r[1] and u16(r, 2) for r in p.records[a.start + offset:a.end])
+
+
 # The events a display carries: those its clip or timeline runs just before it.
 POSE_EVENTS = ("sound", "spawn", "screen", "trail", "variable", "window")
 
@@ -365,11 +372,13 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 else:
                     known.pop(record[4] & 0x3f, None)
             event = decode_event(record)
-            # ponytail: a call keeps its op 0x16 and 0x24 checks' fall-through path, their branches
-            # returning into no call, but for an op 0x24 in its caller's last call, whose return
-            # runs the caller out as the branch's end does (0x4125ea): GIGI's Ranbu start calls
-            # Ranbu start Fin (297) last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. Its
-            # op 0x1f tests return into the call (`called`, `rewind`, `resume`, below), and one of
+            # A call's op 0x16 and 0x24 checks branch as its caller's do where their target's
+            # run-out finds no call to return into and ends the action (0x4126de): in the caller's
+            # last call, whose return runs the caller out (0x4125ea), as GIGI's Ranbu start calls
+            # Ranbu start Fin (297) last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓; and
+            # into an action making calls of its own (`calls`), as SWW's RSK RP1 (215), which
+            # Ryuseiken start calls five times (PC 3074), checks RSK add's command (PCs 3095,
+            # 3103), whose calls (PCs 3118–3119) end it. No other sits in a call. Its op 0x1f tests return into the call (`called`, `rewind`, `resume`, below), and one of
             # a player variable that jumps out of the call into an action looping back into itself
             # branches for good, never running out into the call (0x4125ea):
             # KATE's air fire tests variable 8 in each of its 60 hovers (PCs 3179–3180), and its
@@ -409,8 +418,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 returns.append((len(events), len(stack)))
             elif event and stack and event["op"] in ("input", "command") and not (
                     event["op"] == "command" and len(stack) == 1 and stack[0][2] == 1
-                    and stack[0][0] >= p.action(stack[0][3]).end):
-                event = None
+                    and stack[0][0] >= p.action(stack[0][3]).end or calls(p, event["action"], event["offset"])):
+                sys.exit(f"Action {index}'s check in a call at PC {pc} would return into it; refusing to export.")
             # Its rolls jump within the called action, rejoining the
             # fall-through at its next display (flatten_queue checks): Giant's
             # super base ball picks a ball (PC 5358).

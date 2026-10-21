@@ -161,13 +161,19 @@ describe('SWW (26 SWW.PLAYER)', () => {
       expect(move).toMatchObject({ mine, damage });
       expect(move.sww.stock).toBe(3);
     }
-    // ↓→ J within 35 ticks of PC 3076 or 3078 enters RSK add (216).
-    expect(
-      play(presses({ 0: { dst: true }, ...downForward(100) })),
-    ).toMatchObject({
-      mine: [214, 216, 'idle'],
-      damage: 40,
-    });
+    // ↓→ J within 35 ticks of PC 3076 or 3078 enters RSK add (216), as of
+    // RSK RP1's PCs 3095 and 3103 within its calls, whose own calls (PCs
+    // 3118–3119) leave none to return into: its 25 after RP1's 2 and 1 a
+    // pass, cut at the first pass's first check or the last's.
+    for (const [at, damage] of [
+      [28, 27],
+      [100, 39],
+      [110, 40],
+    ]) {
+      expect(
+        play(presses({ 0: { dst: true }, ...downForward(at) })),
+      ).toMatchObject({ mine: [214, 216, 'idle'], damage });
+    }
     // Chain start hit puts 技名12 (230) in slot 1 for 80 ticks (PC 3360);
     // Chain start's spawn into the busy slot enters Chain 2 (229, PC 3321).
     expect(
