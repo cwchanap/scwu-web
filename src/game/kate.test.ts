@@ -162,6 +162,31 @@ describe('KATE (22 KATE.PLAYER)', () => {
     expect(dash.objects).toContain(246);
   });
 
+  it('drops a victim caught in the air through CHUCK HIT at gravity 80, landing into its displays again (PCs 1729–1730)', () => {
+    // Unheld, CHUCK HIT's op 0x01 drops Ryuko from rest; her landing handler
+    // (slot 1) re-enters its 10- and 30-tick displays, so dash att handen
+    // strikes her on the floor.
+    const { kate, other, steps } = katePlayer();
+    kate.stock = 3;
+    steps({}, 2);
+    steps({ iori: true }, 1, { jump: true });
+    const gravity = 80 * (393 / 65536) * 1.5;
+    let before = other.y;
+    while (other.action !== 'superHeld') {
+      before = other.y;
+      steps({});
+    }
+    expect(before).toBeLessThan(-90);
+    for (let n = 1; other.y < 0; n++) {
+      expect(other.y).toBeCloseTo(before + (gravity * n * (n + 1)) / 2, 6);
+      steps({});
+    }
+    steps({});
+    expect(other).toMatchObject({ action: 'superHeld', age: 0, y: 0 });
+    while (other.action === 'superHeld') steps({});
+    expect(other.action).toBe('hitRapid');
+  });
+
   it('drops a hovering Air fire as af add adds to variable 8 (PC 3401), which each hover tests (PCs 3179–3180)', () => {
     // Air fire Start (224) leaves *eff af01 (220) hovering for 60 calls of
     // its rp (221); af add strikes for 15, and the fire drops (227) on the

@@ -1788,6 +1788,16 @@ export class Match {
       f.vx = f.vy = 0;
       f.gravity = 0;
       f.moving = 0;
+      // CHUCK HIT's op 0x01 drops its victim at gravity 80 (Ryuko's PC 1730;
+      // every twin's alike) until op 0x07 holds it; one already held
+      // returns from its step at once (0x412397), so it never runs.
+      // ponytail: only one in the air; on the floor it sinks a tick or two
+      // before landing restarts its displays (0x41187f), which the port
+      // holds still.
+      if (action === 'superHeld' && !f.held && f.y < 0) {
+        f.gravity = JUMP_GRAVITY;
+        f.moving = 'velocity';
+      }
     } else if (f.gravity === 0) f.gravity = 0.24;
     if (action === 'down' || action === 'koAgain') {
       f.vx = 0;
@@ -1964,14 +1974,13 @@ export class Match {
       // No op 0x07 holding it, CHUCK HIT runs its 10- and 30-tick displays
       // (Ryuko's PCs 1733, 1737; every twin's alike) out into neutral
       // (0x4126de): KATE's Dash att Hit (245) never holds its victim.
-      // ponytail: one in the air takes airHit, not CHUCK HIT's fall (PC
-      // 1730) and landing displays.
       else if (
         target.action === 'superHeld' &&
         !target.held &&
-        target.age >= animationDuration('superHeld', target.who)
+        target.age >= animationDuration('superHeld', target.who) &&
+        !this.runOut(target)
       )
-        this.action(target, target.y < 0 ? 'airHit' : 'idle');
+        this.action(target, 'idle');
     });
   }
 
@@ -2054,7 +2063,8 @@ export class Match {
     // A target one past its action's end runs out at once (0x4125ea): DIDO's
     // >HE300 Hit5 lands in en300 hit + 28 (slot 1, PC 5047), so she stands;
     // RARIO 1UP (117) has no display, so its op 0x15 runs and it runs out.
-    // ponytail: a step early, where the engine's next step runs it out.
+    // Both in the step that enters it: a landing or handler zeroes the wait
+    // (+0x3c), and the record loop then meets the end first (0x4125bc).
     if (!animationDuration(key, f.who) && script(key, f.who).end === 'end') {
       for (const event of script(key, f.who).events)
         this.runEvent(f, this.fighters.indexOf(f), event);
@@ -2739,6 +2749,13 @@ export class Match {
       this.enterKey(f, f.onLand);
       return true;
     }
+    // CHUCK HIT's landing handler (PC 1729) enters 128 + 11, its displays
+    // again; the landing zeroes its gravity (0x411894).
+    if (f.action === 'superHeld') {
+      f.gravity = 0;
+      f.age = 0;
+      return true;
+    }
     f.gravity = 0.24;
     if (f.action === 'down' || f.action === 'koAgain') {
       this.action(f, 'koLand');
@@ -3152,6 +3169,7 @@ export class Match {
         return;
       }
     }
+    if (f.action === 'superHeld' && !f.held && f.gravity) f.moving = 'velocity';
     if (f.action === 'superHeld' || f.action === 'shock') return;
     // A winner holds its result (0x410ff1), moving only by its own runs from
     // the tick their op 0x01 runs, and lands as the source's step does
