@@ -2152,12 +2152,17 @@ export class Match {
     actor: Fighter | Effect,
     { selector, compare, value, pre }: Extract<SourceEvent, { op: 'test' }>,
   ) {
-    // Each 開始時 copies the round (0x470044) into its variable 1 first.
+    // Each 開始時 copies the round (0x470044) into its variable 1 first, and
+    // YINAN's Flash Att its own x in source pixels ([esi + 8] >> 16).
     if (pre)
       this.setLocal(
         actor,
         selector,
-        pre.round ? { value: this.round, add: false } : pre,
+        pre.round
+          ? { value: this.round, add: false }
+          : pre.x
+            ? { value: Math.floor(actor.x / 1.5), add: false }
+            : pre,
       );
     // Global 14 holds the stage's track while it is 200, which only KAY's,
     // DIDO's and SIN's supers set (unplayed), so each 開始時 BR's test for 0

@@ -96,11 +96,12 @@ def decode_event(record):
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
     # (0x413813–0x4138cf): 0xc7 is the round (0x470044), which each 開始時 sets its variable 1 to and tests for 1
-    # (Ryuko's PCs 290, 305). ponytail: the others are positions, so Flash Att's (PCs 5785–5786) keep their
-    # fall-through.
-    if op == 0x1f and record[4] >> 6 == 0 and record[5] & 0x80 and record[6] == 0xc7 and record[5] & 3 == 1 \
-            and record[5] & 0xc:
-        return dict(test_event(record), pre=dict(value=0, add=False, round=True))
+    # (Ryuko's PCs 290, 305), and 0xc0 the object's own x ([esi + 8] >> 16), which YINAN's Flash Att tests
+    # against the stage's ends (PCs 5785–5786).
+    if op == 0x1f and record[4] >> 6 == 0 and record[5] & 0x80 and record[6] in (0xc0, 0xc7) \
+            and record[5] & 3 == 1 and record[5] & 0xc:
+        source = dict(round=True) if record[6] == 0xc7 else dict(x=True)
+        return dict(test_event(record), pre=dict(value=0, add=False, **source))
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and (record[5] & 3) in (1, 2):
         pre = dict(value=s16(record, 7), add=record[5] & 3 == 2)
         return dict(test_event(record), pre=pre) if record[5] & 0xc else dict(op="local", index=record[4], **pre)

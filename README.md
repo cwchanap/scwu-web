@@ -941,7 +941,7 @@ And YINAN's, a white-haired wolf girl with 450 life who borrows armour, mecha an
 | U, or ↓→ J              | Driver: a strike, 10, that ← or → with J or K follows into Boxer, Venom, ARX-7 or Codarl (in EX, a rushing punch)                                                                    |
 | I, or ↓← J              | Assault: a long rush, 40 (in EX, Fist S: rapid fists that J extends, up to six volleys)                                                                                              |
 | F, or ↓← K              | DogeAttack: a dodge back that J, K, O or H (Dragon, a rising strike, 45) follows; in the air a dive (in EX, BTK S: a counter stance in a Bonta-kun suit, and in the air a P90 burst) |
-| G, or ↓↓ J; ↓↓ K        | ECS P / ECS K: an unseen dash through (in EX, Flash P / K: a flashbang)                                                                                                              |
+| G, or ↓↓ J; ↓↓ K        | ECS P / ECS K: an unseen dash through (in EX, Flash P / K: a flashbang that bounces off the stage's ends)                                                                            |
 | 1, or ↓→↓→ J            | SS: a sniper's aim that J fires up to four times and K lowers, 1 stock (in EX, Trap: a claymore)                                                                                     |
 | 2, or ↓→↓← K            | EN Driver: a shield that strikes up close, 80, and answers a fireball with beams, 1 stock (in EX, FB: a batter's swing)                                                              |
 | 4, or →↓←→↓← J          | EN Chuck: a Venom doll that grabs, 50, then chases them for 50, 1 stock (in EX, Call Lin: Lin charges in, 100)                                                                       |

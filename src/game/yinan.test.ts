@@ -505,6 +505,32 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
   });
 
+  it('bounces her flashbang off the stage’s end, as Flash Att tests its own x (PCs 5785–5786)', () => {
+    const { match, yinan, other, steps } = yinanPlayer();
+    yinan.x = 1150 * 1.5;
+    other.x = 1230 * 1.5;
+    yinan.variables[0] = 100;
+    steps({}, 2);
+    // Each action the flash enters, and its source x there.
+    const path: [string, number][] = [];
+    for (let t = 0; t < 150; t++) {
+      steps(t ? {} : { dst: true });
+      const flash = match.effects.find(
+        (e) => e.owner === 0 && /^(328|330|332)/.test(`${e.clip}`),
+      );
+      const action = `${flash?.clip ?? ''}`.split('+')[0];
+      if (flash && path.at(-1)?.[0] !== action)
+        path.push([action, Math.floor(flash.x / 1.5)]);
+    }
+    // Past 1270 it enters 技名9 (330), which flies back at raw vx −200
+    // until its landing enters Flash Att 2 (332).
+    expect(path).toEqual([
+      ['328', 1176],
+      ['330', 1273],
+      ['332', 1225],
+    ]);
+  });
+
   it('spends her stocks on her Normal supers', () => {
     // Sharp Shooter aims until P fires (PC 6441) or K lowers it (PC
     // 6442); each shot's DRAGON Yinan lifts Ryuko above the next.
@@ -669,8 +695,12 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       true,
       false,
     ]);
-    // 開始時 BR's first display, then Round 1 from PC 647.
-    const { images } = brIntro('yinan');
+    // 開始時 BR's first display, then Round 1 from PC 647. Her friends pass
+    // their global 14 = 0 tests (PCs 625–637) past their first poses.
+    const { images, objects } = brIntro('yinan');
+    expect([...objects]).toEqual(
+      expect.arrayContaining(['43+2', '44+2', '45+2', '46+2', '46+6']),
+    );
     expect([1, 2, 3, 192, 193, 198, 199, 202].map((t) => images[t])).toEqual([
       4007, 4007, 4007, 4007, 4006, 4006, 4000, 4000,
     ]);

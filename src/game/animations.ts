@@ -152,7 +152,7 @@ export type SourceEvent =
       skip?: number;
       // Below selector 0x40, the object's own variable, set or added to
       // first, or set to the round.
-      pre?: { value: number; add: boolean; round?: boolean };
+      pre?: { value: number; add: boolean; round?: boolean; x?: boolean };
     }
   | {
       op: 'spawn';
