@@ -5058,6 +5058,28 @@ describe('prototype training rules', () => {
       expect(bg).toMatchObject({ age: 3, box: null, connected: false });
     });
 
+    it('waits out the freeze inside a call: B G HANDEN replays its display (PC 4487)', () => {
+      // Its age and whether it holds a box, each tick from its first step.
+      const ages = (freeze: number) => {
+        const match = new Match();
+        const bg = object(303, 1, { x: 1500, age: -1 });
+        match.effects = [bg];
+        match.freeze = freeze;
+        return Array.from({ length: 15 }, () => {
+          match.step();
+          return `${bg.age}${bg.box ? '*' : ''}`;
+        });
+      };
+      // Each of its 39 calls of 304 strikes for three ticks, then clears
+      // the box and shows two more.
+      expect(ages(0).join(' ')).toBe(
+        '0* 1* 2* 3 4 5* 6* 7* 8 9 10* 11* 12* 13 14',
+      );
+      // While frozen, its test at the display's end jumps back to it (PC
+      // 4485) within the call.
+      expect(ages(12).join(' ')).toBe('0* 1* 2* 0 1 2 0 1 2 0 1 2 3 4 5*');
+    });
+
     it('culls an object that leaves the world unless it follows a parent (0x4124c9)', () => {
       const match = new Match();
       const outside = { x: 1331 * 1.5, y: 0, facing: 1 as const };

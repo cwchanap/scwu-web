@@ -5,7 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro } from './testing';
+import { brIntro, spawn } from './testing';
 
 // KATE as player 1, `gap` from a standing opponent as player 2.
 function katePlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -274,6 +274,28 @@ describe('KATE (22 KATE.PLAYER)', () => {
       118,
       1,
     ]);
+  });
+
+  it('holds *ATT HANDEN RP at its last display while frozen, its test jumping back a record (PC 4287)', () => {
+    // *ATT HANDEN (288) calls RP (289), each pass striking at its start. Each
+    // tick's freeze and the object's age, starred while it holds a box.
+    const ages = (freeze: number) => {
+      const { match, kate } = katePlayer();
+      const handen = spawn(match, 0, 288, { x: kate.x, y: 0 });
+      return Array.from({ length: 14 }, (_, t) => {
+        if (t === 5) match.freeze = freeze;
+        match.step();
+        return `${match.freeze}:${handen.age}${handen.box ? '*' : ''}`;
+      });
+    };
+    expect(ages(0).join(' ')).toBe(
+      '0:0* 0:1* 0:2* 0:3 0:4 0:5 0:6 0:7* 0:8* 0:9* 0:10 0:11 0:12 0:13',
+    );
+    // With no display between, the step spins out its 300 records (0x4125c0)
+    // and goes on at the test the next.
+    expect(ages(6).join(' ')).toBe(
+      '0:0* 0:1* 0:2* 0:3 0:4 5:5 4:6 3:6 2:6 1:6 0:6 0:7* 0:8* 0:9*',
+    );
   });
 
   it('stands through her Vs. intro, charged to two stocks', () => {

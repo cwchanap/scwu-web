@@ -2343,9 +2343,11 @@ export class Match {
           ('clip' in actor || actor.action === 'script') &&
           this.passes(self, actor, event)
         )
-          return event.called
-            ? this.rejoin(actor, owner, event)
-            : this.branchTo(actor, sourceKey(event.action, event.offset));
+          return event.rewind
+            ? this.rewind(actor, owner, event.rewind)
+            : event.called
+              ? this.rejoin(actor, owner, event)
+              : this.branchTo(actor, sourceKey(event.action, event.offset));
         break;
       // Op 0x24 jumps when its steps match in the input history (0x410a50).
       case 'command':
@@ -2597,6 +2599,32 @@ export class Match {
       if (next.t) break;
       this.runEvent(actor, owner, next);
     }
+    return true;
+  }
+
+  // A test in a call that jumps back within the called action keeps the call
+  // (0x4125ea): the timeline goes back to its target's tick, running that
+  // tick's events from the target on at once, so an object's Beam Obj 0.5
+  // waits out the freeze (YINAN's PC 8215).
+  private rewind(
+    actor: Fighter | Effect,
+    owner: number,
+    { t, skip }: { t: number; skip: number },
+  ) {
+    // One back into its own tick spins through the step's 300 records
+    // (0x4125c0), going on from there the next step: KATE's *ATT HANDEN RP
+    // holds while frozen (PC 4287). The exporter checks no events precede it.
+    if (t === actor.age) {
+      actor.age = t - 1;
+      if (!('clip' in actor)) actor.fired = t - 1;
+      return true;
+    }
+    const key = 'clip' in actor ? actor.clip : timeline(actor);
+    actor.age = t;
+    if (!('clip' in actor)) actor.fired = t;
+    rearm(actor, key, t);
+    for (const next of eventsAt(key, t, actor.who).slice(skip))
+      if (this.runEvent(actor, owner, next)) break;
     return true;
   }
 

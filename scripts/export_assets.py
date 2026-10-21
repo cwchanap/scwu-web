@@ -229,6 +229,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     frames, events, bodies, pending = [], [], {}, []
     # Forward skips within a call yet to reach their target: (event index, action, target PC, depth).
     skips = []
+    # Each record this pass of a call has reached: its tick, and the events already at that tick.
+    marks = {}
     # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
     # its own action, as Zoma's run loops, starts with those its earlier records set.
     for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
@@ -260,6 +262,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             ret, called, remaining, caller, entry = stack[-1]
             if remaining > 1:
                 stack[-1] = (ret, called, remaining - 1, caller, entry)
+                marks = {k: v for k, v in marks.items() if k[0] < len(stack)}
                 # Re-entered from +0x7d (0x4126ae), even after a jump left it.
                 action, pc = called, p.action(called).start + entry
             else:
@@ -270,6 +273,8 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
         op = record[0]
         if not stack and pc not in seen:
             seen[pc], seen_events[pc], seen_pending[pc] = len(frames), len(events), len(pending)
+        if stack:
+            marks[len(stack), pc] = (t, next((k for k, e in enumerate(reversed(events)) if e["t"] < t), len(events)))
         # Ops 0x07 and 0x14 clear the holder's boxes and bodies (0x40e550) as an action change
         # does, until op 0x19 sets them again. ponytail: they run only once a contact has set
         # +0xdef9 and only for a player, which every holder here is.
@@ -293,6 +298,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             count, called, entry = (record[1], u16(record, 2), record[4]) if op == 0x09 else (1, u16(record, 1), record[3])
             if count:
                 stack.append((pc + 1, called, count, action, entry))
+                marks = {k: v for k, v in marks.items() if k[0] < len(stack)}
                 action, pc = called, p.action(called).start + entry
                 continue
         elif op == 0x0a and u16(record, 1):
@@ -356,9 +362,10 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             # A branch can't return to a caller, so a call keeps its checks' fall-through path,
             # but for an op 0x24 in its caller's last call, whose return runs the caller out as
             # the branch's end does (0x4125ea): GIGI's Ranbu start calls Ranbu start Fin (297)
-            # last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. ponytail: other checks
-            # there keep their fall-through, Zoma's, Yo's, SOU's, HISO's, ERUS's, OS FENG's,
-            # REMU's and REAR's freeze waits (op 0x1f on global 6) among them. It also keeps an
+            # last (PC 4603), whose checks (PCs 4693–4697) take ↑ or ↓. A test jumping back
+            # within the called action rewinds (below). ponytail: other checks there keep their
+            # fall-through, five freeze waits (op 0x1f on global 6) jumping to another action that
+            # runs out into the call among them (ALEX's PC 3486, MASA's 3419). It also keeps an
             # op 0x1f test of a player variable that jumps out of the call into an action
             # looping back into itself, which never runs out into the call (0x4125ea):
             # KATE's air fire tests variable 8 in each of its 60 hovers (PCs 3179–3180), and its
@@ -382,6 +389,15 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             elif event and stack and event["op"] == "test" and event["action"] == action and (
                     p.action(action).start + event["offset"] > pc):
                 event = dict(event, called=True)
+            # One that jumps back within the called action keeps the call (0x4125ea) and replays it
+            # from there (`rewind`: the target's tick, and the events already at it): Beam Obj 0.5
+            # waits out the freeze in each of its calls (YINAN's PC 8215).
+            elif event and stack and event["op"] == "test" and event["action"] == action and (
+                    len(stack), p.action(action).start + event["offset"]) in marks:
+                at, skip = marks[len(stack), p.action(action).start + event["offset"]]
+                # One into its own tick holds there (KATE's PC 4287), from its first event.
+                assert at < t or not skip, f"rewind into its own tick past events at PC {pc}"
+                event = dict(event, rewind=dict(t=at, skip=skip))
             elif event and stack and event["op"] in ("input", "test", "command") and not (
                     event["op"] == "command" and len(stack) == 1 and stack[0][2] == 1
                     and stack[0][0] >= p.action(stack[0][3]).end):

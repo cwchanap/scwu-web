@@ -150,6 +150,9 @@ export type SourceEvent =
       // when it reaches its target within the tick.
       called?: boolean;
       skip?: number;
+      // A jump back in an inlined call: the target's tick, past the events
+      // already at it.
+      rewind?: { t: number; skip: number };
       // Below selector 0x40, the object's own variable, set or added to
       // first, or set to the round.
       pre?: { value: number; add: boolean; round?: boolean; x?: boolean };
