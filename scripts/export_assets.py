@@ -1050,7 +1050,7 @@ TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", 
 # plays, the lose action that opens every KO and the air guards.
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
-            "airBlockRapid", "airTimeStopGuard", "lose", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
+            "airBlockRapid", "airTimeStopGuard", "lose", "ko", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
             "airHisoStop", "dstToss"]
 
 # The responses whose reactions only some players' moves reach, which the
@@ -4023,7 +4023,7 @@ def main():
     # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 96, 99, 100, 105, 126, 108, 109, 132, 129, 153, 158,
-                              167, 172, 59, 133, 120, 107, 114,
+                              167, 172, 59, 60, 133, 120, 107, 114,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),

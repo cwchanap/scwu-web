@@ -317,9 +317,30 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     expect(faceImage(-1, 'asura')).toBe(2001);
   });
 
-  it('voices his KO through its fall-through (PC 417)', () => {
-    // ponytail: KO NORMAL's rand % 3 > 1 (PC 416) into sound 7 isn't played.
+  it("rolls his KO's voice (PC 416): 8 through its fall-through, or 7", () => {
     expect(sounds('down', 0)).toEqual([18, 8]);
+    const voices = [0, 1, 2, 3, 4, 5].map((seed) => {
+      const match = new Match('practice', false, seed, ['ryuko', 'asura']);
+      const [ryuko, asura] = match.fighters;
+      asura.x = ryuko.x + 90;
+      asura.hp = 1;
+      match.step();
+      match.step();
+      const cued: [number, number, string][] = [];
+      for (let t = 0; t < 200; t++) {
+        match.step(t === 0 ? { punch: true } : {});
+        for (const { owner, index } of match.sounds)
+          if (owner === 1) cued.push([t, index, asura.action]);
+      }
+      return cued;
+    });
+    // Both rejoin at 46 + 15, so he lands alike.
+    const ko = (voice: number) => [
+      [8, 18, 'down'],
+      [8, voice, 'down'],
+      [118, 17, 'koLand'],
+    ];
+    expect(voices).toEqual([ko(7), ko(8), ko(8), ko(8), ko(7), ko(8)]);
   });
 
   it('stands through his idle program until it ends (PC 15)', () => {

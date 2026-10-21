@@ -779,8 +779,9 @@ const darkening = (who: Who) =>
 // first three poses. Ryuko's jump hit (77) has none, but Zoma's and Kiki's
 // (78, PC 784) roll which displays play, Amiro's knockdown (84, PC 990)
 // and ANMC P's Chuck Twis (131, PC 1719, his DST toss) whether to skip
-// their sounds.
+// their sounds, as ASURA's KO NORMAL (46, PC 416) picks its voice.
 const ROLLED: Partial<Record<Action, number>> = {
+  down: 60,
   sweep: 79,
   uppercut: 96,
   liftUp: 126,
@@ -3460,16 +3461,17 @@ export class Match {
     const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered
       ? []
-      : roll
-        ? rolled
+      : [
+          ...(f.action === 'down' || f.action === 'koAgain'
+            ? script(twin(f.who, LOSE), f.who).events
+            : []),
+          ...rolled
             .slice(
               0,
               rolled.findIndex((e) => e.op === 'random'),
             )
-            .filter((e) => (POSE_EVENTS as readonly string[]).includes(e.op))
-        : f.action === 'down' || f.action === 'koAgain'
-          ? script(twin(f.who, LOSE), f.who).events
-          : [];
+            .filter((e) => (POSE_EVENTS as readonly string[]).includes(e.op)),
+        ];
     const events = [...entry, ...(pose.events ?? [])];
     f.entered = pose;
     if (f.action === 'script') return;
