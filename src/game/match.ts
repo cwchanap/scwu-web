@@ -1837,13 +1837,14 @@ export class Match {
       : 'draw';
   }
 
-  // A win rolls its op 0x20s at their records (0x417a22): G Suneo's 勝ち
-  // into Random win (52, PC 696). A roll taken plays its target's timeline
-  // from there, its records at once, rolling, moving and setting handlers
-  // as it goes: TTRO's WIN 2 (58) floats up at raw −200. A target that only
-  // jumps on keeps the fall-through: 3-TIMES's voice pick (94 + 6).
-  // ponytail: YINAN's Win 2 and Win 3 test variable 0 for their EX forms
-  // (PCs 957, 1048), which they don't take.
+  // A win rolls its op 0x20s at their records (0x417a22), and takes its op
+  // 0x1f tests of a player variable: G Suneo's 勝ち rolls into Random win
+  // (52, PC 696), YINAN's tests variable 0 for Win 1 EX (81, PC 909). A
+  // branch taken plays its target's timeline from there, its records at
+  // once, rolling, testing, moving and setting handlers as it goes: TTRO's
+  // WIN 2 (58) floats up at raw −200. A target that jumps on into the win
+  // keeps the fall-through: 3-TIMES's voice pick (94 + 6) and Z-MEGA's
+  // Shin-form Win2 (66, PC 634).
   private rollWin(f: Fighter) {
     const key = f.branch ?? WIN_SCRIPTS[f.who];
     if (f.action !== 'win' || !key) return;
@@ -1851,13 +1852,15 @@ export class Match {
     for (const event of eventsAt(key, f.age, f.who)) {
       if (event.op === 'motion' || event.op === 'handler')
         this.runEvent(f, owner, event);
+      if (event.op !== 'random' && event.op !== 'test') continue;
       if (
-        event.op !== 'random' ||
-        this.cpu.random() % event.divisor <= event.above
+        event.op === 'random'
+          ? this.cpu.random() % event.divisor <= event.above
+          : event.called || !this.passes(f, f, event)
       )
         continue;
       const target = sourceKey(event.action, event.offset);
-      if (!script(target, f.who).frames.length) continue;
+      if (script(target, f.who).end === 'jump') continue;
       [f.branch, f.age] = [target, 0];
       this.rollWin(f);
       return;

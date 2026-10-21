@@ -555,6 +555,27 @@ describe('recovered neutral and round animations', () => {
     const landed = zmega.findIndex(([branch]) => branch === '53+4');
     expect(zmega[landed]).toEqual(['53+4', 0, 0]);
     expect(zmega[landed + 11][2]).toBeLessThan(0);
+    // YINAN's rand % 6 > 3 rolls into Win 2 (82) or Win 3 (90) (PCs
+    // 906–907); in EX mode each then tests variable 0 at 125 ticks, into
+    // Win 1 EX (81, PC 909), 83 + 10 (PC 957) or 90 + 13 (PC 1048).
+    const ex = { null: 81, 82: '83+10', 90: '90+13' };
+    const yinan = [0, 1, 2, 3, 4, 5].map((seed) => {
+      const match = new Match('practice', false, seed, ['yinan', 'ryuko']);
+      const [f, ryuko] = match.fighters;
+      f.variables[0] = 100;
+      ryuko.hp = 0;
+      ryuko.action = 'koLand';
+      match.winner = 'player';
+      match.step();
+      const rolled = f.branch as keyof typeof ex;
+      for (let t = 0; t < 125; t++) match.step();
+      return [rolled, f.branch];
+    });
+    expect(yinan.map(([rolled]) => rolled)).toEqual(
+      expect.arrayContaining([null, 82]),
+    );
+    for (const [rolled, branch] of yinan)
+      expect(branch).toBe(ex[rolled as keyof typeof ex]);
   });
 
   it("charges two stocks through each 開始時 BR's OP super Charge", () => {

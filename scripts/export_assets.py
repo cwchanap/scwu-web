@@ -3544,10 +3544,9 @@ FIGHTERS = {
         # and, for global 14 = 0, jumps past its display (PC 621) to Round 1
         # (42) + 7 (PC 624); it plays flattened (animations.ts drops the
         # display). 勝ち's rand % 6 > 3 rolls into Win 2 (82) and Win 3 (90)
-        # (PCs 906–907) roll in the match (winScript). ponytail: her EX
-        # results' own actions aren't played: Win 1 EX (81, PC 909), Win 2's
-        # and Win 3's (PCs 957, 1048) and the draw's Stop (97, PC 1163), each
-        # for variable 0 = 100.
+        # (PCs 906–907) roll in the match (winScript), which takes each win's
+        # test of variable 0 = 100 into its EX form (PCs 909, 957, 1048).
+        # ponytail: the draw's into Stop (97, PC 1163) isn't played.
         actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57, intro=41),
         flat={"intro"},
         # 2001, 2002, 2007 and 2008: the HUD faces action 104 shows (PCs
