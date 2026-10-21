@@ -13,6 +13,7 @@ import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
 import {
   afterimageColor,
+  faderColor,
   fighterPose,
   FIGHTER_Z,
   FixedClock,
@@ -588,12 +589,21 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // A running type-2 fader shows its start colour on odd drawn frames
-  // (0x40cb72; 0x4456fc counts them).
+  // (0x40cb72; 0x4456fc counts them), and a type-3 one blends at rand() %
+  // 100 each draw (0x40cacf): ANMC P's K 2 (210, PC 2774). ponytail: that
+  // rand is the shared one, as the type-4 shake's, and its last blend stays
+  // until an op 0x23 (K 2's at age 55); this one keeps its own and leaves
+  // the start colour.
   private faded(color: Color, owner: number): Color {
     const { fader } = this.match.fighters[owner];
-    return fader?.type === 2 && fader.left && this.frame & 1
-      ? { ...color, ...fader.start }
-      : color;
+    if (!fader?.left) return color;
+    if (fader.type === 2 && this.frame & 1) return { ...color, ...fader.start };
+    if (fader.type === 3)
+      return {
+        ...color,
+        ...faderColor(fader, Math.floor(Math.random() * 100)),
+      };
+    return color;
   }
 
   // Blitters 0x40c840 by op 0x23 mode: 1 averages with the screen, 2 adds,

@@ -202,6 +202,26 @@ describe('OS FENG (19 OS FENG.PLAYER)', () => {
     expect(byKey({ throw: true }, { ex: true }).mine[1]).toBe(231);
   });
 
+  it('tints his catch blue through her fader in New Chuck Hit (op 0x0e flag 2, PC 3089)', () => {
+    // Flag 2 starts the fader of whomever +0xdef9 holds from 0, not his.
+    const { feng, other, steps } = fengPlayer();
+    feng.variables[0] = 100;
+    steps({}, 2);
+    steps({ throw: true });
+    while (!(feng.branch === 231 && feng.age === 91)) steps({});
+    expect(feng.fader).toBeNull();
+    expect(other).toMatchObject({
+      action: 'superHeld',
+      fader: {
+        type: 1,
+        start: { r: 0, g: 0, b: 0, fade: 0 },
+        target: { r: 0, g: 0, b: 18, fade: 0 },
+        left: 39,
+        ticks: 40,
+      },
+    });
+  });
+
   it('falls straight from AIR FIRE after a jump, but forward after a High Jump (variable 13 at 10, PC 4331)', () => {
     const jump = play(presses({ 0: { jump: true }, 15: { axe: true } }), {
       gap: 400,

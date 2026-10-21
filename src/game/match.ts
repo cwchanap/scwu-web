@@ -1286,7 +1286,8 @@ export function stepShake(
 // Op 0x0e's fader for one player (0x4dfd93 + player × 0xe03f): 0x40ca90
 // writes r, g, b and fade over the colour of every object of that player
 // while `left` runs. Type 1 blends from `start` toward the target as `left`
-// falls; type 2 also shows `start` on odd drawn frames (scene.ts).
+// falls; type 2 also shows `start` on odd drawn frames, and type 3 draws at
+// a random point between the two (scene.ts).
 export interface Fader {
   type: number;
   start: Omit<Color, 'mode'>;
@@ -1294,8 +1295,10 @@ export interface Fader {
   left: number;
   ticks: number;
 }
-export function faderColor({ start, target, left, ticks }: Fader) {
-  const p = Math.trunc((left * 100) / ticks);
+export function faderColor(
+  { start, target, left, ticks }: Fader,
+  p = Math.trunc((left * 100) / ticks),
+) {
   const mix = (to: number, from: number) =>
     Math.trunc((to * (100 - p) + from * p) / 100);
   return {
@@ -2437,20 +2440,33 @@ export class Match {
         break;
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
-        // actor's colour. ponytail: flags 2 (the caught opponent's), 4 and 8
-        // (global faders) start from 0 (0x41336c–0x413481) and are left out:
-        // neither fighter's records use 2 or 8 (Zoma's have no faders), and 4
-        // only fades the round intro's screen fader from 0 to 0 (PCs 303, 327).
-        if (event.fader && event.fader.flags & 1) {
-          const { type, r, g, b, fade, ticks } = event.fader;
-          const { color } = actor;
-          self.fader = {
+        // actor's colour, and flag 2 (0x41336c) that of the player whatever
+        // +0xdef9 holds belongs to from 0: OS FENG's New Chuck Hit (231)
+        // tints his catch blue (PC 3089). ponytail: flags 4 and 8 (global
+        // faders, 0x4133cd–0x413481) are left out: no player's records use
+        // 8, and 4 only fades the round intro's screen fader from 0 to 0
+        // (PCs 303, 327).
+        if (event.fader) {
+          const { type, r, g, b, fade, ticks, flags } = event.fader;
+          const fader = (start: Omit<Color, 'mode'>): Fader => ({
             type,
-            start: { r: color.r, g: color.g, b: color.b, fade: color.fade },
+            start,
             target: { r, g, b, fade },
             left: ticks,
             ticks,
-          };
+          });
+          const { color } = actor;
+          if (flags & 1)
+            self.fader = fader({
+              r: color.r,
+              g: color.g,
+              b: color.b,
+              fade: color.fade,
+            });
+          const { caught } = self;
+          if (flags & 2 && caught)
+            ('clip' in caught ? this.fighters[caught.owner] : caught).fader =
+              fader({ r: 0, g: 0, b: 0, fade: 0 });
         }
         // r[9:15] (0x41348b): each shake axis it names restarts.
         this.quake = {
@@ -3341,7 +3357,7 @@ export class Match {
     // writes a running one over the colour of its player's objects.
     this.fighters.forEach((f, owner) => {
       const { fader } = f;
-      // Type 3 (0x40cacf) blends by rand(); neither fighter's records use it.
+      // Type 3 blends at draw time (scene.ts).
       if (!fader?.left || !--fader.left || fader.type > 2) return;
       const blend = faderColor(fader);
       for (const actor of [f, ...this.effects.filter((e) => e.owner === owner)])
