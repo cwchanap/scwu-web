@@ -3918,7 +3918,7 @@ def main():
         # 'ヒット Fire HISA', HISA burning; 'ヒット hisa fly side' and 'Chuck Twis
         # side', flying flat out (spinning in 93) to the walls their slot 4
         # handlers hit, 95 and 94; 'Chuck GON MISS', a float into HISA.
-        "fireLaunch": 104, "flySide": 91, "flySideWall": 95, "twistSide": 136, "twistFly": 93, "twistWall": 94,
+        "fireLaunch": 104, "flySide": 91, "flySideWall": 95, "twistSide": 136, "twistSideHit": 92, "twistFly": 93, "twistWall": 94,
         "gonMiss": 137,
         # 'Chuck up', thrown straight up into a knockdown (PCs 1825, 1824).
         "chuckUp": 134,

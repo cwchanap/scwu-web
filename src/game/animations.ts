@@ -593,6 +593,9 @@ export const animations = {
   // Response 57 (Chung's EN300) → action 136, spinning in 93 until a wall
   // enters 94, which bounces back out into 87's spin.
   twistSide: clip([...clips.twistSide, ...clips.twistFly], 3),
+  // Response 38 (Giant's BASE BALL MISS ATT) → action 92, the same but for
+  // its first three body boxes, which don't push (kind 2, PC 1097).
+  twistSideHit: clip([...clips.twistSideHit, ...clips.twistFly], 3),
   twistWall: clip([...clips.twistWall, ...clips.twisting2], 2),
   // Response 61 (Chung's lee) → action 137, a float before HISA.
   gonMiss: clip(clips.gonMiss),
@@ -858,6 +861,10 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>) {
     flySideWall: clip(z.flySideWall, false, waits(z.flySideWall)),
     chuckYo: clip(z.chuckYo, true),
     twistSide: clip([...z.twistSide, ...z.twistFly], z.twistSide.length),
+    twistSideHit: clip(
+      [...z.twistSideHit, ...z.twistFly],
+      z.twistSideHit.length,
+    ),
     twistWall: clip([...z.twistWall, ...z.twisting2], z.twistWall.length),
     gonMiss: clip(z.gonMiss),
     musicAttack: silent(z.musicAttack),

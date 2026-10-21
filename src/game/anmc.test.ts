@@ -5,6 +5,7 @@ import {
   animationFrame,
   ANMC_INTRO_EX_TICK,
   BLACK,
+  pushboxes,
 } from './animations';
 import type { Action } from './animations';
 import { exMode, fighterPose, Match } from './match';
@@ -87,7 +88,7 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
       [0, [232, 233], 'twist'],
       // CHUCK HIT tosses through response 38 (PC 3265): Fly twis (92), which
       // flies as Chuck Twis side does.
-      [100, [238, 239], 'twistSide'],
+      [100, [238, 239], 'twistSideHit'],
     ] as const) {
       const { anmc, ryuko, steps } = anmcPlayer();
       anmc.variables[0] = ex;
@@ -100,6 +101,15 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
       expect([...seen]).toEqual(expect.arrayContaining([...moves]));
       expect([ryuko.hp, ryuko.action]).toEqual([485, toss]);
     }
+    // Its first three displays' body boxes don't push (kind 2, PC 1097),
+    // where Chuck Twis side's do (PC 1857); neither does the spin's (93,
+    // PC 1107).
+    const push = (action: 'twistSide' | 'twistSideHit') =>
+      [0, 5, 6].map((age) => pushboxes(action, age).length > 0);
+    expect([push('twistSideHit'), push('twistSide')]).toEqual([
+      [false, false, false],
+      [true, true, false],
+    ]);
   });
 
   it('kicks through K2 NEW and K3 NEW, or K 2 and K3 in EX mode (PCs 2737, 2838)', () => {

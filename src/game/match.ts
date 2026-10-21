@@ -262,6 +262,16 @@ const launchMotion: Partial<
     land: 'knockdown',
     wall: 'twistWall',
   },
+  // Response 38 → action 92, the same flight (PC 1103), whose wall handler
+  // (PC 1102) also enters 94.
+  twistSideHit: {
+    tick: 6,
+    vx: -1500,
+    vy: -500,
+    gravity: 0,
+    land: 'knockdown',
+    wall: 'twistWall',
+  },
   twistWall: { tick: 8, vx: 700, vy: -800, gravity: 60, land: 'knockdown' },
   // Response 61 (Chung's lee) → action 137, floating from its first tick
   // (PC 1871) until GON_MISS_TICKS.
@@ -349,6 +359,7 @@ for (const action of [
   'fireLaunch',
   'flySide',
   'twistSide',
+  'twistSideHit',
   'inatuma',
   'airInatuma',
   'icePunch',
@@ -580,9 +591,9 @@ const RESPONSE_REACTIONS: Record<
   // Amiro's Coment chuck and scc reach 134 through response 52 (op 0x14).
   134: { action: 'chuckUp', stop: 0 },
   // Giant's BASE BALL MISS ATT reaches 92 through response 38, which flies as
-  // 136 does with 91's stops (PC 1096). ponytail: its first three displays'
-  // body boxes don't push (kind 2, PC 1097) where 136's do (PC 1857).
-  92: { action: 'twistSide', stop: 13 },
+  // 136 does with 91's stops (PC 1096), its first three displays' body boxes
+  // not pushing (kind 2, PC 1097) where 136's do (PC 1857).
+  92: { action: 'twistSideHit', stop: 13 },
   // His chuck reaches 133 through response 49 and his counter hit 143
   // through 81 (op 0x14), neither with an op 0x1a.
   133: { action: 'musicAttack', stop: 0 },
