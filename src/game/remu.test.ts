@@ -6,7 +6,6 @@ import {
   animationFrame,
   BLACK,
   REMU_LANDING,
-  REMU_WIN_FLIGHT,
 } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
@@ -288,7 +287,6 @@ describe('REMU (23 REMU.PLAYER)', () => {
   });
 
   it('wins after two calls of stand demo, then flies up at raw −1450 (PC 651); holds his draw and shows face 2001', () => {
-    expect(REMU_WIN_FLIGHT).toBe(116);
     expect(
       [0, 105, 106, 116, 2000].map(
         (age) => animationFrame('win', age, 'remu').image,

@@ -305,8 +305,9 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       undefined,
       undefined,
     ]);
-    // The draw's own stance, then 勝ち's demo stand, then its voice.
-    expect(animationDuration('draw', 'asura')).toBe(192);
+    // The draw's own stance, then 勝ち's demo stand with its voice, then that
+    // stand's loop, replayed once before the clip loops it.
+    expect(animationDuration('draw', 'asura')).toBe(240);
     expect([0, 48, 96, 144].map((age) => sounds('draw', age))).toEqual([
       undefined,
       undefined,

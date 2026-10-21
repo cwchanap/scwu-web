@@ -214,7 +214,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             bodies = body_boxes(bodies, p.records[pc])
         elif p.records[pc][0] in (0x07, 0x14):
             bodies = {}
-    t, pc, stack, seen, seen_events = 0, p.action(index).start + offset, [], {}, {}
+    t, pc, stack, seen, seen_events, seen_pending = 0, p.action(index).start + offset, [], {}, {}, {}
     action = index
     # The player variables this path has set (op 0x1f r[5] = 1).
     known = {}
@@ -236,7 +236,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
         record = p.records[pc]
         op = record[0]
         if not stack and pc not in seen:
-            seen[pc], seen_events[pc] = len(frames), len(events)
+            seen[pc], seen_events[pc], seen_pending[pc] = len(frames), len(events), len(pending)
         # Ops 0x07 and 0x14 clear the holder's boxes and bodies (0x40e550) as an action change
         # does, until op 0x19 sets them again. ponytail: they run only once a contact has set
         # +0xdef9 and only for a player, which every holder here is.
@@ -263,7 +263,20 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
             dest = p.action(target).start + record[3]
             if not stack and dest in seen:
                 # The loop's first frame, and its first record's event.
-                result.update(loop=seen[dest], loopEvent=seen_events[dest], end="loop")
+                loop, first, before = seen[dest], seen_events[dest], seen_pending[dest]
+                # Events pending from before the loop ride its first display
+                # once, as KAY's voice (PC 589) does WIN RP's (58, PC 598):
+                # the loop then replays a copy without them.
+                if before and loop < len(frames):
+                    span = t - frames[loop]["t"]
+                    copies = [dict(frame, t=frame["t"] + span) for frame in frames[loop:]]
+                    copies[0].pop("events")
+                    if rest := frames[loop]["events"][before:]:
+                        copies[0]["events"] = rest
+                    loop, first = len(frames), len(events)
+                    events += [dict(e, t=e["t"] + span) for e in events[seen_events[dest]:]]
+                    frames += copies
+                result.update(loop=loop, loopEvent=first, end="loop")
                 break
             if target < 250 <= index or target in played or target in reactions and index not in reactions:
                 result.update(end="jump", next=target, offset=record[3])
@@ -1599,14 +1612,15 @@ FIGHTERS = {
         aliases={124: 79, 125: 77},
         # Results: 勝ち (57) calls Demo stand (28) once (PC 574), hops (PC
         # 579) and, landing into 57 + 10 (slot 1, PC 578), loops WIN RP (58,
-        # PC 602) after a roll that picks its sound (PCs 588–596). The draw
-        # calls 28 once (PC 681) and holds image 201 (PC 684). The darkening
+        # PC 602) after a roll that picks its sound (PCs 588–596); it plays
+        # flattened up to the hop, the match its landing (resultScripts).
+        # The draw calls 28 once (PC 681) and holds image 201 (PC 684). The darkening
         # panel, image 1013 (action 43). The Vs. intro: 開始時 (30) jumps to
         # 開始時 BR (32) for global 3 = 0 (PC 307), past its display for
         # global 14 = 0 (PC 345), spawns OP super Charge (39, PC 348) and
         # jumps to Round 1 (33) + 5 (PC 350), which walks in (PC 356) and
         # calls Demo stand twice (PC 368); both play flattened.
-        actions=dict(win=57, winStand=28, winLand=(57, 10), winLoop=(58, 0), draw=65, black=43, intro=(32, 3)),
+        actions=dict(win=57, winStand=28, draw=65, black=43, intro=(32, 3)),
         flat={"win", "intro"},
         # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
         # 727–745), as Ryuko's; 464: *name (66, PC 688).
@@ -3875,15 +3889,15 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 if p.records[pc][0] == 0x0c) != 6:
             sys.exit(f"{source[0]}'s {name} no longer enters its heavy air hit's launch; refusing to export.")
     # A result's op 0x20 rolls and op 0x1f tests branch into their targets'
-    # timelines, which the match plays from there, and a draw's op 0x01 and
+    # timelines, which the match plays from there, and its op 0x01 and
     # landing handler run from its own: G Suneo's 勝ち into Random win (52,
-    # PC 696), ERUS's draw hop (PCs 701–707). KAY's and REMU's wins move by
-    # the match's WIN_MOTION.
+    # PC 696), ERUS's draw hop (PCs 701–707), KAY's win hop (PC 579), REMU's
+    # flight (PC 651).
     result_scripts = {}
-    for result, ops in (("win", {"random", "test"}), ("draw", {"random", "test", "motion", "handler"})):
+    for result in ("win", "draw"):
         index, offset = actions[result] if isinstance(actions[result], tuple) else (actions[result], 0)
         events = flatten(p, c, index, offset=offset)["events"]
-        if any(e["op"] in ops for e in events):
+        if any(e["op"] in ("random", "test", "motion", "handler") for e in events):
             # Its landing handler too, though the result plays as a clip.
             queue += [(index, offset)] + [(e["action"], e["offset"]) for e in events
                                           if e["op"] == "handler" and e["action"]]

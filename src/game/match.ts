@@ -20,9 +20,7 @@ import {
   SOU_LANDING,
   SEAN_LANDING,
   GON_LANDING,
-  KAY_WIN_HOP,
   REMU_LANDING,
-  REMU_WIN_FLIGHT,
   REAR_LANDING,
   ZIRO_KO,
   ZIRO_LANDING,
@@ -483,18 +481,6 @@ const INTRO_MOTION: Partial<Record<Who, Runs>> = {
     [25, 0, -1000, 30],
     [50, 0],
     [RARIO_LANDING - 119, 0, -1000, 80],
-  ],
-};
-// The wins' op 0x01 runs alike: KAY's hop (KAY_WIN_HOP) and REMU's flight
-// (REMU_WIN_FLIGHT).
-const WIN_MOTION: Partial<Record<Who, Runs>> = {
-  kay: [
-    [KAY_WIN_HOP.at, 0],
-    [KAY_WIN_HOP.ticks, 0, -1000, 70],
-  ],
-  remu: [
-    [REMU_WIN_FLIGHT, 0],
-    [Infinity, 0, -1450],
   ],
 };
 // The win's and draw's timelines when they roll, test or move
@@ -3312,8 +3298,6 @@ export class Match {
     // (0x41187f).
     if (f.action === 'win' || f.action === 'draw') {
       this.rollResult(f);
-      if (f.action === 'win')
-        f.y = Math.min(0, f.y + runVelocity(WIN_MOTION[f.who], f.age)[1]);
       return;
     }
     if (this.musicAttack(f) || this.vanish(f, other)) return;

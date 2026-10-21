@@ -473,23 +473,6 @@ export const RARIO_LANDING = 175;
 // His Round 1 checks down at PC 486, 68 ticks after he lands.
 export const ZIRO_INTRO_EX_TICK =
   ZIRO_LANDING + ticksBefore(fighterClips.ziro.introLand, 486);
-// KAY's 勝ち (57) hops at raw vy −1000, gravity 70 (PC 579) as its waiting
-// display (PC 581) starts, and lands into 57 + 10 (slot 1, PC 578) on the
-// step after his 47th move passes the floor (0x41187f), 114 source pixels
-// up at the peak.
-export const KAY_WIN_HOP = {
-  at: fighterClips.kay.win.reduce((ticks, frame) => ticks + frame.duration, 0),
-  ticks: 47,
-};
-// REMU's 勝ち (60) flies up at raw vy −1450 (PC 651) after two calls of
-// stand demo (30) and its first display, and never stops.
-export const REMU_WIN_FLIGHT =
-  2 *
-    fighterClips.remu.winStand.reduce(
-      (ticks, frame) => ticks + frame.duration,
-      0,
-    ) +
-  fighterClips.remu.win[0].duration;
 // ZIRO's KO down (70) lies 60 ticks, gets up and flashes red (PCs
 // 832–850): 228 in all. Then ko DOWN2 (71) stops both players 13 ticks (PC
 // 858), bursts for 6 and launches at raw 200/−2400 under gravity 90 (PC
@@ -540,22 +523,22 @@ const waits = (frames: Pose[]) =>
 // 3–5 (+0x7580, 0x4110f0): each takeoff, the displays before its op 0x01
 // launches it (AMIRO's up jump three, 11 ticks), then its air poses up to the
 // first that waits for the landing (a zero duration, 0x412800): ALPHA's 132
-// (PC 56). And its fall, word 6 (+0x7586), which holds Ryuko's 16 (PC 100)
-// or Zoma's 121 for 1010 ticks.
-function jumpClips(who: Who, loop: boolean | number = false) {
-  const [takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack] = (
-    ['jump', 'jumpForward', 'jumpBack'] as const
-  ).flatMap((name, i) => {
-    const frames = fighterClips[who][name];
-    const launch = script(CHARACTERS[who].jumps[i], who).events.find(
-      (event) => event.op === 'motion',
-    )!.t;
-    let n = 0;
-    for (let t = 0; t < launch; n++) t += frames[n].duration;
-    const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
-    const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
-    return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
-  });
+// (PC 56), or looping as its timeline does: TTRO's and Yo's J RP (7, 6)
+// loop two poses until they land (PCs 86, ...). And its fall, word 6
+// (+0x7586), which holds Ryuko's 16 (PC 100) or Zoma's 121 for 1010 ticks.
+function jumpClips(who: Who) {
+  const [takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack] =
+    CHARACTERS[who].jumps.flatMap((index) => {
+      const timeline = script(index, who);
+      const { frames } = timeline;
+      const launch = timeline.events.find((event) => event.op === 'motion')!.t;
+      let n = 0;
+      for (let t = 0; t < launch; n++) t += frames[n].duration;
+      const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
+      const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
+      const loop = timeline.end === 'loop' && timeline.loop - n;
+      return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
+    });
   const fall = fighterClips[who].fall;
   return {
     takeoff,
@@ -752,8 +735,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
   const table: Partial<Record<AnimatedAction, Clip>> = {
     walk: clip(z.walk, true),
     backwalk: clip(z.backwalk, true),
-    // TTRO's J RP (7) loops its two poses (PC 86) until he lands.
-    ...jumpClips(who, who === 'ttro' ? 0 : false),
+    ...jumpClips(who),
     land: clip(z.land),
     crouchEnter: clip(z.crouchEnter),
     // Action 19 holds a single zero-length display.
@@ -836,9 +818,8 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
                 [
                   z.intro[0],
                   ...z.intro.slice(2),
-                  ...Array<Pose[]>(3)
-                    .fill(z.intro.slice(2).map((f) => ({ ...f, events: [] })))
-                    .flat(),
+                  // The loop's exported replay (6–9), without its spawns.
+                  ...Array<Pose[]>(2).fill(z.intro.slice(6)).flat(),
                 ],
                 z.introLand,
                 SEAN_LANDING,
@@ -925,7 +906,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 697–698), KATE's sound (PC 616). KATE's 勝ち (58) calls sTAND demo
     // twice (PC 602), as REMU's (60) does stand demo (30, PC 647) and REAR's
     // (59) STAND DEMO (29, PC 591); REMU's loops image 138 from PC 652 (PC
-    // 653), past his sound (PC 650) and flight (REMU_WIN_FLIGHT), and REAR's
+    // 653), past his sound (PC 650) and flight (PC 651, rollResult), and REAR's
     // image 384 from PC 595 (PC 596), past his sound and shake (PCs
     // 593–594). REAR's draw (66) calls STAND DEMO twice too (PC 678), as
     // GIGI's (63) does Demo stand (28, PC 659); GIGI's 勝ち (56) loops image
@@ -957,57 +938,48 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 436 (PC 692), ALEX's 勝ち (59) image 330 (PC 593), SOU's 勝ち (62)
     // image 310 (PC 650), HISO's 勝ち (58) image 436 (PC 603), ERUS's 勝ち
     // (60) image 350 (PC 612) and OS FENG's 勝ち (67) image 431 (PC 734).
-    // KAY's 勝ち (57) plays flattened up to its hop (KAY_WIN_HOP), then from
-    // its landing (57 + 10) and loops WIN RP (58, PC 602). ponytail: the
-    // roll before WIN RP (PCs 588–596) picks a sound, which isn't played.
-    win:
-      who === 'kay'
-        ? clip(
-            [...z.win, ...z.winLand, ...z.winLoop],
-            z.win.length + z.winLand.length,
-            [...z.win, ...z.winLand, ...z.winLoop].map(
-              (frame) => frame.duration || KAY_WIN_HOP.ticks,
-            ),
-          )
-        : clip(
-            who === 'lizard' ||
-              who === 'dido' ||
-              who === 'sakuya' ||
-              who === 'alex' ||
-              who === 'sou' ||
-              who === 'hiso' ||
-              who === 'erus' ||
-              who === 'feng' ||
-              who === 'zenka' ||
-              who === 'masa'
-              ? [...z.win, ...(z.winLoop ?? [])]
-              : z.winRp
-                ? [
-                    ...z.winStand,
-                    ...z.win.slice(0, -1),
-                    ...Array(who === 'kiki' ? 3 : 7)
-                      .fill(z.winRp)
-                      .flat(),
-                    ...z.win.slice(-1),
-                  ]
-                : [
-                    ...Array<Pose[]>(winStands(who)).fill(z.winStand).flat(),
-                    ...z.win,
-                    ...(z.winLoop ?? []),
-                  ],
-            who === 'masa'
-              ? z.win.length
-              : z.winLoop
-                ? z.winStand.length * winStands(who) + z.win.length
-                : false,
-            // OS FENG's holds its last pose with a zero-length display (PC
-            // 734), as AYA's does (PC 605).
-            who === 'feng'
-              ? waits(z.win)
-              : who === 'aya'
-                ? waits([...z.winStand, ...z.win])
-                : undefined,
-          ),
+    // KAY's 勝ち (57) plays flattened up to its hop, waiting on its display
+    // (PC 581) until the match lands it into 57 + 10 (rollResult).
+    win: clip(
+      who === 'kay' ||
+        who === 'lizard' ||
+        who === 'dido' ||
+        who === 'sakuya' ||
+        who === 'alex' ||
+        who === 'sou' ||
+        who === 'hiso' ||
+        who === 'erus' ||
+        who === 'feng' ||
+        who === 'zenka' ||
+        who === 'masa'
+        ? [...z.win, ...(z.winLoop ?? [])]
+        : z.winRp
+          ? [
+              ...z.winStand,
+              ...z.win.slice(0, -1),
+              ...Array(who === 'kiki' ? 3 : 7)
+                .fill(z.winRp)
+                .flat(),
+              ...z.win.slice(-1),
+            ]
+          : [
+              ...Array<Pose[]>(winStands(who)).fill(z.winStand).flat(),
+              ...z.win,
+              ...(z.winLoop ?? []),
+            ],
+      who === 'masa'
+        ? z.win.length
+        : z.winLoop
+          ? z.winStand.length * winStands(who) + z.win.length
+          : false,
+      // OS FENG's holds its last pose with a zero-length display (PC
+      // 734), as KAY's (PC 581) and AYA's (PC 605) do.
+      who === 'feng' || who === 'kay'
+        ? waits(z.win)
+        : who === 'aya'
+          ? waits([...z.winStand, ...z.win])
+          : undefined,
+    ),
     // ZIRO's draw (78) then loops a call of Randon op rp (32, PCs 947–948);
     // the match steps it back at raw −200 (PC 944, rollResult).
     draw: clip(

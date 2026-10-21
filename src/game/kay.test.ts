@@ -6,7 +6,6 @@ import {
   animationFrame,
   BLACK,
   KAY_INTRO_EX_TICK,
-  KAY_WIN_HOP,
 } from './animations';
 import { faceImage } from './hud';
 import { exMode, Match } from './match';
@@ -259,31 +258,51 @@ describe('KAY (12 KAY.PLAYER)', () => {
     expect(exMode(late.fighters[0])).toBe(false);
   });
 
-  it('hops in his win (PC 579), landing into 57 + 10, then loops WIN RP (58)', () => {
-    expect(KAY_WIN_HOP).toEqual({ at: 77, ticks: 47 });
+  it('hops in his win (PC 579), landing into 57 + 10, then rolls his voice (PCs 588–596) into WIN RP (58)', () => {
     const image = (age: number) => animationFrame('win', age, 'kay').image;
-    expect([0, 76, 77, 123, 124, 144, 165].map(image)).toEqual([
-      114, 375, 376, 376, 376, 377, 380,
+    expect([0, 76, 77, 1000].map(image)).toEqual([114, 375, 376, 376]);
+    const win = (seed: number) => {
+      const match = new Match('practice', false, seed, ['kay', 'ryuko']);
+      const [kay, ryuko] = match.fighters;
+      ryuko.hp = 0;
+      ryuko.action = 'koLand';
+      match.winner = 'player';
+      while (kay.action !== 'win') match.step();
+      const seen: [unknown, number, number, unknown][] = [];
+      const cued: [number, number][] = [];
+      for (let t = 0; t < 300; t++) {
+        match.step({});
+        seen.push([kay.branch, kay.age, kay.y / 1.5, kay.entered?.image]);
+        for (const { owner, index } of match.sounds)
+          if (owner === 0) cued.push([t, index]);
+      }
+      return { seen, cued };
+    };
+    const { seen, cued } = win(0);
+    // Up 9.57 source pixels on the first move at age 77, 114 at the peak;
+    // the step after his 47th move passes the floor (0x41187f) lands him
+    // into 57 + 10.
+    expect(seen[75].slice(1, 3)).toEqual([76, 0]);
+    expect(seen[76][2]).toBeCloseTo(-9.57, 2);
+    expect(Math.min(...seen.map(([, , y]) => y))).toBeCloseTo(-114.0, 1);
+    expect(seen[122][2]).toBeGreaterThan(0);
+    expect(seen[123]).toEqual(['57+10', 0, 0, 376]);
+    expect(seen[164][3]).toBe(380);
+    // The hop's sound (42, PC 580), the landing's (41, PC 584), then the
+    // voice: each roll falls through to its sound or branches on, the last
+    // back to the second (PC 594), and WIN RP loops without replaying it.
+    expect(cued).toEqual([
+      [76, 42],
+      [143, 41],
+      [164, 32],
     ]);
-    expect(animationDuration('win', 'kay')).toBe(165 + 46);
-    expect(image(165 + 46)).toBe(380);
-    const match = new Match('practice', false, 0, ['kay', 'ryuko']);
-    const [kay, ryuko] = match.fighters;
-    ryuko.hp = 0;
-    ryuko.action = 'koLand';
-    match.winner = 'player';
-    const heights: Record<number, number> = {};
-    while (kay.action !== 'win') match.step();
-    for (let t = 0; t < 2000 && kay.age < 130; t++) {
-      match.step({});
-      heights[kay.age] = kay.y / 1.5;
-    }
-    // Up 9.57 source pixels on the first move, 114 at the peak, then the
-    // floor.
-    expect(heights[76]).toBe(0);
-    expect(heights[77]).toBeCloseTo(-9.57, 2);
-    expect(Math.min(...Object.values(heights))).toBeCloseTo(-114.0, 1);
-    expect([heights[122] < 0, heights[123]]).toEqual([true, 0]);
+    expect([1, 2, 3, 4, 5].map((seed) => win(seed).cued.slice(2))).toEqual([
+      [[164, 32]],
+      [[164, 37]],
+      [[164, 37]],
+      [[164, 32]],
+      [[164, 32]],
+    ]);
     expect(animationFrame('draw', 1000, 'kay').image).toBe(201);
     expect(BLACK.kay.opaque.image).toBe(1013);
     expect(faceImage(-1, 'kay')).toBe(2001);

@@ -240,7 +240,8 @@ describe('GOLF (37 GOLF.PLAYER)', () => {
   });
 
   it('wins after a demo act, looping a single call of it (PCs 393–394), and draws looping it', () => {
-    expect(animationDuration('win', 'golf')).toBe(165);
+    // The demo stand, the act with its voice, its replay, then the loop.
+    expect(animationDuration('win', 'golf')).toBe(220);
     expect(
       [0, 18, 29, 47, 55, 110, 165, 1000].map(
         (age) => animationFrame('win', age, 'golf').image,

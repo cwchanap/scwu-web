@@ -286,9 +286,14 @@ describe('selected core animation assets', () => {
     // Action 257 jumps to FLY NO HIT (97), which loops 98 until landing.
     expect(script(257)).toMatchObject({ end: 'jump', next: 97 });
     expect(animationDuration(257)).toBe(578);
-    expect(script(97)).toMatchObject({ end: 'loop', loop: 3 });
+    // It clears variable 2 (PC 1187) before jumping to 98, whose loop
+    // replays a copy of its displays without that.
+    expect(script(97)).toMatchObject({ end: 'loop', loop: 11 });
     expect(animationFrame('fly', 6).image).toBe(102);
-    expect(animationFrame('fly', 22)).toEqual(animationFrame('fly', 6));
+    expect(animationFrame('fly', 22)).toMatchObject({
+      image: 102,
+      events: [{ op: 'sound', index: 37 }],
+    });
     // Objects play by source action; 296 only spawns children.
     expect(animationDuration(371)).toBe(65);
     expect(animationDuration(296)).toBe(0);
