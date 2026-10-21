@@ -306,6 +306,28 @@ describe('KAY (12 KAY.PLAYER)', () => {
     expect(faceImage(-1, 'kay')).toBe(2001);
   });
 
+  it('holds C Stop bright while his move holds variable 8 at 10 (PC 3565)', () => {
+    const { match, kay, steps } = kayPlayer();
+    steps({}, 2);
+    // Hit up's hit (220) sets 8 to 10 and clears it 27 ticks later; each
+    // C Stop it spawns from + 6 jumps back to + 4 meanwhile, then fades.
+    const marks: [number, string][] = [];
+    for (let t = 0; t < 70; t++) {
+      steps(t ? {} : { hitUp: true });
+      const clip = `${match.effects.find((e) => e.owner === 0 && `${e.clip}`.startsWith('233'))?.clip ?? ''}`;
+      if (clip && marks.at(-1)?.[1] !== clip)
+        marks.push([kay.variables[8] ?? 0, clip]);
+    }
+    expect(marks).toEqual([
+      [10, '233'],
+      [10, '233+6'],
+      [10, '233+4'],
+      [10, '233+6'],
+      [10, '233+4'],
+      [0, '233+6'],
+    ]);
+  });
+
   it('plays his own CPU table in Vs. CPU', () => {
     const match = new Match('cpu', false, 0, ['ryuko', 'kay']);
     const kay = match.fighters[1];

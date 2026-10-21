@@ -87,9 +87,10 @@ def decode_event(record):
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
-    # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 12 (EX Fire
-    # 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit, which only the Team VS actions
-    # set) and globals 0 (10 sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss) and 14 (the stage's
+    # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
+    # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
+    # hounds) and 15 (SEAN's cc hit, which only the Team VS actions set) and globals 0 (10
+    # sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss) and 14 (the stage's
     # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
@@ -106,7 +107,7 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
-                                                                              0x47, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
+                                                                              0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
                                                                               0x8a, 0x8e):
         # Only ALPHA's KO writes global 10 (10000, 20000; PCs 1040, 1130), and the select screen's 2P
         # cursor 0 (KGT PCs 542, 590), so its 257 tests for 10 never pass and keep their fall-through.
@@ -1848,7 +1849,7 @@ FIGHTERS = {
             # (0x4138d1), then clearing variable 8 (PC 999). ponytail: where
             # Ryuko's test names no target, his enters ヒット HISA (91) while
             # variable 8 is above 99, which only ICE Punch sets (PC 1429); the
-            # match doesn't read variable 8.
+            # match plays HIT UP by Ryuko's rules, past the test.
             "launchUp",
             # Op 0x01 before op 0x02, as ANMC P's.
             "grabbed",

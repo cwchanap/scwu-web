@@ -329,9 +329,11 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     expect(
       play(presses({ 0: { hitUp: true }, 40: { jump: true } })).mine,
     ).toEqual([249, 250, 251, 'land', 'turn', 'idle']);
+    // Chuck hit Nor Att (256) strikes 15, 10 and 5; its Beam Obj (445)
+    // passes into Beam Stop (450) 18 ticks in, as variable 8 is 0 (PC 8184).
     expect(byKey({ throw: true })).toMatchObject({
       mine: [252, 255, 'idle'],
-      damage: 35,
+      damage: 30,
     });
     expect(byKey({ throw: true }, { ex: true })).toMatchObject({
       mine: [252, 253, 'turn', 'idle'],
@@ -528,9 +530,12 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       damage: 80,
       stock: 2,
     });
+    // Venom Doll Hit takes 50 (PC 8481), then sets variable 8 to 50 (PC
+    // 8484), which Doll Hit 2 waits for (PC 8508) before chasing the victim
+    // to strike 50 more (PC 8524).
     expect(byKey({ blackRush: true })).toMatchObject({
       mine: [452, '452+25', 456, 'idle'],
-      damage: 50,
+      damage: 100,
       stock: 2,
     });
     expect(byKey({ blackRush: true }, { gap: 300 }).mine).toEqual([
@@ -606,7 +611,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     });
     expect(cancel({ blackRush: true })).toMatchObject({
       mine: [268, '268+14', 269, 454, '454+30', 456, 'idle'],
-      damage: 60,
+      damage: 110,
       stock: 1,
     });
   });
@@ -709,9 +714,9 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
   it('plays her own CPU table in Vs. CPU', () => {
     // Her CPU's own CPU Driver Far (658) and its ARX-7 (660).
     for (const [seed, wanted] of [
-      [19, [337, 658, 394, 252, 212, 213, 214, 216, 276]],
-      [7, ['660+3', 661]],
-      [4, [411, 249]],
+      [17, [337, 658, 394, 252, 212, 213, 214, 216, 276]],
+      [26, ['660+3', 661]],
+      [6, [411, 249]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'yinan']);
       const yinan = match.fighters[1];

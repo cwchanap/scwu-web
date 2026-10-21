@@ -2965,7 +2965,9 @@ describe("YINAN's ZA finishers (global 3 > 0)", () => {
       [480, 480],
     ],
     ['Doge Chuck Hit ZA (399, PC 7296)', 396, 399, 80, {}, [490, 490]],
-    ['Venom Doll Hit ZA (457, PC 8479)', 452, 457, 80, {}, [460, 460]],
+    // Both set variable 8 to 50 (PCs 8484, 8497), sending Doll Hit 2 after
+    // the victim for 50 more (PC 8524).
+    ['Venom Doll Hit ZA (457, PC 8479)', 452, 457, 80, {}, [410, 410]],
     ['R100 Hit 2 ZA (526, PC 10201)', 519, 526, 400, { life: 100 }, [430, 430]],
     [
       'R300 Yinan Fin ZA (556, PC 10929)',

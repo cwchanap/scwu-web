@@ -936,7 +936,7 @@ And YINAN's, a white-haired wolf girl with 450 life who borrows armour, mecha an
 | Shift + ← or ← ←        | A dash back                                                                                                                                                                          |
 | In the air: ↑ or → →    | A double jump or an air dash                                                                                                                                                         |
 | H                       | Hit Up: a launcher, 15; ↑ after its hit jumps after them                                                                                                                             |
-| O                       | Chuck: a grab, 35 (in EX, 30)                                                                                                                                                        |
+| O                       | Chuck: a grab, 30                                                                                                                                                                    |
 | E, or ↓↓ H              | TO EX: switches between her Normal and EX types for 50 power; without it, No super                                                                                                   |
 | U, or ↓→ J              | Driver: a strike, 10, that ← or → with J or K follows into Boxer, Venom, ARX-7 or Codarl (in EX, a rushing punch)                                                                    |
 | I, or ↓← J              | Assault: a long rush, 40 (in EX, Fist S: rapid fists that J extends, up to six volleys)                                                                                              |
@@ -944,7 +944,7 @@ And YINAN's, a white-haired wolf girl with 450 life who borrows armour, mecha an
 | G, or ↓↓ J; ↓↓ K        | ECS P / ECS K: an unseen dash through (in EX, Flash P / K: a flashbang)                                                                                                              |
 | 1, or ↓→↓→ J            | SS: a sniper's aim that J fires up to four times and K lowers, 1 stock (in EX, Trap: a claymore)                                                                                     |
 | 2, or ↓→↓← K            | EN Driver: a shield that strikes up close, 80, and answers a fireball with beams, 1 stock (in EX, FB: a batter's swing)                                                              |
-| 4, or →↓←→↓← J          | EN Chuck: a Venom doll that grabs, 50, 1 stock (in EX, Call Lin: Lin charges in, 100)                                                                                                |
+| 4, or →↓←→↓← J          | EN Chuck: a Venom doll that grabs, 50, then chases them for 50, 1 stock (in EX, Call Lin: Lin charges in, 100)                                                                       |
 | ↓→↓→ K                  | EN3: the Arbalest against a Venom, 211, 3 stocks (in EX, MUSIKI, 189)                                                                                                                |
 | 3, or ←→←→ J            | Eat, under 150 life: a leap that catches a jumping opponent, 80, and heals her 50, 1 stock; otherwise Driver                                                                         |
 | 5, or →←↓→ K            | R300, under 150 life: a shell whose burst calls in her friends, 230, 3 stocks; otherwise Driver                                                                                      |
