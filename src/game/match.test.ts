@@ -1373,6 +1373,23 @@ describe('recovered victim responses', () => {
     expect(victim.y).toBeCloseTo(y + vy + gravity, 6);
   });
 
+  it('lets a stopped striker’s live box strike (0x40f010)', () => {
+    // The hit test skips a striker hidden, out or marked as having hit
+    // (+0x15e & 0x10, 0x40f037), never one stopped.
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 120;
+    enter(
+      match,
+      f,
+      RYUKO.punch,
+      firstStrike('ryuko', RYUKO.punch, 'ryuko').from,
+    );
+    f.hitStop = 5;
+    match.step();
+    expect(victim.hp).toBeLessThan(LIFE);
+  });
+
   it('slams any grounded victim of punch 3 into a floor bounce', () => {
     for (const defense of [{}, { guard: true, crouch: true }]) {
       // Response 77 → action 123, including through a crouching guard.

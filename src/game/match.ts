@@ -2819,7 +2819,7 @@ export class Match {
   // handler, waits for its next box. The lunge records the axe as caught
   // (+0xdef9, 0x40f2e0), but only grab-entered actions and Air Drill's hit
   // branch hold or toss with ops 0x07/0x14, so the axe flies on.
-  private objectHits(frozen: boolean[]) {
+  private objectHits() {
     type At = { x: number; y: number; facing: -1 | 1; owner: number };
     const bodies: [At, Omit<BodyBox, 'kind' | 'taken'>, Effect][] = [];
     const strikers: [At, (ScriptBox | null)[], Fighter | Effect][] = [];
@@ -2833,7 +2833,7 @@ export class Match {
       if (!e.connected) strikers.push([at, [e.box, ...e.boxes], e]);
     }
     this.fighters.forEach((f, owner) => {
-      if (f.connected || frozen[owner]) return;
+      if (f.connected) return;
       strikers.push([{ ...f, owner }, [f.box, ...f.boxes], f]);
     });
     // A later victim (slot order) wins.
@@ -3452,7 +3452,6 @@ export class Match {
     const inputs: [Input, Input] = [player, opponent ?? this.ai()];
     this.inputs = inputs;
     inputs.forEach((input, i) => this.record(i, input));
-    const frozen = this.fighters.map((f) => f.hitStop > 0);
     this.koStop = 0;
     for (const i of order) {
       const f = this.fighters[i];
@@ -3475,11 +3474,11 @@ export class Match {
     // attacks can trade.
     const contacts = [
       ...this.fighters.flatMap((f, i) =>
-        !frozen[i] && f.action === 'script' ? this.boxContact(f, i) : [],
+        f.action === 'script' ? this.boxContact(f, i) : [],
       ),
       ...this.effects.flatMap((e) => this.boxContact(e, e.owner)),
     ];
-    const objectHits = this.objectHits(frozen);
+    const objectHits = this.objectHits();
     // 0x40f2c2–0x40f355 at each contact, strikers in slot order (the players,
     // then the objects; the other player before any object): a player's own
     // box joins it to what it met and that one's owner to it (+0xdef9), and
