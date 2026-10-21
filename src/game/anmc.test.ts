@@ -193,6 +193,36 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
     expect(BLACK.anmc.opaque.image).toBe(1009);
   });
 
+  it('rolls rand() % 6 > 2 in his DST toss, Chuck Twis (131), to skip its sound (PC 1719)', () => {
+    // Ryuko's DST tosses him at her throw's age 65; seeds 0 and 5 jump past
+    // his sound 19 (PC 1720) to 131 + 12, the others cue it. Either way he
+    // shows PC 1721 for 3 ticks, then spins in 132 (PCs 1734–1735).
+    const tossed = (seed: number) => {
+      const match = new Match('practice', false, seed, ['ryuko', 'anmc']);
+      const [ryuko, anmc] = match.fighters;
+      [ryuko.x, anmc.x, anmc.facing] = [550, 660, -1];
+      for (let t = 0; anmc.action !== 'dstToss'; t++)
+        match.step(t < 9 ? { throw: true } : {});
+      const sounds = match.sounds.filter((s) => s.owner === 1);
+      const pcs = [];
+      for (let t = 0; t < 12; t++, match.step()) pcs.push(fighterPose(anmc).pc);
+      return { branch: anmc.branch, sounds: sounds.map((s) => s.index), pcs };
+    };
+    const pcs = [
+      1721, 1721, 1721, 1734, 1734, 1734, 1734, 1735, 1735, 1735, 1735, 1734,
+    ];
+    expect(tossed(0)).toEqual({
+      branch: '131+12',
+      sounds: [],
+      pcs,
+    });
+    expect(tossed(1)).toEqual({
+      branch: null,
+      sounds: [19],
+      pcs,
+    });
+  });
+
   it('plays his own CPU table in Vs. CPU', () => {
     const match = new Match('cpu', false, 0, ['ryuko', 'anmc']);
     const anmc = match.fighters[1];

@@ -780,8 +780,9 @@ const darkening = (who: Who) =>
 // 1159, 1215, 1238, 1403, 1425, 1619, 1711, 1787): 75, 76, 80, 96, 99, 100,
 // 126 and 132 only skip a sound, while 83, 84, 108, 109 and 122 swap their
 // first three poses. Ryuko's jump hit (77) has none, but Zoma's and Kiki's
-// (78, PC 784) roll which displays play, and Amiro's knockdown (84, PC
-// 990) whether to skip its sound.
+// (78, PC 784) roll which displays play, Amiro's knockdown (84, PC 990)
+// and ANMC P's Chuck Twis (131, PC 1719, his DST toss) whether to skip
+// their sounds.
 const ROLLED: Partial<Record<Action, number>> = {
   sweep: 79,
   uppercut: 96,
@@ -800,10 +801,8 @@ const ROLLED: Partial<Record<Action, number>> = {
   rushAirHit: 122,
   jumpHit: 77,
   flySide: 91,
+  dstToss: 129,
 };
-// ponytail: ANMC P's Chuck Twis (131) rolls rand % 6 > 2 to skip its sound
-// (PC 1719), but the toss plays as a clip, so it always sounds and draws no
-// roll; add dstToss here once it plays from its timeline.
 // Each player's twins that roll in its own records: Zoma's chuck toss (133)
 // and Kiki's rises (97, 127) don't.
 const ROLLS = Object.fromEntries(
@@ -1319,7 +1318,17 @@ export function fighterPose(f: Fighter): Pose {
   // Op 0x07 replaces a held player's display, whatever its action: Giant's
   // counter hit holds a vanished victim (PC 4334).
   if (f.held?.pose) return heldFrame(f.held.pose, f.held.flags, f.who);
-  if (f.branch) return animationFrame(f.branch, f.age, f.who);
+  // A rolled branch that jumps on draws its reaction's clip past its own
+  // displays: ANMC P's Chuck Twis + 12 enters his spin (132, PC 1722).
+  if (
+    f.branch &&
+    !(
+      f.action !== 'script' &&
+      script(f.branch, f.who).end === 'jump' &&
+      f.age >= animationDuration(f.branch, f.who)
+    )
+  )
+    return animationFrame(f.branch, f.age, f.who);
   return clipPose(
     shown(f),
     f.action === 'jump' ? f.airAge : f.age,
