@@ -804,6 +804,11 @@ export const exMode = (f: Fighter) => {
   const ex = EX_MODE[f.who];
   return ex !== undefined && f.variables[0] === ex;
 };
+// The clips' EX forms follow the guards' and demo stands' tests of variable
+// 0: EX mode's, and Z-MEGA's Shin form, 100, whose DEMO stand plays DEMO
+// stand sp (31, PC 342) in his draw (PC 716), though no face of his reads it.
+const clipEx = (f: Fighter) =>
+  exMode(f) || (f.who === 'zmega' && f.variables[0] === 100);
 // What a fighter shows: under 'script', its source action's timeline.
 const JUMP_CLIPS = [
   ['takeoff', 'jump'],
@@ -1250,7 +1255,7 @@ export function fighterPose(f: Fighter): Pose {
     shown(f),
     f.action === 'jump' ? f.airAge : f.age,
     f.who,
-    exMode(f),
+    clipEx(f),
   );
 }
 const newEffect = (

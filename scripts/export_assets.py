@@ -3020,9 +3020,10 @@ FIGHTERS = {
         # deletes his slot 5 (PCs 615, 714) and enters DEMO air (32) while
         # airborne (op 0x16, PCs 616, 715). 勝ち's rand % 6 > 1 into Random win1
         # (53, PC 618) and its test of variable 0 into Win2 (66, PC 617) run in
-        # the match (resultScripts). ponytail: DEMO stand's test into DEMO
-        # stand sp (31, PC 342) isn't played. The darkening panel, Black (52). The
-        # Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC 367),
+        # the match (resultScripts). In Shin form the draw's DEMO stand tests
+        # variable 0 into DEMO stand sp (31, PC 342), his winStandEx, which the
+        # match plays for his Shin form (clipEx). The darkening panel, Black
+        # (52). The Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC 367),
         # which, for global 14 = 0, jumps past its display (PC 402), spawns
         # Black and OP super Charge (48, PCs 404–405) and enters Round 1 (36) +
         # 2 (PC 407). 開始時's test of global 10 for 10 (PC 368), into 開始時

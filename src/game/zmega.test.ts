@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
-import { Match } from './match';
+import { fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { base, brIntro } from './testing';
 
@@ -379,6 +379,13 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
       ),
     ).toEqual([115, 115, 201, 201]);
     expect(faceImage(-1, 'zmega')).toBe(2001);
+    // In Shin form the draw's DEMO stand (PC 716) tests variable 0 for 100
+    // (PC 342) into DEMO stand sp (31): image 319 for 100 ticks.
+    const { zmega } = zmegaPlayer();
+    Object.assign(zmega, { action: 'draw', variables: { 0: 100 } });
+    expect(
+      [0, 99, 100, 2000].map((age) => fighterPose({ ...zmega, age }).image),
+    ).toEqual([319, 319, 201, 201]);
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
