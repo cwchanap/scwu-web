@@ -996,6 +996,8 @@ And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's fil
 | 5, or J J → K H           | Hug (激神超抱擁): carries the opponent through the Anywhere Door, 270, 3 stocks             |
 | →←↓→ G                    | FK之意思: a leap into a flashing barrage, 3 stocks                                          |
 
+Knocked out with three stocks, DoraEmon reloads: flung away at 1 life, he lies down, spends the three stocks to darken the court and stands back up at full life.
+
 And RARIO's, a muscle-bound, barefoot plumber in a red cap and blue overalls who fights in Ryu's stance, with 450 life:
 
 | Input             | RARIO's move                                                                                                                                                            |

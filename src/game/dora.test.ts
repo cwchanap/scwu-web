@@ -418,6 +418,45 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(images).toEqual([116, 139, 116, 184, 185, 184]);
   });
 
+  it('reloads from a KO with three stocks: KO NORMAL’s op 0x10 (PC 775) enters KO RELOAD (72)', () => {
+    // Ryuko punches him at 1 life: his actions, life and the winner.
+    const knockOut = (stock: number) => {
+      const match = new Match('practice', false, 3, ['ryuko', 'dora']);
+      const [ryuko, dora] = match.fighters;
+      match.step({}, {});
+      dora.x = ryuko.x + 90;
+      [dora.stock, dora.hp] = [stock, 1];
+      const path: unknown[][] = [];
+      for (let t = 0; t < 750; t++) {
+        match.step(t ? {} : { punch: true }, {});
+        if (path.at(-1)?.[1] !== now(dora)) path.push([t, now(dora), dora.hp]);
+      }
+      return { path, stock: dora.stock, winner: match.winner };
+    };
+    // KO RELOAD takes him back to 1 life (PC 833) before the round
+    // controller reads it; KR Down (74) spends 270 power (PC 884), three
+    // stocks, and its Stop (79) gives him 2 life 300 times (PCs 1015–1018).
+    expect(knockOut(4)).toEqual({
+      path: [
+        [0, 'idle', 1],
+        [8, 72, 1],
+        [118, 74, 1],
+        [705, 'land', 600],
+        [713, 'idle', 600],
+      ],
+      stock: 1,
+      winner: null,
+    });
+    expect(knockOut(2)).toMatchObject({
+      path: [
+        [0, 'idle', 1],
+        [8, 'down', 0],
+        [118, 'koLand', 0],
+      ],
+      winner: 'player',
+    });
+  });
+
   it('plays his own CPU table in Vs. CPU', () => {
     // 421's box 9870 down meets Ryuko's object 39, 9900 down, into its hit
     // handler 421 + 28 (0x40f010 tests every box against objects' bodies).

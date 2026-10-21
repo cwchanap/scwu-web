@@ -3203,15 +3203,32 @@ export class Match {
     // before it: make hikari (63) while global 0 is 10 (PC 590), after
     // deleting objects 7–9 and clearing variables 6, 8 and 14; Start KO 3
     // for variable 0 (SHIN-Z's PC 705); ALPHA's KO Boss for global 10 (PC
-    // 1029). Its jump to KO Normal (PC 591) plays as `down`.
+    // 1029). Its jump to KO Normal (PC 591) plays as `down`, but for
+    // DoraEmon's, whose op 0x10 (PC 775) enters KO RELOAD (72) with three
+    // stocks.
     if (action === 'down' || action === 'koAgain') {
-      const lose = script(twin(f.who, LOSE), f.who).events;
-      const jump = lose.find(
-        (e): e is Extract<ScriptEvent, { op: 'test' }> =>
-          e.op === 'test' && this.passes(f, f, e),
-      );
+      const {
+        events: lose,
+        next,
+        offset = 0,
+      } = script(twin(f.who, LOSE), f.who);
+      const reload =
+        next === null
+          ? undefined
+          : script(sourceKey(next, offset), f.who).events[0];
+      const jump =
+        lose.find(
+          (e): e is Extract<ScriptEvent, { op: 'test' }> =>
+            e.op === 'test' && this.passes(f, f, e),
+        ) ??
+        (reload?.op === 'stock' && reload.atLeast && f.stock >= reload.min
+          ? { action: reload.target, offset: reload.offset }
+          : undefined);
       if (jump) {
-        for (const event of lose.slice(0, lose.indexOf(jump)))
+        for (const event of lose.slice(
+          0,
+          'op' in jump ? lose.indexOf(jump) : lose.length,
+        ))
           this.runEvent(f, this.fighters.indexOf(f), event);
         return this.enterSource(f, jump.action, jump.offset);
       }
