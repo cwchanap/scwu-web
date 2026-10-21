@@ -203,7 +203,7 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     const entered = new Set<unknown>();
     // FIRE, chuck sup and dragon sp, over two seeds.
     const wanted = [214, 263, 245];
-    for (const seed of [0, 1]) {
+    for (const seed of [1, 4]) {
       const match = new Match('cpu', false, seed, ['ryuko', 'lizard']);
       const lizard = match.fighters[1];
       for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {

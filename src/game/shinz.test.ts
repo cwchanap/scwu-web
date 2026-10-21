@@ -305,8 +305,8 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     // His CPU's own CPU DASH J and AKUMA SP, and CPU J CUT into Shin SAMA K
     // air add (PC 4243).
     for (const [seed, wanted] of [
-      [1, [318, 236]],
-      [4, [319, 206]],
+      [31, [318, 236]],
+      [1, [319, 206]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'shinz']);
       const shinz = match.fighters[1];

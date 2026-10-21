@@ -1074,8 +1074,14 @@ export interface Fighter {
   black: { shown: 'none' | 'opaque' | 'half'; left: number };
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
-  // This action's own attack or box has connected (hit or block).
-  contact: boolean;
+  // The cancel counter (+0xdf85): op 0x18 arms it with r[10] bit 0 or
+  // disarms it (0x412d2b, 0x412d37), and a contact by any of the player's
+  // boxes, its objects' too, raises an armed one to 2 (0x40f384), which an
+  // op 0x1e mode 1 window needs (0x41194d). A run-out (0x412713) and a
+  // window's cancel (0x4119f7) clear it; other action changes keep it.
+  // ponytail: the port clears it entering any neutral action, where a
+  // landing into neutral (0x40e580) keeps it until that action runs out.
+  contact: number;
   // The op 0x20 branch this reaction rolled on entry, drawn instead of its
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
   // timeline.
@@ -1384,7 +1390,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   fader: null,
   black: { shown: 'none', left: 1 },
   held: null,
-  contact: false,
+  contact: 0,
   reaction: 0,
   striker: null,
   caught: null,
@@ -1750,10 +1756,12 @@ export class Match {
     f.action = action;
     f.age = 0;
     f.connected = false;
-    f.contact = false;
     // Air reactions land straight into idle, as landing without a handler
     // clears the bits too (0x4124c3).
-    if (neutralActions.has(action)) toNeutral(f);
+    if (neutralActions.has(action)) {
+      toNeutral(f);
+      f.contact = 0;
+    }
     f.branch = branch === undefined ? this.roll(f.who, action) : branch;
     // 0x410d50 stops a player entering an action on the ground, and keeps an
     // airborne one's motion: Zoma's moves take this.
@@ -2233,11 +2241,11 @@ export class Match {
           actor.boxes[event.slot] = box;
         } else actor.box = box;
         // Op 0x18 re-arms a player for a box of kind bit 1 (0x412d49), and
-        // restarts its contact counter (0x412d2b). ponytail: a box without
-        // kind bit 0 leaves the counter at 0, so no contact raises it; none of
-        // Zoma's moves opens a window after one.
+        // arms its cancel counter by kind bit 0 (0x412d24): ERUS's K3 (196)
+        // strikes with kind 0 (PC 2729), so its hit never opens its window (PC
+        // 2708).
         if (box && !('clip' in actor)) {
-          actor.contact = false;
+          actor.contact = box.kind & 1;
           if (box.kind & 2) actor.connected = false;
         }
         break;
@@ -3054,13 +3062,19 @@ export class Match {
   // only the action it names.
   private cancel(f: Fighter, other: Fighter, history: number[]) {
     const window = f.window;
-    if (!window || !(window.mode === 2 || (window.mode === 1 && f.contact)))
+    if (
+      !window ||
+      !(window.mode === 2 || (window.mode === 1 && f.contact === 2))
+    )
       return false;
-    return this.command(f, other, history, (level, action) =>
-      window.type === 0
-        ? level >= window.min && level <= window.max
-        : window.type === 1 && action === window.action,
-    );
+    return this.command(f, other, history, (level, action) => {
+      const passes =
+        window.type === 0
+          ? level >= window.min && level <= window.max
+          : window.type === 1 && action === window.action;
+      if (passes) f.contact = 0;
+      return passes;
+    });
   }
 
   // The victim's next action (+0x38), the last write winning: a contact's
@@ -3645,14 +3659,15 @@ export class Match {
       error,
     } of contacts) {
       source.connected = true;
+      // 0x40f384 raises the striker's player's armed counter before the
+      // response is read, its objects' contacts too.
+      if (f.contact) f.contact = 2;
       if (error) continue;
       if (!reaction && !timeline) {
         target.facing = facing === 1 ? -1 : 1;
         continue;
       }
-      // The contact handler (0x40eec4) raises the attacker's cancel counter.
       const body = source === f;
-      if (body) f.contact = true;
       if (damaging) target.hitStop = source.hitStop = 0;
       const wasOut = target.hp === 0;
       f.damage += loseLife(target, strength);

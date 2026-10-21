@@ -1800,7 +1800,7 @@ describe('recovered cancels', () => {
       f.stock = stock;
       f.hp = hp;
       match.step({ iori: true });
-      while (!f.contact) match.step();
+      while (f.contact !== 2) match.step();
       // The victim, struck (0x4f), steps before Ryuko (0x51), so its
       // reaction stops him before he reads the press, which stays in the
       // window until the stop runs out.
@@ -1823,7 +1823,7 @@ describe('recovered cancels', () => {
       target.x = f.x + 150;
       f.stock = 3;
       match.step({ iori: true });
-      while (!f.contact) match.step();
+      while (f.contact !== 2) match.step();
       match.step({ [control]: true });
       while (f.hitStop) match.step();
       match.step();
@@ -1850,7 +1850,7 @@ describe('recovered cancels', () => {
       setup(f);
       strike(match, f, RYUKO.airPunch);
       match.step();
-      expect(f.contact).toBe(true);
+      expect(f.contact).toBe(2);
       // The victim's reaction, stepping first (struck, 0x4f), stops Ryuko
       // (0x51); his window opens again when the stop runs out.
       match.step();
@@ -6478,7 +6478,7 @@ describe('EX mode', () => {
       if (iori) {
         target.x = f.x + 150;
         match.step({ iori: true });
-        while (!f.contact) match.step();
+        while (f.contact !== 2) match.step();
       }
       match.step({ getterBeam: true });
       // The reaction stops Ryuko first (see super-cancels IORI).

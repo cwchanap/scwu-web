@@ -9,6 +9,7 @@ import {
 } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
+import { enter } from './testing';
 import type { Fighter, Input } from './match';
 import type { Action } from './animations';
 
@@ -293,6 +294,22 @@ describe('ERUS (18 ERUS.PLAYER)', () => {
     expect([-1, 0, 40, 80].map((face) => faceImage(face, 'erus'))).toEqual([
       2001, 2002, 2001, 2000,
     ]);
+  });
+
+  it('opens no cancel from K3 (196), whose kind-0 box arms no counter (PC 2729)', () => {
+    // K3's window takes levels 30–50 once its box has connected (PC 2708),
+    // but op 0x18 arms the counter (+0xdf85) only for kind bit 0, so its hit
+    // never raises it: EN300 (level 42) doesn't cancel it.
+    const { match, erus, other, steps } = erusPlayer();
+    erus.stock = 3;
+    steps({}, 2);
+    enter(match, erus, 196);
+    while (other.action === 'idle') steps({});
+    expect([erus.branch, erus.window?.mode, erus.contact]).toEqual([196, 1, 0]);
+    while (erus.hitStop) steps({});
+    steps({ command: 4 });
+    steps({}, 3);
+    expect([erus.branch, erus.age]).toEqual([196, 40]);
   });
 
   it('plays her own CPU table in Vs. CPU', () => {

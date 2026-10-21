@@ -355,7 +355,7 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 2, ['ryuko', 'zmega']);
+    const match = new Match('cpu', false, 0, ['ryuko', 'zmega']);
     const zmega = match.fighters[1];
     const entered = new Set<unknown>();
     // His CPU's own Cpu dash, CPU DASH J and CPU KAISA, whose GAISA fires
