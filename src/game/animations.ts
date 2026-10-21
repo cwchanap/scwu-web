@@ -945,8 +945,9 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 32 twice too (PC 1006).
     // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
     // his stance from PC 789 (PC 792), and his draw (104) calls 32 twice
-    // too (PC 907). ponytail: the rolls that pick their win voices (PCs
-    // 862–880; 770–788) aren't played. ZENKA's 勝ち (77) plays flattened,
+    // too (PC 907); the rolls that pick his voice (PCs 770–788) roll in the
+    // match (rollResult). ponytail: MASA's (PCs 862–880) aren't played, as
+    // his clip starts at Win Motion. ZENKA's 勝ち (77) plays flattened,
     // holding image 283 (PC 799). Z-MEGA's 勝ち (65) calls DEMO stand (30)
     // once (PC 619) and loops image 319 from PC 623 (PC 626), and his draw
     // (73) loops image 201 from PC 717 (PC 719). ALPHA's 勝ち (82) calls demo

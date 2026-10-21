@@ -1871,10 +1871,8 @@ export class Match {
   // once, rolling, testing, moving and setting handlers as it goes: TTRO's
   // WIN 2 (58) floats up at raw −200. Run out, it jumps on: Z-MEGA's
   // Shin-form Win2 (66) back into 勝ち + 9 (PC 634), YINAN's Stop (97) into
-  // her draw + 14 (PC 1157). A target with no display keeps the
-  // fall-through: 3-TIMES's voice pick (94 + 6). A draw moves by its own op
-  // 0x01s: ERUS's hops (PC 701) and lands into its handler (67 + 18, PC
-  // 706).
+  // her draw + 14 (PC 1157). A draw moves by its own op 0x01s: ERUS's
+  // hops (PC 701) and lands into its handler (67 + 18, PC 706).
   private rollResult(f: Fighter) {
     const result = f.action === 'win' || f.action === 'draw' ? f.action : null;
     if (!result) return;
@@ -1887,10 +1885,21 @@ export class Match {
     )
       [f.branch, f.age] = [sourceKey(ran.next, ran.offset ?? 0), 0];
     const key = f.branch ?? RESULT_SCRIPTS[f.who][result];
-    if (!key) return;
+    if (!key || this.resultEvents(f, key, f.age)) return;
+    if (f.vx || f.vy || f.y < 0) f.moving = 'velocity';
+  }
+
+  // A result timeline's records at `age`; true once one branches.
+  private resultEvents(f: Fighter, key: ObjectKey, age: number) {
     const owner = this.fighters.indexOf(f);
-    for (const event of eventsAt(key, f.age, f.who)) {
-      if (event.op === 'motion' || event.op === 'handler')
+    const shown = script(key, f.who).frames.length > 0;
+    for (const event of eventsAt(key, age, f.who)) {
+      // Its displays carry its sounds; one with none cues them here.
+      if (
+        event.op === 'motion' ||
+        event.op === 'handler' ||
+        (!shown && event.op === 'sound')
+      )
         this.runEvent(f, owner, event);
       if (event.op !== 'random' && event.op !== 'test') continue;
       if (
@@ -1899,13 +1908,28 @@ export class Match {
           : event.called || !this.passes(f, f, event)
       )
         continue;
-      const target = sourceKey(event.action, event.offset);
-      if (!script(target, f.who).frames.length) continue;
-      [f.branch, f.age] = [target, 0];
-      this.rollResult(f);
-      return;
+      if (this.enterResult(f, sourceKey(event.action, event.offset)))
+        return true;
     }
-    if (f.vx || f.vy || f.y < 0) f.moving = 'velocity';
+    return false;
+  }
+
+  // A branch with no display runs at once, on into its closing jump:
+  // 3-TIMES's voice picks (94 + 6, ..., PCs 770–788) cue a sound and jump
+  // to his stance (94 + 22). One that ends there keeps the fall-through.
+  private enterResult(f: Fighter, key: ObjectKey): boolean {
+    const { frames, end, next, offset = 0 } = script(key, f.who);
+    if (frames.length) {
+      [f.branch, f.age] = [key, 0];
+      this.rollResult(f);
+      return true;
+    }
+    if (this.resultEvents(f, key, 0)) return true;
+    return (
+      end === 'jump' &&
+      next !== null &&
+      this.enterResult(f, sourceKey(next, offset))
+    );
   }
 
   // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and

@@ -219,6 +219,34 @@ describe('3-TIMES (30 3-TIMES.PLAYER)', () => {
     expect(faceImage(-1, 'times')).toBe(2001);
   });
 
+  it('picks his win voice by its chain of rolls (PCs 770–788), then takes his stance (94 + 22)', () => {
+    const voices = [0, 1, 2, 3, 4, 5].map((seed) => {
+      const match = new Match('practice', false, seed, ['times', 'ryuko']);
+      const [times, ryuko] = match.fighters;
+      ryuko.hp = 0;
+      ryuko.action = 'koLand';
+      match.winner = 'player';
+      const cued: [number, number][] = [];
+      for (let t = 0; t < 120; t++) {
+        match.step();
+        for (const { owner, index } of match.sounds)
+          if (owner === 0) cued.push([t, index]);
+      }
+      return [cued, times.branch];
+    });
+    // Each roll falls through to its sound or branches on to the next; the
+    // last branches to 30 (PC 788). Rolled, his stance plays from its own
+    // records.
+    expect(voices).toEqual([
+      [[[52, 25]], '94+22'],
+      [[[52, 27]], '94+22'],
+      [[[52, 28]], '94+22'],
+      [[[52, 24]], '94+22'],
+      [[[52, 23]], null],
+      [[[52, 23]], null],
+    ]);
+  });
+
   it('plays his own CPU table in Vs. CPU', () => {
     const entered = new Set<unknown>();
     // His CPU's own cpu dash and cpu dash jump, and ---cpu---'s MESATSU.
