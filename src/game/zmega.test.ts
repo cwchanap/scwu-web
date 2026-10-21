@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro } from './testing';
+import { base, brIntro } from './testing';
 
 // Z-MEGA as player 1, `gap` from a standing Ryuko as player 2.
 function zmegaPlayer(gap = 90) {
@@ -224,7 +224,8 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     const { match, zmega, steps } = zmegaPlayer(300);
     steps({}, 2);
     // TO SHIN (194) sets variable 0 (PC 2380) and spawns OBJ TO SHIN (195)
-    // in slot 5 (PC 2382), which calls its drain 400 times (PCs 2390–2391).
+    // in slot 5 (PC 2382), which calls its drain pass on and on (PCs 2390–
+    // 2393).
     steps({ ex: true });
     expect([zmega.branch, zmega.variables[0]]).toEqual([194, 100]);
     steps({}, 100);
@@ -244,6 +245,37 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     expect(match.effects.some((e) => e.owner === 0 && e.slot === 5)).toBe(
       false,
     );
+  });
+
+  it("holds Shin Z's drain through the freeze, and at 1 life while his chuck holds", () => {
+    const { match, zmega, other, steps } = zmegaPlayer(300);
+    steps({}, 2);
+    steps({ ex: true });
+    steps({}, 100);
+    const drain = () =>
+      match.effects.find((e) => e.owner === 0 && e.slot === 5)?.clip;
+    // Each pass's op 0x1f on global 6 (PC 2398) holds its display while
+    // the freeze runs.
+    match.freeze = 60;
+    steps({}, 50);
+    expect([zmega.hp, zmega.power]).toEqual([340, 50]);
+    // Chuck hit (191) sets variable 3 to 30 (PC 2320), so the pass's check
+    // (PC 2394) enters OBJ TO SHIN HP0 (196), whose op 0x11 skips the
+    // drain at 1 life (PC 2422), until the throw clears it (PC 2359).
+    other.x = zmega.x + 60;
+    zmega.hp = 3;
+    steps({ throw: true });
+    steps({}, 20);
+    expect([zmega.branch, zmega.hp, base(drain()!)]).toEqual([191, 1, 196]);
+    let held = 20;
+    while (zmega.variables[3]) {
+      steps({});
+      held++;
+    }
+    expect([zmega.branch, zmega.hp, held]).toEqual([191, 1, 171]);
+    // HP0's check of variable 3 for 0 (PC 2421) returns into the drain.
+    steps({});
+    expect([zmega.action, zmega.hp, drain()]).toEqual(['down', 0, undefined]);
   });
 
   it("plays Shin Z's own moves while variable 0 is 100", () => {

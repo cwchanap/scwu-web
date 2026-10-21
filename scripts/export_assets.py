@@ -86,10 +86,11 @@ def decode_event(record):
         return dict(op="command", action=u16(record, 1), offset=record[3], window=record[4], steps=steps[:last + 1])
     # Op 0x1f jumps to r[1:3] + r[3] if its variable is ==, > or < r[9:11]. The match
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
-    # hit effect, ALEX's reflect), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's
-    # en300 probe), 12 (EX Fire 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit,
-    # which only the Team VS actions set) and globals 6 (the freeze) and 14 (the stage's
-    # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
+    # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
+    # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 12 (EX Fire
+    # 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit, which only the Team VS actions
+    # set) and globals 6 (the freeze) and 14 (the stage's track, which each 開始時 BR tests for
+    # 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -104,8 +105,8 @@ def decode_event(record):
         return dict(test_event(record), pre=pre) if record[5] & 0xc else dict(op="local", index=record[4], **pre)
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
-    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x44, 0x46, 0x47,
-                                                                              0x4c, 0x4d, 0x4f, 0x83, 0x86, 0x8e):
+    if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
+                                                                              0x47, 0x4c, 0x4d, 0x4f, 0x83, 0x86, 0x8e):
         return test_event(record)
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
@@ -187,7 +188,7 @@ def calls_displays(p, record):
     return called is not None and any(p.records[pc][0] == 0x0c for pc in range(called.start, called.end))
 
 
-def flatten(p, c, index, played=(), offset=0, reactions=()):
+def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     """Linearize one action for playback by the match.
 
     Inlines op 0x09 calls with their repeat counts, entering and repeating at
@@ -202,7 +203,9 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
     into an action with displays runs once from its r[3] (0x412a2f) and returns
     after it (0x412625); one into an action without stays an event, whose
     records the match runs at once. `offset` starts at a branch's jump target; one past the action's
-    end runs out at once (0x4125ea).
+    end runs out at once (0x4125ea). An `endless` action's call of its own pass repeats the
+    pass for good, so the pass is its timeline's top level, checks and all, and a branch into
+    it returns into the next pass.
     Like a clip's, each display also carries the op 0x03, 0x04, 0x0e, 0x1f and
     0x25 events run just before it, for reactions drawn from their timelines.
     """
@@ -221,6 +224,13 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
     result = dict(loop=-1, end="end", next=None)
     for _ in range(20000):
         a = p.action(action)
+        if pc >= a.end and not stack and action in endless:
+            # Running out of the pass returns into the next.
+            pc = a.start + next(r[4] for r in p.records[a.start:a.end] if r[0] == 0x09 and u16(r, 2) == action)
+            if pc in seen:
+                result.update(loop=seen[pc], loopEvent=seen_events[pc], end="loop")
+                break
+            continue
         if pc >= a.end:
             if not stack:
                 break
@@ -252,6 +262,9 @@ def flatten(p, c, index, played=(), offset=0, reactions=()):
                 result["end"] = "hold"
                 break
             t += frame["duration"]
+        elif op == 0x09 and not stack and u16(record, 2) == action and action in endless:
+            pc = a.start + record[4]
+            continue
         elif op in (0x09, 0x0b) and calls_displays(p, record):
             count, called, entry = (record[1], u16(record, 2), record[4]) if op == 0x09 else (1, u16(record, 1), record[3])
             if count:
@@ -530,7 +543,7 @@ def pose_clips(p, c, actions, image_ids):
     return clips
 
 
-def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
+def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None, endless=()):
     """Flatten every queued (action, offset) and whatever its events spawn, call or branch into.
     `named`, when given, holds the played actions the match enters by name (its engine states
     and reactions); it enters any other by its timeline."""
@@ -539,7 +552,7 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
         index, offset = key = queue.pop()
         if key in scripts:
             continue
-        script = scripts[key] = flatten(p, c, index, played, offset, reactions)
+        script = scripts[key] = flatten(p, c, index, played, offset, reactions, endless)
         image_ids.update(f["image"] for f in script["frames"] if f["image"] not in (0, 8191))
         # A timeline's last jump enters its target, unless played as a clip
         # from its start (the match enters a reaction at any offset): ZENKA's
@@ -2995,6 +3008,12 @@ FIGHTERS = {
             # Shin Z's drain among them.
             "lose",
         },
+        # OBJ TO SHIN (195) calls its drain (195 + 5) two hundred times,
+        # twice (PCs 2390–2391), then would take 1000 life at 300 or more (PC
+        # 2392) and start over (PC 2393). Every pass that runs out takes a
+        # point of his 350 life, so the count never runs out: the drain plays
+        # as its pass, repeating.
+        endless={195},
         # Results: 勝ち (65) calls DEMO stand (30) once (PC 619) and loops image
         # 319 from PC 623 (PC 626), shaking the screen each pass; the draw (73)
         # calls 30 once (PC 716) and loops image 201 (PC 719). Each first
@@ -3746,7 +3765,7 @@ FIGHTERS = {
 
 
 def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, actions, image_ids, aliases={},
-                   flat=()):
+                   flat=(), endless=()):
     data, c, p = player(*source)
     image_ids = set(image_ids)
     tables = player_tables(data, c, image_ids)
@@ -3861,7 +3880,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
             result_scripts[result] = f"{index}+{offset}" if offset else str(index)
     reactions = set(pairs.values()) | set(aliases)
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids, reactions,
-                            set(neutral.values()) | reactions)
+                            set(neutral.values()) | reactions, endless)
     # Clothes off and its 500 form run out into FLY NO HIT + 19 (Ryuko's PC
     # 1267), past its displays to its launch at age 6 (PC 1186), which the
     # match enters there.

@@ -2456,7 +2456,9 @@ export class Match {
       // Ops 0x10 and 0x11 (0x413500, 0x413164) jump to their target on too
       // little stock, which otherwise pays the super, or past a life
       // threshold. Op 0x10 without r[5] bit 0 (0x4135eb) jumps on enough
-      // stock instead and pays nothing (EX Ch, PC 2861).
+      // stock instead and pays nothing (EX Ch, PC 2861). An object's op 0x11
+      // reads its player's life (+0xdf05): OBJ TO SHIN HP0 holds Z-MEGA's
+      // drain at 1 (PC 2422).
       case 'stock':
         if ('clip' in actor || actor.action !== 'script') break;
         if (event.atLeast) {
@@ -2474,8 +2476,7 @@ export class Match {
         break;
       case 'life':
         if (
-          !('clip' in actor) &&
-          actor.action === 'script' &&
+          ('clip' in actor || actor.action === 'script') &&
           event.target &&
           (event.below ? self.hp <= event.value : self.hp >= event.value)
         )
