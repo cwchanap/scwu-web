@@ -1772,9 +1772,9 @@ FIGHTERS = {
             # Her own copies of hit heavy, BEAM Stand and HISA (129, 128,
             # 130), clearing variable 4, where Ryuko's jump to hers. FB gives
             # the striker 10 power (PC 1634) and FBH 13 (PC 1671), as Ryuko's
-            # 10 and HISA's 3 do. ponytail: FBB has no roll (PCs 1611–1632)
-            # and FBH no sound, where the port plays her BEAM Stand's (PC
-            # 1105) and HISA's (PC 1054).
+            # 10 and HISA's 3 do. FBB has no roll (PCs 1611–1632) and FBH no
+            # sound, where her BEAM Stand rolls (PC 1105) and HISA cries (PC
+            # 1054); the match plays the copies (`copies`).
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter her UNCOUNTER DOWN and Air Fire (139,
@@ -1837,10 +1837,10 @@ FIGHTERS = {
             # clearing variable 4, where Ryuko's jump to hers. FB gives the
             # striker 10 power (PC 1384) and FBH 13 (PC 1447), as Ryuko's 10
             # and HISA's 3 do; FBB rolls rand % 3 > 1 (PC 1424), as BEAM Stand
-            # does. ponytail: FB has no roll and cues sound 33 (PC 1400), FBH
-            # 33 to HISA's 30 (PC 1452), and their smoke spawns name the empty
-            # ----smoke---- (399, PCs 1404, 1423, 1432), where the port plays
-            # hit heavy's, BEAM Stand's and HISA's, with SMOKE >> (400).
+            # does. FB has no roll and cues sound 33 (PC 1400), FBH 33 to
+            # HISA's 30 (PC 1452), and their smoke spawns name the empty
+            # ----smoke---- (399, PCs 1404, 1423, 1432), where hit heavy and
+            # BEAM Stand puff SMOKE >> (400); the match plays the copies.
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (128,
@@ -1968,9 +1968,9 @@ FIGHTERS = {
             # clearing variable 4, where Ryuko's jump to hers. FB gives the
             # striker 10 power (PC 1479) and FBH 13 (PC 1515), as Ryuko's 10
             # and HISA's 3 do; FBB rolls rand % 3 > 1 (PC 1544), as BEAM Stand
-            # does. ponytail: FB has no roll and its smoke spawns name the
-            # empty ----smoke---- (389, PCs 1499, 1502), where the port plays
-            # hit heavy's, with SMOKE >> (390), as ALEX's.
+            # does. FB has no roll and its smoke spawns name the empty
+            # ----smoke---- (389, PCs 1499, 1502), where hit heavy puffs SMOKE
+            # >> (390), as ALEX's; the match plays the copies.
             "fb", "fbb", "fbh",
         },
         # Responses 69 and 70 enter his UNCOUNTER DOWN and Air Fire (127,
@@ -3901,7 +3901,13 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # him in VS single (his flag is 0), so his isn't exported.
     guards = [name for name in GUARDS if not name.startswith("air")]
     own_timelines = {tables["responses"][i] for i in OWN_TIMELINES} - {0}
-    queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
+    # FB, FBB and FBH that copy hit heavy's, BEAM Stand's and HISA's records,
+    # with their own smoke, sounds, rolls and displays, where Ryuko's jump to
+    # hers (PCs 1444, 1446, 1449): the match draws and rolls them as those.
+    copies = [twins[name][1] for name in ("fb", "fbb", "fbh")
+              if any(p.records[pc][0] == 0x0c for pc in range(p.action(twins[name][1]).start,
+                                                               p.action(twins[name][1]).end))]
+    queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards), *copies,
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
                               *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],
                               *tables["walks"], tables["fall"]]]

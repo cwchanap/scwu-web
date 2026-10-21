@@ -2153,6 +2153,55 @@ describe('recovered power gauge', () => {
     expect(thrower.fighters[0].power).toBe(5);
     expect(thrower.fighters[1].power).toBe(5);
   });
+
+  it("enters heavy air hit for an airborne victim's FB (PC 1443), after its 10 power", () => {
+    // Zoma's fireball (205) answers an airborne victim with response 50, FB,
+    // where the axe's answers 4, heavy air hit.
+    const match = new Match('practice', false, 0, ['zoma', 'ryuko']);
+    const [attacker, target] = match.fighters;
+    Object.assign(target, { x: 900, y: -150, action: 'jump', jump: 1 });
+    spawn(match, 0, 205, { x: target.x - 60, y: target.y - 60 });
+    for (let i = 0; i < 10 && target.action === 'jump'; i++) match.step();
+    // 76 credits 5 and 3 (PC 814) after FB's 10.
+    expect(target).toMatchObject({ action: 'airHitHeavy', power: 5 });
+    expect(attacker.power).toBe(13);
+  });
+
+  it("plays a victim's own copy of FB in place of hit heavy: its smoke, sound, roll and power", () => {
+    const fb = (victim: Who, seed = 0) => {
+      const match = new Match('practice', false, seed, ['ryuko', victim]);
+      const [attacker, target] = match.fighters;
+      target.x = attacker.x + 400;
+      match.step({ axe: true });
+      const spawned = new Set<unknown>();
+      const branches = new Set<unknown>();
+      const sounds: number[] = [];
+      for (let i = 0; i < 150; i++) {
+        match.step();
+        for (const e of match.effects) if (e.owner === 1) spawned.add(e.clip);
+        for (const s of match.sounds) if (s.owner === 1) sounds.push(s.index);
+        if (target.copy) branches.add(target.branch);
+      }
+      return { branches, power: attacker.power, spawned, sounds };
+    };
+    // Giant's FB (115) puffs the empty ----smoke---- (423) where his hit
+    // heavy (79) puffs SMOKE >> (424), and rolls rand % 3 > 1 into its own
+    // + 19.
+    const giant = [0, 1, 2, 3, 4, 5].map((seed) => fb('giant', seed));
+    expect(giant[0].spawned).toEqual(new Set([423]));
+    expect(new Set(giant.flatMap(({ branches }) => [...branches]))).toEqual(
+      new Set([115, '115+19']),
+    );
+    // ALEX's (112) never rolls and cries 33 where his hit heavy cries 31
+    // (PC 1400), puffing the empty ----smoke---- (399, PC 1404).
+    expect(fb('alex')).toMatchObject({
+      branches: new Set([112]),
+      spawned: new Set([399]),
+      sounds: [33],
+    });
+    // YINAN's (143) credits the striker HISA's 13 after its 10 (PC 2068).
+    expect(fb('yinan').power).toBe(23);
+  });
 });
 
 describe('recovered supers', () => {

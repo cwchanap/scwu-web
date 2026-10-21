@@ -511,11 +511,26 @@ const RESPONSE_REACTIONS: Record<
   170: { action: 'crouchTimeStopGuard', stop: 0 },
   172: { action: 'airTimeStopGuard', stop: 0 },
 };
-// Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker. KAY's
-// FBH (110), a bare copy of HISA, gives only HISA's 3 (PC 1408).
+// Op 0x15 in FB (PC 1442) and FBH (PC 1448) credits the striker.
 const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
-const OWN_STRIKER_POWER: Partial<Record<Who, Partial<Record<number, number>>>> =
-  { kay: { 112: 0 } };
+// FB, FBB and FBH, which Ryuko's and most players' jump to hit heavy, BEAM
+// Stand and HISA (PCs 1444, 1446, 1449). Giant's, KAY's, SAKUYA's, ALEX's,
+// HISO's, ERUS's, GON's, KATE's, REMU's, GIGI's, SWW's, YINAN's and AYA's
+// copy those records instead, with their own smoke, sounds, rolls, displays
+// and power (export_fighter), which the reaction plays.
+const FB = 110;
+const COPIES = new Set([FB, 111, 112]);
+const AIR_HIT_HEAVY = 76;
+// A copy's op 0x15s: YINAN's FB credits HISA's 13 after its 10 (PC 2068),
+// KAY's FBH only HISA's 3 (PC 1408).
+const copyPower = (f: Fighter) =>
+  script(f.copy!, f.who).events.reduce<[number, number]>(
+    ([self, other], e) =>
+      e.op === 'power'
+        ? [self + e.selfPower, other + e.otherPower]
+        : [self, other],
+    [0, 0],
+  );
 // A loss that empties life sets the lose action 59 (0x40e83e), which enters
 // KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
 // (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
@@ -1009,6 +1024,9 @@ export interface Fighter {
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
   // timeline.
   branch: ObjectKey | null;
+  // The victim's own FB, FBB or FBH this reaction plays (COPIES): drawn,
+  // rolled and entered in place of its clip.
+  copy: number | null;
   // The cycle of the HUD face (action 70's object variable 0) from EX mode's
   // first tick, or −1.
   face: number;
@@ -1333,6 +1351,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   caught: null,
   z: FIGHTER_Z,
   branch: null,
+  copy: null,
   face: -1,
   variables: {},
   locals: {},
@@ -1686,8 +1705,7 @@ export class Match {
 
   // A reaction rolls its op 0x20 at its first script step, before the hit
   // effect's objects (the fighters' bucket 0x50 runs before their 0x5d).
-  private roll(who: Who, action: Action): ObjectKey | null {
-    const rolled = rolls(who)[action];
+  private roll(who: Who, rolled: number | undefined): ObjectKey | null {
     const roll = rolled
       ? script(rolled, who).events.find((e) => e.op === 'random')
       : undefined;
@@ -1717,7 +1735,9 @@ export class Match {
       toNeutral(f);
       f.contact = 0;
     }
-    f.branch = branch === undefined ? this.roll(f.who, action) : branch;
+    f.branch =
+      branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
+    f.copy = null;
     // 0x410d50 stops a player entering an action on the ground, and keeps an
     // airborne one's motion: Zoma's moves take this.
     const flying = action === 'script' && (f.y < 0 || f.vy !== 0);
@@ -3001,8 +3021,7 @@ export class Match {
         y: body.y,
         blocked,
         source,
-        bonus:
-          OWN_STRIKER_POWER[target.who]?.[victim] ?? STRIKER_POWER[victim] ?? 0,
+        bonus: STRIKER_POWER[victim] ?? 0,
         own,
         error,
       },
@@ -3239,7 +3258,8 @@ export class Match {
     const pending = f.pending!;
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
-    const { action, stop, attackerStop, power, own } = pending;
+    const { stop, attackerStop } = pending;
+    let { action, power, own } = pending;
     // The lose action takes its first test that passes, after the records
     // before it: make hikari (63) while global 0 is 10 (PC 590), after
     // deleting objects 7–9 and clearing variables 6, 8 and 14; Start KO 3
@@ -3274,6 +3294,17 @@ export class Match {
         return this.enterSource(f, jump.action, jump.offset);
       }
     }
+    // FB's op 0x16 (PC 1443) enters heavy air hit off the floor after its op
+    // 0x15, before any copy's records: the striker keeps its 10, and 76's
+    // counter records run.
+    if (f.y < 0 && own !== undefined && twinOf(f.who, own) === FB)
+      [action, own] = ['airHitHeavy', twin(f.who, AIR_HIT_HEAVY)];
+    const copy =
+      own !== undefined &&
+      COPIES.has(twinOf(f.who, own) ?? 0) &&
+      exported(own, f.who)
+        ? own
+        : undefined;
     // Giant's reactions open by testing his counter's variable 4 (PCs 723,
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.
@@ -3287,12 +3318,20 @@ export class Match {
     }
     // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor, as
     // HISO stop's does (PC 1455).
-    this.action(f, (f.y < 0 && AIR_FORMS[action]) || action, true);
+    this.action(
+      f,
+      (f.y < 0 && AIR_FORMS[action]) || action,
+      true,
+      copy && (this.roll(f.who, copy) ?? copy),
+    );
+    if (copy) [f.copy, power] = [copy, 0];
     f.vx = f.vy = 0;
     f.moving = 0;
     this.pause(f, stop);
     this.pause(other, attackerStop);
-    const [victimPower, attackerPower] = reactionPower(f);
+    const [victimPower, attackerPower] = f.copy
+      ? copyPower(f)
+      : reactionPower(f);
     addPower(f, victimPower);
     addPower(other, attackerPower + power);
   }
@@ -3491,7 +3530,8 @@ export class Match {
     // lose action 59 first: it deletes objects 7–9 and clears variables 6, 8
     // and 14, then jumps to KO Normal (PC 591), or with global 0 at 10 to
     // make hikari (63, PC 590; enterPending).
-    const roll = f.branch && rolls(f.who)[f.action];
+    const roll =
+      f.branch !== f.copy && f.branch && (f.copy ?? rolls(f.who)[f.action]);
     const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered
       ? []
