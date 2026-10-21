@@ -27,7 +27,7 @@ import {
   RESPONSE_EFFECTS,
 } from './animations';
 import { rand } from './standing';
-import { STAGES, type Stage } from './characters';
+import { STAGES, type Stage, type Who } from './characters';
 import {
   base,
   enter,
@@ -518,6 +518,43 @@ describe('recovered neutral and round animations', () => {
     match.step({});
     match.step({ punch: true });
     expect(playing(player)).toBe(RYUKO.punch);
+  });
+
+  it("rolls each win's op 0x20 at its record, playing the branch taken from there", () => {
+    // Player 1 wins at once; per seed, the branch it shows after each tick.
+    const win = (who: Who, seed: number, ticks: number) => {
+      const match = new Match('practice', false, seed, [who, 'ryuko']);
+      const [f, ryuko] = match.fighters;
+      ryuko.hp = 0;
+      ryuko.action = 'koLand';
+      match.winner = 'player';
+      const seen: [unknown, number, number][] = [];
+      for (let t = 0; t < ticks; t++) {
+        match.step();
+        seen.push([f.branch, f.age, f.y / 1.5]);
+      }
+      return seen;
+    };
+    const VELOCITY = 655 / 65536;
+    // GON's 勝ち rolls rand % 4 > 2 into RANDOM WIN (68) first (PC 693).
+    expect([0, 2].map((seed) => win('gon', seed, 1)[0][0])).toEqual([null, 68]);
+    // TTRO's rand % 3 > 1 (PC 537) 95 ticks in enters WIN 2 (58), which
+    // floats him up at raw −200 (PC 547).
+    const ttro = win('ttro', 0, 105);
+    expect(ttro[94][0]).toBe(null);
+    expect(ttro[95].slice(0, 2)).toEqual([58, 0]);
+    expect(ttro[104][2]).toBeCloseTo(-10 * 200 * VELOCITY, 6);
+    // Z-MEGA's rand % 6 > 1 (PC 618) enters Random win1 (53), which calls
+    // DEMO stand once (PC 499) and hops at raw −500 under gravity 40 (PC
+    // 506), landing into its handler, 53 + 4 (PC 505), which hops again.
+    const zmega = win('zmega', 0, 200);
+    expect(zmega[0][0]).toBe(53);
+    expect(zmega[130][2]).toBe(0);
+    // Each step adds the gravity before it moves.
+    expect(zmega[131][2]).toBeCloseTo((-500 * 655 + 40 * 393) / 65536, 6);
+    const landed = zmega.findIndex(([branch]) => branch === '53+4');
+    expect(zmega[landed]).toEqual(['53+4', 0, 0]);
+    expect(zmega[landed + 11][2]).toBeLessThan(0);
   });
 
   it("charges two stocks through each 開始時 BR's OP super Charge", () => {

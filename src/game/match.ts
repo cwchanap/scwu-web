@@ -498,6 +498,13 @@ const WIN_MOTION: Partial<Record<Who, Runs>> = {
     [Infinity, 0, -1450],
   ],
 };
+// The win's timeline when it rolls (export_fighter).
+const WIN_SCRIPTS = Object.fromEntries(
+  Object.entries(CHARACTERS).map(([who, data]) => [
+    who,
+    'winScript' in data ? data.winScript : null,
+  ]),
+) as Record<Who, ObjectKey | null>;
 // ZIRO's KO down slides at raw −200 for ten ticks (PCs 822–824), then
 // ZIRO_KO: ko DOWN2's flight and ko DOWN3's slide forward.
 const ZIRO_KO_MOTION: Runs = [
@@ -1830,6 +1837,34 @@ export class Match {
       : 'draw';
   }
 
+  // A win rolls its op 0x20s at their records (0x417a22): G Suneo's 勝ち
+  // into Random win (52, PC 696). A roll taken plays its target's timeline
+  // from there, its records at once, rolling, moving and setting handlers
+  // as it goes: TTRO's WIN 2 (58) floats up at raw −200. A target that only
+  // jumps on keeps the fall-through: 3-TIMES's voice pick (94 + 6).
+  // ponytail: YINAN's Win 2 and Win 3 test variable 0 for their EX forms
+  // (PCs 957, 1048), which they don't take.
+  private rollWin(f: Fighter) {
+    const key = f.branch ?? WIN_SCRIPTS[f.who];
+    if (f.action !== 'win' || !key) return;
+    const owner = this.fighters.indexOf(f);
+    for (const event of eventsAt(key, f.age, f.who)) {
+      if (event.op === 'motion' || event.op === 'handler')
+        this.runEvent(f, owner, event);
+      if (
+        event.op !== 'random' ||
+        this.cpu.random() % event.divisor <= event.above
+      )
+        continue;
+      const target = sourceKey(event.action, event.offset);
+      if (!script(target, f.who).frames.length) continue;
+      [f.branch, f.age] = [target, 0];
+      this.rollWin(f);
+      return;
+    }
+    if (f.branch && (f.vx || f.vy)) f.moving = 'velocity';
+  }
+
   // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
   // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
@@ -2762,6 +2797,14 @@ export class Match {
       this.enterKey(f, f.onLand);
       return true;
     }
+    // A rolled win lands into its handler, whose records run at once:
+    // Z-MEGA's Random win1 (53) into 53 + 4.
+    if (f.action === 'win') {
+      f.gravity = 0;
+      if (f.onLand) [f.branch, f.age, f.onLand] = [f.onLand, 0, 0];
+      this.rollWin(f);
+      return true;
+    }
     // CHUCK HIT's landing handler (PC 1729) enters 128 + 11, its displays
     // again; the landing zeroes its gravity (0x411894).
     if (f.action === 'superHeld') {
@@ -3188,6 +3231,7 @@ export class Match {
     // the tick their op 0x01 runs, and lands as the source's step does
     // (0x41187f).
     if (f.action === 'win') {
+      this.rollWin(f);
       f.y = Math.min(0, f.y + runVelocity(WIN_MOTION[f.who], f.age)[1]);
       return;
     }
@@ -3252,6 +3296,7 @@ export class Match {
     // action instead of reading commands; airborne, the fall reads them.
     if (this.winner && !airborne) {
       this.action(f, this.result(f));
+      this.rollWin(f);
       return;
     }
     const direction =

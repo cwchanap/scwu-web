@@ -912,10 +912,11 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     // 540–541), and his draw (64) from PC 644 (PC 646), past his sound (PC
     // 643). OGI's 勝ち (62) loops image 642 from PC 659 (PC 660), past his
     // sound and *ef win (PCs 657–658), and ZIRO's 勝ち (66) image 142 from PC
-    // 765 (PC 766), past his sound (PC 764). ponytail: ZIRO's rand % 3 > 1
-    // (PC 758) into randon win1 (51) isn't played. MASA's 勝ち (94) calls DEMO STAND (32) twice (PC
-    // 861) and jumps to Win Motion (95, PC 881), which loops images 450–451
-    // from PC 889 (PC 891); his draw (105) calls 32 twice too (PC 1006).
+    // 765 (PC 766), past his sound (PC 764); its rand % 3 > 1 (PC 758) into
+    // randon win1 (51) rolls in the match (rollWin). MASA's 勝ち (94) calls
+    // DEMO STAND (32) twice (PC 861) and jumps to Win Motion (95, PC 881),
+    // which loops images 450–451 from PC 889 (PC 891); his draw (105) calls
+    // 32 twice too (PC 1006).
     // 3-TIMES's 勝ち (94) calls DEMO STAND (32) twice (PC 769) and loops
     // his stance from PC 789 (PC 792), and his draw (104) calls 32 twice
     // too (PC 907). ponytail: the rolls that pick their win voices (PCs
