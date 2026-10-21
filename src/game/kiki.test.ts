@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { fighterPose, Match } from './match';
 import type { Input } from './match';
-import { enter, objects, pose, RYUKO, strike } from './testing';
+import { enter, objects, pose, RYUKO, spawn, strike } from './testing';
 
 const KIKI_IMAGES = new Set(CHARACTERS.kiki.images.map(({ index }) => index));
 const VELOCITY = (655 / 65536) * 1.5;
@@ -199,6 +199,29 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
     for (let t = 0; t < 200; t++) match.step({}, { crouch: true });
     expect([ryuko.x, kiki.x]).toEqual([780, 1140]);
     expect(kiki).toMatchObject({ action: 'idle', variables: {} });
+  });
+
+  it('breaks a potato another side’s box meets in POTETO HIT (194, slot 5, 0x40eb60)', () => {
+    // Ryuko's punch meets a potato's (189) box before the hit test: both
+    // lose their boxes, so her punch is spent without connecting.
+    const match = new Match('practice', false, 0, ['kiki', 'ryuko']);
+    const [kiki, ryuko] = match.fighters;
+    kiki.x = ryuko.x - 500;
+    strike(match, ryuko, RYUKO.punch);
+    match.step({}, {});
+    const box = ryuko.box!;
+    const potato = spawn(match, 0, 189, {
+      x: ryuko.x + ryuko.facing * box.x * 1.5 + 3 * 1.5,
+      y: ryuko.y + box.y * 1.5 + 23 * 1.5,
+    });
+    match.step({}, {});
+    expect([ryuko.box, ryuko.connected, potato.box]).toEqual([
+      null,
+      false,
+      null,
+    ]);
+    match.step({}, {});
+    expect(potato.clip).toBe(194);
   });
 
   it('plays her own CPU table in Vs. CPU', () => {

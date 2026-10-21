@@ -322,6 +322,34 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
     ).toEqual([164, 'idle']);
   });
 
+  it('guards a box meeting P’s, K’s, Punch start’s or super P start’s in their GARDs (slot 5, 0x40eb60)', () => {
+    // His key at 0, Ryuko's punch at `at`. SP GARD (224) sets variable 0 to
+    // 10 (PC 3074), which super P start's tests take into SUPER P LV1
+    // (228), 130.
+    const guard = (key: Input, at: number) => {
+      const { match, astroman, other } = astromanPlayer();
+      astroman.stock = 3;
+      const mine: unknown[] = [];
+      for (let t = -5; t < 500; t++) {
+        match.step(t ? {} : key, t === at ? { punch: true } : {});
+        if (t >= 0 && mine.at(-1) !== now(astroman)) mine.push(now(astroman));
+      }
+      return [
+        mine,
+        lifeOf('astroman') - astroman.hp,
+        lifeOf('ryuko') - other.hp,
+      ];
+    };
+    expect(guard({ punch: true }, 0)).toEqual([[164, 165, 'idle'], 0, 39]);
+    expect(guard({ kick: true }, 4)).toEqual([[167, 168, 'idle'], 0, 39]);
+    expect(guard({ axe: true }, 0)).toEqual([[193, 194, 'idle'], 0, 40]);
+    expect(guard({ musashi: true }, -3)).toEqual([
+      [223, 224, 228, 'idle'],
+      0,
+      130,
+    ]);
+  });
+
   it('spends three stocks on S CC and one on SUPER P or ASS GUN SUPER, or enters No super', () => {
     // SCC 300 needs more than two stocks (op 0x10, PC 3215) and grabs (PC
     // 3224) into knees, blasts and kisses that gain 10 five times (PC 3329),

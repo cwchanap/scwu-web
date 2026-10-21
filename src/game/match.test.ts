@@ -1415,6 +1415,23 @@ describe('recovered victim responses', () => {
     expect(victim).toMatchObject({ action: 'idle', hp: LIFE });
   });
 
+  it('strips two meeting boxes without damage before the hit test, and lets one with damage pass (0x40eb60)', () => {
+    const match = new Match();
+    const [a, b] = match.fighters;
+    b.x = a.x + 90;
+    // Facing each other, both boxes sit 45 pixels in front: in one place.
+    const box = { x: 30, y: -100, w: 40, h: 40, damage: 0, kind: 1 };
+    a.box = { ...box };
+    b.box = { ...box };
+    match.step({}, {});
+    expect([a.box, b.box]).toEqual([null, null]);
+    // Neither has a slot 5 handler.
+    a.box = { ...box, damage: 10 };
+    b.box = { ...box };
+    match.step({}, {});
+    expect([a.box, b.box]).toEqual([{ ...box, damage: 10 }, box]);
+  });
+
   it('slams any grounded victim of punch 3 into a floor bounce', () => {
     for (const defense of [{}, { guard: true, crouch: true }]) {
       // Response 77 → action 123, including through a crouching guard.

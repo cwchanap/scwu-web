@@ -1056,6 +1056,9 @@ export interface Fighter {
   onLand: ObjectKey;
   // Slot 4 (+0x70): what a wall enters.
   onWall: ObjectKey;
+  // Slot 5 (+0x74): what another side's box meeting one of its own enters
+  // (clashBoxes).
+  onClash: ObjectKey;
   // Op 0x1e's cancel window (+0xdf91): action changes keep it, and the
   // return to neutral clears it (0x411b0c). Zoma's moves read it.
   window: Window | null;
@@ -1195,6 +1198,9 @@ export interface Effect {
   onGuard?: ObjectKey;
   // Slot 1: what landing on the floor enters (0x41241c).
   onLand?: ObjectKey;
+  // Slot 5 (+0x74): what another side's box meeting one of its own enters
+  // (clashBoxes).
+  onClash?: ObjectKey;
   // The handler a contact queued (+0x38), which the next step enters.
   pending?: ObjectKey;
   // A stage object: the action it restarts and its scroll percentages.
@@ -1367,6 +1373,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   onGuard: 0,
   onLand: 0,
   onWall: 0,
+  onClash: 0,
   window: null,
   color: NORMAL_COLOR,
   trail: null,
@@ -1754,7 +1761,7 @@ export class Match {
     f.boxes = [];
     f.responses = [];
     // 0x40e510 clears the handlers.
-    f.onHit = f.onGuard = f.onLand = f.onWall = 0;
+    f.onHit = f.onGuard = f.onLand = f.onWall = f.onClash = 0;
     // A source action's own op 0x23 sets its colour, and a clip action's op
     // 0x1e its window as its display starts (enter).
     if (action !== 'script') {
@@ -2195,8 +2202,9 @@ export class Match {
         this.sounds.push({ owner, index: event.index });
         break;
       case 'box': {
+        // A zero width or height clears the slot (0x412cfc, 0x412d0f).
         const box =
-          event.w || event.h
+          event.w && event.h
             ? {
                 x: event.x,
                 y: event.y,
@@ -2233,14 +2241,10 @@ export class Match {
       case 'freeze':
         this.freeze = (event.set ? 0 : this.freeze) + event.add;
         break;
-      // ponytail: slot 5 (+0x74) takes a struck object to its action
-      // (0x40edde), as Kiki's potatoes (189, 190) enter POTETO HIT (194);
-      // the port strikes only fighters, so it never fires. TTRO's P (166)
-      // sets one (PCs 1954, 1959) for its guard box, which another box meets
-      // in the box-against-box pass (0x40eb60), unported too, so P gard
-      // (167) never plays.
       // Action 0 clears the slot (0x40f6e6 tests it): LIZARD's SHOOT OBJ
-      // EXPLO (290) clears its own (PCs 3940–3942) before it strikes.
+      // EXPLO (290) clears its own (PCs 3940–3942) before it strikes. Slot 5
+      // (+0x74) is the box-against-box pass's (clashBoxes): Kiki's potatoes
+      // (189, 190) enter POTETO HIT (194, 195), TTRO's P (166) P gard (167).
       case 'handler':
         if (!('clip' in actor)) {
           const key = event.action && sourceKey(event.action, event.offset);
@@ -2248,9 +2252,16 @@ export class Match {
           else if (event.slot === 2) actor.onHit = key;
           else if (event.slot === 3) actor.onGuard = key;
           else if (event.slot === 4) actor.onWall = key;
-        } else if (event.slot >= 1 && event.slot <= 3)
-          actor[(['onLand', 'onHit', 'onGuard'] as const)[event.slot - 1]] =
-            event.action ? sourceKey(event.action, event.offset) : undefined;
+          else if (event.slot === 5) actor.onClash = key;
+        } else {
+          const field = (
+            { 1: 'onLand', 2: 'onHit', 3: 'onGuard', 5: 'onClash' } as const
+          )[event.slot as 1 | 2 | 3 | 5];
+          if (field)
+            actor[field] = event.action
+              ? sourceKey(event.action, event.offset)
+              : undefined;
+        }
         break;
       case 'call':
         this.runCall(actor, owner, event.action);
@@ -2827,6 +2838,63 @@ export class Match {
     ];
   }
 
+  // 0x40eb60, before the hit test (0x40ffdc): each attack box of each object,
+  // slots 19 down to 0, against those of every later object (slot order) of
+  // the other player, but a player reeling (+0x15e & 8) only as the earlier
+  // one. Where two meet, both objects lose every box (0x403300) if neither
+  // has damage; otherwise each one's slot 5 handler (+0x74) is queued
+  // (+0x38) and cleared, both losing their boxes with it, and boxes without
+  // one pass through. The box first found keeps meeting the later objects.
+  // Its clash effect and stops (0x40ee0e) need system flag 2 (0x4438a4),
+  // which SCWU.KGT leaves clear (0x7d), and no player's box sets byte 11's
+  // bit 0x80 (0x40ef4d). ponytail: whom player 1's objects last met, for the
+  // gauges (0x4701c4), is left out.
+  private clashBoxes() {
+    type Holder = Fighter | Effect;
+    const holders: [Holder, number][] = [
+      ...this.fighters.map((f, owner): [Holder, number] => [f, owner]),
+      ...this.effects.map((e): [Holder, number] => [e, e.owner]),
+    ];
+    const boxAt = (o: Holder, slot: number) =>
+      (slot ? o.boxes[slot] : o.box) ?? null;
+    const strip = (...holders: Holder[]) =>
+      holders.forEach((o) => Object.assign(o, { box: null, boxes: [] }));
+    holders.forEach(([a, owner], i) => {
+      const at = this.origin(a);
+      for (let slot = 19; slot >= 0; slot--) {
+        const box = boxAt(a, slot);
+        if (!box) continue;
+        for (const [b, other] of holders.slice(i + 1)) {
+          if (other === owner || (!('clip' in b) && b.reaction & 8)) continue;
+          const to = this.origin(b);
+          for (let s = 19; s >= 0; s--) {
+            const met = boxAt(b, s);
+            if (
+              !met ||
+              Math.abs(
+                at.x + a.facing * box.x * 1.5 - to.x - b.facing * met.x * 1.5,
+              ) >=
+                (box.w + met.w) * 1.5 ||
+              Math.abs(at.y + box.y * 1.5 - to.y - met.y * 1.5) >=
+                (box.h + met.h) * 1.5
+            )
+              continue;
+            if (!box.damage && !met.damage) {
+              strip(a, b);
+              continue;
+            }
+            for (const o of [a, b]) {
+              if (!o.onClash) continue;
+              if ('clip' in o) [o.pending, o.onClash] = [o.onClash, undefined];
+              else [o.pending, o.onClash] = [{ key: o.onClash }, 0];
+              strip(a, b);
+            }
+          }
+        }
+      }
+    });
+  }
+
   // 0x40f010 tests every box of every object, fighters' too, against the
   // other side's objects' bodies. Ryuko's objects meet 2000 pixels down: an
   // axe's box and body (PCs 3290–3291), the beams' boxes (270, 277), B G's
@@ -3332,6 +3400,7 @@ export class Match {
         responses: [],
         pending: undefined,
         onLand: e.stage ? e.onLand : undefined,
+        onClash: e.stage ? e.onClash : undefined,
       });
       this.branchTo(e, key);
       return;
@@ -3497,6 +3566,7 @@ export class Match {
     for (const f of this.fighters) this.pause(f, this.koStop);
     this.stepObjects(after);
     this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
+    this.clashBoxes();
     // The hit test meets the fighters and objects where last tick's motion
     // left them. Contacts are collected before any applies, so same-tick
     // attacks can trade.

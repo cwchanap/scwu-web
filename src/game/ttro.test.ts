@@ -236,6 +236,24 @@ describe('TTRO (39 TTRO.PLAYER)', () => {
     ).toEqual([166, 'idle']);
   });
 
+  it('parries a box meeting his P’s in P gard (167, slot 5, 0x40eb60)', () => {
+    // P's box without damage (PCs 1954, 1959) meets Ryuko's punch before the
+    // hit test: both lose their boxes, and P gard stops her and swipes.
+    const parry = (at: number) => {
+      const { match, ttro, other } = ttroPlayer();
+      const mine: unknown[] = [];
+      for (let t = -2; t < 400; t++) {
+        match.step(t ? {} : { punch: true }, t === at ? { punch: true } : {});
+        if (t >= 0 && mine.at(-1) !== now(ttro)) mine.push(now(ttro));
+      }
+      return [mine, lifeOf('ttro') - ttro.hp, lifeOf('ryuko') - other.hp];
+    };
+    for (const at of [0, 8])
+      expect(parry(at)).toEqual([[166, '167+15', 'idle'], 0, 39]);
+    // Her punch pressed at 10 outlasts his box.
+    expect(parry(10)).toEqual([[166, 'hit', 'idle'], 10, 0]);
+  });
+
   it('spends a stock on SCC or SUPER FIRE and three on EN300, or enters No super', () => {
     // super cc start grabs (PC 2629) into two leaps and slams and a last
     // one, 200 (PC 2743); SCC FAR beyond 180 sets no hit handler.

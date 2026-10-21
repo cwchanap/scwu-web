@@ -40,7 +40,7 @@ def decode_event(record):
     if op == 0x01:  # velocity/acceleration; r[9] bit 0 adds, bits 1-4 keep vx, vy, ax, ay
         return dict(op="motion", ax=s16(record, 1), vx=s16(record, 3), vy=s16(record, 5),
                     ay=s16(record, 7), flags=record[9])
-    if op == 0x02:  # event handler: slot 1 landing, 2 hit, 3 guard
+    if op == 0x02:  # event handler: slot 1 landing, 2 hit, 3 guard, 4 wall, 5 box against box
         return dict(op="handler", slot=record[1], action=u16(record, 2), offset=record[4])
     if op == 0x03:  # play sound r[2:4] of the running container's table (0x4132c8)
         return dict(op="sound", index=u16(record, 2))
@@ -539,7 +539,8 @@ def flatten_queue(p, c, queue, played, image_ids, reactions=(), named=None):
             # its timeline: Yo's Press Hit enters 239 + 15 (PC 3291).
             if event["op"] == "handler" and event["slot"] in (1, 4) and event["action"] not in played:
                 queue.append((event["action"], event["offset"]))
-            if event["op"] == "handler" and event["slot"] in (2, 3):
+            # Hit, guard and box-against-box (slot 5, 0x40eb60) handlers.
+            if event["op"] == "handler" and event["slot"] in (2, 3, 5):
                 queue.append((event["action"], event["offset"]))
             if event["op"] in ("random", "input", "test", "command") and event["action"]:
                 queue.append((event["action"], event["offset"]))
