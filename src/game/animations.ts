@@ -544,7 +544,8 @@ const waits = (frames: Pose[]) =>
 // 3–5 (+0x7580, 0x4110f0): each takeoff, the displays before its op 0x01
 // launches it (AMIRO's up jump three, 11 ticks), then its air poses up to the
 // first that waits for the landing (a zero duration, 0x412800): ALPHA's 132
-// (PC 56).
+// (PC 56). And its fall, word 6 (+0x7586), which holds Ryuko's 16 (PC 100)
+// or Zoma's 121 for 1010 ticks.
 function jumpClips(who: Who, loop: boolean | number = false) {
   const [takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack] = (
     ['jump', 'jumpForward', 'jumpBack'] as const
@@ -559,7 +560,16 @@ function jumpClips(who: Who, loop: boolean | number = false) {
     const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
     return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
   });
-  return { takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack };
+  const fall = fighterClips[who].fall;
+  return {
+    takeoff,
+    jump,
+    takeoffForward,
+    jumpForward,
+    takeoffBack,
+    jumpBack,
+    fall: clip(fall, false, waits(fall)),
+  };
 }
 
 // Neutral, guard, victim and result clips, which the match drives itself.

@@ -426,12 +426,13 @@ def player_tables(data, c, image_ids):
     # fighter's set-up enters its word 17 (+0x759c, 0x412180): 開始時. Up
     # enters word 3 (+0x7580), with forward word 4 and with back word 5
     # (0x4110f0); forward alone enters word 1 (+0x757c) and back word 2
-    # (0x4111b3–0x411209).
+    # (0x4111b3–0x411209). Airborne, return to neutral enters word 6
+    # (+0x7586, 0x411a80): the fall.
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
                 commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
                 jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)],
-                walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)])
+                walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)], fall=u16(data, block + 0x7586))
 
 
 def jump_target(record):
@@ -3834,6 +3835,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         if test:
             actions["winStandEx"] = u16(test, 1)
     clips = pose_clips(p, c, actions, image_ids)
+    # Its fall too, which a move's last jump still enters by its timeline.
+    clips.update(pose_clips(p, c, dict(fall=tables["fall"]), image_ids))
     # Clips that play their action's flattened timeline, calls inlined.
     for name in flat:
         index, offset = actions[name] if isinstance(actions[name], tuple) else (actions[name], 0)
@@ -3855,7 +3858,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards),
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
                               *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],
-                              *tables["walks"]]]
+                              *tables["walks"], tables["fall"]]]
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -3981,9 +3984,10 @@ def main():
     image_ids = {419, 464, 2000, 2001, 2002}
     tables = player_tables(data, c, image_ids)
     # Her forward and back jumps (5, 6), which the match draws by the
-    # direction taken.
+    # direction taken, and her fall (7), which a move's last jump still
+    # enters by its timeline.
     actions.update(jumpForward=tables["jumps"][1], jumpBack=tables["jumps"][2])
-    clips = pose_clips(p, c, actions, image_ids)
+    clips = pose_clips(p, c, {**actions, "fall": tables["fall"]}, image_ids)
     # Her Vs. intro: 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC
     # 286), which jumps past its display for global 14 = 0 (PC 323), spawns
     # Black and OP super Charge (39, PCs 325–326) and jumps to Round 1 (33) +
@@ -4009,7 +4013,7 @@ def main():
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
                               # 開始時, which a VS round plays from the start.
-                              tables["start"], *tables["jumps"], *tables["walks"]]]
+                              tables["start"], *tables["jumps"], *tables["walks"], tables["fall"]]]
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.

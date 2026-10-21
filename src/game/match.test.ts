@@ -6323,8 +6323,8 @@ describe('recovered air and rapid reaction motion', () => {
   // Fighter 1 faces Ryuko on its left, so "back" is +x. The reaction is
   // queued as a contact queues it, without stops: the first step enters it
   // at age 0, its op 0x01 records moving it on that tick.
-  function place(action: Fighter['action'], y = -150) {
-    const match = new Match();
+  function place(action: Fighter['action'], y = -150, who: Who = 'ryuko') {
+    const match = new Match('practice', false, 0, ['ryuko', who]);
     const target = match.fighters[1];
     match.fighters[0].x = 900;
     Object.assign(target, { x: 1200, y, vx: 0, vy: 0 });
@@ -6401,6 +6401,24 @@ describe('recovered air and rapid reaction motion', () => {
     land(match, target);
     // Its landing handler (slot 1, PC 95) enters LEND (9).
     expect(target.action).toBe('land');
+  });
+
+  it("falls by its fighter's own fall, word 6 (+0x7586): its pose, gravity and landing", () => {
+    const fall = (who: Who) => {
+      const { match, target } = place('airBlock', -400, who);
+      ticks(match, 1 + animationDuration('airBlock', who));
+      const { vy } = target;
+      match.step({}, {});
+      const shown = [fighterPose(target).image, (target.vy - vy) / acc];
+      land(match, target);
+      return [...shown.map(Math.round), target.action];
+    };
+    // Ryuko's 7 holds 16 (PC 100) under gravity 80 and lands into LEND (9);
+    // MASA's falls under 120 and ZENKA's 60; RARIO's lands crouching (12).
+    expect(fall('ryuko')).toEqual([16, 80, 'land']);
+    expect(fall('masa')).toEqual([119, 120, 'land']);
+    expect(fall('zenka')).toEqual([135, 60, 'land']);
+    expect(fall('rario')).toEqual([132, 80, 'crouchEnter']);
   });
 
   it('pushes the beam hit back at raw 150, then drifts it in at +10 (83)', () => {

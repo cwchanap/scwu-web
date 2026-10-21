@@ -140,7 +140,6 @@ const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
 const SOURCE_VELOCITY_SCALE = (655 / 65536) * 1.5;
 // Opcode 1 acceleration uses floor(0x3c0000 / 100²) in the same 16.16 units.
 const SOURCE_ACCELERATION_SCALE = (393 / 65536) * 1.5;
-const JUMP_GRAVITY = 80 * SOURCE_ACCELERATION_SCALE;
 // Op 0x01 in each grounded reaction: raw velocity and acceleration from its
 // age, until `until` or its end.
 const slide = (start: number, velocity: number, acceleration = 0) => ({
@@ -916,6 +915,7 @@ const JUMP_CLIPS = [
   ['takeoff', 'jump'],
   ['takeoffForward', 'jumpForward'],
   ['takeoffBack', 'jumpBack'],
+  ['fall', 'fall'],
 ] as const;
 const shown = (f: Fighter): Shown =>
   f.action === 'script'
@@ -1050,8 +1050,9 @@ export interface Fighter {
   action: Action;
   age: number;
   airAge: number;
-  // The jump the takeoff entered: 0 up, 1 forward, 2 back (jumpClips).
-  jump: 0 | 1 | 2;
+  // The jump the takeoff entered: 0 up, 1 forward, 2 back (jumpClips); 3
+  // the fall.
+  jump: 0 | 1 | 2 | 3;
   hitStop: number;
   // The input word op 0x1a's stop saved (+0x4dfd83), while its flag
   // (+0x4dfd7f) holds.
@@ -1473,9 +1474,6 @@ function motion(
   if (!(event.flags & 16))
     actor.gravity = set(actor.gravity, event.ay * SOURCE_ACCELERATION_SCALE);
 }
-// Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
-// ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
-// under 100.
 // Forward enters the default-action table's walk and back its back walk
 // (+0x757c, 0x4111b3–0x411209), each moving at its own op 0x01: Ryuko's raw
 // 230 and −180 (PCs 32, 41), 3-TIMES's 350 and −300.
@@ -1485,6 +1483,9 @@ function walkSpeed(who: Who, back: boolean) {
   return launch?.op === 'motion' ? launch.vx * SOURCE_VELOCITY_SCALE : 0;
 }
 
+// Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
+// ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
+// under 100.
 function launchJump(f: Fighter) {
   const { events } = script(CHARACTERS[f.who].jumps[f.jump], f.who);
   const launch = events.find((event) => event.op === 'motion');
@@ -1841,7 +1842,7 @@ export class Match {
       // before landing restarts its displays (0x41187f), which the port
       // holds still.
       if (action === 'superHeld' && !f.held && f.y < 0) {
-        f.gravity = JUMP_GRAVITY;
+        f.gravity = 80 * SOURCE_ACCELERATION_SCALE;
         f.moving = 'velocity';
       }
     } else if (f.gravity === 0) f.gravity = 0.24;
@@ -2869,7 +2870,8 @@ export class Match {
       return false;
     } else {
       markActing(f);
-      this.action(f, 'land');
+      if (f.onLand) this.enterKey(f, f.onLand);
+      else this.action(f, 'land');
     }
     return true;
   }
@@ -2895,13 +2897,25 @@ export class Match {
   // Running out airborne, the free state falls; false on foot.
   private runOut(f: Fighter) {
     if (f.y < 0) {
-      this.action(f, 'jump');
-      f.gravity = JUMP_GRAVITY;
-      f.moving = 'velocity';
+      this.fall(f);
       return true;
     }
     f.vx = f.vy = 0;
     return false;
+  }
+
+  // Airborne, return to neutral enters the default-action table's fall, word
+  // 6 (+0x7586, 0x411a80), which the port draws as a jump. 0x410cf0 keeps the
+  // motion, and its op 0x01 (Ryuko's PC 99, flags 0xe) keeps vx, vy and ax
+  // and sets its own gravity: 80, MASA's 120, ZENKA's 60. Its landing
+  // handler is the jump's, but RARIO's and TRAINING's crouch (12).
+  private fall(f: Fighter) {
+    const { ax } = f;
+    this.action(f, 'jump');
+    [f.jump, f.ax, f.airAge, f.moving] = [3, ax, 0, 'velocity'];
+    for (const event of script(CHARACTERS[f.who].fall, f.who).events)
+      if (event.op === 'motion' || event.op === 'handler')
+        this.runEvent(f, this.fighters.indexOf(f), event);
   }
 
   // Op 0x04 flag 0x40 objects sit in viewport coordinates.
@@ -3325,15 +3339,11 @@ export class Match {
     )
       return;
     const airborne = f.y < 0 || f.vy < 0;
-    // An air reaction that ends airborne enters action 7 through 0x411a80
-    // (+0x7586), which frees the fighter. Its op 0x01 (PC 99, flags 0xe)
-    // keeps vx, vy and ax and sets gravity 80.
+    // An air reaction that ends airborne falls (0x411a80), which frees the
+    // fighter.
     if (airborne && AIR_REACTIONS[f.action]) {
-      const { ax } = f;
       toNeutral(f);
-      this.action(f, 'jump');
-      f.ax = ax;
-      f.gravity = JUMP_GRAVITY;
+      this.fall(f);
     }
     // Back in neutral once the round is decided, 0x410ff1 enters the result's
     // action instead of reading commands; airborne, the fall reads them.
