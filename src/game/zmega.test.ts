@@ -118,6 +118,29 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
       expect(byKey({ [key]: true }, { gap })).toMatchObject({ mine, damage });
   });
 
+  it('carries the opponent to the wall in her own Chuck Zmega', () => {
+    // GIGA HIT applies response 74 (op 0x14, PCs 3651, 3653), Ryuko's Chuck
+    // Zmega (141), which flies her back at raw 850 (PC 1921) beside him
+    // until the wall enters fly side wall hit (95, slot 4, PC 1920).
+    const { other, steps } = zmegaPlayer();
+    steps({}, 2);
+    const hers: unknown[] = [];
+    for (let t = 0; t < 400; t++) {
+      steps(t ? {} : { iori: true });
+      if (hers.at(-1) !== now(other)) hers.push(now(other));
+    }
+    expect(hers).toEqual([
+      'idle',
+      'rushAirHit',
+      141,
+      'flySideWall',
+      'launchAway',
+      'knockdown',
+      'getUp',
+      'idle',
+    ]);
+  });
+
   it('catches a projectile with REFLACT, whose return fizzles on it', () => {
     const match = new Match('practice', false, 3, ['zoma', 'zmega']);
     const [zoma, zmega] = match.fighters;

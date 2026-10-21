@@ -528,8 +528,10 @@ const FLY_SIDE_WALL = 95;
 // Ryuko's reactions that only some players' moves reach, which each victim
 // plays from its own timeline (export_fighter's OWN_TIMELINES): Clothes off
 // and its 500 form (101, 103; ZENKA's en300 and en500 grabs), the RARIO
-// mushrooms' grow, YARA and 1UP (115–117) and Chuck OGI BALL (138).
-const OWN_TIMELINES = new Set([101, 103, 115, 116, 117, 138]);
+// mushrooms' grow, YARA and 1UP (115–117), Chuck OGI BALL (138), and Chuck
+// Zmega and Chuck ShinZ (141, 142), which Z-MEGA's and SHIN-Z's GIGA presses
+// apply (op 0x14 responses 74, 75).
+const OWN_TIMELINES = new Set([101, 103, 115, 116, 117, 138, 141, 142]);
 // The victim's own timeline a response names, if it is one of those.
 const ownTimeline = (who: Who, response: number) =>
   OWN_TIMELINES.has(responsesOf('ryuko')[response])

@@ -1036,8 +1036,9 @@ SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway
 # The responses whose reactions only some players' moves reach, which the
 # match plays from the victim's own timeline: Clothes off and Clothes off 500
 # (46, 47: ZENKA's grabs), Chuck OGI BALL (62: OGI's, REAR's, Amiro's and
-# YINAN's throws) and RARIO grow, YARA and 1UP (65–67: his mushrooms).
-OWN_TIMELINES = (46, 47, 62, 65, 66, 67)
+# YINAN's throws), RARIO grow, YARA and 1UP (65–67: his mushrooms), and
+# Chuck Zmega and Chuck ShinZ (74, 75: the GIGA presses' op 0x14).
+OWN_TIMELINES = (46, 47, 62, 65, 66, 67, 74, 75)
 
 GUARDS = ("guard", "crouchGuard", "airGuard", "blockHeavy", "crouchBlockHeavy", "airBlockHeavy", "blockStop",
           "crouchBlockStop", "blockRapid", "crouchBlockRapid", "airBlockRapid", "timeStopGuard",

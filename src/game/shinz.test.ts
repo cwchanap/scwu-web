@@ -140,6 +140,24 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     ).toEqual(['takeoff', 'jump', 11, 187, 'land', 'idle']);
   });
 
+  it('carries the opponent to the wall in her own Chuck ShinZ', () => {
+    // Shin GIGA's hit applies response 75 (op 0x14, PCs 2952, 2956), Ryuko's
+    // Chuck ShinZ (142), which flies her back at raw 1250 (PC 1941).
+    const { other, steps } = shinzPlayer();
+    steps({}, 2);
+    const hers: unknown[] = [];
+    for (let t = 0; t < 500; t++) {
+      steps(t ? {} : { iori: true });
+      if (hers.at(-1) !== now(other)) hers.push(now(other));
+    }
+    expect(hers.slice(0, 4)).toEqual([
+      'idle',
+      'rushAirHit',
+      142,
+      'flySideWall',
+    ]);
+  });
+
   it('plays SAMA, Fire BALL, GIGA, REFLACT and GAISA', () => {
     for (const [key, gap, mine, damage] of [
       ['drill', 90, [201, 203, 'idle'], 40],
