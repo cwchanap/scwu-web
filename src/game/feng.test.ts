@@ -1,16 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  FENG_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import { StandingVM } from './standing';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // OS FENG as player 1, `gap` from a standing opponent as player 2.
 function fengPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -279,23 +275,39 @@ describe('OS FENG (19 OS FENG.PLAYER)', () => {
     );
   });
 
-  it('stands through his 198-tick Vs. intro from 開始時 BR + 4 (PC 363), turning EX with down at 128 (PC 393)', () => {
-    expect([animationDuration('intro', 'feng'), FENG_INTRO_EX_TICK]).toEqual([
-      198, 128,
-    ]);
-    for (const down of [false, true]) {
-      const match = new Match('cpu', true, 0, ['feng', 'zoma']);
-      const feng = match.fighters[0];
-      const x = feng.x;
-      for (let t = 0; feng.action === 'intro'; t++)
-        match.step(down && t > 120 && t < 130 ? { crouch: true } : {});
-      expect([feng.x, feng.variables[0] ?? 0]).toEqual([x, down ? 100 : 0]);
-      // OP super Charge (47, PC 364) calls its RP a hundred times for 2
-      // power each, two ticks apart: two stocks two ticks later.
-      match.step({});
-      match.step({});
-      expect(feng.stock).toBe(2);
-    }
+  it('rolls his Vs. intro (PC 360) into Round 1 + 3 or OP2 + 2, turning EX with down at its check (PCs 393, 538)', () => {
+    // 開始時 BR + 4 (PC 363) into Round 1 (35) + 3, or a third of the time
+    // + 10 into OP2 (43) + 2 (PC 372).
+    expect([
+      animationDuration('34+4', 'feng'),
+      animationDuration('34+10', 'feng'),
+    ]).toEqual([198, 208]);
+    // 開始時 (32) shows its blank display a tick first. Round 1's check (PC
+    // 393) comes 128 ticks into it, entering OP TYPE CHANGE (52), and OP2's
+    // (PC 538) 142, entering 52 + 7; each sets variable 0 (PC 582).
+    for (const [seed, path, check, change] of [
+      [1, '34+4', 129, 52],
+      [0, '34+10', 143, '52+7'],
+    ] as const)
+      for (const down of [check - 1, check]) {
+        const run = brIntro('feng', seed, (t) =>
+          t === down ? { crouch: true } : {},
+        );
+        const ex = down === check;
+        expect([run.path, run.ticks, run.f.x, run.f.variables[0] ?? 0]).toEqual(
+          [
+            [32, path, ...(ex ? [change] : [])],
+            2 + animationDuration(path, 'feng'),
+            390 * 1.5,
+            ex ? 100 : 0,
+          ],
+        );
+        // OP super Charge (47, PC 364) calls its RP a hundred times for 2
+        // power each, two ticks apart: two stocks two ticks later.
+        run.match.step({});
+        run.match.step({});
+        expect(run.f.stock).toBe(2);
+      }
   });
 
   it('wins holding image 431 (PC 734), fades out of his draw, and shows face 2001, cycling through 2006 in EX mode', () => {

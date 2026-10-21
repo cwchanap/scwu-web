@@ -5,6 +5,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // ASTROMAN as player 1, `gap` from a standing Ryuko as player 2.
 function astromanPlayer(gap = 90) {
@@ -486,22 +487,25 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
     ]);
   });
 
-  it('charges two stocks through his Vs. intro, 開始時 BR (33)', () => {
-    expect(animationDuration('intro', 'astroman')).toBe(273);
-    const match = new Match('cpu', true, 0, ['astroman', 'zoma']);
-    const astroman = match.fighters[0];
-    let ticks = 0;
-    while (astroman.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    expect([ticks, astroman.stock]).toEqual([273, 2]);
+  it('rolls his Vs. intro voice (PC 402), charged with two stocks', () => {
+    expect(animationDuration('33+3', 'astroman')).toBe(273);
     // Round 1 (34) + 2 bulks a slight boy up into his muscles.
     expect(
       [0, 119, 120, 135, 145, 155, 165, 264, 265, 272].map(
-        (age) => animationFrame('intro', age, 'astroman').image,
+        (age) => animationFrame('33+3', age, 'astroman').image,
       ),
     ).toEqual([151, 151, 150, 149, 148, 147, 146, 146, 145, 145]);
+    // After 開始時's (31) blank display, Round 1's rand % 3 > 1 (PC 402)
+    // enters Round 1 + 5, voicing 3; otherwise 4 (PC 403).
+    expect(
+      [1, 0].map((seed) => {
+        const { path, ticks, f, sounds } = brIntro('astroman', seed);
+        return [path, ticks, f.stock, sounds[0]];
+      }),
+    ).toEqual([
+      [[31, '33+3'], 275, 2, [1, 4]],
+      [[31, '34+5'], 275, 2, [1, 3]],
+    ]);
   });
 
   it('wins shrinking back into the boy (PC 637), and draws sitting down (PC 747)', () => {
@@ -548,7 +552,7 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
     // His CPU's own CPU D F (306), as well as his moves.
     for (const [seed, wanted] of [
       [5, [205, 201, 306, 164, 170, 181, 188, 193, 213, 167, 216]],
-      [11, [175]],
+      [10, [175]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'astroman']);
       const astroman = match.fighters[1];

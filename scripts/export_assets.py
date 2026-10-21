@@ -88,8 +88,8 @@ def decode_event(record):
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
     # hit effect, ALEX's reflect), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's
     # en300 probe), 12 (EX Fire 2), 13 (ERUS's coins and hounds) and 15 (SEAN's cc hit,
-    # which only the Team VS actions set) and global 6 (the freeze); other tests keep
-    # their fall-through path.
+    # which only the Team VS actions set) and globals 6 (the freeze) and 14 (the stage's
+    # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -105,7 +105,7 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x44, 0x46, 0x47,
-                                                                              0x4c, 0x4d, 0x4f, 0x83, 0x86):
+                                                                              0x4c, 0x4d, 0x4f, 0x83, 0x86, 0x8e):
         return test_event(record)
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
@@ -1665,8 +1665,9 @@ FIGHTERS = {
         # for global 3 = 0 (PC 324), which rolls rand % 3 > 1 (PC 360), then
         # skips its display for global 14 = 0 (PC 361), spawns OP super
         # Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC 366); both
-        # play flattened. ponytail: the roll's other third, which hops
-        # through op2 (44, PC 372), isn't played.
+        # play flattened. The match plays the intro from 開始時
+        # (SCRIPTED_INTROS): the roll's other third hops through op2 (44, PC
+        # 372).
         actions=dict(win=61, winStand=29, draw=68, black=41, intro=(33, 4)),
         flat={"win", "intro"},
         # 2001: the HUD face action 76 shows (PC 817); 258: *name (69, PC 777).
@@ -1733,8 +1734,9 @@ FIGHTERS = {
         # spawns Black (55) and OP super Charge (51, PCs 383–384) and jumps to
         # Round 1 (40) + 3 (PC 386); both play flattened; the win's roll into
         # random win2 (70, PC 686) rolls in the match (resultScripts).
-        # ponytail: the intro rolls' other paths, to Random OP3 (45, PC 380)
-        # and RANDOM OP1 (41, PC 403), aren't played.
+        # The match plays the intro from 開始時 (SCRIPTED_INTROS), its rolls'
+        # other paths, to Random OP3 (45, PC 380) and RANDOM OP1 (41, PC
+        # 403), included.
         actions=dict(win=69, winStand=31, draw=78, black=55, intro=(39, 4)),
         flat={"win", "intro"},
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX
@@ -2056,8 +2058,9 @@ FIGHTERS = {
         # (32) jumps to 開始時 BR (34) for global 3 = 0 (PC 322), which rolls
         # rand % 3 > 1 (PC 360), then skips its display for global 14 = 0 (PC
         # 361), spawns Black (51) and OP super Charge (47, PCs 363–364) and
-        # jumps to Round 1 (35) + 3 (PC 366); both play flattened. ponytail:
-        # the roll's other third, through OP2 (43, PC 372), isn't played.
+        # jumps to Round 1 (35) + 3 (PC 366); both play flattened. The match
+        # plays the intro from 開始時 (SCRIPTED_INTROS): the roll's other third
+        # runs through OP2 (43, PC 372).
         actions=dict(win=67, winStand=28, draw=75, black=51, intro=(34, 4)),
         flat={"win", "intro"},
         # 2000–2002 and 2006: the HUD faces action 85 shows, cycling in EX
@@ -2193,8 +2196,9 @@ FIGHTERS = {
         # Black (48) and OP super Charge (44, PCs 435–436) and jumps to Round 1
         # (39) + 2 (PC 438), which leaps (PC 452) and lands into 39 + 25 (slot
         # 1, PC 451); both play flattened. The win's roll, to RANDOM WIN (68,
-        # PC 693), rolls in the match (resultScripts). ponytail: the intro's
-        # (PC 456), which only picks its voice, isn't played.
+        # PC 693), rolls in the match (resultScripts). The match plays the
+        # intro from 開始時 (SCRIPTED_INTROS), its roll (PC 456) picking its
+        # voice.
         actions=dict(win=65, winStand=31, winLoop=(65, 8), draw=75, black=48, intro=(38, 3),
                      introLand=(39, 25)),
         flat={"intro", "introLand"},
@@ -2355,7 +2359,8 @@ FIGHTERS = {
         # and OP super Charge (42, PCs 384–385) and jumps to Round 1 (36) + 5
         # (PC 387), which calls OP movie rp (40) fifteen times (PCs 404–406)
         # and lands into 36 + 44 (slot 1, PC 430); both play flattened.
-        # ponytail: the intro's rolls (PCs 396, 399) only pick its voice.
+        # The match plays the intro from 開始時 (SCRIPTED_INTROS), its rolls
+        # (PCs 396, 399) picking its voice.
         actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46, intro=(35, 10),
                      introLand=(36, 44)),
         flat={"intro", "introLand"},
@@ -2621,8 +2626,9 @@ FIGHTERS = {
         # 14 = 0 (PC 382), spawns Black and OP super Charge (43, PCs 384–385)
         # and jumps to Round 1 (37) + 4 (PC 387), which spawns *OP obj (33)
         # twice (PCs 401–402) and calls OP motion RP (41) 14 times (PC 403);
-        # it plays flattened. ponytail: the roll's other half, which jumps to
-        # RANDON OP1 (31) + 2 (PC 393), as long, isn't played.
+        # it plays flattened. The match plays the intro from 開始時
+        # (SCRIPTED_INTROS): the roll's other half jumps to RANDON OP1 (31) +
+        # 2 (PC 393), as long.
         actions=dict(win=62, winStand=29, winLoop=(62, 23), draw=69, black=47, intro=(36, 4)),
         flat={"intro"},
         # 2001: the HUD face action 77 shows (PC 789); 648: *name (70, PC
@@ -2690,7 +2696,9 @@ FIGHTERS = {
         # jumps to 38 + 18 (PC 429): it rises (PC 445), spawns Black and OP
         # super Charge (45, PCs 434–435) and enters Round 1 (39) + 6 (PC 438),
         # which falls (PC 459) and lands into 39 + 11 (slot 1, PC 458); both
-        # play flattened. His KO down rolls (PCs 828, 834) and runs on into
+        # play flattened. The match plays the intro from 開始時
+        # (SCRIPTED_INTROS): the roll's other third enters RANDOM OP1 (31) + 2
+        # (PC 444). His KO down rolls (PCs 828, 834) and runs on into
         # ko DOWN2, ko down 2 fly and ko DOWN3 (71–73), which the match plays
         # from its timeline.
         actions=dict(win=66, winStand=30, winLoop=(66, 10), draw=78, drawLoop=32, black=49, intro=(38, 18),
@@ -3104,10 +3112,10 @@ FIGHTERS = {
         # The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3 = 0
         # (PC 426), which, for global 14 = 0, jumps past its display (PC
         # 464), spawns Black and OP super Charge (54, PCs 466–467) and enters
-        # OP2 (30) + 2 (PC 469); it plays flattened. ponytail: 開始時's test
-        # of global 10 for 10 (PC 427), into 開始時 BR + 14, and 開始時 BR's
-        # rand % 3 > 1 (PC 463), into Round 1 (35) + 4 (PC 475), aren't
-        # played.
+        # OP2 (30) + 2 (PC 469); it plays flattened. The match plays the
+        # intro from 開始時 (SCRIPTED_INTROS): 開始時 BR's rand % 3 > 1 (PC
+        # 463) enters Round 1 (35) + 4 (PC 475). ponytail: 開始時's test of
+        # global 10 for 10 (PC 427), into 開始時 BR + 14, isn't played.
         actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59, intro=(33, 4)),
         flat={"intro"},
         # 2001: the HUD face action 108 shows (PC 1333); 576: *name (99, PC
@@ -3496,8 +3504,8 @@ FIGHTERS = {
         # 394), spawns Black and OP super Charge (39, PCs 396–397) and enters
         # Round 1 (34) + 2 (PC 399); it plays flattened. 勝ち's rand % 3 > 1 (PC
         # 632), which only picks its voice, rolls in the match (resultScripts).
-        # ponytail: Round 1's (PC 402) isn't played, so the intro always plays
-        # the other voice (PC 403).
+        # The match plays the intro from 開始時 (SCRIPTED_INTROS), Round 1's
+        # roll (PC 402) picking its voice.
         actions=dict(win=57, winStand=29, winLoop=(57, 18), draw=64, drawLoop=(64, 8), black=43, intro=(33, 3)),
         flat={"intro"},
         # 2001: the HUD face action 69 shows (PC 769); 170: VS NAME (56, PC
@@ -4116,7 +4124,7 @@ def export_stage(key, name, filename, sha256, track):
     # round checks (Greek's scenery, PCs 10–198), and the paths only those
     # checks reach go.
     for script in scripts.values():
-        kept = [not (e["op"] == "test" and (e["selector"] == 0x83 or e.get("pre", {}).get("round")))
+        kept = [not (e["op"] == "test" and (e["selector"] in (0x83, 0x8e) or e.get("pre", {}).get("round")))
                 for e in script["events"]]
         if "loopEvent" in script:
             script["loopEvent"] = sum(kept[:script["loopEvent"]])

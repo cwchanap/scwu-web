@@ -1547,6 +1547,21 @@ const stageObjects = (stage: Stage) =>
 
 // Every round set-up places the players at 390 and 890 source pixels
 // (0x408a2e, 0x408ac3), and their Br. intros move them from there.
+// The 開始時 BR paths that roll, into another path or only a voice: DIDO's
+// (PC 360), SAKUYA's (PCs 380, 403), OS FENG's (PC 360), OGI's (PC 381),
+// ZIRO's (PC 428) and ALPHA's (PC 463) into others, GON's (PC 456), REMU's
+// (PCs 396, 399) and ASTROMAN's (PC 402) into another voice.
+const SCRIPTED_INTROS = new Set<Who>([
+  'dido',
+  'sakuya',
+  'feng',
+  'ogi',
+  'ziro',
+  'alpha',
+  'gon',
+  'remu',
+  'astroman',
+]);
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
   { ...fighter(390 * 1.5, 1, a), action: 'intro' },
   { ...fighter(890 * 1.5, -1, b), action: 'intro' },
@@ -1622,16 +1637,19 @@ export class Match {
   // and each set-up enters its 開始時 (+0x759c, 0x412180), which plays the
   // VS intro as a script from the round's first step. DoraEmon, whom VS
   // single never offers, exports none: a pairing with him plays the authored
-  // Br. intro.
+  // Br. intro. Otherwise global 3 is 0 and 開始時 jumps to 開始時 BR, which
+  // plays as a script for the players whose BR path rolls (SCRIPTED_INTROS);
+  // the others play it as a clip.
   private entrants(): [Fighter, Fighter] {
+    const fighters = introFighters(this.characters);
     const starts = this.characters.map((who) => CHARACTERS[who].start);
-    if (!this.vs || this.characters.some((who, i) => !exported(starts[i], who)))
-      return introFighters(this.characters);
-    const fighters: [Fighter, Fighter] = [
-      fighter(390 * 1.5, 1, this.characters[0]),
-      fighter(890 * 1.5, -1, this.characters[1]),
-    ];
+    const scripted = this.characters.map(
+      (who, i) =>
+        exported(starts[i], who) && (this.vs || SCRIPTED_INTROS.has(who)),
+    );
+    if (this.vs && !scripted.every(Boolean)) return fighters;
     fighters.forEach((f, i) => {
+      if (!scripted[i]) return;
       this.action(f, 'script', true, starts[i]);
       f.age = -1;
     });
@@ -2258,6 +2276,9 @@ export class Match {
         selector,
         pre.round ? { value: this.round, add: false } : pre,
       );
+    // Global 14 holds the stage's track while it is 200, which only KAY's,
+    // DIDO's and SIN's supers set (unplayed), so each 開始時 BR's test for 0
+    // skips its display.
     const variable =
       selector < 0x40
         ? (actor.locals[selector] ?? 0)
@@ -2267,7 +2288,9 @@ export class Match {
             ? this.vs
               ? 50
               : 0
-            : (self.variables[selector & 0x3f] ?? 0);
+            : selector === 0x8e
+              ? 0
+              : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2

@@ -1,17 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  ZIRO_INTRO_EX_TICK,
-  ZIRO_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { commanded, entriesOf } from './commands';
 import { faceImage } from './hud';
 import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // ZIRO as player 1, `gap` from a standing opponent as player 2.
 function ziroPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -301,24 +296,37 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     ).toMatchObject({ mine: [270, 'idle'], damage: 20 });
   });
 
-  it('drops in from the sky for his Vs. intro, charging two stocks and starting in EX mode while down is held (PC 486)', () => {
-    expect([
-      animationDuration('intro', 'ziro'),
-      ZIRO_LANDING,
-      ZIRO_INTRO_EX_TICK,
-    ]).toEqual([278, 119, 187]);
+  it('rolls his Vs. intro (PC 428): dropping in from the sky or RANDOM OP1, charged with two stocks, in EX mode while down is held (PCs 486, 343)', () => {
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['ziro', 'zoma']);
-      const ziro = match.fighters[0];
-      const heights: number[] = [];
-      while (ziro.action === 'intro') {
-        match.step({ crouch });
-        heights.push(ziro.y);
-      }
-      // 1599 source pixels up after eight ticks, back down on the 119th.
-      expect(heights[7]).toBeCloseTo(-1599.12 * 1.5, 0);
-      expect([heights[117] < 0, heights[118]]).toEqual([true, 0]);
-      expect([exMode(ziro), ziro.stock]).toEqual([crouch, 2]);
+      // Two thirds of the time 開始時 BR + 18 (PC 429), after 開始時's (36)
+      // blank display, rises unseen at raw −20000 for 8 ticks (PC 445):
+      // 1599 source pixels. Round 1 (39) + 6 falls at 2000 under gravity 30
+      // (PC 459); a tick past the floor, the landing (0x41187f) enters 39 +
+      // 11 (slot 1, PC 458), whose check (PC 486) enters Change EX (43).
+      const drop = brIntro('ziro', 1, () => ({ crouch }));
+      expect(drop.heights[8] / 1.5).toBeCloseTo(-1599.12, 1);
+      expect([
+        drop.heights[118] < 0,
+        drop.heights[119] > 0,
+        drop.heights[120],
+      ]).toEqual([true, true, 0]);
+      expect([drop.path, drop.ticks, exMode(drop.f), drop.f.stock]).toEqual([
+        [36, '38+18', '39+11', ...(crouch ? [43] : [])],
+        280,
+        crouch,
+        2,
+      ]);
+      // A third of the time + 14 enters RANDOM OP1 (31) + 2 (PC 444), which
+      // steps back at raw −200 for 8 ticks (PC 341) past its check (PC 343),
+      // into Change EX + 3.
+      const op1 = brIntro('ziro', 0, () => ({ crouch }));
+      expect([op1.path, op1.ticks, exMode(op1.f), op1.f.stock]).toEqual([
+        [36, '38+14', ...(crouch ? ['43+3'] : [])],
+        202,
+        crouch,
+        2,
+      ]);
+      expect(op1.f.x / 1.5).toBeCloseTo(390 - (8 * 200 * 655) / 65536, 6);
     }
     expect([0, 40, 80, 120].map((face) => faceImage(face, 'ziro'))).toEqual([
       2002, 2006, 2000, 2006,

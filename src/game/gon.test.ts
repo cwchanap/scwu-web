@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  GON_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // GON as player 1, `gap` from a standing opponent as player 2.
 function gonPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -257,26 +253,45 @@ describe('GON (21 GON.PLAYER)', () => {
       expect(byKey(key, { gap, ex: true })).toMatchObject({ mine, damage });
   });
 
-  it('leaps into his 200-tick Vs. intro, landing at 180 (PC 451), and turns to EX with down held as he lands (PC 466)', () => {
-    expect([animationDuration('intro', 'gon'), GON_LANDING]).toEqual([
-      200, 180,
-    ]);
+  it('leaps into his Vs. intro, rolls its voice (PC 456), lands (PC 451) and turns to EX with down held as he lands (PC 466)', () => {
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['gon', 'zoma']);
-      const gon = match.fighters[0];
-      const x = gon.x;
-      const heights: number[] = [];
-      while (gon.action === 'intro') {
-        match.step(crouch ? { crouch: true } : {});
-        heights.push(gon.y);
-      }
-      // 265 source pixels up at the peak, back down on the 180th step.
+      const { heights, path, ticks, f } = brIntro('gon', 1, () =>
+        crouch ? { crouch: true } : {},
+      );
+      // After 開始時's (36) blank display, 265 source pixels up at the
+      // peak, a tick past the floor before the landing (0x41187f) enters 39
+      // + 25 (slot 1, PC 451), whose check enters TYPE CHANGE (49).
       expect(Math.min(...heights)).toBeCloseTo(-397.641, 3);
-      expect([heights[178] < 0, heights[179], gon.x]).toEqual([true, 0, x]);
-      expect(gon.variables[0] ?? 0).toBe(crouch ? 100 : 0);
-      // OP super Charge (44, PC 436) charges two stocks within it.
-      expect(gon.stock).toBe(2);
+      expect([heights[179] < 0, heights[180] > 0, heights[181], f.x]).toEqual([
+        true,
+        true,
+        0,
+        390 * 1.5,
+      ]);
+      expect([path, ticks, f.variables[0] ?? 0, f.stock]).toEqual([
+        [36, '38+3', crouch ? 49 : '39+25'],
+        202,
+        crouch ? 100 : 0,
+        2,
+      ]);
     }
+    // Round 1's rand % 3 > 1 (PC 456) enters 39 + 20, voicing 15; otherwise
+    // 26 (PC 457).
+    expect(
+      [1, 0].map((seed) => {
+        const { path, sounds } = brIntro('gon', seed);
+        return [path, sounds.find(([t]) => t === 129)];
+      }),
+    ).toEqual([
+      [
+        [36, '38+3', '39+25'],
+        [129, 26],
+      ],
+      [
+        [36, '38+3', '39+20', '39+25'],
+        [129, 15],
+      ],
+    ]);
   });
 
   it('wins looping images 620–623 (PC 707), holds his draw, and shows face 2001 or the EX cycle', () => {

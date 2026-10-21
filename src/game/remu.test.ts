@@ -1,15 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  REMU_LANDING,
-} from './animations';
+import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // REMU as player 1, `gap` from a standing opponent as player 2.
 function remuPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -261,29 +257,40 @@ describe('REMU (23 REMU.PLAYER)', () => {
     expect(cancel({ musashi: true }, 10, 120).remu.stock).toBe(1);
   });
 
-  it('rises, sinks, soars and falls through his Vs. intro, landing at REMU_LANDING, charged to two stocks', () => {
-    expect([animationDuration('intro', 'remu'), REMU_LANDING]).toEqual([
-      281, 246,
+  it('rolls his Vs. intro voice (PCs 396, 399), rises, sinks, soars and falls, charged to two stocks', () => {
+    const runs = [0, 1, 6].map((seed) => brIntro('remu', seed));
+    // Round 1's rand % 4 > 1 (PC 396) enters 36 + 8, whose rand % 3 > 1 (PC
+    // 399) enters 36 + 11: voices 5, 6 or 4 (PCs 397, 400, 402).
+    expect(runs.map(({ path, sounds }) => [path, sounds[0]])).toEqual([
+      [
+        [33, '35+10', '36+44'],
+        [3, 5],
+      ],
+      [
+        [33, '35+10', '36+8', '36+44'],
+        [3, 6],
+      ],
+      [
+        [33, '35+10', '36+11', '36+44'],
+        [3, 4],
+      ],
     ]);
-    const match = new Match('cpu', true, 0, ['remu', 'zoma']);
-    const remu = match.fighters[0];
-    const x = remu.x;
-    const heights: number[] = [];
-    while (remu.action === 'intro') {
-      match.step({});
-      heights.push(remu.y / 1.5);
-    }
-    // 300 source pixels up, 280 down, then 989 up and back to the floor on
-    // the 246th step.
-    expect(heights[1]).toBeCloseTo(-299.835, 3);
-    expect(heights[71]).toBeCloseTo(-19.99, 2);
+    const [{ ticks, f }] = runs;
+    const heights = runs[0].heights.map((y) => y / 1.5);
+    // After 開始時's (33) blank display, 300 source pixels up, 280 down, then
+    // 989 up and back, a tick past the floor before the landing (0x41187f)
+    // enters 36 + 44 (slot 1, PC 430).
+    expect(heights[2]).toBeCloseTo(-299.835, 3);
+    expect(heights[72]).toBeCloseTo(-19.99, 2);
     expect(Math.min(...heights)).toBeCloseTo(-1009.445, 2);
-    expect([heights[244] < 0, heights[245], remu.x, remu.stock]).toEqual([
-      true,
-      0,
-      x,
-      2,
-    ]);
+    expect([
+      heights[245] < 0,
+      heights[246] > 0,
+      heights[247],
+      f.x,
+      f.stock,
+      ticks,
+    ]).toEqual([true, true, 0, 390 * 1.5, 2, 283]);
   });
 
   it('wins after two calls of stand demo, then flies up at raw −1450 (PC 651); holds his draw and shows face 2001', () => {

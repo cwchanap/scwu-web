@@ -2,8 +2,9 @@
 // source action; these name the ones the tests drive, and the objects they
 // spawn (the axe, DST's missiles).
 import type { ObjectKey } from './animations';
-import { firstStrike } from './match';
-import type { Effect, Fighter, Match } from './match';
+import type { Who } from './characters';
+import { fighterPose, firstStrike, Match } from './match';
+import type { Effect, Fighter, Input } from './match';
 
 export const RYUKO = {
   fall: 7,
@@ -172,4 +173,36 @@ export function spawn(
     z: 0,
   });
   return match.effects.find((e) => !before.has(e))!;
+}
+
+// A Vs. CPU intro, which the title's demos play with global 3 at 0: 開始時
+// jumps to 開始時 BR. It steps `who`, as player 1 against Zoma, until it
+// idles, recording the timelines it plays, each tick's image and height,
+// the sounds it cues by tick and the objects it spawns.
+export function brIntro(
+  who: Who,
+  seed = 0,
+  input: (t: number) => Input = () => ({}),
+) {
+  const match = new Match('cpu', true, seed, [who, 'zoma']);
+  const f = match.fighters[0];
+  const [path, images, heights] = [[], [], []] as [
+    ObjectKey[],
+    number[],
+    number[],
+  ];
+  const sounds: [number, number][] = [];
+  const objects = new Set<ObjectKey>();
+  let ticks = 0;
+  while (f.action === 'script') {
+    match.step(input(ticks++));
+    for (const { owner, index } of match.sounds)
+      if (owner === 0) sounds.push([ticks - 1, index]);
+    for (const e of match.effects) if (e.owner === 0) objects.add(e.clip);
+    if (f.action !== 'script') break;
+    if (path.at(-1) !== f.branch) path.push(f.branch!);
+    images.push(fighterPose(f).image);
+    heights.push(f.y);
+  }
+  return { match, f, path, images, heights, sounds, objects, ticks };
 }

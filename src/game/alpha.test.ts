@@ -4,6 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // ALPHA as player 1, `gap` from a standing Ryuko as player 2.
 function alphaPlayer(gap = 90) {
@@ -244,24 +245,27 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     expect(BLACK.alpha.opaque.image).toBe(1026);
   });
 
-  it('charges four stocks through his Vs. intro, 開始時 BR + 4 (PC 466)', () => {
-    expect(animationDuration('intro', 'alpha')).toBe(346);
-    const match = new Match('cpu', true, 0, ['alpha', 'zoma']);
-    const alpha = match.fighters[0];
-    let ticks = 0;
-    while (alpha.action === 'intro') {
-      match.step({});
-      ticks++;
-    }
-    // OP super Charge (54) clears his power and adds 400 (PCs 800–801):
-    // four of his five stocks (+0x7cb2).
-    expect([ticks, alpha.stock]).toEqual([346, 4]);
+  it('rolls his Vs. intro (PC 463) into OP2 + 2 or Round 1 + 4, charging four stocks', () => {
     // OP2 (30) + 2 (PC 469), which calls demo stand (PC 422).
+    expect(animationDuration('33+4', 'alpha')).toBe(346);
     expect(
       [0, 104, 105, 120, 196, 345].map(
-        (age) => animationFrame('intro', age, 'alpha').image,
+        (age) => animationFrame('33+4', age, 'alpha').image,
       ),
     ).toEqual([130, 130, 129, 116, 118, 118]);
+    // A third of the time Round 1 (35) + 4 (PC 475).
+    expect(animationDuration('33+10', 'alpha')).toBe(298);
+    // After 開始時's (31) blank display, OP super Charge (54) clears his
+    // power and adds 400 (PCs 800–801): four of his five stocks (+0x7cb2).
+    expect(
+      [1, 0].map((seed) => {
+        const { path, ticks, f } = brIntro('alpha', seed);
+        return [path, ticks, f.stock];
+      }),
+    ).toEqual([
+      [[31, '33+4'], 348, 4],
+      [[31, '33+10'], 300, 4],
+    ]);
   });
 
   it('wins after demo stand, looping his stance (PC 1017), and draws holding 130', () => {

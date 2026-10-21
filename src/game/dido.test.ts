@@ -6,6 +6,7 @@ import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 // DIDO as player 1 at `x`, `gap` from a standing opponent.
 function didoPlayer(x = 900, gap = 90, opponent: Who = 'ryuko') {
@@ -170,18 +171,37 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     expect([vm.ended, vm.frame?.image]).toEqual([true, 113]);
   });
 
-  it('opens her Vs. intro with a stance where Ryuko walks to, charged with two stocks', () => {
-    expect(animationDuration('intro', 'dido')).toBe(200);
-    // Round 1 (34) from PC 379: images 343–353, then 113.
+  it("rolls her Vs. intro's path (PC 360): Round 1 + 3's stance or op2's hop, charged with two stocks", () => {
+    // Round 1 (34) from PC 379: images 343–353, then 113, for 200 ticks.
+    expect(animationDuration('33+4', 'dido')).toBe(200);
     expect(
-      [0, 80, 173, 183].map(
-        (age) => animationFrame('intro', age, 'dido').image,
-      ),
+      [0, 80, 173, 183].map((age) => animationFrame('33+4', age, 'dido').image),
     ).toEqual([343, 344, 353, 113]);
-    const match = new Match('cpu', true, 0, ['dido', 'zoma']);
-    const dido = match.fighters[0];
-    while (dido.action === 'intro') match.step({});
-    expect([dido.x, dido.stock, dido.power]).toEqual([390 * 1.5, 2, 0]);
+    // 開始時 (31) shows its blank display a tick (PC 323) before 開始時 BR,
+    // and the script runs out a tick after its last display.
+    const stance = brIntro('dido', 1);
+    expect([stance.path, stance.ticks, stance.f.x, stance.f.stock]).toEqual([
+      [31, '33+4'],
+      202,
+      390 * 1.5,
+      2,
+    ]);
+    // A third of the time she hops through op2 (44) + 2 (PC 372): up at raw
+    // −300 for 16 ticks (PC 500), a hang, then gravity 20 (PC 511) from
+    // tick 163, its 28th move past the floor; the landing enters 44 + 26
+    // (PC 510), image 113 for 10 ticks.
+    const hop = brIntro('dido', 0);
+    expect([hop.path, hop.ticks, hop.f.x, hop.f.stock]).toEqual([
+      [31, '33+10', '44+26'],
+      202,
+      390 * 1.5,
+      2,
+    ]);
+    expect(Math.min(...hop.heights) / 1.5).toBeCloseTo(
+      (-16 * 300 * 655) / 65536,
+      3,
+    );
+    expect(hop.images.indexOf(113)).toBe(163 + 28);
   });
 
   it('wins after a call of Demo Stand (PC 681), holding image 330, and draws holding 382', () => {

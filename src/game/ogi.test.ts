@@ -5,6 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
+import { brIntro } from './testing';
 
 // OGI as player 1, `gap` from a standing opponent as player 2.
 function ogiPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -247,17 +248,24 @@ describe('OGI (27 OGI.PLAYER)', () => {
     ).toMatchObject({ mine: [241, 'idle'], damage: 28 });
   });
 
-  it('charges two stocks through his 200-tick Vs. intro', () => {
-    expect(animationDuration('intro', 'ogi')).toBe(200);
-    const match = new Match('cpu', true, 0, ['ogi', 'zoma']);
-    const ogi = match.fighters[0];
-    const objects = new Set<unknown>();
-    while (ogi.action === 'intro') {
-      match.step({});
-      for (const e of match.effects) if (e.owner === 0) objects.add(e.clip);
-    }
-    // Black (47), OP super Charge (43) and *OP obj (33) twice.
-    expect([ogi.stock, [...objects]]).toEqual([2, [47, 43, 33, '33+6']]);
+  it("rolls his Vs. intro's path (PC 381), charging two stocks", () => {
+    // 開始時 BR + 4 into Round 1 (37) + 4 (PC 387), or half the time + 10
+    // into RANDON OP1 (31) + 2 (PC 393): 200 ticks each, after 開始時's (34)
+    // blank display.
+    expect([
+      animationDuration('36+4', 'ogi'),
+      animationDuration('36+10', 'ogi'),
+    ]).toEqual([200, 200]);
+    const runs = [0, 1].map((seed) => {
+      const { path, ticks, f, objects } = brIntro('ogi', seed);
+      return [path, ticks, f.stock, [...objects]];
+    });
+    // Black (47) and OP super Charge (43) either way; Round 1 spawns *OP obj
+    // (33) twice (PCs 401–402), RANDON OP1 its 375 (PC 320).
+    expect(runs).toEqual([
+      [[34, '36+4'], 202, 2, [47, 43, 33, '33+6']],
+      [[34, '36+10'], 202, 2, [47, 43, 375]],
+    ]);
   });
 
   it('wins after demo act, looping image 642 (PC 660), and draws holding image 142 (PC 745)', () => {

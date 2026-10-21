@@ -1,17 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import {
-  animationDuration,
-  animationFrame,
-  BLACK,
-  SAKUYA_INTRO_EX_TICK,
-} from './animations';
+import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { faceImage } from './hud';
-import { exMode, fighterPose, Match } from './match';
+import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
+import { brIntro } from './testing';
 
 const VELOCITY = (655 / 65536) * 1.5;
 
@@ -255,35 +251,46 @@ describe('SAKUYA (14 SAKUYA.PLAYER)', () => {
     }
   });
 
-  it('opens her Vs. intro from Round 1 + 3, charged with two stocks, in EX mode with down held (PC 413)', () => {
-    expect([
-      SAKUYA_INTRO_EX_TICK,
-      animationDuration('intro', 'sakuya'),
-    ]).toEqual([120, 200]);
+  it('rolls her Vs. intro (PCs 380, 403), charged with two stocks, in EX mode with down held (PCs 413, 482)', () => {
     // Round 1 (40) from PC 399: images 415–421 and 129, then STAND DEMO.
+    expect(animationDuration('39+4', 'sakuya')).toBe(200);
     expect(
       [0, 64, 110, 120, 199].map(
-        (age) => animationFrame('intro', age, 'sakuya').image,
+        (age) => animationFrame('39+4', age, 'sakuya').image,
       ),
     ).toEqual([415, 420, 129, 117, 116]);
+    // 開始時 (36) jumps at once (PC 338). Half the time 開始時 BR's roll (PC
+    // 380) enters Random OP3 (45), 170 ticks to its check (PC 482);
+    // otherwise Round 1's (PC 403) a third of the time enters RANDOM OP1
+    // (41), whose own (PC 416) a third of the time enters random op2 (42),
+    // each 81 ticks to Round 1 + 17's check (PC 413), as Round 1's displays
+    // are. Each check enters ex change (49) for down, which sets variable 0
+    // (PC 521) before the same STAND DEMO, which in EX mode jumps to Skill1
+    // (32, PC 296): images 236–238 for the same 80 ticks (PCs 308–311).
     for (const crouch of [false, true]) {
-      const match = new Match('cpu', true, 0, ['sakuya', 'zoma']);
-      const sakuya = match.fighters[0];
-      const images: number[] = [];
-      while (sakuya.action === 'intro') {
-        images[sakuya.age] = fighterPose(sakuya).image;
-        match.step(crouch ? { crouch } : {});
-      }
-      expect([sakuya.x, sakuya.stock, exMode(sakuya)]).toEqual([
-        390 * 1.5,
-        2,
-        crouch,
+      const runs = [10, 0, 4, 1].map((seed) => {
+        const { path, ticks, images, f } = brIntro('sakuya', seed, () =>
+          crouch ? { crouch } : {},
+        );
+        const stand = ticks - 81;
+        return [
+          path,
+          ticks,
+          f.stock,
+          exMode(f),
+          [0, 20, 40, 65, 79].map((age) => images[stand + age]),
+        ];
+      });
+      const ex = crouch ? [49] : [];
+      const stand = crouch
+        ? [236, 237, 238, 237, 237]
+        : [117, 115, 115, 116, 116];
+      expect(runs).toEqual([
+        [['39+4', ...ex], 201, 2, crouch, stand],
+        [['39+4', 41, ...ex], 201, 2, crouch, stand],
+        [['39+4', 42, ...ex], 201, 2, crouch, stand],
+        [['39+10', ...ex], 251, 2, crouch, stand],
       ]);
-      // In EX mode STAND DEMO jumps to Skill1 (32, PC 296): images 236–238
-      // for the same 80 ticks (PCs 308–311).
-      expect([120, 140, 160, 185, 199].map((age) => images[age])).toEqual(
-        crouch ? [236, 237, 238, 237, 237] : [117, 115, 115, 116, 116],
-      );
     }
   });
 
