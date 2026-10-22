@@ -2790,7 +2790,7 @@ FIGHTERS = {
             # Ryuko's, clearing 13 (PCs 2233, 2249) where hers clear 6.
             "knockdown", "bounceDown",
             # Ryuko's, then a voice from a chain of rolls, rand % 9 > 1 to
-            # rand % 3 > 1 (PCs 2205–2225).
+            # rand % 3 > 1 (PCs 2205–2225), as it starts (GET_UP_ROLLS).
             "getUp",
             # Zoma's KO tests (PC 900), after jumping to KO 2 (99, PC 899) for
             # variable 14 = 10, which only his 開始時 D50 and D10 (47–48, PCs
@@ -2806,8 +2806,7 @@ FIGHTERS = {
             # Clears variables 6, 8, 13 and 5 (PCs 2029–2033), then rolls rand %
             # 3 > 1 (PC 2036) past a voice that a chain of rolls picks (PCs
             # 2040–2061) to call its displays ten times (PC 2038), 100 ticks
-            # for Ryuko's one; ponytail: the match runs its first roll and
-            # the chain's first, and one call per pass.
+            # for Ryuko's 10, which the match follows (Match.musicAttack).
             "musicAttack",
             # Chung's 1002-tick wait.
             "flySideWall",
@@ -2897,9 +2896,8 @@ FIGHTERS = {
             "lose",
             # MASA's, but clearing variables 8, 5 and 13 (PCs 1930–1932): it
             # rolls rand % 3 > 1 (PC 1936) past a voice that a chain of rolls
-            # picks (PCs 1940–1961) to call its displays ten times (PC 1938);
-            # ponytail: the match runs its first roll and the chain's first,
-            # and one call per pass.
+            # picks (PCs 1940–1961) to call its displays ten times (PC 1938),
+            # which the match follows (Match.musicAttack).
             "musicAttack",
             # Chung's 1002-tick wait.
             "flySideWall",
@@ -3054,8 +3052,8 @@ FIGHTERS = {
             # Ryuko's, but rolling rand % 6 > 2 (PC 1937) past a one-tick
             # display whose hit and guard handlers name RAMDOM GET UP (156)
             # while its box (kind 2, PC 1940) sits 9869 pixels down, where
-            # nothing meets it; either way it takes 30 ticks. ponytail: it
-            # plays as a clip through that display, drawing no roll.
+            # nothing meets it; either way it takes 30 ticks, so it plays as a
+            # clip through that display, rolling as it starts (GET_UP_ROLLS).
             "getUp",
             # ZIRO's: Zoma's KO tests (PC 647).
             "ko",
@@ -3194,8 +3192,7 @@ FIGHTERS = {
             # Z-MEGA's, rolling rand % 6 > 4 (PC 2013) past its one-tick
             # display whose hit and guard handlers name RAMDOM GET UP (158) and
             # whose box (kind 2, PC 2016) sits 9890 pixels down; either way it
-            # takes 30 ticks. ponytail: it plays as a clip through that
-            # display, drawing no roll.
+            # takes 30 ticks, played as Z-MEGA's.
             "getUp",
             # Giant's KO NORMAL.
             "ko",
