@@ -523,9 +523,64 @@ def player_tables(data, c, image_ids):
     # (+0x7586, 0x411a80): the fall.
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
                 commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
+                scenario=scenario(data, block + 0x7cc9),
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
                 jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)],
                 walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)], fall=u16(data, block + 0x7586))
+
+
+def scenario(data, at):
+    """A player's story (PLAYER +0x7cc9, read from the story's player, 0x406a3d): 100 steps of 206
+    bytes, run by 0x4069b0 by the type in byte 0's low nibble. 1, a battle (0x406aa3): its stage (+1,
+    1-based), the rounds to win (+2, 0x470048), the life a round restores (+4, %), flags (+5: bit 0
+    a loss opens the continue screen, bit 1 keeps the wins from the battle before), the time in
+    seconds (+6, 0 for none), the 1P's x (+8), its letterings (+0xc: bit 0 ROUND n, bit 1 FIGHT,
+    bit 2 the camera follows the mean of every player), the points player 1 scores at a
+    time-up with more life than the 1P (+0x11; +0x10 picks player 1, 0x40908f), and who
+    (+0x12: 0 the striker, n player n - 1) scores what (+0x13) when the 1P is KO'd; then
+    seven slots of 26 bytes, players 1-7, each a dword of flags (bit 0 player +0xdf0d, bits
+    1-2 how it enters, bits 7-8 who a KO helps, bit 9 an ally), the player (+4, 1-based), its
+    CPU level (+5), whom it fights (+6, a bit per player), its x (+7), the seconds before it
+    enters (+0xb, plus rand % +0xc), whose life (+0xd, below +0xe) brings it in, the points a
+    KO of it gives (+0xf) to whom (+0x12), the life and power that KO gives (+0x10, +0x11),
+    and the points the 1P scores at a time-up with more life than it (+0x14; +0x13 picks the
+    1P, 0x4090d3). 2, a demo (+1), 3, a jump (+5) on a condition (+1, against +2), 4, the end;
+    0 ends the story too. Trailing empty steps are left out."""
+    steps = []
+    for k in range(100):
+        s = data[at + 206 * k:at + 206 * (k + 1)]
+        kind = s[0] & 15
+        # The carried life (+3) and a slot's KO fate (bits 5-6, 0x40e9c8), which deletes or
+        # moves it, are 0 in every story; the other bytes are unused.
+        unused = (s[0] >> 4, s[3], s[7], *s[0xa:0xc], *s[0xd:0x11], *s[0x14:0x18])
+        if kind > 4 or kind == 1 and any(unused):
+            sys.exit(f"Story step {k} uses an unknown field; refusing to export.")
+        if kind == 2:
+            if s[1] and s[1] not in STORY_DEMOS:
+                sys.exit(f"Story step {k} plays demo {s[1]}, which isn't exported; refusing to export.")
+            steps.append(dict(type=2, demo=s[1]))
+        elif kind == 3:
+            steps.append(dict(type=3, condition=s[1], value=s[2], offset=s8(s, 5)))
+        elif kind != 1:
+            steps.append(dict(type=kind))
+            continue
+        else:
+            slots = []
+            for i in range(7):
+                slot = s[0x18 + 26 * i:0x18 + 26 * (i + 1)]
+                flags = struct.unpack_from("<I", slot)[0]
+                if slot[4] and (flags & 0x60 or any((*slot[9:0xb], slot[0x13], *slot[0x15:]))):
+                    sys.exit(f"Story step {k} slot {i} uses an unknown field; refusing to export.")
+                slots.append(dict(flags=flags, player=slot[4] - 1, level=slot[5], enemies=slot[6], x=u16(slot, 7),
+                                  delay=slot[0xb], random=slot[0xc], watch=slot[0xd], below=slot[0xe],
+                                  points=slot[0xf], life=s8(slot, 0x10), power=s8(slot, 0x11), scorer=slot[0x12],
+                                  timeUp=slot[0x14]) if slot[4] else None)
+            steps.append(dict(type=1, stage=s[1], rounds=s[2], recover=s[4], flags=s[5], time=u16(s, 6),
+                              x=u16(s, 8), letterings=s[0xc], timeUp=s[0x11], koScorer=s[0x12], koPoints=s[0x13],
+                              slots=slots))
+    while steps and not steps[-1]["type"]:
+        steps.pop()
+    return steps
 
 
 def jump_target(record):
@@ -4104,9 +4159,12 @@ def main():
     write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
         **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
-    export_ui()
-    for key in DEMOS:
-        export_demo(key)
+    demo_name = export_ui()
+    for key, (name, sha256) in DEMOS.items():
+        export_demo(key, name, sha256, GENERATED / f"{key}.json")
+    (GENERATED / "demos").mkdir(exist_ok=True)
+    for index, sha256 in STORY_DEMOS.items():
+        export_demo(f"demo{index}", demo_name(index), sha256, GENERATED / f"demos/{index}.json")
     write_json(GENERATED / "stages.json", {key: export_stage(key, *stage) for key, stage in STAGES.items()})
     # Python is an independent oracle. Keep fixtures out of the browser bundle.
     cases = []
@@ -4323,8 +4381,8 @@ def export_ui():
     # and lists the modes 0x4438a4's bits 4, 8 and 0x10 allow (0x408263): story
     # (0), VS single (1) and VS multi (2). Its cursor (0x445244) stands where
     # each mode's action's first record says (0x445246, 0x445248, 0x445258).
-    demo_name = lambda index: tail[0x43d49c - base + 0x100 * (index - 1):].split(b"\0")[0]
-    if (demo_name(tail[0x4438a1 - base]), demo_name(tail[0x44389c - base])) != (b"T1", b"T2"):
+    demo_name = lambda index: tail[0x43d49c - base + 0x100 * (index - 1):].split(b"\0")[0].decode("cp932")
+    if (demo_name(tail[0x4438a1 - base]), demo_name(tail[0x44389c - base])) != ("T1", "T2"):
         sys.exit("The title no longer plays T1 and T2; refusing to export.")
     cursor, story, single = at(0x445244, "<3H")
     multi, = at(0x445258, "<H")
@@ -4352,6 +4410,7 @@ def export_ui():
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
                                            select=select, title=title))
+    return demo_name
 
 
 DEMOS = {
@@ -4361,17 +4420,112 @@ DEMOS = {
 }
 
 
-def export_demo(key):
+# The demos story steps play (type 2, 0x406ad4) by their index in the KGT's demo names
+# (0x43d49c), and CONTINUE (9, the byte at 0x4438a0), which the continue screen plays.
+STORY_DEMOS = {
+    3: "9febfbfae82e64de5918df27896a32d18ef33dc6158d39138698ef63a6b4a567",  # --NEXT--
+    4: "62e367836d415a913d2aab788b5ee7c22b80b8b05e0e7c23617f4821425b1061",  # --BR ANOTHER NEXT--
+    5: "245e5db2bbd4dc39c42fd3f29edadd9bbbd34181024815283b2b987289d09a27",  # --SEED NEXT--
+    6: "b1aab7f7fbef6643fa92a46a843143f57a35145cbcbbd689d8f1834d1db62c3c",  # --BR ZERO NEXT--
+    7: "86b6bb7938c532ab3dafb6aeccc0f398c1568126a04660bda153753f10e35053",  # --BR BOSS NEXT--
+    8: "653dbd52632fafcde516c624ce0e8e446bff801acb47b48328008b3464109332",  # --ZA NEXT--
+    9: "427dce1b24ae765b4dda0de174cbb79eff3a82f08cea243a8015912dac602865",  # CONTINUE
+    12: "1c2eda4d2ffb1dfc6105f0e6bfe965a7176f8b58c4b6c640dac47a319b9faca7",  # --ZenkaOP
+    13: "681c491e9b2c3bb5dbf24435bc48a2fd0a941860c6c4577dceeca7245adfbe15",  # --ZenkaLOST
+    14: "72d4476ccf0b5eb87f37d55e700e22d611357fe8c3cc055d3454f2ddab4aa630",  # --Z-MEGA OP
+    15: "d05b1f5167ce1bece2cbbc55ff0ab86400a2e0120c68ae0b012c95feaf1693cc",  # --Z-MEGA WIN(ED3)
+    16: "a9045ae837492d5bb8fe942bebfbd72c24802a69eeecfd18dc708845132a8633",  # --ALPHA OP
+    17: "9995b177af2d509550e038a7982f26a5579739016b90ff2ff93aa6a61a487bcd",  # --ALPHA LOST
+    18: "c8780ab48f46cd69e6267da98b2b38f75ad93dba611102681c403bcfe7b6226e",  # +BR-OP
+    19: "86da7f06f515f8be8b554f5fe41a1e2f0219339d9dd7b7e356a08757e18300d4",  # +BR-RARIO
+    20: "756f60f4a7f4c2f38ddcb36cd29ea633f024fff52c7fec12030a703049a8e4a2",  # +BR-RZ1
+    21: "88a019e13f0368a506a9a5ba8916d05cb0edb4fd299d03974b2045d27fa05e76",  # +BR-RZ OP
+    22: "1f693d5f0e16e17d68f0886dca48f6a66768d54383233e6df6ce871b27298dbb",  # +BR-END
+    23: "3956f6c4531352928f97b4dcbd9461084257a7e4ec4668f279b1eb84d8acc466",  # Challenge
+    24: "5e9679cc7df1ed93dcfff486db0039d63d7fe6b8f2e2c8e20775fa93c6eeb67a",  # --Challenge BR--
+    25: "e72e45322cd7b52bdea9b79ed14d7877a7ad04af6af4b1064e652eec844eb0ae",  # --ENDING--
+    26: "61a36d24261cba8175eeb9eea13ea5fac24a1b261cc3f8fa19affd84c5d6f23a",  # --NEXT Zaku Halo--
+    27: "c95b49f7b98e00604973dafd4862d047f6915eecd996613eff9f186e718ab944",  # --NEXT MASA 3T--
+    28: "64df98d8236505348a47d61721ed4874216633bee89ca508ed44abf219461e28",  # =PASS=
+    29: "e723b4494d15526a65399806179717b56f33e9ebfd3869eae2be1e79faf2187a",  # END A
+    30: "5386786badd3c8a713207e2aaa601abf418057febc9524f53751d66851b990a4",  # RYUendA
+    31: "9c7ced5d29367eeb73b2715d0e7ae073f9f58e16340c627e63c2cc31e1456312",  # RYUendB
+    32: "3b4a674d235bc919804d60569207c1b6e1888350f7b82acbba3e7aced873e227",  # ZOMAendA
+    33: "7cd21668faa96bcff318830bf09b388e7fef360aa813355786700464ce501bf6",  # ZOMAendB
+    34: "b6b84216ec9b7eec0967d0d01ab88e5c5bc730f5b72ba37a4273db8e596f2bbb",  # AMIendA
+    35: "0076c767dd890abb65bcd2c081ff2bd3d28e1548150967a456d6d1a63c81e6b7",  # AMIendB
+    36: "fd1cc1cf48d1c88820a39a4e50b93318d21475bbf863df791e7faed0a9c7a540",  # ANMCendA
+    37: "cf7f97cd292292984754b77d9fafed9c3c8e52e7de643841690219424d6ea4f7",  # ANMCendB
+    38: "66cff746590c117f82a7dae8d15466949c22f384ff7ed22c365987fae18e02d6",  # KIKIendA
+    39: "7eff714454572e675fffe49e2882b7e09e2424c5ce4031897041f3519d34946e",  # KIKIendB
+    40: "4c50ccd899e1233e282da2dabce9b8ac2d1c72921d8aca8cdd93dbbab8ed44b4",  # CHUendA
+    41: "31253734e1b236a76bc08f0f682310e7d52b42b3ab3a647dd5f07b4fde73f231",  # CHUendB
+    42: "31b7f7d228432bf49c1849d22b45166131878a6d2ef0732a397b675a33a593a1",  # GIANendA
+    43: "b0551f778c771b2d27ada571e393f08da03f842749d23b2f92b77da7627506b4",  # GIANendB
+    44: "337c0025578099a5d0f25f0ff2817b870c03caa140743a7c10d29807c10f327a",  # SUNEendA
+    45: "3c848f5311d956e656017ede824df3e219f2371928722fe4faf641a7ddb359b3",  # SUNEendB
+    46: "1a57d5015e3817d6d2ef508e5bbf4157ebe1e37d7d3bb7af25ee9159c4c12b3a",  # YOendA
+    47: "9168e85164b79f750690335775a6f30f4c38362a15e42fff552b3a461d074c12",  # YOendB
+    48: "056181c37c1bced5d039f9d4c7ce36c68af01605d99c859eeacc6818db4dc72b",  # SINendA
+    49: "822a86ed54893e7d69335c424fdb1add804faefce3d95dbd8de00bd2da602c1f",  # SINendB
+    50: "cfc5839deb36975392f4acd840bf048fdb48bd55d9cf238ab2fb3aa2b13a8912",  # LIZendA
+    51: "3eedce2504ce1efa3893c43891d159e2cd8ccd8a97c2d984966cadaf7aaf4f70",  # LIZendB
+    52: "a40e8e3a096ad2ed3912111d9a005bd372026072f65707c620a9637aed978614",  # KAYendA
+    53: "e9f620b6596a1b7a4f08a9e2b3f3275fd78b56e921b1568d6e2e181b16de10a4",  # KAYendB
+    54: "d76256a62734b2cb8a9e74093de9e2536c2b49e989a068386bdea6370130b105",  # DIDOendA
+    55: "051a84e377a0de284783ed8234475a1a505167860ae1635e016e37e5fb5bfe81",  # DIDOendB
+    56: "8fb8db7a31b4cf341262cc2aaa06875002e4f676994d26e1c0581144b1d98e51",  # SAKUendA
+    57: "8e4f7038e3185bbb5e6c1d9f22c96c785002403c9b327ed15ae982c6af46b8a4",  # SAKUendB
+    58: "ae716030b8b42a5d11b9b83a391c606437a6ee6fabaddad4308cca0890099c10",  # ALEXendA
+    59: "87680cb70e1c3b22cca6678a16136227cd67edd6b0fc87efa1cbe640d621d6bf",  # ALEXendB
+    60: "ccb0ab355bf16933faf81a110fa8aba88facdf0df7b7d3f249beaf9849cee950",  # SOUendA
+    61: "38f9090c1426d56d2d741cbec3b5ccff1d58fc80695487f2508725206eb9c520",  # SOUendB
+    62: "992ea88f170e7f1460ec372cd6552480bec36c1797cbe59efe00aa6156618c0e",  # HISOendA
+    63: "8dde86f8e7d9ad4d6bf39af7d62a39922f67962913a42da6439f226fa285485e",  # HISOendB
+    64: "3d3ad5257e7481b388daa67abb9fed878a311e0f661c87f57b12b3332d3183e7",  # ERUSendA
+    65: "abafe78c452c2007b64e4a75a90526eac3861155a932ba7176b6cf92465f94cc",  # ERUSendB
+    66: "e7852f69b099f6fec94a36bcaab450bf861947b022e62efccced279b5e481fe7",  # OSFendA
+    67: "17eee1394b713c5ea9d6d467582f9c1f12abcc2703b06785a8f278de2427ba70",  # OSFendB
+    68: "71b7edb3ec347acf3ff8860d1949e21963a48bc8455d449e8d023cf0fa688ffe",  # SEANendA
+    69: "900e6d180bd721c2fdd5e28904bb78d972fec783b858b3855afbc3802109f5e3",  # SEANendB
+    70: "29a21622753d13656115643c3da5d78dd6cdafb15eed8d493179817875231a9a",  # GONendA
+    71: "19681552e139a9e14fe1b2c1a91307d55b6eb429210585d65b8786cff337f76e",  # GONendB
+    72: "211b94cbcee858de94d1113890c21c284c4027492841556596490c6c9478daeb",  # KATEendA
+    73: "8bdc50285b8f5d5e12ed252abba1fbefe108a1f2d7e5ce6704a34bce5572c585",  # KATEendB
+    74: "ff8d22c7cafe8b70682b5d977361c9df8b7828bd08b8dc7d689ce181215772f9",  # REMUendA
+    75: "85302f9d7f595374718f17cd608ed056196182a9c3039386e73199fcefbbe54c",  # REMUendB
+    76: "2513434469236a834995f923bbc07473e40151821338684a820dc4316248558e",  # REARendA
+    77: "f1560c378d6184816b6b3f88c7b4ba6f4f86b445d1dda7bc0b6d4e3897b589a2",  # REARendB
+    78: "3a1226663714c8f0038ef31a300f474998990e12932706cddd253ce55e0de9cb",  # GIendA
+    79: "527383c55229abf08ad8ca51ae29064839030d8719277367d59e98bcb6f88d3e",  # GIendB
+    80: "01c7a5e192252f785964f5a362db38c3a5cd7dd2bb244bd673c659d7d2d454e8",  # SWWendA
+    81: "fa94b36af3f7cc8b54a0262981fa99d4d313c9825b4d95efcb133c688525421b",  # SWWendB
+    82: "ce0a61690a07d4aae817b3deb2b4132c1e5fe8906e531958181e568e883d8b5a",  # OGIendA
+    83: "6f344e0890fce789c60da752df6e53454f857db0ce9a1b8e0133051dfe9e06b0",  # OGIendB
+    84: "de9aca0bc08e519f0a6703d9acc9eb0ef6906b302a59df47df7ba98e3fbffa66",  # ZIROendA
+    85: "ef9755dd0504b075dc586b3fe4ad468625478b50af2a65d5b75889132a20280e",  # ZIROendB
+    86: "f82e0bd6bd315666586fe42eeeccfb2a0c0eaa6bd922fdd12765310936d8e0f5",  # YINANendA
+    87: "3eabb87be0d06e4dcb1e4d204a69ac54a4e9e47eba12b83c5bdad957043f4277",  # YINANendB
+    88: "af435c8d985618d1b3a0e6b11499c79a8e373d3ece5b89d0509255c1df9b7f0f",  # Zenka End
+    89: "dc83a444e2a2307e845558fef1151c59723445adb47f9d28e7b74bbac511dde1",  # Zmega End
+    90: "8a16fad41ff216ee66042e04f1ae6869c3216d890554d25a2e46f043ab22b2de",  # Alpha End
+    91: "dae8dcaca92386eeaf960b0ac62370671ee6bc0ab0fba3392896b5fecfdffb9f",  # DoraOP
+    92: "2dc1841f7247acaacb82627cd2b475842c5342923c48122083b72de59a2c1604",  # DoraED
+}
+
+
+def export_demo(key, name, sha256, out):
     """A demo as raw records: the select screen's, CHAR SELECT (demo 10, the byte at
-    0x44389e for VS single), and the title's, T1 and T2 (demos 1 and 2, the bytes
-    at 0x4438a1 and 0x44389c). 0x403fc0 loads it and 0x406790 makes an object (type
+    0x44389e for VS single), the title's, T1 and T2 (demos 1 and 2, the bytes
+    at 0x4438a1 and 0x44389c), and the story's. 0x403fc0 loads it and 0x406790 makes an object (type
     4, at 0, 0) of every named action between the first and the last that holds a
     display, at z 0xc, or 0x64 from the first action of kind 3 (+0x23) on, as a
     stage's. After the common container the loader reads 0x409 bytes to 0x427c94
     (0x4040d2), of which 0x406790 keeps the flags (0x427c96, bit 0 lets a press
     skip it) and the ticks it lasts (0x427c99, 0 for until a press)."""
-    name, sha256 = DEMOS[key]
-    data = (RESEARCH / f"extracted/{name}.DEMO").read_bytes()
+    # The KGT's names differ from the files' in case (Challenge, CHALLENGE.DEMO).
+    path, = (path for path in (RESEARCH / "extracted").glob("*.DEMO") if path.stem.upper() == name.upper())
+    data = path.read_bytes()
     if hashlib.sha256(data).hexdigest() != sha256:
         sys.exit(f"{name} source hash differs from the verified handoff; refusing to export.")
     c = Container(data)
@@ -4393,7 +4547,7 @@ def export_demo(key):
     # panels and T2's backdrop cue, is empty in all three.
     cues = {u16(r, 2) for r in p.records if r[0] == 0x03 and c.sounds[u16(r, 2)]["size"]}
     flags, duration = data[c.common_end + 2], struct.unpack_from("<I", data, c.common_end + 5)[0]
-    write_json(GENERATED / f"{key}.json", dict(source_sha256=sha256, objects=objects, actions=actions,
+    write_json(out, dict(source_sha256=sha256, objects=objects, actions=actions,
                                                images=export_images(c, key, image_ids - {8191}),
                                                sounds=export_sounds(c, key, cues), flags=flags, duration=duration))
 
