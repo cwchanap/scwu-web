@@ -219,8 +219,11 @@ export class CpuVM {
   ) {}
 
   // Authored: the engine shares one rand seed with everything; the CPU keeps
-  // its own, and the match draws its other rolls from it.
-  random() {
+  // its own, and the match draws its other rolls from it. A story's other
+  // CPUs roll the first's (shared).
+  shared: CpuVM = this;
+  random(): number {
+    if (this.shared !== this) return this.shared.random();
     const [seed, value] = rand(this.seed);
     this.seed = seed;
     return value;

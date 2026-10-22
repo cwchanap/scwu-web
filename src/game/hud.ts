@@ -31,6 +31,7 @@ const { ko, calls } = ui as unknown as {
     start: number;
     rounds: Lettering[];
     results: Record<'win' | 'perfect' | 'draw', number>;
+    story: Record<'win' | 'lose', Lettering>;
     vs: Record<'first' | 'later', Lettering[]>;
   } & Record<'logo' | 'fight' | 'transition', Lettering>;
 };
@@ -59,6 +60,21 @@ export function roundEndTick(winner: Match['winner'], perfect: boolean) {
   return ko.wait + win + (perfect ? bonus + 1 : 0) + 1;
 }
 export const NEXT_ROUND_TICKS = calls.transition.wait + 1;
+
+// A story's result states (410, 420, 430; 0x4091fc–0x40933d) wait out YOU
+// WIN, YOU LOSE or DRAW (28, 29, 32) alone.
+export function storyEndTick(winner: Match['winner']) {
+  if (winner === 'draw') return calls.results.draw + 1;
+  return calls.story[winner === 'player' ? 'win' : 'lose'].wait + 1;
+}
+
+// A story step without ROUND n (letterings bit 0) leaves state 111 the tick
+// after KGT 13's wait, and without FIGHT (bit 1) state 112 the tick after
+// that (0x408d4b, 0x408dde).
+export const storyFightTick = (letterings: number) =>
+  DRESS_TICK +
+  (letterings & 1 ? calls.rounds[0].wait : 1) +
+  (letterings & 2 ? 0 : 1);
 
 function letteringFrame({ frames, loop }: Lettering, age: number) {
   if (age < 0) return;

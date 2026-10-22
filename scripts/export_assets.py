@@ -4338,12 +4338,14 @@ def export_ui():
     # (state 900, 0x4096c0) KGT 14 counts its 50 ticks while its 116 (PC 103)
     # wipes the logo back in and holds it. The result states wait out 1P/2P WIN
     # (30, 31), PERFECT (27) and DRAW/DOUBLE KO (32, 33), which show nothing
-    # or jump to 26.
+    # or jump to 26; a story's (0x4091fc, 0x40929f) YOU WIN or YOU LOSE (28,
+    # 29), which play 26's displays with waits of their own.
     wait = lambda action: u16(p.records[p.action(action).start], 1)
     ko = kgt_timeline(p, 26)
     calls = dict(start=wait(13), logo=kgt_timeline(p, 115), rounds=[kgt_timeline(p, 15 + i) for i in range(5)],
                  fight=kgt_timeline(p, 25), transition=dict(kgt_timeline(p, 116), wait=wait(14)),
-                 results=dict(win=wait(30), perfect=wait(27), draw=wait(32)))
+                 results=dict(win=wait(30), perfect=wait(27), draw=wait(32)),
+                 story=dict(win=kgt_timeline(p, 28), lose=kgt_timeline(p, 29)))
     # KGT 13's VS path (global 3 isn't 0, PC 72): in round 1 (PC 73) it spawns VS L, VS R, V and S
     # (118, 119, 122, 123, PCs 82-85), and from round 2 demo black (117, PC 76), the logo for 110
     # ticks and its wipe; each at its spawn record's place (r[8:12]) and z (r[13]). Their op 0x1f

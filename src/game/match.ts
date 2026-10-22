@@ -62,7 +62,11 @@ import {
   NEXT_ROUND_TICKS,
   roundEndTick,
   ROUND_END_TICKS,
+  storyEndTick,
+  storyFightTick,
 } from './hud';
+import { ROSTER } from './select';
+import type { Battle, Slot } from './story';
 export const SUPER_CONTROLS = [
   'getterBeam',
   'musashi',
@@ -91,7 +95,7 @@ export type Control =
   | SuperControl;
 // The CPU's command entry, written as 0x4115e3 does (cpu.ts).
 export type Input = Partial<Record<Control, boolean>> & { command?: number };
-export type Mode = 'practice' | 'cpu';
+export type Mode = 'practice' | 'cpu' | 'story';
 // Free-practice settings (authored): the partner's behavior, stock topped up
 // to three whenever a fighter is idle, and Ryuko's health held at 30%.
 export interface PracticeOptions {
@@ -563,6 +567,11 @@ const copyPower = (f: Fighter) =>
 // (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
 const knockedOut = (wasOut: boolean): Action => (wasOut ? 'koAgain' : 'down');
 // 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1).
+// +0xdf09, life per mille (0x408f68); a story's waiting slot keeps its full
+// life over a maximum of 1 (0x4089a3, 0x411e4c).
+const perMille = (f: Fighter) =>
+  f.present ? Math.trunc((f.hp * 1000) / lifeOf(f.who)) : f.hp * 1000;
+
 function loseLife(f: Fighter, loss: number) {
   if (loss && f.hp <= desperationOf(f.who))
     loss = Math.max(1, Math.trunc((loss * 60) / 100));
@@ -1093,6 +1102,15 @@ export interface Fighter {
   // +0xdf51: which way the target lies, which the input word and the free
   // state's facing take.
   toward: -1 | 1;
+  // +0x2238 and +0xe00f: whether the player has entered, which a story's
+  // waiting slot hasn't, and whether it has shown a display since, which one
+  // stopped for its entry's seconds hasn't. Neither is targeted (0x40e5f7),
+  // struck, pushed or drawn before.
+  present: boolean;
+  shown: boolean;
+  // +0xdfbb: a story's points, which KOs (knockOut) and a time-up
+  // (storyResult) score; 100 ends the round (0x408ef1).
+  points: number;
   // Priority (+4): the step and the draw take it at the tick's start. Each
   // contact and ops 0x07/0x14 set it about its plane's base (0x41f130), and
   // a KO drops it to 0x3c (0x40e8cd).
@@ -1394,6 +1412,9 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   target: null,
   enemies: -1,
   toward: facing,
+  present: true,
+  shown: true,
+  points: 0,
   z: FIGHTER_Z,
   branch: null,
   copy: null,
@@ -1405,18 +1426,24 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   moving: 0,
   pending: null,
 });
-// Camera scroll (0x447f2c) in source pixels, which the walls read this tick.
+// Camera scroll (0x447f2c) in source pixels, which the walls read this tick,
+// and whether they stand at the stage's ends instead.
 let cameraLeft = 0;
+let stageWalls = false;
 // In the Vs. modes (0x470058 1 or 2) a player's motion step clamps x to 50
-// and 590 source pixels from the camera (0x40fba2–0x40fca2).
-const clampX = (x: number) =>
-  Math.max((cameraLeft + 50) * 1.5, Math.min((cameraLeft + 590) * 1.5, x));
-// Moves stop at the walls at once; settle hands on the distance stopped. The
-// left wall measures it as (50 − camera) − x (0x40fbdd), not from the wall.
-// True when a wall stopped it.
+// and 590 source pixels from the camera (0x40fba2–0x40fca2). A story without
+// letterings bit 2 clamps it to the stage's 50 and 1230 (0x40fac3), but for
+// a player with a wall handler (+0x70). Moves stop at the walls at once;
+// settle hands on the distance stopped. The camera's left wall measures it
+// as (50 − camera) − x (0x40fbdd), not from the wall. True when a wall
+// stopped it.
 function placeX(f: Fighter, x: number) {
-  f.x = clampX(x);
-  f.stopped += f.x > x ? Math.max(0, (50 - cameraLeft) * 1.5 - x) : f.x - x;
+  const handler =
+    launchMotion[f.action]?.wall || (f.action === 'script' && f.onWall);
+  const left = stageWalls && !handler ? 0 : cameraLeft;
+  const right = stageWalls && !handler ? 1180 : cameraLeft + 540;
+  f.x = Math.max((left + 50) * 1.5, Math.min((right + 50) * 1.5, x));
+  f.stopped += f.x > x ? Math.max(0, (50 - left) * 1.5 - x) : f.x - x;
   return f.x !== x;
 }
 const clampCamera = ({ x, y }: { x: number; y: number }) => ({
@@ -1565,6 +1592,19 @@ export class Match {
   };
   // Each player's CPU (+0xdf5d), player 2's in VS.
   cpus: (CpuVM | null)[];
+  // A story's seat for each fighter (+0x156: the 1P 0, slot n's player n +
+  // 1; an empty slot seats no one), each slot (waits, which entry keeps
+  // until it enters), the results the round gave (+0xe007: 1 win, 2 lose, 3
+  // draw), and the rounds the 1P lost or drew (0x424e64).
+  private seats = [0, 1];
+  private slots: (Slot | null)[] = [];
+  private waits: (Slot | null)[] = [];
+  private results: number[] = [];
+  lost = 0;
+  // 0x4701c4: the player the 1P last struck (0x40f2ef), for the story HUD,
+  // until 1000 ticks pass (0x4701c8, 0x409d00), or −1.
+  enemy = -1;
+  private enemyTicks = 0;
   // This tick's opponent input comes from the CPU (none was supplied, in Vs.
   // CPU or with the CPU practice partner).
   private cpuDriven = false;
@@ -1587,6 +1627,8 @@ export class Match {
     // Whether the select screen started it, which leaves global 3 at 50 (KGT
     // PCs 541, 548, 585): VS single. Otherwise the title's demos clear it.
     readonly vs = false,
+    // A story step's battle (story.ts), which seats the players.
+    readonly battle: Battle | null = null,
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
@@ -1595,12 +1637,157 @@ export class Match {
       new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]),
     ];
     this.calls = intro;
-    this.fighters = intro
-      ? this.entrants()
-      : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+    if (battle) this.seat(battle, seed);
+    this.fighters = battle
+      ? this.storyFighters()
+      : intro
+        ? this.entrants()
+        : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
     this.clearInput();
   }
 
+  // A story battle (0x406aa3) on its stage (+1: stage file n − 1, in the
+  // export's order), with the story's player as the 1P.
+  static story(who: Who, battle: Battle, seed = 0) {
+    return new Match(
+      'story',
+      true,
+      seed,
+      [who, who],
+      (Object.keys(STAGES) as Stage[])[battle.stage - 1],
+      false,
+      battle,
+    );
+  }
+
+  // State 100 spawns a story's 1P, then each slot's player (0x408b14), every
+  // slot a CPU of its level (0x408bb0, 0–100). Authored: they roll the
+  // first one's rand, as the engine's CPUs share one.
+  private seat(battle: Battle, seed: number) {
+    this.seats = [0];
+    this.slots = [null];
+    battle.slots.forEach((slot, i) => {
+      if (!slot) return;
+      const who = ROSTER[slot.player]!;
+      const level = Math.max(0, Math.min(100, slot.level));
+      const vm = new CpuVM(CPU_TABLES[who], level, seed, CPU_CONTROLS[who]);
+      if (this.seats.length > 1) vm.shared = this.cpus[1]!;
+      this.cpus[this.seats.length] = vm;
+      this.seats.push(i + 1);
+      this.slots.push(slot);
+    });
+  }
+
+  // The fighter in a seat, if a slot seats one.
+  private bySeat(seat: number): Fighter | undefined {
+    return this.fighters[this.seats.indexOf(seat)];
+  }
+
+  // Each player's story set-up (0x411d0a) at its first step: the 1P fights
+  // every player but its allies (a slot's flag bit 9), a slot those its +6
+  // names (a bit per seat), and faces left unless an ally. A slot enters at
+  // once (bits 1–2 0); after its seconds (+0xb, plus rand % +0xc), stopped
+  // that long as +0x40 (1); or once its watched player's (+0xd) life falls
+  // below its mark (+0xe), retrying each step until then (2).
+  private storyFighters() {
+    const battle = this.battle!;
+    // Masks by seat, as fighter indices.
+    const bits = (mask: number) =>
+      this.seats.reduce(
+        (bits, seat, i) => bits | (((mask >> seat) & 1) << i),
+        0,
+      );
+    const allies = this.slots.reduce(
+      (mask, slot, i) =>
+        slot && slot.flags & 0x200 ? mask | (1 << this.seats[i]) : mask,
+      0,
+    );
+    this.waits = this.slots.map(() => null);
+    return this.slots.map((slot, i) => {
+      const who = slot ? ROSTER[slot.player]! : this.characters[0];
+      const ally = !slot || slot.flags & 0x200;
+      const f = fighter((slot ?? battle).x * 1.5, ally ? 1 : -1, who);
+      f.enemies = bits(slot ? slot.enemies : ~1 & ~allies);
+      const entry = slot ? (slot.flags >> 1) & 3 : 0;
+      if (entry === 2) {
+        Object.assign(f, { present: false, shown: false });
+        this.waits[i] = slot;
+        return f;
+      }
+      this.opening(f);
+      if (entry === 1) {
+        f.hitStop = slot!.delay * 100;
+        if (slot!.random) f.hitStop += (this.cpu.random() % slot!.random) * 100;
+        f.shown = f.hitStop === 0;
+      }
+      return f;
+    });
+  }
+
+  // The tick phase 1 begins: FIGHT's, or a story's without ROUND n or FIGHT
+  // (letterings bits 0, 1) a tick after each skipped one (0x408d4b,
+  // 0x408dde).
+  get fightTick() {
+    return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
+  }
+
+  // State 300 in a story (0x409062). At a time-up, seat 1 scores the step's
+  // +0x11 for more life than the 1P and the 1P each slot's +0x14 for more
+  // than that slot's player, by per mille. The 1P's side then counts the
+  // most of the 1P's points and its allies' of 100 or more, the enemies the
+  // most of theirs of 100 or more: more wins (410), fewer loses (420), the
+  // same draws (430); a loss or draw counts in 0x424e64. The results go to
+  // the 1P and the slots (0x409262–0x409389): a win gives enemies 2, or 3 at
+  // a time-up, and allies 1; a loss the 1P 2, or 3 at a time-up, enemies 1
+  // and allies 3; a draw everyone 3.
+  private storyResult() {
+    const battle = this.battle!;
+    const [one] = this.fighters;
+    const timeUp = this.seconds === 0;
+    if (timeUp) {
+      const first = this.bySeat(1);
+      if (first && perMille(one) < perMille(first))
+        first.points += battle.timeUp;
+      this.fighters.forEach((f, i) => {
+        if (i && perMille(f) < perMille(one))
+          one.points += this.slots[i]!.timeUp;
+      });
+    }
+    const ally = (i: number) => !i || this.slots[i]!.flags & 0x200;
+    let [ours, theirs] = [one.points, 0];
+    this.fighters.forEach((f, i) => {
+      if (!i || f.points < 100) return;
+      if (ally(i)) ours = Math.max(ours, f.points);
+      else theirs = Math.max(theirs, f.points);
+    });
+    this.winner =
+      ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
+    if (this.winner !== 'player') this.lost++;
+    const lose = timeUp ? 3 : 2;
+    this.results = this.fighters.map((_, i) =>
+      this.winner === 'draw'
+        ? 3
+        : this.winner === 'player'
+          ? ally(i)
+            ? 1
+            : lose
+          : !i
+            ? lose
+            : ally(i)
+              ? 3
+              : 1,
+    );
+  }
+
+  // A waiting slot's step retries its set-up (0x411e7e): it enters once its
+  // watched seat's life is below the mark, an empty seat's being 0.
+  private arrive(f: Fighter, i: number) {
+    const slot = this.waits[i]!;
+    if ((this.bySeat(slot.watch)?.hp ?? 0) >= slot.below) return;
+    this.waits[i] = null;
+    f.present = true;
+    this.opening(f);
+  }
   get cpu() {
     return this.cpus[1]!;
   }
@@ -1616,24 +1803,34 @@ export class Match {
   // the authored Br. intro clip, whatever the mode.
   private entrants() {
     const fighters = introFighters(this.characters);
-    fighters.forEach((f) => {
-      const start = CHARACTERS[f.who].start;
-      if (!exported(start, f.who)) return;
-      this.action(f, 'script', true, start);
-      f.age = -1;
-    });
+    fighters.forEach((f) => this.opening(f));
     return fighters;
+  }
+
+  private opening(f: Fighter) {
+    const start = CHARACTERS[f.who].start;
+    if (!exported(start, f.who)) {
+      f.action = 'intro';
+      return;
+    }
+    this.action(f, 'script', true, start);
+    f.age = -1;
+  }
+
+  // The rounds to win (0x470048): a story step's (+2), or three.
+  get rounds() {
+    return this.battle?.rounds ?? ROUNDS_TO_WIN;
   }
 
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
   // rounds; a single round otherwise.
   get matchOver() {
-    return !this.calls || this.wins.some((wins) => wins >= ROUNDS_TO_WIN);
+    return !this.calls || this.wins.some((wins) => wins >= this.rounds);
   }
 
   get matchWinner() {
     if (!this.calls) return this.winner;
-    const [a, b] = this.wins.map((wins) => wins >= ROUNDS_TO_WIN);
+    const [a, b] = this.wins.map((wins) => wins >= this.rounds);
     return a && b ? 'draw' : a ? 'player' : b ? 'opponent' : null;
   }
 
@@ -1642,6 +1839,7 @@ export class Match {
   // screen, and a single round after the KO lettering and one more second.
   get roundEnd() {
     if (!this.calls) return ROUND_END_TICKS;
+    if (this.battle) return storyEndTick(this.winner);
     const winner = this.fighters[this.winner === 'player' ? 0 : 1];
     return roundEndTick(this.winner, winner.hp === lifeOf(winner.who));
   }
@@ -1650,7 +1848,7 @@ export class Match {
   // re-enter at full life (0x411ca5) with their variables cleared
   // (0x4121cc), keeping their stock and power from round 2 (0x411f2d).
   private nextRound() {
-    const fighters = this.entrants();
+    const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
       f.power = this.fighters[i].power;
@@ -1667,6 +1865,9 @@ export class Match {
     this.koStop = 0;
     this.quake.x = this.quake.y = null;
     this.camera = null;
+    this.results = [];
+    this.enemy = -1;
+    this.enemyTicks = 0;
     this.clearInput();
   }
 
@@ -1722,19 +1923,49 @@ export class Match {
   }
 
   // Authored start: the camera begins on the fighters, as round start's 320,
-  // 480 (0x407094) does for fighters centred on the stage.
+  // 480 (0x407094) does for fighters centred on the stage. A story's set-up
+  // centres it on every seat (0x408c1f).
   private view() {
-    return this.camera ?? clampCamera(this.aim());
+    if (this.camera) return this.camera;
+    if (!this.battle) return clampCamera(this.aim());
+    const xs = this.fighters.map((f) => Math.trunc(f.x / 1.5));
+    const x = Math.trunc(xs.reduce((a, b) => a + b) / xs.length) - 320;
+    return clampCamera({ x, y: this.aim().y });
+  }
+
+  // The camera in a story (0x40b08a) follows the 1P's y halfway. With
+  // letterings bit 2 its x moves halfway to the mean of the live players;
+  // otherwise, the 1P alive, a quarter of the way to the midpoint of the 1P
+  // and the mean of the live players who have entered, kept within 280 of
+  // the 1P; with the 1P KO'd, a sixteenth of the way to that mean.
+  private storyCamera(view: { x: number; y: number }) {
+    const [one] = this.fighters;
+    const half = (a: number, b: number) => Math.trunc((a + b) / 2);
+    const px = (f: Fighter) => Math.trunc(f.x / 1.5);
+    const y = half(Math.trunc(920 + one.y / 1.5) + view.y, -320);
+    const live = this.fighters.filter((f) => f.hp && f.present);
+    if (!live.length) return { x: view.x, y };
+    const mean = Math.trunc(live.reduce((t, f) => t + px(f), 0) / live.length);
+    if (this.battle!.letterings & 4) return { x: half(mean + view.x, -320), y };
+    if (!one.hp)
+      return { x: view.x + Math.trunc((mean - view.x - 320) / 16), y };
+    const aim = Math.max(
+      px(one) - 280,
+      Math.min(px(one) + 280, half(mean, px(one))),
+    );
+    return { x: view.x + Math.trunc((aim - view.x - 320) / 4), y };
   }
 
   get cameraX() {
     return this.view().x * 1.5;
   }
 
+  // A story step sets its own time (+6), or none (0x408c26).
   get seconds() {
+    const time = this.battle ? this.battle.time || Infinity : 60;
     return this.mode === 'practice'
       ? Infinity
-      : Math.max(0, 60 - Math.floor(this.ticks / 100));
+      : Math.max(0, time - Math.floor(this.ticks / 100));
   }
 
   get cameraY() {
@@ -1753,6 +1984,7 @@ export class Match {
       this.endingTicks >= this.roundEnd &&
       this.fighters.every(
         (f) =>
+          !f.present ||
           f.action === 'win' ||
           f.action === 'draw' ||
           (!f.pending &&
@@ -1772,7 +2004,7 @@ export class Match {
   // following each (0x4136ae–0x413774).
   private pauseOthers(f: Fighter, ticks: number) {
     for (const other of this.fighters)
-      if (other !== f) this.pause(other, ticks);
+      if (other !== f && other.present) this.pause(other, ticks);
   }
 
   // Op 0x15 reaches the player +0xdef9's object belongs to, or with none its
@@ -1797,15 +2029,42 @@ export class Match {
     return i > 0 && this.cpuDriven && Boolean(this.cpus[i]);
   }
 
-  // 0x40e5f7: the nearest other player by x it fights (+0xdfb7), not KO'd.
+  // 0x40e5f7: the nearest other player by x it fights (+0xdfb7), not KO'd,
+  // entered and shown.
   private nearest(f: Fighter) {
     const self = this.fighters.indexOf(f);
     let [distance, target] = [Infinity, null as Fighter | null];
     this.fighters.forEach((o, i) => {
-      if (o.hp && this.hostile(self, i) && Math.abs(o.x - f.x) < distance)
+      const near = Math.abs(o.x - f.x) < distance;
+      if (o.hp && o.shown && this.hostile(self, i) && near)
         [distance, target] = [Math.abs(o.x - f.x), o];
     });
     return target;
+  }
+
+  // 0x40e7c0 queues the lose action as a loss empties life (0x40e84b), and in
+  // a story scores the step's points (0x40e863): the 1P's KO gives its +0x13
+  // to +0x12's player (0 the striker, +0xdef9's, n seat n − 1), another's its
+  // slot's +0xf to that slot's +0x12; and that slot's KO bonus (bits 7–8)
+  // gives its life and power (+0x10, +0x11) to the 1P (1) or the striker (2).
+  private knockOut(f: Fighter, wasOut: boolean) {
+    this.queue(f, knockedOut(wasOut));
+    const { battle } = this;
+    if (!battle) return;
+    const slot = this.slots[this.fighters.indexOf(f)];
+    const { caught } = f;
+    const striker =
+      caught && ('clip' in caught ? this.fighters[caught.owner] : caught);
+    const pick = (n: number) =>
+      n === 0 ? striker : n <= 8 ? this.bySeat(n - 1) : null;
+    const scorer = pick(slot ? slot.scorer : battle.koScorer);
+    if (scorer) scorer.points += slot ? slot.points : battle.koPoints;
+    const bonus =
+      slot && [null, this.fighters[0], striker][(slot.flags >> 7) & 3];
+    if (!bonus) return;
+    // ponytail: every story's bonus life is a gain.
+    bonus.hp = Math.min(lifeOf(bonus.who), bonus.hp + slot.life);
+    addPower(bonus, slot.power);
   }
 
   // 0x40e5c0, on each step a stop or a queued action doesn't skip
@@ -1905,9 +2164,12 @@ export class Match {
 
   // The action of a standing fighter's round result (+0xe007): 1 win (57),
   // or 3 draw (65), which the result states (0x409444, 0x409519) also give
-  // the loser once the timer (0x470050) has run out.
+  // the loser once the timer (0x470050) has run out. A story's may be 2, the
+  // lose action (0x411038).
   private result(f: Fighter) {
     const index = this.fighters.indexOf(f);
+    if (this.battle)
+      return (['win', 'lose', 'draw'] as const)[this.results[index] - 1];
     return this.winner !== 'draw' &&
       (this.winner === 'player') === (index === 0)
       ? 'win'
@@ -2121,7 +2383,7 @@ export class Match {
     if (striker) addPower(striker, 3);
     this.queue(f, 'launchAway', 13, 13);
     this.enterPending(f);
-    if (f.hp === 0) this.queue(f, knockedOut(wasOut));
+    if (f.hp === 0) this.knockOut(f, wasOut);
     return true;
   }
 
@@ -2631,7 +2893,7 @@ export class Match {
         if (event.selfLife < 0) {
           const wasOut = self.hp === 0;
           loseLife(self, -event.selfLife);
-          if (self.hp === 0) this.queue(self, knockedOut(wasOut));
+          if (self.hp === 0) this.knockOut(self, wasOut);
         }
         if (!other) {
           addPower(self, event.selfPower);
@@ -2644,7 +2906,7 @@ export class Match {
           const damage = loseLife(other, -event.otherLife);
           self.hits++;
           self.damage += damage;
-          if (other.hp === 0) this.queue(other, knockedOut(wasOut));
+          if (other.hp === 0) this.knockOut(other, wasOut);
         }
         addPower(self, event.selfPower);
         addPower(other, event.otherPower);
@@ -3124,7 +3386,9 @@ export class Match {
   private boxContact(source: Fighter | Effect, owner: number) {
     if (source.connected) return [];
     return this.fighters.flatMap((target, i) =>
-      this.hostile(owner, i) ? this.contact(source, owner, target) : [],
+      this.hostile(owner, i) && target.shown
+        ? this.contact(source, owner, target)
+        : [],
     );
   }
 
@@ -3527,6 +3791,7 @@ export class Match {
       if (f.hitStop === 0) {
         // 0x4123c5: an unstopped step drops the word a stop saved.
         f.stopInput = null;
+        f.shown = true;
         this.retarget(f);
         if (this.driven(f)) input = this.think(f);
         // An op 0x1a stop adds to the -1 (0x4136fb), as a struck holder's
@@ -3623,8 +3888,13 @@ export class Match {
       this.queue(f, knockedOut(true));
       return this.enterPending(f);
     }
-    if (this.winner && !airborne) {
-      this.action(f, this.result(f));
+    const result = this.winner && !airborne && this.result(f);
+    if (result === 'lose') {
+      this.queue(f, knockedOut(false));
+      return this.enterPending(f);
+    }
+    if (result) {
+      this.action(f, result);
       this.rollResult(f);
       return;
     }
@@ -3744,6 +4014,7 @@ export class Match {
   step(player: Input = {}, opponent?: Input) {
     if (this.resultReady) return;
     this.sounds = [];
+    if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;
     // 0x412271: before its script each tick, frozen or not, an object with
     // an afterimage slot counts down and, past zero, samples its position,
     // facing and display.
@@ -3908,11 +4179,16 @@ export class Match {
     // modes it moves halfway to its aim each tick (0x40b022–0x40b080).
     const view = this.view();
     const aim = this.aim();
-    this.camera = clampCamera({
-      x: Math.trunc((view.x + aim.x) / 2),
-      y: Math.trunc((view.y + aim.y) / 2),
-    });
+    this.camera = clampCamera(
+      this.battle
+        ? this.storyCamera(view)
+        : {
+            x: Math.trunc((view.x + aim.x) / 2),
+            y: Math.trunc((view.y + aim.y) / 2),
+          },
+    );
     cameraLeft = this.camera.x;
+    stageWalls = Boolean(this.battle && !(this.battle.letterings & 4));
     // Every script step runs (0x404d4c), then the contact passes (0x40eb60,
     // 0x40f010), then the motion pass (0x40f910: travel, moveObjects). Each
     // step first checks landing (0x41241c, 0x411810) and the world bounds
@@ -3945,8 +4221,9 @@ export class Match {
     // fighters finish their intro and stand.
     this.roundTicks++;
     this.cpuDriven =
-      !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
-    if (this.calls && this.roundTicks < FIGHT_TICK) {
+      !opponent &&
+      (this.mode !== 'practice' || this.practice.partner === 'cpu');
+    if (this.calls && this.roundTicks < this.fightTick) {
       this.inputs = this.fighters.map((_, i) =>
         i === 0 ? player : i === 1 ? (opponent ?? {}) : {},
       );
@@ -3955,6 +4232,10 @@ export class Match {
       for (const [k, i] of order.entries()) {
         const f = this.fighters[i];
         this.stepObjects(below[k]);
+        if (!f.present) {
+          this.arrive(f, i);
+          continue;
+        }
         // The step enters a queued action whatever the phase (0x412327):
         // SHIN-Z's VS Start KO takes 1000 of his life (PC 505), and his lose
         // action runs before FIGHT. Only the KO check waits for the fight
@@ -3968,6 +4249,7 @@ export class Match {
           f.hitStop--;
           continue;
         }
+        f.shown = true;
         this.retarget(f);
         // A VS 開始時 steps as any script does, and runs out into idle.
         if (f.action === 'script') {
@@ -4027,6 +4309,10 @@ export class Match {
     for (const [k, i] of order.entries()) {
       const f = this.fighters[i];
       this.stepObjects(below[k]);
+      if (!f.present) {
+        this.arrive(f, i);
+        continue;
+      }
       this.move(f, inputs[i], this.previous[i], this.history[i]);
       this.enter(f, i);
     }
@@ -4034,13 +4320,21 @@ export class Match {
     for (const f of this.fighters) this.pause(f, this.koStop);
     this.stepObjects(objects);
     // The round controller (type 0xe, 0x4086a0) steps last, at priority
-    // 0x7f: its fight state reads both lives after every step (0x408eda), so
+    // 0x7f: its fight state reads the lives after every step (0x408e90), so
     // a lose action that restores life on its first step (ALPHA's KO Boss,
-    // PC 1037) is never seen at 0.
+    // PC 1037) is never seen at 0. A story's ends as the 1P is KO'd or any
+    // player reaches 100 points (0x408eda). State 300 compares life per
+    // mille (+0xdf09, 0x408f68), as lives differ.
     const [one, two] = this.fighters;
-    if (!this.winner && (!one.hp || !two.hp || this.seconds === 0)) {
-      this.winner =
-        one.hp === two.hp ? 'draw' : one.hp > two.hp ? 'player' : 'opponent';
+    const over = this.battle
+      ? !one.hp || this.fighters.some((f) => f.points >= 100)
+      : !one.hp || !two.hp;
+    if (!this.winner && (over || this.seconds === 0)) {
+      if (this.battle) this.storyResult();
+      else {
+        const [a, b] = [perMille(one), perMille(two)];
+        this.winner = a === b ? 'draw' : a > b ? 'player' : 'opponent';
+      }
       // The result states credit the winner (0x40948a, 0x40955f), and a
       // draw or double KO both (0x409394, 0x40966b).
       if (this.winner !== 'opponent') this.wins[0]++;
@@ -4064,6 +4358,11 @@ export class Match {
     // brings it 1 in front of its plane's priority, and a player struck goes
     // 1 behind it.
     const meet = (striker: Fighter | Effect, victim: Fighter | Effect) => {
+      // A 1P's box, its objects' too, marks the player it met (0x40f2e6).
+      const by =
+        'clip' in striker ? striker.owner : this.fighters.indexOf(striker);
+      if (by === 0 && !('clip' in victim))
+        [this.enemy, this.enemyTicks] = [this.fighters.indexOf(victim), 1000];
       if (!('clip' in victim)) victim.z = FIGHTER_Z - 1;
       if ('clip' in striker) return;
       striker.z = FIGHTER_Z + 1;
@@ -4119,7 +4418,7 @@ export class Match {
       // action instead (0x40e84b), so the reaction's records never run: no
       // op 0x15 power, no op 0x1a stops. The last box to reach the victim
       // sets its reaction, so DST's two missiles stop it once.
-      if (target.hp === 0) this.queue(target, knockedOut(wasOut));
+      if (target.hp === 0) this.knockOut(target, wasOut);
       else if (timeline) target.pending = { key: timeline };
       else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
       target.reaction = blocked
@@ -4155,11 +4454,13 @@ export class Match {
     // own share stays unclamped until its next move. Allies push too.
     const pixel = (v: number) => Math.floor(v / 1.5);
     this.fighters.forEach((a, i) => {
+      if (!a.present) return;
       this.travel(a);
+      if (!a.shown) return;
       for (const boxA of pushboxes(shown(a), a.age, a.who)) {
         const ax = pixel(a.x) + a.facing * boxA.x;
         const ay = pixel(a.y) + boxA.y;
-        for (const b of this.fighters.slice(i + 1))
+        for (const b of this.fighters.slice(i + 1).filter((b) => b.shown))
           for (const boxB of pushboxes(shown(b), b.age, b.who)) {
             const bx = pixel(b.x) + b.facing * boxB.x;
             const by = pixel(b.y) + boxB.y;
