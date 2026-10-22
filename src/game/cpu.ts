@@ -173,7 +173,9 @@ export const CPU_CONTROLS: Record<Who, Record<number, [Control, string?]>> = {
   rario: {},
   training: {},
 };
-// Authored: the Vs. level comes from the story setup (+0xdf61), not recovered.
+// Authored: VS single has no CPU. Story mode sets each CPU's level (+0xdf61,
+// 0x40ea34) from its slot in the battle step its 1P's scenario has reached
+// (PLAYER +0x7cc9, 0x406a0b): Ryuko's first eight fights run 30 to 100.
 export const CPU_LEVEL = 50;
 // The scan draws a roll for every slot, used or not.
 const SLOTS = 100;
