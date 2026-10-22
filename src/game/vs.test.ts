@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { animationFrame } from './animations';
 import type { Action, ObjectKey } from './animations';
-import type { Who } from './characters';
+import type { Stage, Who } from './characters';
 import { FIGHT_TICK } from './hud';
 import { EX_MODE, exMode, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -9,8 +9,8 @@ import { enter, named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
-const vsMatch = (who: Who = 'ryuko', seed = 0) =>
-  new Match('cpu', true, seed, [who, who], 'court', true);
+const vsMatch = (who: Who = 'ryuko', seed = 0, stage: Stage = 'court') =>
+  new Match('cpu', true, seed, [who, who], stage, true);
 const steps = (match: Match, ticks: number, input: Input = {}) => {
   for (let t = 0; t < ticks; t++) match.step(input);
 };
@@ -1303,6 +1303,32 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
   // VS Alpha (88) for global 3 = 50 (PC 760) as variable 0 isn't 0, the
   // dash and cross, Black, image 113 for 70 ticks and OP super Charge, then
   // OP (53, PC 373), which plays OP Alpha (54, PC 473) for variable 0.
+  // In VS the SP BGM action (2) of Boss Base, ZM Office, ZM Office T2 and
+  // BR Boss Base sets global 5 to 12, 13, 14 or 15 at its first step. OP
+  // Music 1P tests it for 12, 13 and 15 (MASA's PCs 379–381) to pick its
+  // theme, OP Alpha (PCs 476–478) its OP and VS Alpha (PCs 798–800) its
+  // banner; nothing reads 14.
+  it('opens as Zenka, Z-Mega or Shin-Z on the boss stages, whose SP BGM sets global 5', () => {
+    const themes = { masa: [41, 46, 49, 51], times: [35, 38, 41, 43] }[who];
+    const opening = (stage: Stage) => {
+      const match = vsMatch(who, 0, stage);
+      steps(match, 6);
+      const theme = match.sounds.find((sound) => sound.owner === 0)?.index;
+      match.step();
+      const banner = match.effects
+        .filter((e) => e.owner === 0)
+        .map((e) => e.clip)
+        .find((clip) => [88, 90, 91, 92].includes(clip as number));
+      steps(match, 150);
+      return [match.globals[5] ?? 0, theme, banner, named(match.fighters[0])];
+    };
+    expect(opening('court')).toEqual([0, themes[0], 88, '53']);
+    expect(opening('boss')).toEqual([12, themes[1], 90, '56']);
+    expect(opening('office')).toEqual([13, themes[2], 91, '59']);
+    expect(opening('office2')).toEqual([14, themes[0], 88, '53']);
+    expect(opening('brboss')).toEqual([15, themes[3], 92, '60']);
+  });
+
   it('takes his Alpha form and plays OP Alpha in round 1', () => {
     const match = vsMatch(who);
     const [p1, p2] = match.fighters;

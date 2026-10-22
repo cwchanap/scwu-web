@@ -90,9 +90,9 @@ def decode_event(record):
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
     # hounds) and 15 (SEAN's cc hit, which only the Team VS actions set) and globals 0 (10
-    # sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss), 11 (10 or above 99 turns the
-    # stage's track off) and 14 (200 stops it, which each 開始時 BR tests for 0); other tests keep their
-    # fall-through path.
+    # sends a KO to make hikari), 5 (MASA's and 3-TIMES's VS openings), 6 (the freeze), 10 (ALPHA's
+    # KO Boss), 11 (10 or above 99 turns the stage's track off) and 14 (200 stops it, which each
+    # 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -110,15 +110,16 @@ def decode_event(record):
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
                                                                               0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
-                                                                              0x8a, 0x8b, 0x8e):
+                                                                              0x85, 0x8a, 0x8b, 0x8e):
         # Only ALPHA's KO writes global 10 (10000, 20000; PCs 1040, 1130), and the select screen's 2P
         # cursor 0 (KGT PCs 542, 590), so its 257 tests for 10 never pass and keep their fall-through.
         if record[4] == 0x8a and record[5] >> 2 & 3 == 1 and s16(record, 9) == 10:
             return None
         return test_event(record)
-    # Global 0 = r[7:9] (at 10 a KO enters make hikari), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's
+    # Global 0 = r[7:9] (at 10 a KO enters make hikari), 5 (in VS, 12, 13, 14 or 15 from the SP BGM actions of
+    # Boss Base, ZM Office, ZM Office T2 and BR Boss Base), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's
     # 開始時 set 10, their OPs 100) and 14 (SIN's, KAY's and DIDO's supers hold 200, then clear it).
-    if op == 0x1f and record[4] in (0x80, 0x8a, 0x8b, 0x8e) and record[5] == 1:
+    if op == 0x1f and record[4] in (0x80, 0x85, 0x8a, 0x8b, 0x8e) and record[5] == 1:
         return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7))
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
