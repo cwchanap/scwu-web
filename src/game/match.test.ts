@@ -4082,11 +4082,13 @@ describe('prototype training rules', () => {
       // wall. The fall (7) it jumps to at age 43 pushes with its own box (−3,
       // −141) ±(39, 52) (PC 96), which clears that body until the jumper
       // comes down to it at age 53. Sharing x, the push then moves the jumper
-      // off a quarter of their overlap, in whole source pixels.
+      // off a quarter of their overlap, in whole source pixels; the idle body
+      // faces left there, as one at or right of its target does (0x40e6b5).
       expect(f.x).toBe(target.x);
       while (f.x === target.x) match.step({}, {});
       expect(f).toMatchObject({ branch: RYUKO.airDash, age: 53 });
-      expect((target.x - f.x) * facing).toBe(facing === 1 ? 27.75 : 27);
+      expect(target.facing).toBe(-1);
+      expect((target.x - f.x) * facing).toBe(facing === 1 ? 27 : 27.75);
     },
   );
 
@@ -6055,7 +6057,13 @@ describe('prototype training rules', () => {
     expect(match.cameraX).toBe(STAGE_WIDTH - WIDTH);
     // The camera moves halfway to the pair's aim of 110, to 375, so the left
     // wall is at source 425 and stops the reeling victim 25 pixels.
-    Object.assign(victim, { x: 600, facing: 1, reaction: 8, striker: 'body' });
+    Object.assign(victim, {
+      x: 600,
+      facing: 1,
+      reaction: 8,
+      striker: 'body',
+      struckBy: striker,
+    });
     Object.assign(striker, { x: 690, facing: -1 });
     match.step();
     expect(match.cameraX).toBe(375 * 1.5);

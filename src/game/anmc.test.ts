@@ -192,6 +192,8 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
   it('takes 5 power and gives 3 in Tatumaki >> (PC 1229), and flies out of HISA Down at −800 (PC 1631)', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'anmc']);
     const [ryuko, anmc] = match.fighters;
+    // Its op 0x15 gives to its target, which its first free step finds.
+    match.step();
     react(match, anmc, 'tatumakiOut');
     expect([anmc.power, ryuko.power]).toEqual([5, 3]);
     react(match, anmc, 'launchDown');

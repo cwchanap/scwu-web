@@ -293,7 +293,7 @@ describe('SOU (16 SOU.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'sou']);
+    const match = new Match('cpu', false, 19, ['ryuko', 'sou']);
     const sou = match.fighters[1];
     const entered = new Set<unknown>();
     // BK GROUND, CPU IORI1, CPU AKU JUMP, HIDDEN MOVE and DANKUHO LOW START.

@@ -1081,6 +1081,18 @@ export interface Fighter {
   // met. Only the round's setup clears it (0x411f7c), so ops 0x07 and 0x14
   // reach it long after.
   caught: Fighter | Effect | null;
+  // +0xdefd's player: whose box, or object following it, last struck this
+  // one (0x40f8a4, 0x40f8ac).
+  struckBy: Fighter | null;
+  // +0xdf69: the nearest player it fights, which it faces, measures its
+  // commands' near and far from and plays its CPU against (retarget); and
+  // the players it fights (+0xdfb7, a bit each): every other one in VS
+  // (0x411cc0 clears only its own bit, which no check reads).
+  target: Fighter | null;
+  enemies: number;
+  // +0xdf51: which way the target lies, which the input word and the free
+  // state's facing take.
+  toward: -1 | 1;
   // Priority (+4): the step and the draw take it at the tick's start. Each
   // contact and ops 0x07/0x14 set it about its plane's base (0x41f130), and
   // a KO drops it to 0x3c (0x40e8cd).
@@ -1378,6 +1390,10 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   reaction: 0,
   striker: null,
   caught: null,
+  struckBy: null,
+  target: null,
+  enemies: -1,
+  toward: facing,
   z: FIGHTER_Z,
   branch: null,
   copy: null,
@@ -1503,7 +1519,8 @@ const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
 ];
 
 export class Match {
-  fighters: [Fighter, Fighter];
+  // The players by slot: 1P, then the CPU or 2P.
+  fighters: Fighter[];
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
@@ -1546,18 +1563,19 @@ export class Match {
     maxStock: false,
     lowHealth: false,
   };
-  cpu: CpuVM;
+  // Each player's CPU (+0xdf5d), player 2's in VS.
+  cpus: (CpuVM | null)[];
   // This tick's opponent input comes from the CPU (none was supplied, in Vs.
   // CPU or with the CPU practice partner).
   private cpuDriven = false;
-  private previous: [Input, Input] = [{}, {}];
+  private previous: Input[] = [];
   // This tick's input, which op 0x16 reads.
-  private inputs: [Input, Input] = [{}, {}];
-  private history = [blankHistory(), blankHistory()];
+  private inputs: Input[] = [];
+  private history: number[][] = [];
   // Whether a command key's command waits in its player's history, and the
   // ticks recorded since one was entered (-1 for none).
-  private keyed = [false, false];
-  private spent = [-1, -1];
+  private keyed: boolean[] = [];
+  private spent: number[] = [];
 
   constructor(
     public mode: Mode = 'practice',
@@ -1572,11 +1590,23 @@ export class Match {
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
-    this.cpu = new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]);
+    this.cpus = [
+      null,
+      new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]),
+    ];
     this.calls = intro;
     this.fighters = intro
       ? this.entrants()
       : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+    this.clearInput();
+  }
+
+  get cpu() {
+    return this.cpus[1]!;
+  }
+
+  set cpu(vm: CpuVM) {
+    this.cpus[1] = vm;
   }
 
   // Each set-up enters each player's 開始時 (+0x759c, 0x412180), which plays
@@ -1584,7 +1614,7 @@ export class Match {
   // = 50, and otherwise its jump to 開始時 BR, the Br. intro. DoraEmon's
   // exports none (his BR first jumps into a scene with SEAN), so he plays
   // the authored Br. intro clip, whatever the mode.
-  private entrants(): [Fighter, Fighter] {
+  private entrants() {
     const fighters = introFighters(this.characters);
     fighters.forEach((f) => {
       const start = CHARACTERS[f.who].start;
@@ -1646,13 +1676,17 @@ export class Match {
   // the same, so a key enters its own command whatever was typed before it.
   private record(i: number, input: Input, clear = false) {
     const history = this.history[i];
-    const [f, other] = [this.fighters[i], this.fighters[1 - i]];
+    const f = this.fighters[i];
     const key = KEYS[f.who].find(
       ([control]) => input[control] && !this.previous[i][control],
     );
     if (key || clear) history.fill(0);
     if (key) [this.keyed[i], this.spent[i]] = [true, -1];
-    const word = inputWord(input, other.x >= f.x, f.who);
+    // The word mirrors by +0xdf51 (0x414368), which the step's retarget turns
+    // along with this tick's word (0x40e6df): it reads the nearest now.
+    const target = this.nearest(f);
+    const right = target ? f.x < target.x : f.toward === 1;
+    const word = inputWord(input, right, f.who);
     history.push(word);
     history.shift();
     if (this.spent[i] >= 0) this.spent[i]++;
@@ -1669,10 +1703,12 @@ export class Match {
   }
 
   clearInput() {
-    this.previous = [{}, {}];
-    this.history = [blankHistory(), blankHistory()];
-    this.keyed = [false, false];
-    this.spent = [-1, -1];
+    const seats = this.fighters.map(() => 0);
+    this.previous = seats.map(() => ({}));
+    this.inputs = seats.map(() => ({}));
+    this.history = seats.map(blankHistory);
+    this.keyed = seats.map(() => false);
+    this.spent = seats.map(() => -1);
   }
 
   // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
@@ -1732,6 +1768,55 @@ export class Match {
   // Op 0x1a's stops (0x413637 self, 0x4136ae other) reach a player and
   // every object following it (+0x28 bit 0x20000000, op 0x04 flag 0x20).
   // Each saves the player's input word this tick (0x413676, 0x413715).
+  // Op 0x1a's stop for the others reaches every other player and the objects
+  // following each (0x4136ae–0x413774).
+  private pauseOthers(f: Fighter, ticks: number) {
+    for (const other of this.fighters)
+      if (other !== f) this.pause(other, ticks);
+  }
+
+  // Op 0x15 reaches the player +0xdef9's object belongs to, or with none its
+  // target (0x413259–0x413278).
+  private met(f: Fighter) {
+    const { caught } = f;
+    if (!caught) return f.target;
+    return 'clip' in caught ? (this.fighters[caught.owner] ?? null) : caught;
+  }
+
+  // Whom a player's boxes and objects may strike (0x40f0ed–0x40f118): another
+  // player it fights.
+  private hostile(owner: number, other: number) {
+    return (
+      owner !== other && Boolean((this.fighters[owner]?.enemies >> other) & 1)
+    );
+  }
+
+  // Whether a CPU plays this player this tick (+0xdf5d).
+  private driven(f: Fighter) {
+    const i = this.fighters.indexOf(f);
+    return i > 0 && this.cpuDriven && Boolean(this.cpus[i]);
+  }
+
+  // 0x40e5f7: the nearest other player by x it fights (+0xdfb7), not KO'd.
+  private nearest(f: Fighter) {
+    const self = this.fighters.indexOf(f);
+    let [distance, target] = [Infinity, null as Fighter | null];
+    this.fighters.forEach((o, i) => {
+      if (o.hp && this.hostile(self, i) && Math.abs(o.x - f.x) < distance)
+        [distance, target] = [Math.abs(o.x - f.x), o];
+    });
+    return target;
+  }
+
+  // 0x40e5c0, on each step a stop or a queued action doesn't skip
+  // (0x412518): the nearest becomes the player's target, and which side of
+  // it the player is (+0xdf51) the way the free state faces; with no target
+  // that stays as it was.
+  private retarget(f: Fighter) {
+    f.target = this.nearest(f);
+    if (f.target) f.toward = f.x >= f.target.x ? -1 : 1;
+  }
+
   private pause(f: Fighter, ticks: number) {
     if (!ticks) return;
     f.hitStop += ticks;
@@ -1762,8 +1847,7 @@ export class Match {
     if (f.action === action && !restart) return;
     if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
-    if (action === 'down')
-      this.pause(this.fighters[1 - this.fighters.indexOf(f)], 10);
+    if (action === 'down') this.pauseOthers(f, 10);
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -2012,11 +2096,11 @@ export class Match {
 
   // Chuck 消える (143) holds its blank display for 100 ticks, then jumps into
   // rambu AIR (122, PC 1965), running its first records at once.
-  private vanish(f: Fighter, other: Fighter) {
+  private vanish(f: Fighter) {
     if (f.action !== 'vanish') return false;
     if (f.age >= animationDuration('vanish', f.who)) {
       this.queue(f, 'rushAirHit');
-      this.enterPending(f, other);
+      this.enterPending(f);
     }
     return true;
   }
@@ -2026,15 +2110,17 @@ export class Match {
   // 3 to the striker, and PC 1875 jumps into HISA (80), running its first
   // records at once: 13 stop ticks for both and its own power. Life that
   // runs out queues the lose action.
-  private gonMiss(f: Fighter, other: Fighter) {
+  private gonMiss(f: Fighter) {
     if (f.action !== 'gonMiss' || f.age < animationDuration(f.action, f.who))
       return false;
     const wasOut = f.hp === 0;
-    other.damage += loseLife(f, 40);
+    const striker = this.met(f);
+    const damage = loseLife(f, 40);
+    if (striker) striker.damage += damage;
     addPower(f, 5);
-    addPower(other, 3);
+    if (striker) addPower(striker, 3);
     this.queue(f, 'launchAway', 13, 13);
-    this.enterPending(f, other);
+    this.enterPending(f);
     if (f.hp === 0) this.queue(f, knockedOut(wasOut));
     return true;
   }
@@ -2334,7 +2420,9 @@ export class Match {
     event: SourceEvent,
   ): boolean {
     const self = this.fighters[owner];
-    const other = this.fighters[1 - owner];
+    // Ops 0x07, 0x14 and 0x15 reach +0xdef9's player (met). A stage's
+    // objects have no player.
+    const other = self && this.met(self);
     switch (event.op) {
       case 'spawn':
         // 0x412ac0: Zoma's spawn into his slot r[12] while its object lives
@@ -2390,7 +2478,7 @@ export class Match {
         actor.responses = event.ids;
         break;
       case 'stop':
-        this.pause(other, event.other);
+        this.pauseOthers(self, event.other);
         if (actor === self) this.pause(self, event.self);
         break;
       case 'freeze':
@@ -2483,7 +2571,7 @@ export class Match {
           });
           break;
         }
-        if (!this.struck(self, other)) break;
+        if (!other || !this.struck(self, other)) break;
         other.held = {
           pose: event.pose,
           flags: event.flags,
@@ -2504,6 +2592,7 @@ export class Match {
         }
         // REAR's 255 applies Chuck OGI BALL (response 62, Ryuko's 138),
         // which the victim plays from its own timeline (ownTimeline).
+        if (!other) break;
         const own = responsesOf(other.who)[event.response];
         const reaction = RESPONSE_REACTIONS[twinOf(other.who, own) ?? 0];
         const timeline = reaction
@@ -2543,6 +2632,10 @@ export class Match {
           const wasOut = self.hp === 0;
           loseLife(self, -event.selfLife);
           if (self.hp === 0) this.queue(self, knockedOut(wasOut));
+        }
+        if (!other) {
+          addPower(self, event.selfPower);
+          break;
         }
         if (event.otherLife > 0)
           other.hp = Math.min(lifeOf(other.who), other.hp + event.otherLife);
@@ -2844,14 +2937,14 @@ export class Match {
   // takes it. An object striker's bits stay clear, so its owner always does.
   // Fighter 1 moves it this tick, fighter 0 the next.
   private settle(f: Fighter, walled = false) {
-    const other = this.fighters[1 - this.fighters.indexOf(f)];
+    const other = this.met(f);
     f.x += f.transfer;
     f.transfer = 0;
     // 0x40fa29: a hold with flag 0x10 places its victim here, before the
     // holder's walls, until op 0x14 clears it (0x41314c). A victim moving
     // later in the pass clamps itself; fighter 0 stays where it is put.
     if (
-      other.action === 'superHeld' &&
+      other?.action === 'superHeld' &&
       !other.pending &&
       (other.held?.flags ?? 0) & 0x10
     )
@@ -2864,9 +2957,9 @@ export class Match {
     if (walled && wall) this.queue(f, wall);
     else if (walled && f.action === 'script' && f.onWall && !f.pending)
       f.pending = { key: f.onWall };
-    const reeling = f.striker === 'body' && (other.reaction & 12) === 8;
-    if (f.hp > 0 && f.reaction & 8 && f.striker && !reeling)
-      other.transfer += f.stopped;
+    const by = f.striker ? f.struckBy : null;
+    const reeling = f.striker === 'body' && ((by?.reaction ?? 0) & 12) === 8;
+    if (f.hp > 0 && f.reaction & 8 && by && !reeling) by.transfer += f.stopped;
     f.stopped = 0;
   }
 
@@ -3026,10 +3119,17 @@ export class Match {
   // 0x40f010 tries the striker's boxes in slot order: the IORI super-cancel
   // Musashi (260) grabs a grounded victim with slot 0 (kind 0x2a) and an
   // airborne one with slot 1 (kind 0x18).
+  // Each player it may strike, in slot order, meets the first box that
+  // reaches it (0x40f0d0): a box takes every victim it reaches that tick.
   private boxContact(source: Fighter | Effect, owner: number) {
-    const attacker = this.fighters[owner];
-    const target = this.fighters[1 - owner];
     if (source.connected) return [];
+    return this.fighters.flatMap((target, i) =>
+      this.hostile(owner, i) ? this.contact(source, owner, target) : [],
+    );
+  }
+
+  private contact(source: Fighter | Effect, owner: number, target: Fighter) {
+    const attacker = this.fighters[owner];
     const box = [source.box, ...source.boxes].find(
       (box) =>
         box &&
@@ -3122,7 +3222,8 @@ export class Match {
         const box = boxAt(a, slot);
         if (!box) continue;
         for (const [b, other] of holders.slice(i + 1)) {
-          if (other === owner || (!('clip' in b) && b.reaction & 8)) continue;
+          if (!this.hostile(owner, other) || (!('clip' in b) && b.reaction & 8))
+            continue;
           const to = this.origin(b);
           for (let s = 19; s >= 0; s--) {
             const met = boxAt(b, s);
@@ -3187,7 +3288,7 @@ export class Match {
     return strikers.flatMap(([a, boxes, striker]) => {
       const met = bodies.filter(
         ([b, body]) =>
-          a.owner !== b.owner &&
+          this.hostile(a.owner, b.owner) &&
           boxes.some(
             (box) =>
               box &&
@@ -3216,9 +3317,13 @@ export class Match {
   // 0x411867: the CPU (0x411270) runs at the start of its fighter's step,
   // which skips it while entering a queued action (0x412327), stopped
   // (0x412390) or held by op 0x07 (+0x40 at -1, 0x412397).
-  private think(f: Fighter, other: Fighter) {
-    const input = (this.inputs[1] = this.cpu.input(f, other));
-    this.record(1, input, true);
+  private think(f: Fighter) {
+    const i = this.fighters.indexOf(f);
+    // With no target it clears its history and enters nothing (0x4112a1).
+    const input = (this.inputs[i] = f.target
+      ? this.cpus[i]!.input(f, f.target)
+      : {});
+    this.record(i, input, true);
     return input;
   }
 
@@ -3233,9 +3338,11 @@ export class Match {
     box: ScriptBox,
   ) {
     let guard = guards.has(target.action) && target.facing !== source.facing;
-    if (this.cpuDriven && target === this.fighters[1]) {
+    if (this.driven(target)) {
       const bits = target.reaction & 0xc;
-      guard = bits === 0xc || (bits === 0 && this.cpu.guards());
+      guard =
+        bits === 0xc ||
+        (bits === 0 && this.cpus[this.fighters.indexOf(target)]!.guards());
     }
     return guard && !(box.kind & 0x40);
   }
@@ -3254,7 +3361,6 @@ export class Match {
   // it accepts (header byte 2); a refused command enters nothing.
   private command(
     f: Fighter,
-    other: Fighter,
     history: number[],
     ok: (level: number, action?: number) => boolean = () => true,
   ) {
@@ -3264,7 +3370,10 @@ export class Match {
         air: f.y < 0,
         still: f.y === 0 && f.vy === 0,
         landing: f.y < 0 && f.y > -50 * 1.5 && f.vy > 0,
-        near: Math.trunc(Math.abs(f.x - other.x) / 1.5) <= nearOf(f.who),
+        // With no target, the far action (0x4107fa).
+        near:
+          !!f.target &&
+          Math.trunc(Math.abs(f.x - f.target.x) / 1.5) <= nearOf(f.who),
       },
       f.who,
     );
@@ -3285,14 +3394,14 @@ export class Match {
   // window themselves: mode 1 once the move's box has connected, 2 always;
   // type 0 passes a command whose action's level lies in [min, max], type 1
   // only the action it names.
-  private cancel(f: Fighter, other: Fighter, history: number[]) {
+  private cancel(f: Fighter, history: number[]) {
     const window = f.window;
     if (
       !window ||
       !(window.mode === 2 || (window.mode === 1 && f.contact === 2))
     )
       return false;
-    return this.command(f, other, history, (level, action) => {
+    return this.command(f, history, (level, action) => {
       const passes =
         window.type === 0
           ? level >= window.min && level <= window.max
@@ -3321,7 +3430,7 @@ export class Match {
   // that halts the victim (and any drift, which the motion pass adds once
   // the stop runs out), op 0x1a's stops for it and the striker (0x413637,
   // 0x4136ae), and op 0x15's power.
-  private enterPending(f: Fighter, other: Fighter) {
+  private enterPending(f: Fighter) {
     const pending = f.pending!;
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
@@ -3401,30 +3510,25 @@ export class Match {
     f.vx = f.vy = 0;
     f.moving = 0;
     this.pause(f, stop);
-    this.pause(other, attackerStop);
+    this.pauseOthers(f, attackerStop);
     const [victimPower, attackerPower] = f.copy
       ? copyPower(f)
       : reactionPower(f);
     addPower(f, victimPower);
-    addPower(other, attackerPower + power);
+    const striker = this.met(f);
+    if (striker) addPower(striker, attackerPower + power);
   }
 
-  private move(
-    f: Fighter,
-    other: Fighter,
-    input: Input,
-    previous: Input,
-    history: number[],
-  ) {
-    if (f.pending) this.enterPending(f, other);
+  private move(f: Fighter, input: Input, previous: Input, history: number[]) {
+    if (f.pending) this.enterPending(f);
     else {
       // Held by op 0x07 (+0x40 at -1), the step returns at once (0x412397).
       if (f.hitStop < 0) return;
       if (f.hitStop === 0) {
         // 0x4123c5: an unstopped step drops the word a stop saved.
         f.stopInput = null;
-        if (this.cpuDriven && f === this.fighters[1])
-          input = this.think(f, other);
+        this.retarget(f);
+        if (this.driven(f)) input = this.think(f);
         // An op 0x1a stop adds to the -1 (0x4136fb), as a struck holder's
         // reaction does to its victim, which counts it down and then runs on
         // from where op 0x07 left it, action 0's offset 1 (0x412fc5), past
@@ -3436,7 +3540,7 @@ export class Match {
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
-        if (this.cancel(f, other, history)) return;
+        if (this.cancel(f, history)) return;
         if (f.action === 'idle')
           for (const event of idlePower(f.who, f.age))
             this.runEvent(f, this.fighters.indexOf(f), event);
@@ -3455,11 +3559,11 @@ export class Match {
       this.rollResult(f);
       return;
     }
-    if (this.musicAttack(f) || this.vanish(f, other)) return;
+    if (this.musicAttack(f) || this.vanish(f)) return;
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
     if (f.action === 'script' && this.moveScripted(f)) return;
-    if (this.gonMiss(f, other)) return;
+    if (this.gonMiss(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
     // ERUS INATUMA AIR, ICE Punch Air and HISO stop air run out into heavy
@@ -3517,7 +3621,7 @@ export class Match {
     // flies him off (PC 441) and he gets up at 0 life.
     if (this.winner && !airborne && f.hp === 0) {
       this.queue(f, knockedOut(true));
-      return this.enterPending(f, other);
+      return this.enterPending(f);
     }
     if (this.winner && !airborne) {
       this.action(f, this.result(f));
@@ -3527,7 +3631,7 @@ export class Match {
     const direction =
       Number(Boolean(input.right)) - Number(Boolean(input.left));
     const crouched = f.action.startsWith('crouch');
-    const facing = other.x >= f.x ? 1 : -1;
+    const facing = f.toward;
     const turning = !airborne && facing !== f.facing;
     f.facing = facing;
     if (input.guard) {
@@ -3559,7 +3663,7 @@ export class Match {
     }
     // The free state scans commands (0x411a01) after the port's own guard
     // and jump keys.
-    if (this.command(f, other, history)) {
+    if (this.command(f, history)) {
       markActing(f);
       return;
     }
@@ -3819,13 +3923,18 @@ export class Match {
     // place; within a priority they go in slot order. ponytail: the HUD's
     // KGT letterings and the camera hold no slot here, so a slot a lettering
     // frees goes to no later object first.
-    const order = this.fighters[1].z < this.fighters[0].z ? [1, 0] : [0, 1];
-    const [first, second] = order.map((i) => this.fighters[i].z);
-    const [behind, between, after] = [[], [], []] as Effect[][];
-    const objects = [...this.layers, ...this.effects];
-    for (const e of objects.sort((a, b) => a.z - b.z || a.index - b.index))
-      (e.z < first ? behind : e.z < second ? between : after).push(e);
-    this.stepObjects(behind);
+    const order = this.fighters
+      .map((_, i) => i)
+      .sort((a, b) => this.fighters[a].z - this.fighters[b].z || a - b);
+    // The objects below a player's priority step before it.
+    const below = order.map(() => [] as Effect[]);
+    const objects: Effect[] = [];
+    for (const e of [...this.layers, ...this.effects].sort(
+      (a, b) => a.z - b.z || a.index - b.index,
+    )) {
+      const k = order.findIndex((i) => e.z < this.fighters[i].z);
+      (k < 0 ? objects : below[k]).push(e);
+    }
     // After a KO or time-out the round phase stays 1 (only a debug key sets
     // 2, 0x406231 and 0x408f38): fighters keep reading commands and
     // striking, and each takes its result's action once back in neutral
@@ -3838,18 +3947,20 @@ export class Match {
     this.cpuDriven =
       !opponent && (this.mode === 'cpu' || this.practice.partner === 'cpu');
     if (this.calls && this.roundTicks < FIGHT_TICK) {
-      this.inputs = [player, opponent ?? {}];
+      this.inputs = this.fighters.map((_, i) =>
+        i === 0 ? player : i === 1 ? (opponent ?? {}) : {},
+      );
       this.cpuDriven = false;
       this.koStop = 0;
-      for (const i of order) {
+      for (const [k, i] of order.entries()) {
         const f = this.fighters[i];
-        if (i === order[1]) this.stepObjects(between);
+        this.stepObjects(below[k]);
         // The step enters a queued action whatever the phase (0x412327):
         // SHIN-Z's VS Start KO takes 1000 of his life (PC 505), and his lose
         // action runs before FIGHT. Only the KO check waits for the fight
         // state (0x408eda).
         if (f.pending || !['script', 'intro', 'idle'].includes(f.action)) {
-          this.move(f, this.fighters[1 - i], {}, {}, []);
+          this.move(f, {}, {}, []);
           this.enter(f, i);
           continue;
         }
@@ -3857,6 +3968,7 @@ export class Match {
           f.hitStop--;
           continue;
         }
+        this.retarget(f);
         // A VS 開始時 steps as any script does, and runs out into idle.
         if (f.action === 'script') {
           f.age++;
@@ -3873,18 +3985,17 @@ export class Match {
       }
       // History keeps recording, so a button held through the intro must be
       // pressed again once control begins.
-      this.record(0, player);
-      this.record(1, opponent ?? {});
-      this.previous = [{ ...player }, { ...opponent }];
+      this.inputs.forEach((input, i) => this.record(i, input));
+      this.previous = this.inputs.map((input) => ({ ...input }));
       for (const f of this.fighters) this.pause(f, this.koStop);
       // KGT 13, which round setup spawns after the players at priority 0x65
       // (0x408ce9), steps after the objects below it: it holds global 14 at
       // 10 for its first 10 ticks (PCs 70, 78, 88, 97), so a 開始時 BR that
       // tests it after the first tick keeps its display (Ryuko's PC 323).
-      this.stepObjects(after.filter((e) => e.z < 0x65));
+      this.stepObjects(objects.filter((e) => e.z < 0x65));
       if (this.roundTicks === 1) this.globals[14] = 10;
       if (this.roundTicks === 11) this.globals[14] = 0;
-      this.stepObjects(after.filter((e) => e.z >= 0x65));
+      this.stepObjects(objects.filter((e) => e.z >= 0x65));
       for (const f of this.fighters)
         if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
       this.moveObjects();
@@ -3907,25 +4018,21 @@ export class Match {
           desperationOf(this.fighters[0].who) - 1,
         );
     }
-    const inputs: [Input, Input] = [player, opponent ?? this.ai()];
+    const inputs = this.fighters.map((_, i) =>
+      i === 0 ? player : i === 1 ? (opponent ?? this.ai()) : {},
+    );
     this.inputs = inputs;
     inputs.forEach((input, i) => this.record(i, input));
     this.koStop = 0;
-    for (const i of order) {
+    for (const [k, i] of order.entries()) {
       const f = this.fighters[i];
-      if (i === order[1]) this.stepObjects(between);
-      this.move(
-        f,
-        this.fighters[1 - i],
-        inputs[i],
-        this.previous[i],
-        this.history[i],
-      );
+      this.stepObjects(below[k]);
+      this.move(f, inputs[i], this.previous[i], this.history[i]);
       this.enter(f, i);
     }
     // Applied after both steps, so a double KO holds once.
     for (const f of this.fighters) this.pause(f, this.koStop);
-    this.stepObjects(after);
+    this.stepObjects(objects);
     // The round controller (type 0xe, 0x4086a0) steps last, at priority
     // 0x7f: its fight state reads both lives after every step (0x408eda), so
     // a lose action that restores life on its first step (ALPHA's KO Boss,
@@ -3939,7 +4046,7 @@ export class Match {
       if (this.winner !== 'opponent') this.wins[0]++;
       if (this.winner !== 'player') this.wins[1]++;
     }
-    this.previous = [{ ...inputs[0] }, { ...inputs[1] }];
+    this.previous = inputs.map((input) => ({ ...input }));
     this.clashBoxes();
     // The hit test meets the fighters and objects where last tick's motion
     // left them. Contacts are collected before any applies, so same-tick
@@ -4020,8 +4127,8 @@ export class Match {
         : (target.reaction & ~4) | 8;
       // 0x40f8a4 records a fighter striking with its own box, 0x40f8ac an
       // object following its parent; other objects leave the striker as is.
-      if (body) target.striker = 'body';
-      else if ('clip' in source && source.follow) target.striker = 'object';
+      if (body || ('clip' in source && source.follow))
+        [target.striker, target.struckBy] = [body ? 'body' : 'object', f];
       target.facing = facing === 1 ? -1 : 1;
       // 0x40f567: a box with damage spawns its response's effect action (word
       // 2 of the entry) through 0x406570 at the contact, facing the striker,
@@ -4037,32 +4144,33 @@ export class Match {
           z: 0x5d,
         });
     }
-    const [a, b] = this.fighters;
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
     // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
     // (above the floor, 0x40fec9) moves when the other is grounded, and a
     // KO'd fighter (life +0xdf05 is 0) pushes no one. Held and hidden poses
     // set no such box, and hit stop doesn't stop the push.
-    // 0x40f910 walks fighter 0, then fighter 1: each moves and settles, and
-    // fighter 0 then pushes against fighter 1's boxes from the last tick, so
-    // its own share stays unclamped until its next move.
-    this.travel(a);
+    // 0x40f910 walks the players in slot order: each moves and settles, then
+    // pushes against every later one's boxes, which haven't moved yet, so its
+    // own share stays unclamped until its next move. Allies push too.
     const pixel = (v: number) => Math.floor(v / 1.5);
-    for (const boxA of pushboxes(shown(a), a.age, a.who)) {
-      const ax = pixel(a.x) + a.facing * boxA.x;
-      const ay = pixel(a.y) + boxA.y;
-      for (const boxB of pushboxes(shown(b), b.age, b.who)) {
-        const bx = pixel(b.x) + b.facing * boxB.x;
-        const by = pixel(b.y) + boxB.y;
-        const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
-        if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
-        const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
-        if (b.hp > 0 && (a.y < 0 || b.y >= 0)) a.x += push;
-        if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
+    this.fighters.forEach((a, i) => {
+      this.travel(a);
+      for (const boxA of pushboxes(shown(a), a.age, a.who)) {
+        const ax = pixel(a.x) + a.facing * boxA.x;
+        const ay = pixel(a.y) + boxA.y;
+        for (const b of this.fighters.slice(i + 1))
+          for (const boxB of pushboxes(shown(b), b.age, b.who)) {
+            const bx = pixel(b.x) + b.facing * boxB.x;
+            const by = pixel(b.y) + boxB.y;
+            const overlap = boxA.w + boxB.w - Math.abs(ax - bx);
+            if (overlap <= 0 || Math.abs(ay - by) >= boxA.h + boxB.h) continue;
+            const push = ((ax > bx ? 1 : -1) * overlap * 1.5) / 4;
+            if (b.hp > 0 && (a.y < 0 || b.y >= 0)) a.x += push;
+            if (a.hp > 0 && (b.y < 0 || a.y >= 0)) b.x -= push;
+          }
       }
-    }
-    this.travel(b);
+    });
     this.moveObjects();
     // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at
     // the contact (0x40f6f1), its hit handler after the motion pass
