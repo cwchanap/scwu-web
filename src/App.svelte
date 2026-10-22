@@ -63,6 +63,7 @@
     error: '',
     selecting: true,
     fighters: ['ryuko', 'zoma'],
+    story: false,
   });
   let help = $state(false);
   const asset = `${import.meta.env.BASE_URL}assets/`;
@@ -546,9 +547,10 @@
   function focusArena() {
     (session?.game.canvas ?? host).focus({ preventScroll: true });
   }
-  function reset(next = mode) {
-    mode = next;
-    session?.scene.reset(mode);
+  // A story battle starts over; otherwise the match starts in this mode.
+  function reset(next: Mode = mode) {
+    if (next !== 'story') mode = next;
+    session?.scene.reset(next);
     focusArena();
   }
   function openSelect() {
@@ -727,7 +729,7 @@
           >Fighter
           <select
             value={fighter}
-            disabled={!status.ready || status.selecting}
+            disabled={!status.ready || status.selecting || status.story}
             onchange={(event) => setFighter(event.currentTarget.value as Who)}
           >
             <option value="ryuko">Ryuko</option>
@@ -781,7 +783,7 @@
           >Opponent
           <select
             value={opponent}
-            disabled={!status.ready || status.selecting}
+            disabled={!status.ready || status.selecting || status.story}
             onchange={(event) => setOpponent(event.currentTarget.value as Who)}
           >
             <option value="zoma">Zoma</option>
@@ -835,7 +837,7 @@
           >Stage
           <select
             value={stage}
-            disabled={!status.ready}
+            disabled={!status.ready || status.story}
             onchange={(event) => setStage(event.currentTarget.value as Stage)}
           >
             {#each Object.entries(stageLabels) as [value, label] (value)}
@@ -888,7 +890,7 @@
         <button
           class:rematch={status.resultReady}
           disabled={!status.ready || !!status.error}
-          onclick={() => reset()}
+          onclick={() => reset(status.story ? 'story' : mode)}
           >{status.resultReady ? 'Fight again' : 'Reset'} <kbd>R</kbd></button
         >
       </div>

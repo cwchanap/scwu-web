@@ -4359,7 +4359,7 @@ def export_ui():
                                                    for f in timeline["frames"]])
     calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)])
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"],
-                 *calls["vs"]["first"], *calls["vs"]["later"]]
+                 *calls["vs"]["first"], *calls["vs"]["later"], *calls["story"].values()]
     # The select screen (object type 10, 0x406fc0) reads the system block the
     # loader copies from the file's tail to 0x435474: the players' names, 256
     # bytes each, the action words from 0x4451c2 (13, 14, 15, ... the round
@@ -4393,6 +4393,15 @@ def export_ui():
                  items=[[s16(p.records[p.action(a).start], 1), s16(p.records[p.action(a).start], 3)]
                         for a in (story, single, multi)])
     select["programs"].update(select_program(p, cursor, select_images)["actions"])
+    # The continue screen (0x4084f0) plays CONTINUE (the demo at 0x4438a0) with
+    # its cursor (0x44524a), which stands where YES's and NO's actions' first
+    # records say (0x44524c, 0x44524e).
+    if demo_name(tail[0x4438a0 - base]) != "CONTINUE":
+        sys.exit("The continue screen no longer plays CONTINUE; refusing to export.")
+    cursor, yes, no = at(0x44524a, "<3H")
+    resume = dict(cursor=cursor, items=[[s16(p.records[p.action(a).start], 1), s16(p.records[p.action(a).start], 3)]
+                                        for a in (yes, no)])
+    select["programs"].update(select_program(p, cursor, select_images)["actions"])
     cues = {u16(r, 2) for records in select["programs"].values() for r in map(bytes, records) if r[0] == 0x03}
     sounds = export_sounds(c, "kgt", {i for t in timelines for f in t["frames"] for i in f.get("sounds", [])} | cues)
     # 17–23: stock digits EMPTY/100–600 (KGT 45–51, 0x445202); 31–38: gauge
@@ -4411,7 +4420,7 @@ def export_ui():
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
-                                           select=select, title=title))
+                                           select=select, title=title, **{"continue": resume}))
     return demo_name
 
 
@@ -4549,9 +4558,15 @@ def export_demo(key, name, sha256, out):
     # panels and T2's backdrop cue, is empty in all three.
     cues = {u16(r, 2) for r in p.records if r[0] == 0x03 and c.sounds[u16(r, 2)]["size"]}
     flags, duration = data[c.common_end + 2], struct.unpack_from("<I", data, c.common_end + 5)[0]
+    # Each sound's length, by which the scene tells a story demo's tracks from its cues.
+    sounds = export_sounds(c, key, cues)
+    for sound in sounds:
+        wav = (PUBLIC / sound["filename"]).read_bytes()
+        rate, size = struct.unpack_from("<I", wav, 28)[0], struct.unpack_from("<I", wav, wav.index(b"data", 12) + 4)[0]
+        sound["seconds"] = round(size / rate, 2)
     write_json(out, dict(source_sha256=sha256, objects=objects, actions=actions,
                                                images=export_images(c, key, image_ids - {8191}),
-                                               sounds=export_sounds(c, key, cues), flags=flags, duration=duration))
+                                               sounds=sounds, flags=flags, duration=duration))
 
 
 def inputs():

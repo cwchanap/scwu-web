@@ -5,8 +5,17 @@ import ui from './generated/ui.json';
 import selectData from './generated/select.json';
 import t1 from './generated/t1.json';
 import t2 from './generated/t2.json';
-import { battlePalettes, CharacterSelect, Title } from './select';
-import type { SelectObject } from './select';
+import {
+  battlePalettes,
+  CharacterSelect,
+  Continue,
+  storyPalettes,
+  StoryDemo,
+  Title,
+} from './select';
+import type { Demo, SelectObject } from './select';
+import { Story } from './story';
+import type { Battle, Next } from './story';
 import { createHud, letteringSounds } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
@@ -49,6 +58,8 @@ export interface GameStatus {
   // On the title or the character select screen, and the pair it last chose.
   selecting: boolean;
   fighters: [Who, Who];
+  // In a story battle.
+  story: boolean;
 }
 export const initialStatus: GameStatus = {
   ready: false,
@@ -65,9 +76,22 @@ export const initialStatus: GameStatus = {
   error: '',
   selecting: true,
   fighters: ['ryuko', 'zoma'],
+  story: false,
 };
 const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t1, t2 };
+// A story's demos, loaded as they play.
+type StoryDemoData = Demo & {
+  images: { index: number; width: number; height: number; filename: string }[];
+  sounds: { index: number; filename: string; seconds: number }[];
+};
+const STORY_DEMOS = import.meta.glob<StoryDemoData>(
+  './generated/demos/*.json',
+  { import: 'default' },
+);
+// Authored: a story demo's sounds of five seconds or more are its tracks,
+// which play only with Music ticked, as the stages' and the title's do.
+const TRACK_SECONDS = 5;
 // The draw walks the priority lists lowest first, the players' slots before
 // any object's within one (0x404df1). A viewport object behind the fighters
 // (the KO flash, z 15 like action 43) sits over the court. Within its band a
@@ -176,8 +200,20 @@ export class TrainingScene extends Phaser.Scene {
   private track?: Phaser.Sound.BaseSound;
   // The character select screen (select.ts) the game opens on, and returns
   // to from the toolbar, before the match it chooses.
-  // The title, which the game opens on, then the select screen.
-  private select: Title | CharacterSelect | null = new Title();
+  // The title, which the game opens on, then the select screen, or story
+  // mode's demos and continue screen.
+  private select: Title | CharacterSelect | StoryDemo | Continue | null =
+    new Title();
+  // Story mode: the story running (story.ts), its 1P's palette, and the
+  // 1P's life and the rounds it lost or drew as its last battle ended, which
+  // the runner's jumps read; and whether a demo or stage is loading.
+  private story: Story | null = null;
+  private storyPalette = 0;
+  private storyLife = 0;
+  private storyLost = 0;
+  private loading = false;
+  // The tracks the loaded demos cue, by sound key.
+  private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
   // The palette each player's objects draw with, from the select's buttons.
   private palettes = [0, 0];
@@ -221,24 +257,7 @@ export class TrainingScene extends Phaser.Scene {
       (object: Phaser.GameObjects.GameObject) =>
         object.setVertexRoundMode('fullAuto'),
     );
-    for (const f of this.match.fighters) {
-      // Action 43, a viewport object at (327, 498) in bucket 15 (op 0x04
-      // flags 0x46 at PCs 300/325): over the court, behind every object.
-      this.blacks.push(
-        this.add
-          .image(0, 0, 'ryuko-294')
-          .setScale(ART_SCALE)
-          .setScrollFactor(0)
-          .setDepth(0.5)
-          .setVisible(false),
-      );
-      this.shadows.push(
-        this.add.ellipse(f.x, GROUND - 1, 94, 13, 0x171311, 0.3),
-      );
-      this.sprites.push(
-        this.add.image(f.x, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
-      );
-    }
+    this.growFighters(this.match.fighters.length);
     this.updateHud = createHud(this, (key, color) => this.tint(key, color));
     this.game.canvas.tabIndex = 0;
     this.game.canvas.setAttribute(
@@ -278,8 +297,9 @@ export class TrainingScene extends Phaser.Scene {
       this.togglePause();
     }
     if (!e.repeat && e.code === 'KeyR')
-      if (this.select instanceof Title) this.openTitle();
-      else if (this.select) this.openSelect();
+      if (this.select instanceof CharacterSelect)
+        this.open(new CharacterSelect(undefined, this.select.story));
+      else if (this.select) this.openTitle();
       else this.reset(this.match.mode);
   };
   private keyup = (e: KeyboardEvent) => {
@@ -325,7 +345,7 @@ export class TrainingScene extends Phaser.Scene {
   private openTitle() {
     this.open(new Title());
   }
-  private open(screen: Title | CharacterSelect) {
+  private open(screen: NonNullable<TrainingScene['select']>) {
     this.select = screen;
     this.sound.stopAll();
     this.paused = false;
@@ -352,17 +372,115 @@ export class TrainingScene extends Phaser.Scene {
       }
       // CHAR SELECT's sound 0, which its closing panels cue, is empty.
       const key = `${container}-sound-${index}`;
-      if (this.cache.audio.exists(key)) this.play(key);
+      if (this.demoTracks.has(key)) {
+        if (!this.music) continue;
+        this.selectTrack?.stop();
+        this.selectTrack = this.sound.get(key) ?? this.sound.add(key);
+        this.selectTrack.play();
+      } else if (this.cache.audio.exists(key)) this.play(key);
     }
     if (!select.done) return;
-    if (select instanceof Title) return this.openSelect();
+    if (select instanceof Title)
+      return select.done === 'story'
+        ? this.open(new CharacterSelect(undefined, true))
+        : this.openSelect();
+    if (select instanceof StoryDemo)
+      return this.runStory(this.story!.next(this.storyLife, this.storyLost));
+    if (select instanceof Continue)
+      return select.done === 'yes'
+        ? this.runStory(this.story!.retry())
+        : this.openTitle();
+    // The story's first step (0x4069b0), its counter reset by the title.
+    if (select.story) {
+      this.story = new Story(select.done[0]);
+      this.storyPalette = select.palettes[0];
+      return this.runStory(this.story.next());
+    }
     [this.fighter, this.opponent] = select.done;
     this.chosen = true;
     this.palettes = battlePalettes(select.palettes);
+    this.leaveScreen();
+    this.reset(this.match.mode);
+  }
+
+  private leaveScreen() {
     this.select = null;
     this.selectTrack?.stop();
     for (const sprite of this.selectSprites) sprite.setVisible(false);
-    this.reset(this.match.mode);
+  }
+
+  // The story runner's step (0x4069b0): a battle (object type 14), a demo
+  // (16) or the title (12).
+  private runStory(next: Next) {
+    if (next.kind === 'title') return this.openTitle();
+    if (next.kind === 'demo')
+      return this.openDemo(
+        next.demo,
+        (demo) => new StoryDemo(next.demo, demo, randomSeed()),
+      );
+    this.startBattle(next.battle);
+  }
+
+  // A story battle on its stage, once the stage's images load.
+  private startBattle(battle: Battle) {
+    const match = Match.story(this.story!.who, battle, randomSeed());
+    this.whenLoaded(match.stage, () => {
+      this.leaveScreen();
+      this.palettes = storyPalettes(this.storyPalette, match.fighters.length);
+      this.begin(match);
+    });
+  }
+
+  // A won Vs. match returns to the select screen (state 902 spawns object
+  // type 10, 0x40982b); a story battle runs the story on, unless the 1P won
+  // no more rounds than the CPUs and the step's flag bit 0 opens the
+  // continue screen (0x40983b).
+  private matchOver() {
+    const { battle, fighters, lost } = this.match;
+    if (!battle) return this.openSelect();
+    [this.storyLife, this.storyLost] = [fighters[0].hp, lost];
+    if (this.match.matchWinner !== 'player' && battle.flags & 1)
+      return this.openDemo(9, (demo) => new Continue(demo));
+    this.runStory(this.story!.next(this.storyLife, this.storyLost));
+  }
+
+  // A story demo's records, images and sounds load before it opens; the
+  // last screen stays until then.
+  private openDemo(
+    index: number,
+    make: (demo: StoryDemoData) => StoryDemo | Continue,
+  ) {
+    this.loading = true;
+    void STORY_DEMOS[`./generated/demos/${index}.json`]().then((demo) => {
+      const prefix = `demo${index}`;
+      for (const image of demo.images) {
+        selectSizes.set(`${prefix}-${image.index}`, image);
+        this.load.image(`${prefix}-${image.index}`, BASE + image.filename);
+      }
+      for (const sound of demo.sounds) {
+        const key = `${prefix}-sound-${sound.index}`;
+        if (sound.seconds >= TRACK_SECONDS) this.demoTracks.add(key);
+        this.load.audio(key, BASE + sound.filename);
+      }
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        this.loading = false;
+        this.open(make(demo));
+      });
+      this.load.start();
+    });
+  }
+
+  // Runs once a stage's images are in.
+  private whenLoaded(stage: Stage, then: () => void) {
+    if (this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`))
+      return then();
+    this.loading = true;
+    this.loadStage(stage);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.loading = false;
+      then();
+    });
+    this.load.start();
   }
   // Demo and KGT objects draw their display's top left at their offset; a
   // player's select face and name stand on their ground point (placement).
@@ -384,7 +502,7 @@ export class TrainingScene extends Phaser.Scene {
     const size = selectImage(prefix, frame.image);
     if (!size) return sprite.setVisible(false);
     const pose: Pose = { ...frame, ...size };
-    const player = !(o.container in DEMOS) && o.container !== 'kgt';
+    const player = o.container in CHARACTERS;
     const p = player
       ? placement(pose, size.width, size.height, o.x, o.y, o.facing === -1)
       : {
@@ -439,15 +557,25 @@ export class TrainingScene extends Phaser.Scene {
       this.load.image(`${stage}-${image.index}`, BASE + image.filename);
   }
   reset(mode: Mode) {
+    // A story battle starts over.
+    if (mode === 'story') {
+      if (this.match.battle) this.startBattle(this.match.battle);
+      return;
+    }
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
-    this.match = new Match(
-      mode,
-      mode === 'cpu',
-      randomSeed(),
-      [this.fighter, this.opponent],
-      this.stage,
-      this.chosen && mode === 'cpu',
+    this.begin(
+      new Match(
+        mode,
+        mode === 'cpu',
+        randomSeed(),
+        [this.fighter, this.opponent],
+        this.stage,
+        this.chosen && mode === 'cpu',
+      ),
     );
+  }
+  private begin(match: Match) {
+    this.match = match;
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.cue = undefined;
@@ -462,7 +590,7 @@ export class TrainingScene extends Phaser.Scene {
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
     this.idle = this.match.fighters.map((f, i) => idleVM(f, i));
-    this.idling = [true, true];
+    this.idling = this.match.fighters.map(() => true);
     this.idle.forEach((vm) => vm.tick());
   }
 
@@ -477,7 +605,8 @@ export class TrainingScene extends Phaser.Scene {
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).
   private stageSound(index: number) {
-    this.cue = STAGES[this.stage].sounds.find((s) => s.index === index);
+    const { stage } = this.match;
+    this.cue = STAGES[stage].sounds.find((s) => s.index === index);
     if (this.cue) this.playMusic();
     else this.sound.stopAll();
   }
@@ -485,7 +614,7 @@ export class TrainingScene extends Phaser.Scene {
     this.track?.stop();
     const cue = this.cue;
     if (!this.music || !cue) return;
-    const key = `${this.stage}-sound-${cue.index}`;
+    const key = `${this.match.stage}-sound-${cue.index}`;
     if (!this.cache.audio.exists(key)) {
       this.load.audio(key, BASE + cue.filename);
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {
@@ -508,6 +637,27 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // Grow a hidden sprite pool to the current object count.
+  // Each fighter's sprite, shadow and action-43 black, grown as a story seats
+  // more.
+  private growFighters(count: number) {
+    while (this.sprites.length < count) {
+      // Action 43, a viewport object at (327, 498) in bucket 15 (op 0x04
+      // flags 0x46 at PCs 300/325): over the court, behind every object.
+      this.blacks.push(
+        this.add
+          .image(0, 0, 'ryuko-294')
+          .setScale(ART_SCALE)
+          .setScrollFactor(0)
+          .setDepth(0.5)
+          .setVisible(false),
+      );
+      this.shadows.push(this.add.ellipse(0, GROUND - 1, 94, 13, 0x171311, 0.3));
+      this.sprites.push(
+        this.add.image(0, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
+      );
+    }
+  }
+
   private pool(sprites: Phaser.GameObjects.Image[], count: number) {
     while (sprites.length < count)
       sprites.push(
@@ -673,12 +823,13 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   update(_time: number, delta: number) {
-    if (!this.ready || this.error) return;
+    if (!this.ready || this.error || this.loading) return;
     try {
       if (this.select) {
         if (!this.paused)
           this.clock.advance(delta, () => {
-            if (!this.select) return;
+            // A screen that finished waits for what it opens to load.
+            if (!this.select || this.loading) return;
             const controls = new Set([
               ...this.virtual,
               ...this.pressed,
@@ -699,6 +850,8 @@ export class TrainingScene extends Phaser.Scene {
       }
       if (!this.paused && !this.match.resultReady)
         this.clock.advance(delta, () => {
+          // The match is over once it opens a screen or loads the next.
+          if (this.select || this.loading) return;
           const controls = new Set([
             ...this.virtual,
             ...this.pressed,
@@ -711,9 +864,7 @@ export class TrainingScene extends Phaser.Scene {
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
           if (this.match.round !== round) this.resetIdle();
-          // A won Vs. match returns to the select screen (state 902 spawns
-          // object type 10, 0x40982b).
-          if (this.match.resultReady) this.openSelect();
+          if (this.match.resultReady) this.matchOver();
           for (const { owner, index } of this.match.sounds)
             if (owner < 0) this.stageSound(index);
             else
@@ -725,7 +876,7 @@ export class TrainingScene extends Phaser.Scene {
             this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {
             const f = this.match.fighters[i];
-            if (frozen[i] || f.hitStop > 0) return;
+            if (!f.present || frozen[i] || f.hitStop > 0) return;
             if (f.action !== 'idle') {
               this.idling[i] = false;
               return;
@@ -786,10 +937,22 @@ export class TrainingScene extends Phaser.Scene {
           )
           .setFlip(pose.flip_x, pose.flip_y);
       });
+      this.growFighters(this.match.fighters.length);
       this.sprites.forEach((sprite, i) => {
         const f = this.match.fighters[i];
+        // A story's player draws once it has entered and shown a display.
+        if (!f?.present || !f.shown) {
+          sprite.setVisible(false);
+          this.shadows[i].setVisible(false);
+          this.blacks[i].setVisible(false);
+          return;
+        }
+        this.shadows[i].setVisible(true);
         const pose = this.pose(i);
-        const holder = this.match.fighters[1 - i];
+        // A held pose places by its holder's facing.
+        const by = f.caught;
+        const holder =
+          (by && !('clip' in by) ? by : this.match.fighters[1 - i]) ?? f;
         const p = (pose.held ? heldPlacement : placement)(
           pose,
           pose.width,
@@ -902,7 +1065,10 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   private report() {
-    const [a, b] = this.match.fighters;
+    const [a] = this.match.fighters;
+    const b = this.match.rival ?? this.match.fighters[1] ?? a;
+    // A story battle's result goes once the story moves on.
+    const over = this.match.resultReady && !(this.select && this.match.battle);
     const status: GameStatus = {
       ready: this.ready,
       paused: this.paused,
@@ -917,11 +1083,12 @@ export class TrainingScene extends Phaser.Scene {
           ? `action ${a.branch}`
           : a.action.replace(/([A-Z])/g, ' $1'),
       winner: this.match.winner,
-      matchWinner: this.match.resultReady ? this.match.matchWinner : null,
-      resultReady: this.match.resultReady,
+      matchWinner: over ? this.match.matchWinner : null,
+      resultReady: over,
       error: this.error,
       selecting: !!this.select,
       fighters: [this.fighter, this.opponent],
+      story: !this.select && !!this.match.battle,
     };
     const serialized = JSON.stringify(status);
     if (serialized !== this.lastStatus) {
@@ -933,7 +1100,7 @@ export class TrainingScene extends Phaser.Scene {
 
 // An exported title or select-screen image's size: a demo's ('t1', 't2',
 // 'select'), the KGT's ('ui') or a player's.
-const selectSizes = new Map(
+const selectSizes = new Map<string, { width: number; height: number }>(
   [
     ...Object.entries(DEMOS).flatMap(([demo, { images }]) =>
       images.map((i) => [`${demo}-${i.index}`, i] as const),

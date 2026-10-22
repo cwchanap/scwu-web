@@ -215,6 +215,22 @@ describe('story battles', () => {
     }
   });
 
+  it("shows the only other player with life on the HUD's 2P side (0x40a36e)", () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ slots: [slot(), slot(), null] }),
+    );
+    const [, first, second] = match.fighters;
+    match.step();
+    expect(match.rival).toBeNull();
+    first.hp = 0;
+    match.step();
+    expect(match.rival).toBe(second);
+    // Vs. shows player 2.
+    const vs = new Match();
+    expect(vs.rival).toBe(vs.fighters[1]);
+  });
+
   it('walls a story without letterings bit 2 at the stage, not the screen', () => {
     for (const letterings of [0, 4]) {
       const match = Match.story('ryuko', battle({ letterings }));

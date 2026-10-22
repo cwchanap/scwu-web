@@ -1,11 +1,13 @@
-// Ports of the title (0x4080a0) and the character select screen (object
-// type 10, 0x406fc0) as VS single (mode 1) runs it: their demos (T1 and T2,
-// CHAR SELECT), the KGT cursors and each hovered player's select face, run
-// from their raw records.
+// Ports of the title (0x4080a0), the character select screen (object type
+// 10, 0x406fc0) as VS single (mode 1) and story mode (0) run it, a story's
+// demos (type 16, 0x406c10) and the continue screen (13, 0x4084f0): their
+// demos (T1 and T2, CHAR SELECT, the story's, CONTINUE), the KGT cursors and
+// each hovered player's select face, run from their raw records.
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import type { Color } from './animations';
 import type { Input } from './match';
+import { rand } from './standing';
 import type { Frame } from './standing';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
@@ -15,14 +17,16 @@ import t2 from './generated/t2.json';
 type Records = number[][];
 type Program = Record<string, Records>;
 // A demo's objects, records and header (export_demo).
-interface Demo {
+export interface Demo {
   objects: { action: number; z: number }[];
   actions: Program;
   flags: number;
   duration: number;
 }
 const DEMOS: Record<'select' | 't1' | 't2', Demo> = { select, t1, t2 };
-export type SelectContainer = keyof typeof DEMOS | 'kgt' | Who;
+// A story's demos load as they play (scene.ts), each its own container.
+export type SelectContainer =
+  keyof typeof DEMOS | `demo${number}` | 'kgt' | Who;
 
 const u16 = (r: number[], i: number) => r[i] | (r[i + 1] << 8);
 const s16 = (r: number[], i: number) => (u16(r, i) << 16) >> 16;
@@ -85,20 +89,13 @@ export const ROSTER: readonly (Who | null)[] = [
 ];
 // A cell VS single lets a cursor rest on: a named player whose flag has bit 1
 // (0x4079a0); SHIN-Z's has only bit 0 (story), DoraEmon's and the blanks'
-// none.
-export const selectable = (index: number) =>
+// none. Story mode asks for bit 0 (0x407c5c).
+export const selectable = (index: number, bit = 2) =>
   index >= 0 &&
   index < 50 &&
   LAYOUT.named[index] &&
-  (LAYOUT.flags[index] & 2) !== 0 &&
+  (LAYOUT.flags[index] & bit) !== 0 &&
   ROSTER[index] !== null;
-
-const programs = (container: SelectContainer): Program =>
-  container in DEMOS
-    ? DEMOS[container as keyof typeof DEMOS].actions
-    : container === 'kgt'
-      ? LAYOUT.programs
-      : (CHARACTERS[container as Who].select.actions as Program);
 
 export interface SelectObject {
   container: SelectContainer;
@@ -122,6 +119,10 @@ export interface SelectObject {
   alive: boolean;
   born: number;
   owner: number;
+  // Op 0x0b's return (+0x85), and op 0x09's: the action it runs, the times
+  // left and the return (+0x7c, +0x7d, +0x81); each an action and offset.
+  single: [number, number] | null;
+  call: { left: number; to: [number, number]; back: [number, number] } | null;
 }
 export interface Cue {
   container: SelectContainer;
@@ -137,11 +138,13 @@ const REPEAT_INTERVAL = 5;
 // The buttons that choose (0x407814): A–F.
 const BUTTONS = 0x3f0;
 // Where each cursor rests, kept from one visit to the next as the engine's
-// statics at 0x424e50 and 0x424e58 are; both start on Ryuko's cell.
+// statics at 0x424e50 and 0x424e58 are, and story mode's at 0x424e68; all
+// start on Ryuko's cell.
 const remembered: [number, number][] = [
   [0, 0],
   [0, 0],
 ];
+const storyRemembered: [number, number][] = [[0, 0]];
 
 // A screen's objects, run from their records as the engine's objects are.
 abstract class Screen {
@@ -150,6 +153,9 @@ abstract class Screen {
   globals: number[] = Array<number>(64).fill(0);
   sounds: Cue[] = [];
   protected tick = 0;
+  // The rand op 0x20 rolls (0x417a22). Authored: each screen seeds its own;
+  // the engine shares one with everything.
+  protected seed = 0;
 
   step(input: Input = {}) {
     this.tick++;
@@ -169,11 +175,21 @@ abstract class Screen {
   protected abstract control(input: Input): void;
 
   // 0x406450 clears the screen's objects; 0x406790 makes the loaded demo's.
-  protected load(demo: keyof typeof DEMOS) {
+  protected load(
+    container: SelectContainer,
+    demo = DEMOS[container as keyof typeof DEMOS],
+  ) {
     for (const o of this.objects) o.alive = false;
-    for (const { action, z } of DEMOS[demo].objects)
-      this.spawn(demo, action, 0, 0, z);
-    return DEMOS[demo];
+    for (const { action, z } of demo.objects)
+      this.spawn(container, action, 0, 0, z);
+    return demo;
+  }
+
+  protected programs(container: SelectContainer): Program {
+    if (container in DEMOS)
+      return DEMOS[container as keyof typeof DEMOS].actions;
+    if (container === 'kgt') return LAYOUT.programs;
+    return CHARACTERS[container as Who].select.actions as Program;
   }
 
   protected spawn(
@@ -206,6 +222,8 @@ abstract class Screen {
       alive: true,
       born: this.tick,
       owner,
+      single: null,
+      call: null,
     };
     this.objects.push(o);
     return o;
@@ -214,20 +232,28 @@ abstract class Screen {
   // One script step (0x4125fc) of an object's raw records.
   private run(o: SelectObject) {
     if (--o.timer > 0) return;
-    const program = programs(o.container);
+    const program = this.programs(o.container);
     for (let steps = 0; ; steps++) {
       if (steps >= 300)
         throw new Error(`Select ${o.container} ${o.action} runs no display`);
       const records = program[o.action];
       if (!records) throw new Error(`Select ${o.container} lacks ${o.action}`);
-      // Running out restarts an object that has shown a display and deletes
-      // one that hasn't (0x4127b7).
+      // Running out returns from a single call, runs a call again until its
+      // times are up and then returns (0x412625), and otherwise ends the
+      // object: these restart action 0 (+0x34, which their spawns leave 0),
+      // whose one empty record runs out again until the 300-step limit
+      // deletes them (0x4127b7, 0x413b7b), or delete one that showed nothing.
       if (o.pc >= records.length) {
-        if (!o.displayed) {
+        if (o.single) {
+          [o.action, o.pc] = o.single;
+          o.single = null;
+        } else if (o.call) {
+          [o.action, o.pc] = --o.call.left ? o.call.to : o.call.back;
+          if (!o.call.left) o.call = null;
+        } else {
           o.alive = false;
           return;
         }
-        o.pc = 0;
         continue;
       }
       const r = records[o.pc++];
@@ -260,6 +286,30 @@ abstract class Screen {
             o.pc = r[3];
           }
           break;
+        // Op 0x09 runs action r[2:4] from r[4], r[1] times; op 0x0b runs
+        // r[1:3] from r[3] once (0x4129a9, 0x412a2f).
+        case 0x09:
+          if (r[1] && u16(r, 2)) {
+            const to: [number, number] = [u16(r, 2), r[4]];
+            o.call = { left: r[1], to, back: [o.action, o.pc] };
+            [o.action, o.pc] = to;
+          }
+          break;
+        case 0x0b:
+          if (u16(r, 1)) {
+            o.single = [o.action, o.pc];
+            [o.action, o.pc] = [u16(r, 1), r[3]];
+          }
+          break;
+        // 0x4139a3: a roll of rand % (r[1:3] + 1) above r[3:5] jumps to
+        // r[6:8] at r[8].
+        case 0x20: {
+          const [seed, value] = rand(this.seed);
+          this.seed = seed;
+          if (value % (u16(r, 1) + 1) > u16(r, 3) && u16(r, 6))
+            [o.action, o.pc] = [u16(r, 6), r[8]];
+          break;
+        }
         case 0x1f:
           if (this.variable(o, r)) {
             o.action = u16(r, 1);
@@ -361,15 +411,25 @@ export class CharacterSelect extends Screen {
   drawn = [-1, -1];
   // Authored: one person drives the 1P cursor, then the 2P one.
   active = 0;
+  // The pair chosen; story mode's 1P, twice.
   done: [Who, Who] | null = null;
   private wait = 0;
   private cursors: SelectObject[] = [];
   private previous = [0, 0];
   private held = [0, 0];
   private countdown = [0, 0];
+  private cells: [number, number][];
+  // Story mode (0x407ad6) moves the 1P cursor alone over the players whose
+  // flag has bit 0.
+  private sides: number[];
 
-  constructor(private cells = remembered) {
+  constructor(
+    cells?: [number, number][],
+    readonly story = false,
+  ) {
     super();
+    this.cells = cells ?? (story ? storyRemembered : remembered);
+    this.sides = story ? [0] : [0, 1];
   }
 
   protected control(input: Input) {
@@ -378,19 +438,19 @@ export class CharacterSelect extends Screen {
   }
 
   // State 0 (0x40701f): the demo's objects (0x406790) and both cursors
-  // (0x4071ae).
+  // (0x4071ae), or story mode's 1P one (0x407207).
   private open() {
     this.load('select');
-    this.cursors = [0, 1].map((p) =>
+    this.cursors = this.sides.map((p) =>
       this.spawn('kgt', LAYOUT.cursors[p], 0, 0, 0x65),
     );
   }
 
-  // State 1, VS single (0x407782), for each side.
+  // State 1, VS single (0x407782), for each side, or story mode's.
   private choose(input: Input) {
     const words = [0, 1].map((p) => (p === this.active ? word(input) : 0));
     const [pressed, directions] = this.read(words);
-    for (const p of [0, 1]) {
+    for (const p of this.sides) {
       const cell = this.cells[p];
       const cursor = this.cursors[p];
       cursor.x = LAYOUT.origin[0] + LAYOUT.step[0] * cell[0];
@@ -432,17 +492,21 @@ export class CharacterSelect extends Screen {
         for (const o of this.objects)
           if (o.owner === p && o.container !== 'kgt') o.alive = false;
         this.hover[p] = -1;
-      } else if (selectable(index)) {
+      } else if (selectable(index, this.story ? 1 : 2)) {
         this.hover[p] = index;
         const who = ROSTER[index]!;
         const [x, y] = LAYOUT.sides[p];
         this.spawn(who, CHARACTERS[who].selectFace, x, y, 0x50, p ? -1 : 1, p);
       }
     }
-    if (!this.decided[0] || !this.decided[1] || this.done) return;
-    // 0x407a94: then a hundred ticks before the battle.
+    if (this.sides.some((p) => !this.decided[p]) || this.done) return;
+    // 0x407a94: then a hundred ticks before the battle, or story mode's
+    // first step (0x407b1f).
     if (this.wait++ > 100)
-      this.done = [ROSTER[this.hover[0]]!, ROSTER[this.hover[1]]!];
+      this.done = [
+        ROSTER[this.hover[0]]!,
+        ROSTER[this.hover[this.sides.at(-1)!]]!,
+      ];
   }
 
   private moveCell(cell: [number, number], dx: number, dy: number) {
@@ -567,9 +631,9 @@ export class Title extends Screen {
       place = place < last ? place + 1 : 0;
       this.latch = true;
     } else if (pressed & BUTTONS && !this.latch) {
-      // Authored: only VS single is ported, so the others choose nothing.
+      // Authored: VS multi isn't ported, so it chooses nothing.
       const mode = MODES[this.items[place]];
-      if (mode === 'vs') this.done = mode;
+      if (mode !== 'multi') this.done = mode;
     }
     [this.cursor!.x, this.cursor!.y] = TITLE.items[this.items[place]];
     // T2 lasts until a press, so no countdown returns the menu to T1.
@@ -587,6 +651,103 @@ export class Title extends Screen {
   private restart() {
     for (const o of this.objects) o.alive = false;
     this.state = 0;
+  }
+}
+
+// A story step's demo (object type 16, 0x406c10). Its first step loads it
+// (0x403fc0) and makes its objects (0x406790); from then on its ticks (0
+// for until a press) run out, and ten ticks on a fresh button skips one
+// whose flag allows it (bit 0) once a tick has passed without one. The step
+// after, the story runs on (state 2).
+export class StoryDemo extends Screen {
+  done = false;
+  private state = 0;
+  private wait = 0;
+  private armed = false;
+  private left = 0;
+  private previous = 0;
+
+  constructor(
+    readonly index: number,
+    private demo: Demo,
+    seed = 0,
+  ) {
+    super();
+    this.seed = seed;
+  }
+
+  protected programs(container: SelectContainer) {
+    return container === `demo${this.index}`
+      ? this.demo.actions
+      : super.programs(container);
+  }
+
+  protected control(input: Input) {
+    const now = word(input);
+    const pressed = (now ^ this.previous) & now;
+    this.previous = now;
+    if (this.state === 2) {
+      this.done = true;
+      return;
+    }
+    if (this.state === 0) {
+      this.state = 1;
+      this.left = this.load(`demo${this.index}`, this.demo).duration;
+    }
+    if (this.wait < 10) this.wait++;
+    else if (this.demo.flags & 1) {
+      if (!(pressed & BUTTONS)) this.armed = true;
+      else if (this.armed) {
+        this.state = 2;
+        return;
+      }
+    }
+    if (this.left && --this.left === 0) this.state = 2;
+  }
+}
+
+// The continue screen (object type 13, 0x4084f0): CONTINUE (the demo at
+// 0x4438a0, whose ticks it doesn't count) and its cursor (KGT 81,
+// 0x44524a), which stands where YES's or NO's action's first record says
+// (82, 83: 0x44524c, 0x44524e). With a key held, a fresh direction turns
+// it over or a fresh button chooses, once every key was let go since; yes
+// runs the battle again (0x408585), no returns to the title.
+export const CONTINUE = ui.continue;
+export class Continue extends Screen {
+  done: 'yes' | 'no' | null = null;
+  choice = 0;
+  private cursor: SelectObject | null = null;
+  private latch = false;
+  private previous = 0;
+
+  constructor(private demo: Demo) {
+    super();
+  }
+
+  protected programs(container: SelectContainer) {
+    return container === 'demo9'
+      ? this.demo.actions
+      : super.programs(container);
+  }
+
+  protected control(input: Input) {
+    const now = word(input);
+    const pressed = (now ^ this.previous) & now;
+    this.previous = now;
+    if (!this.cursor) {
+      this.load('demo9', this.demo);
+      this.cursor = this.spawn('kgt', CONTINUE.cursor, 0, 0, 0x65);
+      return;
+    }
+    if (!now) this.latch = false;
+    else if (pressed & 0xf && !this.latch) {
+      this.choice ^= 1;
+      this.latch = true;
+    } else if (pressed & BUTTONS && !this.latch) {
+      this.done = this.choice ? 'no' : 'yes';
+      return;
+    }
+    [this.cursor.x, this.cursor.y] = CONTINUE.items[this.choice];
   }
 }
 
@@ -614,6 +775,19 @@ function buttonIndex(pressed: number) {
 // next of the eight.
 const apart = (palette: number, other: number) =>
   palette === other ? (palette + 1) % 8 : palette;
+// A story's 1P keeps its button's palette, and each slot's player enters
+// with none (0x411edf) and takes the first no other player holds (0x412056).
+// ponytail: those of players an earlier battle seated, which the engine
+// keeps, aren't counted.
+export function storyPalettes(first: number, count: number) {
+  const palettes = [first];
+  while (palettes.length < count) {
+    let palette = 0;
+    while (palettes.includes(palette)) palette++;
+    palettes.push(palette);
+  }
+  return palettes;
+}
 // The battle sets each player's palette to its button (0x408a9f), and each
 // fighter, player 1's first, moves off the other's as it enters (0x412056):
 // the same button twice turns player 1's.

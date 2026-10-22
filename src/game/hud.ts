@@ -86,26 +86,41 @@ function letteringFrame({ frames, loop }: Lettering, age: number) {
 }
 export const koFrame = (age: number) => letteringFrame(ko, age);
 
-// The letterings a match shows, by age: in Vs. CPU the round-start logo wipe
-// (13's 115), or on the VS path its VS splash in round 1 and demo black
-// after, the round's 'DRESS' and 'SHOW TIME'; then every result's KO
-// lettering (26, or 28, 29, 32 and 33, which jump to it), and before another
+// The letterings a match shows, by age: in Vs. CPU and a story the
+// round-start logo wipe (13's 115), or on the VS path its VS splash in round
+// 1 and demo black after, the round's 'DRESS' and 'SHOW TIME', which a story
+// step shows by its letterings' bits 0 and 1 (0x408d4b, 0x408dde); then
+// every result's KO lettering (26, or 32 and 33, which jump to it), a
+// story's YOU WIN or YOU LOSE (28, 29) in its place, and before another
 // round 14's logo wipe back in (116). A match lasts at most five rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
   const opening = match.vs
     ? calls.vs[match.round === 1 ? 'first' : 'later']
     : [calls.logo];
-  if (match.calls)
+  const bits = match.battle?.letterings ?? 3;
+  if (match.calls) {
     shown.push(
       ...opening.map((lettering): [Lettering, number] => [
         lettering,
         match.roundTicks,
       ]),
-      [calls.rounds[match.round - 1], match.roundTicks - DRESS_TICK],
-      [calls.fight, match.roundTicks - FIGHT_TICK],
     );
-  if (match.winner) shown.push([ko, match.endingTicks]);
+    if (bits & 1)
+      shown.push([
+        calls.rounds[match.round - 1],
+        match.roundTicks - DRESS_TICK,
+      ]);
+    if (bits & 2) shown.push([calls.fight, match.roundTicks - match.fightTick]);
+  }
+  const { battle, winner } = match;
+  if (winner)
+    shown.push([
+      battle && winner !== 'draw'
+        ? calls.story[winner === 'player' ? 'win' : 'lose']
+        : ko,
+      match.endingTicks,
+    ]);
   if (match.winner && !match.matchOver)
     shown.push([calls.transition, match.endingTicks - match.roundEnd]);
   return shown;
@@ -324,7 +339,10 @@ export function createHud(
   const gauges = [image(31, 99, 443), image(31, 414, 443).setFlipX(true)];
   // Stock anchors come from KGT actions 74/75.
   const stocks = [image(17, 49, 434), image(17, 545, 434)];
-  const digits = [image(47, 300, 16), image(47, 320, 16)];
+  // The timer (0x40a7ec) shows the round timer, which starts at its seconds
+  // × 100 − 1 (0x408a7e, 0x408c26), over 100: one less than `seconds`. Its
+  // one, two or three digits sit 20 apart, centred on 320.
+  const digits = [0, 1, 2].map(() => image(47, 310, 16));
   const infinity = scene.add
     .text(320 * scale, 27 * scale, '∞', {
       fontFamily: 'Arial',
@@ -342,7 +360,22 @@ export function createHud(
   );
 
   return (match: Match) => {
-    match.fighters.forEach((f, index) => {
+    // In a story the 2P side shows the enemy, and nothing while there is
+    // none (0x40ddf5, 0x40de53, 0x40a50e).
+    [match.fighters[0], match.rival].forEach((f, index) => {
+      if (!f) {
+        for (const part of [
+          life[index],
+          gauges[index],
+          stocks[index],
+          faces[index],
+          names[index],
+        ])
+          part.setVisible(false);
+        return;
+      }
+      const bar = healthCrop(f.hp, index === 1, lifeOf(f.who));
+      life[index].setCrop(bar.x, 0, bar.width, 14).setVisible(bar.width > 0);
       const crop = gaugeCrop(f.power, perStockOf(f.who));
       gauges[index]
         .setTexture(`ui-${gaugeImage(match.ticks)}`)
@@ -350,6 +383,7 @@ export function createHud(
         .setVisible(crop.width > 0);
       const [dx, dy] = STOCK_OFFSETS[f.stock];
       stocks[index]
+        .setVisible(true)
         .setTexture(`ui-${17 + f.stock}`)
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
       underPower[index].setTexture(
@@ -357,30 +391,33 @@ export function createHud(
           ? tint('ui-135', { r: 10, g: 10, b: 10 })
           : 'ui-135',
       );
-      const face = faces[index].setTexture(
-        `${f.who}-${faceImage(f.face, f.who)}`,
-      );
+      const face = faces[index]
+        .setVisible(true)
+        .setTexture(`${f.who}-${faceImage(f.face, f.who)}`);
       if (index) face.setX((609 - face.width) * scale);
       const name = NAMES[f.who];
       names[index].setVisible(name !== null);
       if (name !== null) names[index].setTexture(`${f.who}-${name}`);
     });
-    life.forEach((bar, index) => {
-      const { hp, who } = match.fighters[index];
-      const crop = healthCrop(hp, index === 1, lifeOf(who));
-      bar.setCrop(crop.x, 0, crop.width, 14).setVisible(crop.width > 0);
-      wins[index].forEach((mark, i) => {
+    // A mark per round to win (0x470048).
+    wins.forEach((side, index) =>
+      side.forEach((mark, i) => {
         const won = match.wins[index] > i ? 1 : 0;
         mark
+          .setVisible(i < match.rounds)
           .setTexture(`ui-${won ? 29 : 30}`)
           .setPosition((marks[index][i] + won) * scale, (40 + won) * scale);
-      });
-    });
+      }),
+    );
     const finite = Number.isFinite(match.seconds);
-    const value = String(match.seconds).padStart(2, '0');
+    const value = String(Math.max(0, match.seconds - 1));
     digits.forEach((digit, i) => {
-      digit.setVisible(finite);
-      if (finite) digit.setTexture(`ui-${47 + Number(value[i]) * 5}`);
+      const shown = finite && i < value.length;
+      digit.setVisible(shown);
+      if (shown)
+        digit
+          .setTexture(`ui-${47 + Number(value[i]) * 5}`)
+          .setX((310 + 20 * i - 10 * (value.length - 1)) * scale);
     });
     infinity.setVisible(!finite);
     // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds, 4 fades

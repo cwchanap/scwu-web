@@ -2,21 +2,30 @@ import { describe, expect, it } from 'vitest';
 import {
   battlePalettes,
   CharacterSelect,
+  Continue,
+  CONTINUE,
   LAYOUT,
   MODES,
   ROSTER,
   selectable,
+  storyPalettes,
+  StoryDemo,
   Title,
   TITLE,
 } from './select';
+import type { Demo } from './select';
 import type { Input } from './match';
+import continueDemo from './generated/demos/9.json';
+import next from './generated/demos/3.json';
+import ending from './generated/demos/22.json';
+import yinanEnd from './generated/demos/87.json';
 
 const fresh = () =>
   new CharacterSelect([
     [0, 0],
     [0, 0],
   ]);
-const run = (select: CharacterSelect, inputs: Input[]) => {
+const run = (select: { step(input: Input): void }, inputs: Input[]) => {
   for (const input of inputs) select.step(input);
 };
 const tap = (input: Input) => [input, {}];
@@ -220,7 +229,7 @@ describe('title (0x4080a0)', () => {
     expect(frame(title, 'kgt', TITLE.cursor)).toBe(137);
   });
 
-  it('moves its cursor a press at a time, wrapping, and enters VS single', () => {
+  it('moves its cursor a press at a time, wrapping, and enters story or VS single', () => {
     const title = new Title();
     while (title.state !== 3) title.step();
     title.step({ kick: true });
@@ -238,17 +247,141 @@ describe('title (0x4080a0)', () => {
     title.step({ jump: true });
     expect(title.place).toBe((start + 2) % 3);
     expect([cursor().x, cursor().y]).toEqual(TITLE.items[title.place]);
-    // Story and VS multi aren't ported; VS single chooses.
-    while (MODES[title.items[title.place]] !== 'vs') {
-      title.step();
-      title.step({ crouch: true });
-      title.step();
-      title.step({ punch: true });
-      if (MODES[title.items[title.place]] !== 'vs')
-        expect(title.done).toBeNull();
+    // Story and VS single choose their mode; VS multi isn't ported.
+    for (const mode of MODES) {
+      const menu = new Title();
+      while (menu.state !== 3) menu.step();
+      menu.step({ kick: true });
+      menu.step();
+      while (MODES[menu.items[menu.place]] !== mode) {
+        menu.step({ crouch: true });
+        menu.step();
+      }
+      menu.step({ punch: true });
+      expect(menu.done).toBe(mode === 'multi' ? null : mode);
     }
-    title.step();
-    title.step({ punch: true });
-    expect(title.done).toBe('vs');
+  });
+});
+
+describe('story select (object type 10, story mode)', () => {
+  it('moves the 1P cursor alone over the story players and runs the story 101 ticks after the choice', () => {
+    const select = new CharacterSelect([[0, 0]], true);
+    select.step();
+    expect(
+      select.objects.filter((o) => o.container === 'kgt').map((o) => o.action),
+    ).toEqual([LAYOUT.cursors[0]]);
+    // SHIN-Z's cell (33), down 4 and right 1, has bit 0 (story).
+    run(select, [
+      ...tap({ crouch: true }),
+      ...tap({ crouch: true }),
+      ...tap({ crouch: true }),
+      ...tap({ crouch: true }),
+      ...tap({ right: true }),
+      {},
+    ]);
+    expect(select.hover).toEqual([33, -1]);
+    select.step({ kick: true });
+    let ticks = 1;
+    while (!select.done) {
+      select.step();
+      ticks++;
+    }
+    expect([ticks, select.done, select.palettes[0]]).toEqual([
+      102,
+      ['shinz', 'shinz'],
+      0,
+    ]);
+    // Bit 0 locks out DoraEmon (45) and the blank templates.
+    const locked = ROSTER.flatMap((_, i) => (selectable(i, 1) ? [] : [i]));
+    expect(locked).toEqual([42, 43, 44, 45, 47, 48, 49]);
+  });
+
+  it("gives each slot's player the first palette no one before it holds", () => {
+    expect(storyPalettes(0, 4)).toEqual([0, 1, 2, 3]);
+    expect(storyPalettes(2, 4)).toEqual([2, 0, 1, 3]);
+  });
+});
+
+describe('story demos (object type 16, 0x406c10)', () => {
+  const play = (demo: StoryDemo, input: (t: number) => Input = () => ({})) => {
+    let ticks = 0;
+    while (!demo.done) demo.step(input(++ticks));
+    return ticks;
+  };
+
+  it('runs out its ticks, then the story runs on the step after', () => {
+    // --BR-END (22): 1300 ticks, no skipping.
+    expect(
+      play(new StoryDemo(22, ending as Demo), (t) => ({ punch: !(t % 2) })),
+    ).toBe(1301);
+  });
+
+  it('lets a fresh button skip a flag-1 demo once ten ticks pass', () => {
+    // --NEXT-- (3): the press at tick 12 follows a tick without one.
+    const tapped = (at: number) => (t: number) => ({
+      punch: t === at || t === 5,
+    });
+    expect(play(new StoryDemo(3, next as Demo), tapped(12))).toBe(13);
+    // Held from the start, it never finds a fresh press: the 1000 ticks run.
+    expect(play(new StoryDemo(3, next as Demo), () => ({ punch: true }))).toBe(
+      1001,
+    );
+  });
+
+  it('runs op 0x09 calls their times and op 0x0b calls once, then returns (0x412625)', () => {
+    // YINANendB (87): action 2 calls action 1 from its third record, two
+    // 5-tick displays, 60 times (PC 21), then twice once (PCs 23, 25), and
+    // shows image 1000 (PC 26).
+    const demo = new StoryDemo(87, yinanEnd as Demo);
+    demo.step();
+    const o = demo.objects.find((o) => o.action === 2)!;
+    while (o.action !== 1) demo.step();
+    // 600 ticks, then 10 for each single call.
+    for (let t = 1; t < 620; t++) {
+      demo.step();
+      expect([o.action, o.frame?.image]).toEqual([1, 4]);
+    }
+    demo.step();
+    expect([o.action, o.pc, o.frame?.image]).toEqual([2, 27, 1000]);
+  });
+});
+
+describe('continue screen (object type 13, 0x4084f0)', () => {
+  const opened = () => {
+    const screen = new Continue(continueDemo as Demo);
+    screen.step();
+    screen.step();
+    return screen;
+  };
+  const cursor = (screen: Continue) => {
+    const o = screen.objects.find((o) => o.container === 'kgt')!;
+    return [o.x, o.y];
+  };
+
+  it('stands its cursor on YES, turns it over with a direction and chooses with a button', () => {
+    const screen = opened();
+    expect([cursor(screen), CONTINUE.items]).toEqual([
+      [180, 158],
+      [
+        [180, 158],
+        [180, 225],
+      ],
+    ]);
+    // A held direction turns it once; the button waits for a release.
+    run(screen, [
+      { crouch: true },
+      { crouch: true },
+      { crouch: true, punch: true },
+    ]);
+    expect([screen.choice, screen.done, cursor(screen)]).toEqual([
+      1,
+      null,
+      [180, 225],
+    ]);
+    run(screen, [{}, { punch: true }]);
+    expect(screen.done).toBe('no');
+    const yes = opened();
+    yes.step({ kick: true });
+    expect(yes.done).toBe('yes');
   });
 });

@@ -1824,6 +1824,13 @@ export class Match {
 
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
   // rounds; a single round otherwise.
+  // The fighter the HUD's 2P side shows: player 2, or in a story the enemy
+  // (0x40dde6), and none while there is none.
+  get rival(): Fighter | null {
+    if (!this.battle) return this.fighters[1];
+    return this.fighters[this.enemy] ?? null;
+  }
+
   get matchOver() {
     return !this.calls || this.wins.some((wins) => wins >= this.rounds);
   }
@@ -4015,6 +4022,11 @@ export class Match {
     if (this.resultReady) return;
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;
+    // The story HUD (0x40a36e) takes the only other player with life.
+    if (this.battle) {
+      const alive = this.fighters.flatMap((f, i) => (i && f.hp ? [i] : []));
+      if (alive.length === 1) this.enemy = alive[0];
+    }
     // 0x412271: before its script each tick, frozen or not, an object with
     // an afterimage slot counts down and, past zero, samples its position,
     // facing and display.
