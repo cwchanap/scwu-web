@@ -36,36 +36,38 @@ describe('selected core animation assets', () => {
     ]);
   });
 
-  it("exports each stage's track for the optional music", () => {
-    for (const [stage, seconds] of [
-      ['court', 75],
-      ['train', 139],
-      ['sakuranight', 131],
-      ['trainnight', 114],
-      ['dojin', 170],
-      ['japan', 99],
-      ['park', 126],
-      ['parknight', 120],
-      ['sakura', 129],
-      ['greek', 129],
-      ['space', 94],
-      ['boss', 126],
-      ['office', 116],
-      ['office2', 155],
-      ['brboss', 129],
-      ['gi', 134],
-      ['spacenight', 91],
-      ['streetnight', 82],
+  it("exports the sounds each stage's scripts cue: its tracks (looping) and jingles", () => {
+    const tracks = (index: number, seconds: number) => [index, seconds, true];
+    for (const [stage, sounds] of [
+      ['court', [tracks(2, 75)]],
+      ['train', [tracks(1, 139)]],
+      ['sakuranight', [[2, 16, false], tracks(3, 131)]],
+      ['trainnight', [tracks(1, 114)]],
+      ['dojin', [tracks(1, 170)]],
+      ['japan', [tracks(1, 99)]],
+      ['park', [tracks(1, 126)]],
+      ['parknight', [tracks(2, 120)]],
+      ['sakura', [tracks(1, 129)]],
+      ['greek', [[1, 7, false], tracks(2, 71), tracks(3, 129), [4, 13, false]]],
+      ['space', [tracks(1, 94)]],
+      ['boss', [tracks(2, 126)]],
+      ['office', [tracks(2, 116)]],
+      ['office2', [tracks(2, 155)]],
+      ['brboss', [tracks(2, 129)]],
+      ['gi', [tracks(1, 134)]],
+      ['spacenight', [tracks(2, 91)]],
+      ['streetnight', [tracks(2, 82)]],
     ] as const) {
-      const wav = readFileSync(
-        new URL(
-          `../../public/assets/${STAGES[stage].music.filename}`,
-          import.meta.url,
-        ),
-      );
-      expect(wav.subarray(8, 12).toString()).toBe('WAVE');
-      // Seconds: payload bytes over the fmt chunk's byte rate.
-      expect(Math.round(wav.length / wav.readUInt32LE(28))).toBe(seconds);
+      expect(
+        STAGES[stage].sounds.map(({ index, filename, loop }) => {
+          const wav = readFileSync(
+            new URL(`../../public/assets/${filename}`, import.meta.url),
+          );
+          expect(wav.subarray(8, 12).toString()).toBe('WAVE');
+          // Seconds: payload bytes over the fmt chunk's byte rate.
+          return [index, Math.round(wav.length / wav.readUInt32LE(28)), loop];
+        }),
+      ).toEqual(sounds);
     }
   });
 

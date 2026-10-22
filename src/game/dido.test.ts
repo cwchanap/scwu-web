@@ -161,6 +161,30 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     });
   });
 
+  it('stops every sound while en300 hit holds global 14 at 200, and the stage loops its track again once it clears (PCs 4259, 4270)', () => {
+    const { match, dido, steps } = didoPlayer();
+    dido.stock = 3;
+    const seen: unknown[][] = [];
+    let held = 0;
+    for (let tick = 1; tick <= 1000; tick++) {
+      steps(tick === 3 ? { megaBeam: true } : {});
+      for (const { owner, index } of match.sounds)
+        if (owner < 0) seen.push([tick, index]);
+      if ((match.globals[14] ?? 0) !== held)
+        seen.push([tick, 'global 14', (held = match.globals[14]), now(dido)]);
+    }
+    // Sport Court's off (2) tests every 5 ticks until it sees 200, then
+    // every tick (PCs 3–13).
+    expect(seen).toEqual([
+      [1, 0],
+      [6, 2],
+      [124, 'global 14', 200, 310],
+      [126, 0],
+      [949, 'global 14', 0, 310],
+      [950, 2],
+    ]);
+  });
+
   it("sends K2's shots off the stage while en300 hit holds variable 7 at 100, even within their calls (PC 2745)", () => {
     // K2 obj2 (196) calls a 1-tick pass of itself 40 times, each first
     // testing variable 7 into Skill7 (198), which flies off at 30000.

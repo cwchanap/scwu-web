@@ -7003,6 +7003,35 @@ describe('stage objects', () => {
     expect(match.cpu.seed).toBe(cpu.seed);
   });
 
+  it("loops its track 5 ticks into round 1 alone, unless global 11 is 10 (Sport Court's PCs 15–23)", () => {
+    const cues = (stage: Stage, round = 1, global11 = 0) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'ryuko'], stage);
+      match.round = round;
+      match.globals[11] = global11;
+      const seen: number[][] = [];
+      for (let tick = 1; tick <= 1400; tick++) {
+        match.step();
+        for (const { owner, index } of match.sounds)
+          if (owner < 0) seen.push([tick, index]);
+      }
+      return seen;
+    };
+    // Its empty sound 0 (type 0) stops every sound; 2 is the 75-second track.
+    expect(cues('court')).toEqual([
+      [1, 0],
+      [6, 2],
+    ]);
+    expect(cues('court', 2)).toEqual([]);
+    expect(cues('court', 1, 10)).toEqual([[1, 0]]);
+    // Greek's back2 (5) plays its 13-second jingle (4) first and its track
+    // (3) 1290 ticks on.
+    expect(cues('greek')).toEqual([
+      [1, 0],
+      [6, 4],
+      [1296, 3],
+    ]);
+  });
+
   it('restarts a Train Morning object that runs out (0x4127b7)', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'ryuko'], 'train');
     const tv = match.layers.find((layer) => layer.clip === 6)!;

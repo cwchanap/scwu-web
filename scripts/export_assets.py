@@ -90,8 +90,9 @@ def decode_event(record):
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
     # hounds) and 15 (SEAN's cc hit, which only the Team VS actions set) and globals 0 (10
-    # sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss) and 14 (the stage's
-    # track, which each 開始時 BR tests for 0); other tests keep their fall-through path.
+    # sends a KO to make hikari), 6 (the freeze), 10 (ALPHA's KO Boss), 11 (10 or above 99 turns the
+    # stage's track off) and 14 (200 stops it, which each 開始時 BR tests for 0); other tests keep their
+    # fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -109,14 +110,15 @@ def decode_event(record):
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
                                                                               0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
-                                                                              0x8a, 0x8e):
+                                                                              0x8a, 0x8b, 0x8e):
         # Only ALPHA's KO writes global 10 (10000, 20000; PCs 1040, 1130), and the select screen's 2P
         # cursor 0 (KGT PCs 542, 590), so its 257 tests for 10 never pass and keep their fall-through.
         if record[4] == 0x8a and record[5] >> 2 & 3 == 1 and s16(record, 9) == 10:
             return None
         return test_event(record)
-    # Global 0 = r[7:9] (at 10 a KO enters make hikari) and global 10 (ALPHA's KO Boss).
-    if op == 0x1f and record[4] in (0x80, 0x8a) and record[5] == 1:
+    # Global 0 = r[7:9] (at 10 a KO enters make hikari), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's
+    # 開始時 set 10, their OPs 100) and 14 (SIN's, KAY's and DIDO's supers hold 200, then clear it).
+    if op == 0x1f and record[4] in (0x80, 0x8a, 0x8b, 0x8e) and record[5] == 1:
         return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7))
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
@@ -4093,35 +4095,33 @@ def main():
           f"idle programs, and {len(cases)} oracle traces.")
 
 
-# Each stage: its file, hash, and the looping track (type 0x11) the port's
-# Music box plays. After loading a stage, 0x40677c plays the first word of its
-# 0x409-byte block, a silent sound in all of these ('235no wav', 'no sound' or 'No');
-# two stage actions play the track only after SIN's, KAY's or DIDO's supers.
+# Each stage: its file and hash. After loading a stage, 0x40677c plays the first word of its
+# 0x409-byte block, a silent sound in all of these ('235no wav', 'no sound' or 'No'); its
+# scripts play its music (export_stage).
 STAGES = {
-    "court": ("Sport Court", "0-SPORT COURT", "dac3aca92f717921fca4cc1c777a5fe91657b1295b4d56eae1acfcd4c7570988", 2),
-    "train": ("Train Morning", "1-TRAIN MORNING", "d183b2f684062c63586c241cd867aad7a96dc6b7df4a15a17555314b276468f3", 1),
-    "sakuranight": ("Sakura Night", "2-SAKURA NIGHT", "411358a796f19eb3719fc2043ca971ecbcca18b0787b00c3729972724b6132cc", 3),
-    "trainnight": ("Train Night", "3-TRAIN NIGHT", "59af004e91dfa6413b79b7210e937f8a37a338440c35b1bea7bb9f9fc2989311", 1),
-    "dojin": ("Dojin BKG", "4-DOJIN BKG", "265a5a7a2af246bce2b3c4d855e5aff12b9361de15b937cd5868be97eb53866e", 1),
-    "japan": ("Japan Street", "5-JAPAN STREET", "08174c41c6c743485f5cb221ac374cb3d095d0935faba2564758e6ca5654aa21", 1),
-    "park": ("Park Morning", "6-PARK MORNING", "bc93dd038159ab36eac1490d18dee1a5c2cedd81ea0bfe06e800bb9f896e7148", 1),
-    "parknight": ("Park Night", "7-PARK NIGHT", "949ddb6f871ab35421628ca6a7a20d026c351a14af2c08d9718c59bd18447a3b", 2),
-    "sakura": ("Sakura Street", "8-SAKURA STREET", "5cc441325518e4c456d1617fbbdc5b8cbf077ee2070b44c9869e5ed4235c61aa", 1),
-    # Greek's 'off' (action 3) plays sound 3; sound 2 is a 71-second track.
-    "greek": ("Greek", "9-GREEK", "14bc51c38cf6d9931b9578c80ea6f072a33cb2b7adab47403c29dae1b5fedc18", 3),
-    "space": ("Space", "10-SPACE", "45523d1e3e1e19c929af26dd04b199b1b574781acc6c19ef1f6edea47dc1a095", 1),
-    "boss": ("Boss Base", "11-BOSS BASE", "837cda375858da2db614f0402d088984a5a13c47b17ae17b4bd5acc35273a54a", 2),
-    "office": ("ZM Office", "12-ZM OFFICE", "da3102370d33a92f0afd24f92bf30645f3c1ba9dba3f2931ee730209b91ae50b", 2),
-    "office2": ("ZM Office T2", "13-ZM OFFICE T2", "a2e6150db7f6545c6f3a8c9626d0e221381680ad639d8acf4ecb3885a66b4054", 2),
-    "brboss": ("BR Boss Base", "14-BR BOSS BASE", "7026e76455e6efa96076f08907be988a3299e80a836435f39ee707e667ee670b", 2),
-    "gi": ("GI Stage", "15-GI STAGE", "2695d56c7d9c91a1496049e9a783fa0a7e0e9e37fbcd42abbf8cd411d63f9b4f", 1),
-    "spacenight": ("Space Night", "16-SPACE NIGHT", "ce2fb3eec353168a698f7f7c159e8130a9734ee84d4014440cb38f1079ecdc86", 2),
-    "streetnight": ("Street Night", "17-STREET NIGHT", "e2227cda8dfa921a3a1eec07e7976dc825af62eb84d8239c9f0ca472f8e1891d", 2),
+    "court": ("Sport Court", "0-SPORT COURT", "dac3aca92f717921fca4cc1c777a5fe91657b1295b4d56eae1acfcd4c7570988"),
+    "train": ("Train Morning", "1-TRAIN MORNING", "d183b2f684062c63586c241cd867aad7a96dc6b7df4a15a17555314b276468f3"),
+    "sakuranight": ("Sakura Night", "2-SAKURA NIGHT", "411358a796f19eb3719fc2043ca971ecbcca18b0787b00c3729972724b6132cc"),
+    "trainnight": ("Train Night", "3-TRAIN NIGHT", "59af004e91dfa6413b79b7210e937f8a37a338440c35b1bea7bb9f9fc2989311"),
+    "dojin": ("Dojin BKG", "4-DOJIN BKG", "265a5a7a2af246bce2b3c4d855e5aff12b9361de15b937cd5868be97eb53866e"),
+    "japan": ("Japan Street", "5-JAPAN STREET", "08174c41c6c743485f5cb221ac374cb3d095d0935faba2564758e6ca5654aa21"),
+    "park": ("Park Morning", "6-PARK MORNING", "bc93dd038159ab36eac1490d18dee1a5c2cedd81ea0bfe06e800bb9f896e7148"),
+    "parknight": ("Park Night", "7-PARK NIGHT", "949ddb6f871ab35421628ca6a7a20d026c351a14af2c08d9718c59bd18447a3b"),
+    "sakura": ("Sakura Street", "8-SAKURA STREET", "5cc441325518e4c456d1617fbbdc5b8cbf077ee2070b44c9869e5ed4235c61aa"),
+    "greek": ("Greek", "9-GREEK", "14bc51c38cf6d9931b9578c80ea6f072a33cb2b7adab47403c29dae1b5fedc18"),
+    "space": ("Space", "10-SPACE", "45523d1e3e1e19c929af26dd04b199b1b574781acc6c19ef1f6edea47dc1a095"),
+    "boss": ("Boss Base", "11-BOSS BASE", "837cda375858da2db614f0402d088984a5a13c47b17ae17b4bd5acc35273a54a"),
+    "office": ("ZM Office", "12-ZM OFFICE", "da3102370d33a92f0afd24f92bf30645f3c1ba9dba3f2931ee730209b91ae50b"),
+    "office2": ("ZM Office T2", "13-ZM OFFICE T2", "a2e6150db7f6545c6f3a8c9626d0e221381680ad639d8acf4ecb3885a66b4054"),
+    "brboss": ("BR Boss Base", "14-BR BOSS BASE", "7026e76455e6efa96076f08907be988a3299e80a836435f39ee707e667ee670b"),
+    "gi": ("GI Stage", "15-GI STAGE", "2695d56c7d9c91a1496049e9a783fa0a7e0e9e37fbcd42abbf8cd411d63f9b4f"),
+    "spacenight": ("Space Night", "16-SPACE NIGHT", "ce2fb3eec353168a698f7f7c159e8130a9734ee84d4014440cb38f1079ecdc86"),
+    "streetnight": ("Street Night", "17-STREET NIGHT", "e2227cda8dfa921a3a1eec07e7976dc825af62eb84d8239c9f0ca472f8e1891d"),
 }
 
 
-def export_stage(key, name, filename, sha256, track):
-    """A stage's objects, their timelines and images, and its track.
+def export_stage(key, name, filename, sha256):
+    """A stage's objects, their timelines and images, and the sounds they cue.
 
     Round setup (0x408c3f) calls 0x406610, which makes an object (type 4, at
     0, 0) of every named action between the first and the last that holds a
@@ -4145,18 +4145,6 @@ def export_stage(key, name, filename, sha256, track):
         if any(r[0] == 0x0c for r in p.records[a.start:a.end]):
             objects.append(dict(action=a.index, z=z))
     scripts = flatten_queue(p, c, [(o["action"], 0) for o in objects], set(), set())
-    # The match runs a stage object's colour, motion, spawns and op 0x20
-    # rolls; its op 0x1f checks (of globals 10, 11 and 14 among them), and the
-    # music behind them, keep their fall-through path. So do the four whose
-    # global 3 check picks special music in VS (SP BGM 12 and 14) and the
-    # round checks (Greek's scenery, PCs 10–198), and the paths only those
-    # checks reach go.
-    for script in scripts.values():
-        kept = [not (e["op"] == "test" and (e["selector"] in (0x83, 0x8e) or e.get("pre", {}).get("round")))
-                for e in script["events"]]
-        if "loopEvent" in script:
-            script["loopEvent"] = sum(kept[:script["loopEvent"]])
-        script["events"] = [e for e, keep in zip(script["events"], kept) if keep]
     named = lambda action, offset: f"{action}+{offset}" if offset else str(action)
     reached, todo = set(), [named(o["action"], 0) for o in objects]
     while todo:
@@ -4165,8 +4153,19 @@ def export_stage(key, name, filename, sha256, track):
             todo += [named(e["action"], e["offset"]) for e in scripts[k]["events"] if e.get("action")]
     scripts = {k: v for k, v in scripts.items() if k in reached}
     events = [e for script in scripts.values() for e in script["events"]]
-    if any(e["op"] not in ("color", "motion", "spawn", "random") for e in events):
+    if any(e["op"] not in ("color", "motion", "spawn", "random", "test", "global", "sound") for e in events):
         sys.exit(f"{name} runs records the match does not; refusing to export.")
+    # Music: in round 1 each stage's base action stops every sound with its empty sound 0 (type 0,
+    # 0x4034e0), and 5 ticks on, unless global 11 is 10, loops its track (type 0x11, 0x403476; Sport
+    # Court's 遠景, PCs 15–23). Its 'off' action stops every sound while global 14 is 200 and loops the
+    # track again once it leaves (PCs 3–13). Greek's and Sakura Night's open with a jingle (type 1).
+    cued = sorted({e["index"] for e in events if e["op"] == "sound"})
+    types = {index: u16(data, c.sounds[index]["header_offset"] + 40) for index in cued}
+    if any(t not in (0, 1, 0x11) or (t == 0) != (not c.sounds[i]["size"]) for i, t in types.items()):
+        sys.exit(f"{name} cues a sound that neither stops every sound nor plays a WAV; refusing to export.")
+    sounds = export_sounds(c, key, [index for index in cued if types[index]])
+    for sound in sounds:
+        sound["loop"] = bool(types[sound["index"]] & 0x10)
     spawned = {(e["action"], e["offset"]) for e in events if e["op"] == "spawn" and e["action"]}
     # A stage object restarts after a display (0x4127b7), and is deleted without one.
     if any(offset or not any(r[0] == 0x0c for r in p.records[p.action(action).start:p.action(action).end])
@@ -4182,7 +4181,7 @@ def export_stage(key, name, filename, sha256, track):
     # Image 0 is the background here, not a marker.
     images = export_images(c, f"stages/{key}", {f["image"] for s in scripts.values() for f in s["frames"]})
     return dict(name=name, source_sha256=sha256, objects=objects, scroll=scroll, scripts=scripts, images=images,
-                music=export_sounds(c, key, [track])[0])
+                sounds=sounds)
 
 
 def export_sounds(c, prefix, indices):

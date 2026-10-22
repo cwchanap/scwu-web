@@ -168,10 +168,11 @@ export class TrainingScene extends Phaser.Scene {
   // (0x415f00), so each player's copy of a sound restarts rather than
   // overlapping itself; different sounds mix.
   private voices = new Map<string, Phaser.Sound.BaseSound>();
-  // Authored: the stage's looping track, off by default and loaded on first
-  // use. The original plays it only after SIN's, KAY's or DIDO's supers; like
-  // a stage load (0x40677c), each match starts it over.
+  // The stage's music: the last track or jingle its scripts cued since they
+  // last stopped every sound (export_stage). Authored: it plays only with
+  // Music ticked, off by default, and loads on first use.
   private music = false;
+  private cue?: { index: number; filename: string; loop: boolean };
   private track?: Phaser.Sound.BaseSound;
   // The character select screen (select.ts) the game opens on, and returns
   // to from the toolbar, before the match it chooses.
@@ -449,7 +450,7 @@ export class TrainingScene extends Phaser.Scene {
     );
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
-    if (!this.select) this.playMusic();
+    this.cue = undefined;
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
     this.resetIdle();
@@ -473,17 +474,27 @@ export class TrainingScene extends Phaser.Scene {
     }
     this.playMusic();
   }
+  // A sound the stage's export lacks is its empty one, which stops every
+  // sound (0x4034e0).
+  private stageSound(index: number) {
+    this.cue = STAGES[this.stage].sounds.find((s) => s.index === index);
+    if (this.cue) this.playMusic();
+    else this.sound.stopAll();
+  }
   private playMusic() {
     this.track?.stop();
-    if (!this.music) return;
-    const key = `music-${this.stage}`;
+    const cue = this.cue;
+    if (!this.music || !cue) return;
+    const key = `${this.stage}-sound-${cue.index}`;
     if (!this.cache.audio.exists(key)) {
-      this.load.audio(key, BASE + STAGES[this.stage].music.filename);
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => this.playMusic());
+      this.load.audio(key, BASE + cue.filename);
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        if (this.cue === cue) this.playMusic();
+      });
       this.load.start();
       return;
     }
-    this.track = this.sound.get(key) ?? this.sound.add(key, { loop: true });
+    this.track = this.sound.get(key) ?? this.sound.add(key, { loop: cue.loop });
     this.track.play();
     if (this.paused) this.track.pause();
   }
@@ -704,10 +715,12 @@ export class TrainingScene extends Phaser.Scene {
           // object type 10, 0x40982b).
           if (this.match.resultReady) this.openSelect();
           for (const { owner, index } of this.match.sounds)
-            this.play(
-              `${this.match.fighters[owner].who}-sound-${index}`,
-              owner,
-            );
+            if (owner < 0) this.stageSound(index);
+            else
+              this.play(
+                `${this.match.fighters[owner].who}-sound-${index}`,
+                owner,
+              );
           for (const index of letteringSounds(this.match))
             this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {

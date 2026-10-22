@@ -14,7 +14,7 @@ A Vs. CPU match the character select screen starts plays the original's VS singl
 
 ## Session
 
-Tick **Music** above the arena for the stage's track, which the original keeps silent in these matchups. Changing modes, fighters or the stage, or Reset, restarts the match. Leaving the window pauses the match and clears held input; resume explicitly. Touch buttons support simultaneous movement and actions. Landscape is recommended on phones.
+Tick **Music** above the arena for the stage's music. As in the original, its track starts as round 1 does and loops through the match; SIN's, KAY's and DIDO's supers silence every sound, and the track starts over once they finish. Greek plays its other track from round 3, and MASA's and 3-TIMES's matches play no stage track. Changing modes, fighters or the stage, or Reset, restarts the match. Leaving the window pauses the match and clears held input; resume explicitly. Touch buttons support simultaneous movement and actions. Landscape is recommended on phones.
 
 ## Basics
 

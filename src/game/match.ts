@@ -1515,16 +1515,20 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
-  // Globals 0 (0x4456b0) and 10 (0x4456c4) by index. At global 0 = 10, which
+  // Globals 0 (0x4456b0), 10, 11 and 14 by index. At global 0 = 10, which
   // LIZARD's, HISO's, SEAN's and G Suneo's lethal blows hold for their
   // strike's tick, a KO enters make hikari; ALPHA's KO sets global 10 to
-  // 10000 or 20000. ponytail: each match starts them at 0, where the source
-  // keeps global 10 until the select screen's 2P cursor clears it (KGT PCs
-  // 542, 590).
+  // 10000 or 20000. At 11 = 10, which MASA's and 3-TIMES's 開始時 set, the
+  // stage plays no track; while 14 is 200, which SIN's, KAY's and DIDO's
+  // supers hold, it stops every sound (export_stage). ponytail: each match
+  // starts them at 0, where the source keeps global 10 until the select
+  // screen's 2P cursor clears it (KGT PCs 542, 590), and KGT 13 holds global
+  // 14 at 10 for its first 10 ticks (PCs 70, 78).
   globals: Record<number, number> = {};
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
-  // This tick's op 0x03 cues: each fighter's sound table (+0x221c) and index.
+  // This tick's op 0x03 cues: each fighter's sound table (+0x221c), or the
+  // stage's (owner −1), and index.
   sounds: { owner: number; index: number }[] = [];
   // The latest op 0x0e shake per axis; the renderer steps it (stepShake), and
   // a new object restarts it.
@@ -2251,23 +2255,18 @@ export class Match {
             ? { value: Math.floor(actor.x / 1.5), add: false }
             : pre,
       );
-    // Global 14 holds the stage's track while it is 200, which only KAY's,
-    // DIDO's and SIN's supers set (unplayed), so each 開始時 BR's test for 0
-    // skips its display.
     const variable =
       selector < 0x40
         ? (actor.locals[selector] ?? 0)
         : selector === 0x86
           ? this.freeze
-          : selector === 0x80 || selector === 0x8a
-            ? (this.globals[selector & 0x3f] ?? 0)
-            : selector === 0x83
-              ? this.vs
-                ? 50
-                : 0
-              : selector === 0x8e
-                ? 0
-                : (self.variables[selector & 0x3f] ?? 0);
+          : selector === 0x83
+            ? this.vs
+              ? 50
+              : 0
+            : selector >= 0x80
+              ? (this.globals[selector & 0x3f] ?? 0)
+              : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
