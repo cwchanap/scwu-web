@@ -1605,7 +1605,8 @@ export class Match {
   // (0x4700ec, 0x4700f0).
   teams: Who[][] | null = null;
   members = [0, 0];
-  // 0x4701c4: the player the 1P last struck (0x40f2ef), for the story HUD,
+  // 0x4701c4: the player the 1P last struck (0x40f2ef) or whose box the 1P's
+  // met (0x40ed54), for the story HUD,
   // until 1000 ticks pass (0x4701c8, 0x409d00), or −1.
   enemy = -1;
   private enemyTicks = 0;
@@ -3537,8 +3538,8 @@ export class Match {
   // one pass through. The box first found keeps meeting the later objects.
   // Its clash effect and stops (0x40ee0e) need system flag 2 (0x4438a4),
   // which SCWU.KGT leaves clear (0x7d), and no player's box sets byte 11's
-  // bit 0x80 (0x40ef4d). ponytail: whom player 1's objects last met, for the
-  // gauges (0x4701c4), is left out.
+  // bit 0x80 (0x40ef4d). Boxes meeting with the earlier one player 1's mark
+  // the later one's player for the story HUD (0x40ed54), as a hit does.
   private clashBoxes() {
     type Holder = Fighter | Effect;
     const holders: [Holder, number][] = [
@@ -3570,6 +3571,7 @@ export class Match {
                 (box.h + met.h) * 1.5
             )
               continue;
+            if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
             if (!box.damage && !met.damage) {
               strip(a, b);
               continue;

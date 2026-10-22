@@ -255,6 +255,26 @@ describe('story battles', () => {
     expect(vs.rival).toBe(vs.fighters[1]);
   });
 
+  it("shows the player whose box the 1P's met, before any hit (0x40ed54)", () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ slots: [slot(), slot(), null] }),
+    );
+    fight(match);
+    const [ryuko, first, second] = match.fighters;
+    expect(match.rival).toBeNull();
+    // Facing each other, both boxes sit 45 pixels in front: in one place.
+    const box = { x: 30, y: -100, w: 40, h: 40, damage: 0, kind: 1 };
+    second.x = ryuko.x + 90 * ryuko.facing;
+    second.facing = -ryuko.facing as -1 | 1;
+    first.x = ryuko.x - 900 * ryuko.facing;
+    ryuko.box = { ...box };
+    second.box = { ...box };
+    match.step();
+    expect([ryuko.box, second.box]).toEqual([null, null]);
+    expect(match.rival).toBe(second);
+  });
+
   it('walls a story without letterings bit 2 at the stage, not the screen', () => {
     for (const letterings of [0, 4]) {
       const match = Match.story('ryuko', battle({ letterings }));
