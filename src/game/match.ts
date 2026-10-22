@@ -1047,6 +1047,9 @@ export interface Fighter {
   // The victim's own copy this reaction plays (copyOf): drawn, rolled and
   // entered in place of its clip.
   copy: number | null;
+  // Where a result branch's check that jumped out of a call returns, as an
+  // object's does (Effect's resume).
+  resume?: { clip: ObjectKey; t: number; skip: number };
   // The cycle of the HUD face (action 70's object variable 0) from EX mode's
   // first tick, or −1.
   face: number;
@@ -1758,6 +1761,7 @@ export class Match {
     f.branch =
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     f.copy = null;
+    f.resume = undefined;
     if (action === 'getUp' && GET_UP_ROLLS.has(f.who))
       this.rollPass(f, twin(f.who, GET_UP), true);
     // 0x410d50 stops a player entering an action on the ground, and keeps an
@@ -1831,6 +1835,22 @@ export class Match {
     if (!key || this.resultEvents(f, key, f.age)) return;
     // Its records at the tick it runs out run before its jump.
     const ran = f.branch && script(f.branch, f.who);
+    // An EX stand returns into the call its demo stand's test jumped out of
+    // (0x4125ea): YINAN's Win 2 and Win 3 (82, 90) call Demo Stand (36, PCs
+    // 953, 1046), whose test of variable 0 for 100 (PC 543) enters her EX
+    // stance (35), and GON's RANDOM WIN (68) Stand DEMO (31, PC 719), whose
+    // test (PC 335) enters Stand DEMO 2 (32).
+    if (
+      ran &&
+      ran.end === 'end' &&
+      f.resume &&
+      f.age === animationDuration(f.branch!, f.who)
+    ) {
+      const { clip, t, skip } = f.resume;
+      [f.branch, f.age, f.resume] = [clip, t, undefined];
+      this.resultEvents(f, clip, t, skip);
+      return;
+    }
     if (
       ran &&
       ran.end === 'jump' &&
@@ -1842,8 +1862,9 @@ export class Match {
     if (f.vx || f.vy || f.y < 0) f.moving = 'velocity';
   }
 
-  // A result timeline's records at `age`; true once one branches.
-  private resultEvents(f: Fighter, key: ObjectKey, age: number) {
+  // A result timeline's records at `age`, past `skip`; true once one
+  // branches.
+  private resultEvents(f: Fighter, key: ObjectKey, age: number, skip = 0) {
     const owner = this.fighters.indexOf(f);
     // Its displays carry its sounds; one with none cues them here, as the
     // drawn branch does those past its last: ZIRO's KO voice (PC 829). A
@@ -1854,7 +1875,7 @@ export class Match {
       : key === f.branch && end === 'jump'
         ? animationDuration(key, f.who)
         : Infinity;
-    for (const event of eventsAt(key, age, f.who)) {
+    for (const event of eventsAt(key, age, f.who).slice(skip)) {
       if (
         event.op === 'motion' ||
         event.op === 'handler' ||
@@ -1863,12 +1884,18 @@ export class Match {
       )
         this.runEvent(f, owner, event);
       if (event.op !== 'random' && event.op !== 'test') continue;
+      // A drawn branch takes a test out of a call, returning into it; the
+      // result's own clip draws its EX stands (exStands).
       if (
         event.op === 'random'
           ? this.cpu.random() % event.divisor <= event.above
-          : event.called || event.resume || !this.passes(f, f, event)
+          : event.called ||
+            (event.resume && key !== f.branch) ||
+            !this.passes(f, f, event)
       )
         continue;
+      if (event.op === 'test' && event.resume)
+        f.resume = { clip: key, ...event.resume };
       if (this.enterResult(f, sourceKey(event.action, event.offset)))
         return true;
     }
@@ -2401,11 +2428,9 @@ export class Match {
       // An object and Zoma take their checks' jumps; Ryuko's are his
       // entry's.
       case 'test':
-        // ponytail: a fighter keeps the fall-through of one that jumps out
-        // of a call, tracking no call to return into; only demo stands'
-        // tests of variable 0 do, which set-up clears before each 開始時,
-        // and results skip them too (resultEvents), drawing their EX stands
-        // from clips (exStands).
+        // A fighter's that jump out of a call are only demo stands' tests
+        // of variable 0, which set-up clears before each 開始時; a result
+        // takes them in its drawn branches (resultEvents).
         if (event.resume && !('clip' in actor)) break;
         if (
           ('clip' in actor || actor.action === 'script') &&

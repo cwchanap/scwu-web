@@ -539,6 +539,23 @@ describe('recovered neutral and round animations', () => {
     const VELOCITY = 655 / 65536;
     // GON's 勝ち rolls rand % 4 > 2 into RANDOM WIN (68) first (PC 693).
     expect([0, 2].map((seed) => win('gon', seed, 1)[0][0])).toEqual([null, 68]);
+    // In EX mode its Stand DEMO's test (PC 335) plays Stand DEMO 2 (32) in
+    // its place, 83 ticks, back into RANDOM WIN.
+    const gon = new Match('practice', false, 2, ['gon', 'ryuko']);
+    gon.fighters[0].variables[0] = 100;
+    gon.fighters[1].hp = 0;
+    gon.fighters[1].action = 'koLand';
+    gon.winner = 'player';
+    const random: unknown[] = [];
+    for (let t = 0; t < 84; t++) {
+      gon.step();
+      random.push([gon.fighters[0].branch, fighterPose(gon.fighters[0]).image]);
+    }
+    expect([random[0], random[82], random[83]]).toEqual([
+      [32, 734],
+      [32, 733],
+      [68, 619],
+    ]);
     // TTRO's rand % 3 > 1 (PC 537) 95 ticks in enters WIN 2 (58), which
     // floats him up at raw −200 (PC 547).
     const ttro = win('ttro', 0, 105);
@@ -558,8 +575,11 @@ describe('recovered neutral and round animations', () => {
     expect(zmega[landed + 11][2]).toBeLessThan(0);
     // YINAN's rand % 6 > 3 rolls into Win 2 (82) or Win 3 (90) (PCs
     // 906–907); in EX mode each then tests variable 0 at 125 ticks, into
-    // Win 1 EX (81, PC 909), 83 + 10 (PC 957) or 90 + 13 (PC 1048).
+    // Win 1 EX (81, PC 909), 83 + 10 (PC 957) or 90 + 13 (PC 1048). Each
+    // first calls Demo Stand (36), whose test (PC 543) plays her EX stance
+    // (35) in its place, 125 ticks, returning into the call.
     const ex = { null: 81, 82: '83+10', 90: '90+13' };
+    const stances: unknown[] = [];
     const yinan = [0, 1, 2, 3, 4, 5].map((seed) => {
       const match = new Match('practice', false, seed, ['yinan', 'ryuko']);
       const [f, ryuko] = match.fighters;
@@ -568,10 +588,12 @@ describe('recovered neutral and round animations', () => {
       ryuko.action = 'koLand';
       match.winner = 'player';
       match.step();
-      const rolled = f.branch as keyof typeof ex;
+      const rolled = (f.resume?.clip ?? f.branch) as keyof typeof ex;
+      stances.push(fighterPose(f).image);
       for (let t = 0; t < 125; t++) match.step();
       return [rolled, f.branch];
     });
+    expect(new Set(stances)).toEqual(new Set([4636]));
     expect(yinan.map(([rolled]) => rolled)).toEqual(
       expect.arrayContaining([null, 82]),
     );
