@@ -492,7 +492,7 @@ export class CharacterSelect extends Screen {
       } else if (this.hover[p] >= 0 && pressed[p] & BUTTONS) {
         // Any button chooses.
         this.palettes[p] = buttonIndex(pressed[p]);
-        this.seat(p, this.palettes[p]);
+        takePalette(this.drawn, p, this.palettes[p]);
         this.decide(p);
       } else this.rest(p, directions[p]);
     }
@@ -540,7 +540,7 @@ export class CharacterSelect extends Screen {
     const picks = this.members[p];
     const seat = 4 * p + picks.length;
     picks.push(this.hover[p]);
-    this.seat(seat, buttonIndex(pressed));
+    takePalette(this.drawn, seat, buttonIndex(pressed));
     const left = TEAM_SIZE - picks.length;
     if (!left) return this.decide(p);
     const who = ROSTER[this.hover[p]]!;
@@ -577,13 +577,6 @@ export class CharacterSelect extends Screen {
       this.held[1] = this.held[0];
       this.countdown[1] = this.countdown[0];
     }
-  }
-
-  // 0x406f20: a palette another seat holds moves on to the next of the eight.
-  private seat(seat: number, palette: number) {
-    while (this.drawn.some((held, i) => i !== seat && held === palette))
-      palette = (palette + 1) % 8;
-    this.drawn[seat] = palette;
   }
 
   private moveCell(cell: [number, number], dx: number, dy: number) {
@@ -845,28 +838,19 @@ function buttonIndex(pressed: number) {
   for (let bit = 0; bit < 6; bit++) if (pressed & (0x10 << bit)) index = bit;
   return index;
 }
-// 0x412056: a palette the other player holds moves on to the next of the
-// eight.
-const apart = (palette: number, other: number) =>
-  palette === other ? (palette + 1) % 8 : palette;
-// A story's 1P keeps its button's palette, and each slot's player enters
-// with none (0x411edf) and takes the first no other player holds (0x412056).
-// ponytail: those of players an earlier battle seated, which the engine
-// keeps, aren't counted.
-export function storyPalettes(first: number, count: number) {
-  const palettes = [first];
-  while (palettes.length < count) {
-    let palette = 0;
-    while (palettes.includes(palette)) palette++;
-    palettes.push(palette);
-  }
-  return palettes;
+// 0x406f20 and 0x412056: a palette any other of the eight seats holds
+// (player +0xe00b) moves on to the next of the eight, and the seat takes it.
+export function takePalette(held: number[], seat: number, palette: number) {
+  while (held.some((other, i) => i !== seat && other === palette))
+    palette = (palette + 1) % 8;
+  held[seat] = palette;
 }
 // The battle sets each player's palette to its button (0x40789a, 0x408a9f),
 // or in VS multi to the one its member's seat took (0x407577), and each
 // fighter, player 1's first, moves off the other's as it enters (0x412056):
 // the same button twice turns player 1's.
-export function battlePalettes([first, second]: number[]) {
-  const one = apart(first, second);
-  return [one, apart(second, one)];
+export function battlePalettes(buttons: number[]) {
+  const held = [...buttons];
+  buttons.forEach((palette, seat) => takePalette(held, seat, palette));
+  return held;
 }

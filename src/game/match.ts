@@ -65,7 +65,7 @@ import {
   storyEndTick,
   storyFightTick,
 } from './hud';
-import { ROSTER } from './select';
+import { ROSTER, takePalette } from './select';
 import type { Battle, Slot } from './story';
 export const SUPER_CONTROLS = [
   'getterBeam',
@@ -1633,6 +1633,9 @@ export class Match {
     readonly vs = false,
     // A story step's battle (story.ts), which seats the players.
     readonly battle: Battle | null = null,
+    // Each seat's palette (+0xe00b), −1 for none, which a story keeps from
+    // battle to battle.
+    readonly held = Array<number>(8).fill(-1),
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
@@ -1651,8 +1654,9 @@ export class Match {
   }
 
   // A story battle (0x406aa3) on its stage (+1: stage file n − 1, in the
-  // export's order), with the story's player as the 1P.
-  static story(who: Who, battle: Battle, seed = 0) {
+  // export's order), with the story's player as the 1P, its seats holding
+  // the palettes the story's select screen and earlier battles left.
+  static story(who: Who, battle: Battle, seed = 0, held?: number[]) {
     return new Match(
       'story',
       true,
@@ -1661,6 +1665,7 @@ export class Match {
       (Object.keys(STAGES) as Stage[])[battle.stage - 1],
       false,
       battle,
+      held,
     );
   }
 
@@ -1734,6 +1739,7 @@ export class Match {
         this.waits[i] = slot;
         return f;
       }
+      this.takeSeat(i);
       this.opening(f);
       if (entry === 1) {
         f.hitStop = slot!.delay * 100;
@@ -1806,7 +1812,23 @@ export class Match {
     if ((this.bySeat(slot.watch)?.hp ?? 0) >= slot.below) return;
     this.waits[i] = null;
     f.present = true;
+    this.takeSeat(i);
     this.opening(f);
+  }
+
+  // Each player's set-up takes its palette (0x412056): a slot's player
+  // enters with none (0x411edf), so palette 0, and every player moves on
+  // from one any other seat holds, this battle's or one an earlier battle
+  // seated, which keeps it.
+  private takeSeat(i: number) {
+    const seat = this.seats[i];
+    if (seat) this.held[seat] = -1;
+    takePalette(this.held, seat, Math.max(0, this.held[seat]));
+  }
+
+  // Each fighter's palette.
+  get palettes() {
+    return this.seats.map((seat) => Math.max(0, this.held[seat]));
   }
   get cpu() {
     return this.cpus[1]!;

@@ -135,6 +135,29 @@ describe('story battles', () => {
     expect(ryuko.target).toBe(match.fighters[1]);
   });
 
+  it('gives each player as it enters the first palette no seat holds, those earlier battles seated too (0x412056)', () => {
+    // The 1P chose with K, palette 0; the select screen left no other.
+    const held = [0, -1, -1, -1, -1, -1, -1, -1];
+    const match = Match.story('ryuko', FIRST, 0, held);
+    // Seats 1 and 2 enter as the round sets up; 3–6 wait with none.
+    expect(match.palettes).toEqual([0, 1, 2, 0, 0, 0, 0]);
+    fight(match);
+    match.fighters[2].hp = 0;
+    match.step();
+    // Seats 3 and 4, watching seat 2, enter as it falls.
+    expect(match.palettes).toEqual([0, 1, 2, 3, 4, 0, 0]);
+    // The seats keep theirs into the next battle, where seat 7 enters with
+    // none and passes over all five.
+    const next = Match.story(
+      'ryuko',
+      battle({ slots: [null, null, null, null, null, null, slot()] }),
+      0,
+      held,
+    );
+    expect(next.palettes).toEqual([0, 5]);
+    expect(held).toEqual([0, 1, 2, 3, 4, -1, -1, 5]);
+  });
+
   it('ends the round at 100 points, the 1P winning and the slots losing', () => {
     const match = Match.story('ryuko', FIRST);
     fight(match);

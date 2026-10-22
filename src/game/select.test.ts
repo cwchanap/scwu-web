@@ -8,7 +8,6 @@ import {
   MODES,
   ROSTER,
   selectable,
-  storyPalettes,
   StoryDemo,
   TEAM_SIZE,
   Title,
@@ -369,11 +368,6 @@ describe('story select (object type 10, story mode)', () => {
     // Bit 0 locks out DoraEmon (45) and the blank templates.
     const locked = ROSTER.flatMap((_, i) => (selectable(i, 1) ? [] : [i]));
     expect(locked).toEqual([42, 43, 44, 45, 47, 48, 49]);
-  });
-
-  it("gives each slot's player the first palette no one before it holds", () => {
-    expect(storyPalettes(0, 4)).toEqual([0, 1, 2, 3]);
-    expect(storyPalettes(2, 4)).toEqual([2, 0, 1, 3]);
   });
 });
 

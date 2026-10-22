@@ -9,7 +9,6 @@ import {
   battlePalettes,
   CharacterSelect,
   Continue,
-  storyPalettes,
   StoryDemo,
   TEAM_DEMO,
   Title,
@@ -214,7 +213,8 @@ export class TrainingScene extends Phaser.Scene {
   // 1P's life and the rounds it lost or drew as its last battle ended, which
   // the runner's jumps read; and whether a demo or stage is loading.
   private story: Story | null = null;
-  private storyPalette = 0;
+  // The seats' palettes a story keeps from battle to battle (+0xe00b).
+  private storyHeld: number[] = [];
   private storyLife = 0;
   private storyLost = 0;
   private loading = false;
@@ -410,7 +410,8 @@ export class TrainingScene extends Phaser.Scene {
     // The story's first step (0x4069b0), its counter reset by the title.
     if (select.story) {
       this.story = new Story(select.done[0]);
-      this.storyPalette = select.palettes[0];
+      this.storyHeld = [...select.drawn];
+      this.teams = null;
       return this.runStory(this.story.next());
     }
     [this.fighter, this.opponent] = select.done;
@@ -441,10 +442,14 @@ export class TrainingScene extends Phaser.Scene {
 
   // A story battle on its stage, once the stage's images load.
   private startBattle(battle: Battle) {
-    const match = Match.story(this.story!.who, battle, randomSeed());
+    const match = Match.story(
+      this.story!.who,
+      battle,
+      randomSeed(),
+      this.storyHeld,
+    );
     this.whenLoaded(match.stage, () => {
       this.leaveScreen();
-      this.palettes = storyPalettes(this.storyPalette, match.fighters.length);
       this.begin(match);
     });
   }
@@ -603,7 +608,7 @@ export class TrainingScene extends Phaser.Scene {
   }
   private begin(match: Match) {
     this.match = match;
-    this.memberPalettes();
+    this.roundPalettes();
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.cue = undefined;
@@ -615,14 +620,17 @@ export class TrainingScene extends Phaser.Scene {
     this.report();
   }
 
-  // VS multi's round start gives each fighter its member's palette; free
-  // practice has the first members.
-  private memberPalettes() {
-    if (!this.teams) return;
-    const members = this.match.teams ? this.match.members : [0, 0];
-    this.palettes = battlePalettes(
-      members.map((m, p) => this.teams![p][m].palette),
-    );
+  // A story's players take their palettes as they enter; VS multi's round
+  // start gives each fighter its member's, and free practice after it has
+  // the first members.
+  private roundPalettes() {
+    if (this.match.battle) this.palettes = this.match.palettes;
+    else if (this.teams) {
+      const members = this.match.teams ? this.match.members : [0, 0];
+      this.palettes = battlePalettes(
+        members.map((m, p) => this.teams![p][m].palette),
+      );
+    }
   }
 
   // Each round's fighters start their idle programs afresh.
@@ -901,10 +909,8 @@ export class TrainingScene extends Phaser.Scene {
           this.match.step(
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
-          if (this.match.round !== round) {
-            this.resetIdle();
-            this.memberPalettes();
-          }
+          if (this.match.round !== round) this.resetIdle();
+          this.roundPalettes();
           if (this.match.resultReady) this.matchOver();
           for (const { owner, index } of this.match.sounds)
             if (owner < 0) this.stageSound(index);
