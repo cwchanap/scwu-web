@@ -403,6 +403,7 @@ const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // GAISA FINAL ends in his (157) + 5 (PC 4137), at its roll.
 const KNOCKDOWN = 146;
 const GET_UP = 145;
+const HISA = 80;
 // MASA's and 3-TIMES's Down Get up (190, 187) picks its voice by a chain of
 // rolls (PCs 2205–2226, 2114–2135); Z-MEGA's and SHIN-Z's (157, 159) roll
 // rand % 6 > 2 and > 4 (PCs 1937, 2013) past a one-tick display whose hit
@@ -3322,8 +3323,7 @@ export class Match {
     const pending = f.pending!;
     f.pending = null;
     if ('key' in pending) return this.enterKey(f, pending.key);
-    const { stop, attackerStop } = pending;
-    let { action, power, own } = pending;
+    let { action, stop, attackerStop, power, own } = pending;
     // The lose action takes its first test that passes, after the records
     // before it: make hikari (63) while global 0 is 10 (PC 590), after
     // deleting objects 7–9 and clearing variables 6, 8 and 14; Start KO 3
@@ -3358,6 +3358,18 @@ export class Match {
         return this.enterSource(f, jump.action, jump.offset);
       }
     }
+    // HIT UP tests variable 8 above 99 (PC 921), which only ICE Punch sets
+    // (PCs 1347, 1371) and the idle clears (PC 3), into HISA (80) and its
+    // records, 13 stop ticks for both (PC 907): SWW's ICE Punch, then his
+    // Hit up, launches away. HISA's counter records are HIT UP's (HISO's
+    // come before the test, PC 933), so they run past the jump.
+    if (action === 'launchUp' && f.variables[8] > 99)
+      [action, stop, attackerStop, own] = [
+        'launchAway',
+        13,
+        13,
+        twin(f.who, HISA),
+      ];
     // FB's op 0x16 (PC 1443) enters heavy air hit off the floor after its op
     // 0x15, before any copy's records: the striker keeps its 10, and 76's
     // counter records run.

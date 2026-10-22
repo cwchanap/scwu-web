@@ -1886,10 +1886,7 @@ FIGHTERS = {
             # Kiki's raw vx −800 (PC 1725).
             "launchDown",
             # Its variable 8 test's r[7:9] (PC 998), which a test doesn't read
-            # (0x4138d1), then clearing variable 8 (PC 999). ponytail: where
-            # Ryuko's test names no target, his enters ヒット HISA (91) while
-            # variable 8 is above 99, which only ICE Punch sets (PC 1429); the
-            # match plays HIT UP by Ryuko's rules, past the test.
+            # (0x4138d1), then clearing variable 8 (PC 999).
             "launchUp",
             # Op 0x01 before op 0x02, as ANMC P's.
             "grabbed",
@@ -3853,6 +3850,13 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         if (gameplay(ryuko, r) == gameplay(p, z, counter_records(p, z))) == (name in differ):
             sys.exit(f"{source[0]}'s {name} ({z}) no longer matches the recorded comparison with Ryuko's {r}; "
                      "refusing to export.")
+    # HIT UP tests variable 8 above 99 into the player's own HISA, as Ryuko's PC 921 enters hers (80),
+    # whose counter records are HIT UP's, so the match takes them past the jump (Match.enterPending).
+    hit_up, hisa = twins["launchUp"][1], twins["launchAway"][1]
+    a = p.action(hit_up)
+    test = next(r for r in p.records[a.start:a.end] if r[0] == 0x1f and r[4] == 0x48)
+    if (test[5], u16(test, 9), u16(test, 1)) != (0x08, 99, hisa) or counters.get(hit_up) != counters.get(hisa):
+        sys.exit(f"{source[0]}'s HIT UP no longer tests variable 8 into its HISA; refusing to export.")
     # Own reactions a response names where Ryuko's names a twin's other half.
     pairs = {r: z for r, z in twins.values()}
     if {own: r for r, own in zip(ryuko_responses, tables["responses"])

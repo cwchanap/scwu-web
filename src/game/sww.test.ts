@@ -188,6 +188,41 @@ describe('SWW (26 SWW.PLAYER)', () => {
     expect(phenix.objects).toContain(281);
   });
 
+  it('launches an ICE Punch victim away with Hit up: its HIT UP tests variable 8 (PC 921) into HISA', () => {
+    // The victim's reactions and, as Hit up's starts, both stops.
+    const reactions = (victim: Who, ice: boolean) => {
+      const { sww, other, steps } = swwPlayer(90, victim);
+      steps({}, 2);
+      const seen: unknown[][] = [];
+      for (let t = 0; t < 400; t++) {
+        steps(t === 0 && ice ? { axe: true } : t === 80 ? { hitUp: true } : {});
+        if (seen.at(-1)?.[0] !== other.action)
+          seen.push(
+            t >= 80 && t < 120
+              ? [other.action, other.hitStop, sww.hitStop]
+              : [other.action],
+          );
+      }
+      return seen;
+    };
+    for (const victim of ['ryuko', 'sou'] as const) {
+      // ICE Punch sets variable 8 to 100 (PCs 1347, SOU's 1429); HISA, 13
+      // stop ticks for both (PC 907), clears it.
+      expect(reactions(victim, true)).toEqual([
+        ['idle'],
+        ['icePunch'],
+        ['launchAway', 13, 13],
+        ['knockdown'],
+        ['getUp'],
+        ['idle'],
+      ]);
+      expect(reactions(victim, false).slice(0, 2)).toEqual([
+        ['idle'],
+        ['launchUp', 10, 33],
+      ]);
+    }
+  });
+
   it('turns ICE Punch, Dragon P, GOD DRAGON, EN300 and Healing into their G forms at or below 138 life (op 0x11)', () => {
     const low = { hp: 100 };
     for (const [key, mine, damage] of [
