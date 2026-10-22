@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { desperationOf, lifeOf, perStockOf } from './characters';
+import { lifeOf, perStockOf } from './characters';
 import type { Who } from './characters';
 import { LIFE, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
@@ -106,9 +106,12 @@ export function letteringSounds(match: Match) {
   });
 }
 
+// Object types 10 and 11 (0x40ddb6, 0x40dde6) draw life × 254 pixels of the
+// bar over the full life, truncated: 1P's keeps the texture's right-hand
+// columns, 2P's its left-hand ones, so each drains toward the centre.
 export function healthCrop(hp: number, right: boolean, life = LIFE) {
-  const width = Math.round((254 * Math.max(0, Math.min(life, hp))) / life);
-  return { x: right ? 254 - width : 0, width };
+  const width = Math.floor((254 * Math.max(0, Math.min(life, hp))) / life);
+  return { x: right ? 0 : 254 - width, width };
 }
 
 // Object types 20/21 (0x40de1b/0x40de44) draw power × 126 pixels of the bar
@@ -253,9 +256,20 @@ export function createHud(
       .setOrigin(0)
       .setScale(scale)
       .setDepth(100);
-  image(25, 22, 20);
-  const life = [image(27, 22, 20), image(28, 364, 20)];
+  // KGT 63–68 lay the bars out by priority (PCs 402–417): the backing (106,
+  // z 0x12), averaged with the screen (op 0x23 mode 1, PC 725), UNDER PW
+  // (104/105, 0x13), the frame (103, 0x14), and the life bars (107/108,
+  // 0x15) on top.
+  image(25, 22, 20).setAlpha(0.5);
+  // UNDER PW adds image 135 (mode 2) at 202, or mirrored at 364, its colours
+  // raised 10 every other 15 ticks (PCs 713–716, 719–722). Under the bars,
+  // it shows where a bar's inner 74 pixels have drained, below 29% life.
+  const underPower = [
+    image(135, 202, 20),
+    image(135, 364, 20).setFlipX(true),
+  ].map((bar) => bar.setBlendMode('ADD'));
   image(24, 10, 5);
+  const life = [image(27, 22, 20), image(28, 364, 20)];
   image(39, 292, 13);
   image(40, 31, 37);
   image(41, 472, 37);
@@ -294,12 +308,6 @@ export function createHud(
   const gauges = [image(31, 99, 443), image(31, 414, 443).setFlipX(true)];
   // Stock anchors come from KGT actions 74/75.
   const stocks = [image(17, 49, 434), image(17, 545, 434)];
-  // KGT actions 104/105 blink image 135 over the low remaining life. The port's
-  // life bars drain toward their outer edges, so it mirrors to those ends.
-  const underPower = [
-    image(135, 22, 20).setFlipX(true),
-    image(135, 544, 20),
-  ].map((bar) => bar.setBlendMode('ADD').setVisible(false));
   const digits = [image(47, 300, 16), image(47, 320, 16)];
   const infinity = scene.add
     .text(320 * scale, 27 * scale, '∞', {
@@ -328,9 +336,11 @@ export function createHud(
       stocks[index]
         .setTexture(`ui-${17 + f.stock}`)
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
-      underPower[index]
-        .setVisible(f.hp > 0 && f.hp <= desperationOf(f.who))
-        .setAlpha(Math.floor(match.ticks / 15) % 2 ? 0.45 : 0.9);
+      underPower[index].setTexture(
+        Math.floor(match.ticks / 15) % 2
+          ? tint('ui-135', { r: 10, g: 10, b: 10 })
+          : 'ui-135',
+      );
       const face = faces[index].setTexture(
         `${f.who}-${faceImage(f.face, f.who)}`,
       );

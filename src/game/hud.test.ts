@@ -33,11 +33,16 @@ it('plays the recovered KO displays through the squash-out before showing rematc
   expect(match.resultReady).toBe(true);
 });
 
-it('crops opposing life bars toward their outside edges without stretching the gradient', () => {
-  expect(healthCrop(255, false)).toEqual({ x: 0, width: 127 });
-  expect(healthCrop(255, true)).toEqual({ x: 127, width: 127 });
-  expect(healthCrop(0, true)).toEqual({ x: 254, width: 0 });
+it("keeps each life bar's inner columns, truncating, without stretching the gradient", () => {
+  expect(healthCrop(255, false)).toEqual({ x: 127, width: 127 });
+  expect(healthCrop(255, true)).toEqual({ x: 0, width: 127 });
+  expect(healthCrop(0, true)).toEqual({ x: 0, width: 0 });
   expect(healthCrop(510, false)).toEqual({ x: 0, width: 254 });
+  // 2 × 254 / 510 truncates to 0 (0x40ddcd).
+  expect(healthCrop(2, false)).toEqual({ x: 254, width: 0 });
+  // UNDER PW's 74 pixels show once Ryuko's bar is under them: 148 life.
+  expect(healthCrop(149, false).width).toBe(74);
+  expect(healthCrop(148, false).width).toBe(73);
 });
 
 it('anchors power bars at their inner ends and cycles the recovered shimmer', () => {
