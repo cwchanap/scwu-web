@@ -10,6 +10,7 @@ import {
   selectable,
   storyPalettes,
   StoryDemo,
+  TEAM_SIZE,
   Title,
   TITLE,
 } from './select';
@@ -19,6 +20,7 @@ import continueDemo from './generated/demos/9.json';
 import next from './generated/demos/3.json';
 import ending from './generated/demos/22.json';
 import yinanEnd from './generated/demos/87.json';
+import teamDemo from './generated/demos/11.json';
 
 const fresh = () =>
   new CharacterSelect([
@@ -171,19 +173,92 @@ describe('character select (object type 10, VS single)', () => {
   it("draws each chosen face in its button's palette, moved off the other side's", () => {
     const select = fresh();
     select.step();
-    expect(select.drawn).toEqual([-1, -1]);
+    expect(select.drawn).toEqual(Array(8).fill(-1));
     // H is B, palette 1, for 1P; 2P's H takes the next palette, 2
     // (0x406f20).
     run(select, [{ hitUp: true }, {}]);
-    expect(select.drawn).toEqual([1, -1]);
+    expect(select.drawn.slice(0, 2)).toEqual([1, -1]);
     run(select, [{ hitUp: true }, {}]);
-    expect([select.palettes, select.drawn]).toEqual([
+    expect([select.palettes, select.drawn.slice(0, 2)]).toEqual([
       [1, 1],
       [1, 2],
     ]);
     // In battle player 1 enters first and moves off player 2's (0x412056).
     expect(battlePalettes(select.palettes)).toEqual([2, 1]);
     expect(battlePalettes([3, 0])).toEqual([3, 0]);
+  });
+});
+
+describe('character select (object type 10, VS multi)', () => {
+  const team = () =>
+    new CharacterSelect(
+      [
+        [0, 0],
+        [0, 0],
+      ],
+      false,
+      teamDemo as Demo,
+    );
+  // Ryuko's select faces (67, then 68), not her *NAME (66).
+  const faces = (select: CharacterSelect) =>
+    select.objects
+      .filter((o) => o.container === 'ryuko' && o.action !== 66)
+      .map((o) => [o.container, o.x, o.y, o.z, o.owner]);
+
+  it('opens on TEAM VS, whose global 3 of 100 the 2P cursor keeps', () => {
+    const select = team();
+    select.step();
+    expect(
+      select.objects
+        .filter((o) => o.container === 'demo11')
+        .map((o) => o.action),
+    ).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15]);
+    run(select, Array<Input>(10).fill({}));
+    expect(select.globals[3]).toBe(100);
+    // Each side's hovered player is its seat 4 × side + 3's.
+    expect(faces(select)).toEqual([
+      ['ryuko', 100, 470, 0x50, 3],
+      ['ryuko', 540, 470, 0x50, 7],
+    ]);
+  });
+
+  it('picks three members a side, standing each but the last 150 pixels a pick left higher', () => {
+    const select = team();
+    select.step();
+    // K, palette 0, then K again, which seat 0 holds: 1 (0x406f20).
+    run(select, [...tap({ kick: true }), ...tap({ kick: true })]);
+    expect(select.members[0]).toEqual([0, 0]);
+    expect(faces(select)).toEqual([
+      ['ryuko', 100, 470, 0x50, 3],
+      ['ryuko', 540, 470, 0x50, 7],
+      ['ryuko', 100, 170, 0x52, 0],
+      ['ryuko', 100, 320, 0x51, 1],
+    ]);
+    // Moving clears only the hovered player, for a tick that picks no one
+    // (0x407442).
+    run(select, [{ right: true, hitUp: true }, {}]);
+    expect([select.hover[0], select.members[0].length]).toEqual([1, 2]);
+    // H, palette 1, which seat 1 holds: 2. The last pick decides.
+    run(select, tap({ hitUp: true }));
+    expect(select.decided).toEqual([true, false]);
+    expect(select.drawn.slice(0, 4)).toEqual([0, 1, 2, -1]);
+    // Player 2's J, palette 3, then 4 and 5 as its seats take them.
+    for (let i = 0; i < TEAM_SIZE; i++) run(select, tap({ punch: true }));
+    expect(select.drawn.slice(4)).toEqual([3, 4, 5, -1]);
+    while (!select.done) select.step();
+    expect(select.done).toEqual(['ryuko', 'ryuko']);
+    expect(select.teams).toEqual([
+      [
+        { who: 'ryuko', palette: 0 },
+        { who: 'ryuko', palette: 1 },
+        { who: 'zoma', palette: 2 },
+      ],
+      [
+        { who: 'ryuko', palette: 3 },
+        { who: 'ryuko', palette: 4 },
+        { who: 'ryuko', palette: 5 },
+      ],
+    ]);
   });
 });
 
@@ -247,7 +322,7 @@ describe('title (0x4080a0)', () => {
     title.step({ jump: true });
     expect(title.place).toBe((start + 2) % 3);
     expect([cursor().x, cursor().y]).toEqual(TITLE.items[title.place]);
-    // Story and VS single choose their mode; VS multi isn't ported.
+    // A button chooses the mode under the cursor.
     for (const mode of MODES) {
       const menu = new Title();
       while (menu.state !== 3) menu.step();
@@ -258,7 +333,7 @@ describe('title (0x4080a0)', () => {
         menu.step();
       }
       menu.step({ punch: true });
-      expect(menu.done).toBe(mode === 'multi' ? null : mode);
+      expect(menu.done).toBe(mode);
     }
   });
 });

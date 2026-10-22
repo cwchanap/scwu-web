@@ -1601,6 +1601,10 @@ export class Match {
   private waits: (Slot | null)[] = [];
   private results: number[] = [];
   lost = 0;
+  // VS multi's teams (0x47006c) and the member each side fights with
+  // (0x4700ec, 0x4700f0).
+  teams: Who[][] | null = null;
+  members = [0, 0];
   // 0x4701c4: the player the 1P last struck (0x40f2ef), for the story HUD,
   // until 1000 ticks pass (0x4701c8, 0x409d00), or −1.
   enemy = -1;
@@ -1621,8 +1625,8 @@ export class Match {
     public mode: Mode = 'practice',
     intro = false,
     seed = 0,
-    // Player 1's and player 2's characters.
-    readonly characters: [Who, Who] = ['ryuko', 'ryuko'],
+    // Player 1's and player 2's characters: in VS multi, the round's members.
+    public characters: [Who, Who] = ['ryuko', 'ryuko'],
     readonly stage: Stage = 'court',
     // Whether the select screen started it, which leaves global 3 at 50 (KGT
     // PCs 541, 548, 585): VS single. Otherwise the title's demos clear it.
@@ -1658,6 +1662,22 @@ export class Match {
       false,
       battle,
     );
+  }
+
+  // VS multi (TEAM VS, mode 2) pits each side's first member against the
+  // other's (0x408a07); the select screen leaves global 3 at 100 (KGT PCs
+  // 540, 547, 584).
+  static team(teams: Who[][], stage: Stage, seed = 0) {
+    const match = new Match(
+      'cpu',
+      true,
+      seed,
+      [teams[0][0], teams[1][0]],
+      stage,
+      true,
+    );
+    match.teams = teams;
+    return match;
   }
 
   // State 100 spawns a story's 1P, then each slot's player (0x408b14), every
@@ -1817,9 +1837,10 @@ export class Match {
     f.age = -1;
   }
 
-  // The rounds to win (0x470048): a story step's (+2), or three.
+  // The rounds to win (0x470048): a story step's (+2), VS multi's team
+  // size (0x408797), or three.
   get rounds() {
-    return this.battle?.rounds ?? ROUNDS_TO_WIN;
+    return this.battle?.rounds ?? this.teams?.[0].length ?? ROUNDS_TO_WIN;
   }
 
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
@@ -1853,8 +1874,29 @@ export class Match {
 
   // State 100 (0x408970) counts the round and sets it up again: the fighters
   // re-enter at full life (0x411ca5) with their variables cleared
-  // (0x4121cc), keeping their stock and power from round 2 (0x411f2d).
+  // (0x4121cc), keeping their stock and power from round 2 (0x411f2d). In
+  // VS multi state 902 has moved on the member of each side that lost or
+  // drew (0x409764–0x4097a1), whom its seat loads (0x408a07) with its stock
+  // and power: as many as the other side's wins. The life, power and stock
+  // it saves of the winner (0x4097ab) are never restored, as round setup
+  // clears whose they are (0x4089e6) before the players' set-up reads it
+  // (0x4120ce).
+  // Authored: player 2's CPU plays the new member's table, rolling on.
   private nextRound() {
+    if (this.teams) {
+      this.members = [this.wins[1], this.wins[0]];
+      this.characters = [
+        this.teams[0][this.members[0]],
+        this.teams[1][this.members[1]],
+      ];
+      const who = this.characters[1];
+      this.cpu = new CpuVM(
+        CPU_TABLES[who],
+        CPU_LEVEL,
+        this.cpu.seed,
+        CPU_CONTROLS[who],
+      );
+    }
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
@@ -2619,9 +2661,11 @@ export class Match {
         : selector === 0x86
           ? this.freeze
           : selector === 0x83
-            ? this.vs
-              ? 50
-              : 0
+            ? this.teams
+              ? 100
+              : this.vs
+                ? 50
+                : 0
             : selector >= 0x80
               ? (this.globals[selector & 0x3f] ?? 0)
               : (self.variables[selector & 0x3f] ?? 0);

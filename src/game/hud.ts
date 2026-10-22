@@ -32,7 +32,7 @@ const { ko, calls } = ui as unknown as {
     rounds: Lettering[];
     results: Record<'win' | 'perfect' | 'draw', number>;
     story: Record<'win' | 'lose', Lettering>;
-    vs: Record<'first' | 'later', Lettering[]>;
+    vs: Record<'first' | 'later' | 'team', Lettering[]>;
   } & Record<'logo' | 'fight' | 'transition', Lettering>;
 };
 export const KO_TICKS = ko.frames.reduce(
@@ -88,15 +88,16 @@ export const koFrame = (age: number) => letteringFrame(ko, age);
 
 // The letterings a match shows, by age: in Vs. CPU and a story the
 // round-start logo wipe (13's 115), or on the VS path its VS splash in round
-// 1 and demo black after, the round's 'DRESS' and 'SHOW TIME', which a story
-// step shows by its letterings' bits 0 and 1 (0x408d4b, 0x408dde); then
-// every result's KO lettering (26, or 32 and 33, which jump to it), a
-// story's YOU WIN or YOU LOSE (28, 29) in its place, and before another
-// round 14's logo wipe back in (116). A match lasts at most five rounds.
+// 1, or every round in VS multi, and demo black after, the round's 'DRESS'
+// and 'SHOW TIME', which a story step shows by its letterings' bits 0 and 1
+// (0x408d4b, 0x408dde); then every result's KO lettering (26, or 32 and 33,
+// which jump to it), a story's YOU WIN or YOU LOSE (28, 29) in its place,
+// and before another round 14's logo wipe back in (116), or VS multi's VS L
+// and VS R sliding in (120, 121). A match lasts at most five rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
   const opening = match.vs
-    ? calls.vs[match.round === 1 ? 'first' : 'later']
+    ? calls.vs[match.round === 1 || match.teams ? 'first' : 'later']
     : [calls.logo];
   const bits = match.battle?.letterings ?? 3;
   if (match.calls) {
@@ -122,7 +123,8 @@ function letterings(match: Match): [Lettering, number][] {
       match.endingTicks,
     ]);
   if (match.winner && !match.matchOver)
-    shown.push([calls.transition, match.endingTicks - match.roundEnd]);
+    for (const lettering of match.teams ? calls.vs.team : [calls.transition])
+      shown.push([lettering, match.endingTicks - match.roundEnd]);
   return shown;
 }
 

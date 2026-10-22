@@ -4357,24 +4357,32 @@ def export_ui():
         timeline = kgt_timeline(p, u16(record, 2))
         return dict(timeline, z=record[13], frames=[dict(f, dx=f["dx"] + s16(record, 8), dy=f["dy"] + s16(record, 10))
                                                    for f in timeline["frames"]])
-    calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)])
+    # TEAM VS's demo leaves global 3 at 100, which the 2P cursor keeps (KGT PCs 540, 547, 584): 13
+    # takes the VS splash every round (PC 74), and between rounds 14 (PC 102) slides VS L and VS R
+    # in from the screen's edges (120, 121, PCs 110-111) to join where they stand; 14's own displays
+    # only repeat them.
+    calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)],
+                       team=[spawned(pc) for pc in (110, 111)])
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"],
-                 *calls["vs"]["first"], *calls["vs"]["later"], *calls["story"].values()]
+                 *(t for path in calls["vs"].values() for t in path), *calls["story"].values()]
     # The select screen (object type 10, 0x406fc0) reads the system block the
     # loader copies from the file's tail to 0x435474: the players' names, 256
     # bytes each, the action words from 0x4451c2 (13, 14, 15, ... the round
     # letterings'), its cursors' (0x445250: 1P, 2P and their decided forms),
     # the grid's origin, spacing, columns and rows (0x4452b0–0x4452ba), where
-    # each side's hovered player stands (0x4452bc, 0x4452c4) and a flag byte a
-    # player (0x4452cc + index: bit 0 story, bit 1 VS).
+    # each side's hovered player stands (0x4452bc, 0x4452c4) and how far apart
+    # TEAM VS stands the members it picked (0x4452c0, 0x4452c8: a member with n
+    # left to pick n times that from it), and a flag byte a player (0x4452cc +
+    # index: bit 0 story, bit 1 VS).
     tail, base = data[c.common_end:], 0x435474
     at = lambda address, fmt: struct.unpack_from(fmt, tail, address - base)
     if at(0x4451c2, "<3H") != (13, 14, 15):
         sys.exit("The KGT system block no longer maps to 0x435474; refusing to export.")
     cursors = at(0x445250, "<4H")
-    x0, y0, dx, dy, cols, rows, x1, y1, _, _, x2, y2, _, _ = at(0x4452b0, "<14h")
+    x0, y0, dx, dy, cols, rows, x1, y1, mx1, my1, x2, y2, mx2, my2 = at(0x4452b0, "<14h")
     select_images = set()
     select = dict(cursors=cursors, origin=[x0, y0], step=[dx, dy], cols=cols, rows=rows, sides=[[x1, y1], [x2, y2]],
+                  members=[[mx1, my1], [mx2, my2]],
                   flags=list(tail[0x4452cc - base:0x4452cc - base + 50]), named=[bool(tail[256 * i]) for i in range(50)],
                   programs={})
     for cursor in cursors:
@@ -4396,6 +4404,9 @@ def export_ui():
     # The continue screen (0x4084f0) plays CONTINUE (the demo at 0x4438a0) with
     # its cursor (0x44524a), which stands where YES's and NO's actions' first
     # records say (0x44524c, 0x44524e).
+    # TEAM VS's select screen plays TEAM VS (the demo at 0x44389f) in CHAR SELECT's place.
+    if demo_name(tail[0x44389f - base]) != "TEAM VS":
+        sys.exit("TEAM VS's select screen no longer plays TEAM VS; refusing to export.")
     if demo_name(tail[0x4438a0 - base]) != "CONTINUE":
         sys.exit("The continue screen no longer plays CONTINUE; refusing to export.")
     cursor, yes, no = at(0x44524a, "<3H")
@@ -4432,7 +4443,8 @@ DEMOS = {
 
 
 # The demos story steps play (type 2, 0x406ad4) by their index in the KGT's demo names
-# (0x43d49c), and CONTINUE (9, the byte at 0x4438a0), which the continue screen plays.
+# (0x43d49c), CONTINUE (9, the byte at 0x4438a0), which the continue screen plays, and TEAM
+# VS (11, 0x44389f), TEAM VS's select screen's.
 STORY_DEMOS = {
     3: "9febfbfae82e64de5918df27896a32d18ef33dc6158d39138698ef63a6b4a567",  # --NEXT--
     4: "62e367836d415a913d2aab788b5ee7c22b80b8b05e0e7c23617f4821425b1061",  # --BR ANOTHER NEXT--
@@ -4441,6 +4453,7 @@ STORY_DEMOS = {
     7: "86b6bb7938c532ab3dafb6aeccc0f398c1568126a04660bda153753f10e35053",  # --BR BOSS NEXT--
     8: "653dbd52632fafcde516c624ce0e8e446bff801acb47b48328008b3464109332",  # --ZA NEXT--
     9: "427dce1b24ae765b4dda0de174cbb79eff3a82f08cea243a8015912dac602865",  # CONTINUE
+    11: "b76ccc2593a088164ae2931f4c70b6c7485159e43c9931f82c235eb5a7d71eda",  # TEAM VS
     12: "1c2eda4d2ffb1dfc6105f0e6bfe965a7176f8b58c4b6c640dac47a319b9faca7",  # --ZenkaOP
     13: "681c491e9b2c3bb5dbf24435bc48a2fd0a941860c6c4577dceeca7245adfbe15",  # --ZenkaLOST
     14: "72d4476ccf0b5eb87f37d55e700e22d611357fe8c3cc055d3454f2ddab4aa630",  # --Z-MEGA OP

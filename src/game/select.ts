@@ -1,8 +1,9 @@
 // Ports of the title (0x4080a0), the character select screen (object type
-// 10, 0x406fc0) as VS single (mode 1) and story mode (0) run it, a story's
-// demos (type 16, 0x406c10) and the continue screen (13, 0x4084f0): their
-// demos (T1 and T2, CHAR SELECT, the story's, CONTINUE), the KGT cursors and
-// each hovered player's select face, run from their raw records.
+// 10, 0x406fc0) as VS single (mode 1), VS multi (2) and story mode (0) run
+// it, a story's demos (type 16, 0x406c10) and the continue screen (13,
+// 0x4084f0): their demos (T1 and T2, CHAR SELECT, TEAM VS, the story's,
+// CONTINUE), the KGT cursors and each hovered player's select face, run from
+// their raw records.
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import type { Color } from './animations';
@@ -145,6 +146,11 @@ const remembered: [number, number][] = [
   [0, 0],
 ];
 const storyRemembered: [number, number][] = [[0, 0]];
+// VS multi (TEAM VS) plays the KGT's demo 11 (0x44389f) in CHAR SELECT's
+// place, and each side picks GAME.INI's Editor.TestPlay.VSTeamPlay players
+// (3: 0x430128, 0x40707c).
+export const TEAM_DEMO = 11;
+export const TEAM_SIZE = 3;
 
 // A screen's objects, run from their records as the engine's objects are.
 abstract class Screen {
@@ -406,9 +412,12 @@ export class CharacterSelect extends Screen {
   decided = [false, false];
   // The button each side chose with (0x406ee0), which picks its palette.
   palettes = [0, 0];
-  // The palette each side's face draws with (player +0xe00b), −1 for palette
-  // 0 until it chooses.
-  drawn = [-1, -1];
+  // The palette each seat's face draws with (player +0xe00b), −1 for palette
+  // 0 until it chooses: VS's side's own, TEAM VS's 4 × side + the member it
+  // picked, or + 3 for the player its cursor rests on.
+  drawn = Array<number>(8).fill(-1);
+  // TEAM VS's picks by side (0x47006c + 16 × side, counted by 0x4700ec).
+  members: number[][] = [[], []];
   // Authored: one person drives the 1P cursor, then the 2P one.
   active = 0;
   // The pair chosen; story mode's 1P, twice.
@@ -426,10 +435,28 @@ export class CharacterSelect extends Screen {
   constructor(
     cells?: [number, number][],
     readonly story = false,
+    // TEAM VS's demo, which the scene loads first.
+    readonly team: Demo | null = null,
   ) {
     super();
     this.cells = cells ?? (story ? storyRemembered : remembered);
     this.sides = story ? [0] : [0, 1];
+  }
+
+  // Each side's picks and the palettes their seats took (0x47011c).
+  get teams() {
+    return this.members.map((picks, p) =>
+      picks.map((index, k) => ({
+        who: ROSTER[index]!,
+        palette: this.drawn[4 * p + k],
+      })),
+    );
+  }
+
+  protected programs(container: SelectContainer) {
+    return this.team && container === `demo${TEAM_DEMO}`
+      ? this.team.actions
+      : super.programs(container);
   }
 
   protected control(input: Input) {
@@ -440,13 +467,16 @@ export class CharacterSelect extends Screen {
   // State 0 (0x40701f): the demo's objects (0x406790) and both cursors
   // (0x4071ae), or story mode's 1P one (0x407207).
   private open() {
-    this.load('select');
+    if (this.team) this.load(`demo${TEAM_DEMO}`, this.team);
+    else this.load('select');
     this.cursors = this.sides.map((p) =>
       this.spawn('kgt', LAYOUT.cursors[p], 0, 0, 0x65),
     );
   }
 
-  // State 1, VS single (0x407782), for each side, or story mode's.
+  // State 1, VS single (0x407782), for each side, or story mode's: a button
+  // chooses the player under the cursor, else the cursor moves. VS multi
+  // (0x4072c1) moves first and then picks there, a member at a time.
   private choose(input: Input) {
     const words = [0, 1].map((p) => (p === this.active ? word(input) : 0));
     const [pressed, directions] = this.read(words);
@@ -456,57 +486,104 @@ export class CharacterSelect extends Screen {
       cursor.x = LAYOUT.origin[0] + LAYOUT.step[0] * cell[0];
       cursor.y = LAYOUT.origin[1] + LAYOUT.step[1] * cell[1];
       if (this.decided[p]) continue;
-      if (this.hover[p] >= 0 && pressed[p] & BUTTONS) {
-        // Any button chooses: the cursor gives way to its decided form.
-        cursor.alive = false;
-        this.cursors[p] = this.spawn(
-          'kgt',
-          LAYOUT.cursors[2 + p],
-          cursor.x,
-          cursor.y,
-          0x65,
-        );
-        this.decided[p] = true;
+      if (this.team) {
+        if (this.rest(p, directions[p]) && pressed[p] & BUTTONS)
+          this.pick(p, pressed[p]);
+      } else if (this.hover[p] >= 0 && pressed[p] & BUTTONS) {
+        // Any button chooses.
         this.palettes[p] = buttonIndex(pressed[p]);
-        this.drawn[p] = apart(this.palettes[p], this.drawn[1 - p]);
-        // The 2P cursor takes over the keys as they are held, so the press
-        // that chose isn't fresh for it too.
-        if (p === 0) {
-          this.active = 1;
-          this.previous[1] = this.previous[0];
-          this.held[1] = this.held[0];
-          this.countdown[1] = this.countdown[0];
-        }
-        continue;
-      }
-      // 0x406e70 moves a cursor a cell at a time, wrapping at the edges.
-      if (directions[p] & 4) this.moveCell(cell, 0, -1);
-      if (directions[p] & 8) this.moveCell(cell, 0, 1);
-      if (directions[p] & 1) this.moveCell(cell, -1, 0);
-      if (directions[p] & 2) this.moveCell(cell, 1, 0);
-      const index = LAYOUT.cols * cell[1] + cell[0];
-      if (index === this.hover[p]) continue;
-      // Leaving a cell clears its player (0x406520) for a tick; resting on a
-      // selectable one stands its select face at the side's spot (0x4079ad).
-      if (this.hover[p] !== -1) {
-        for (const o of this.objects)
-          if (o.owner === p && o.container !== 'kgt') o.alive = false;
-        this.hover[p] = -1;
-      } else if (selectable(index, this.story ? 1 : 2)) {
-        this.hover[p] = index;
-        const who = ROSTER[index]!;
-        const [x, y] = LAYOUT.sides[p];
-        this.spawn(who, CHARACTERS[who].selectFace, x, y, 0x50, p ? -1 : 1, p);
-      }
+        this.seat(p, this.palettes[p]);
+        this.decide(p);
+      } else this.rest(p, directions[p]);
     }
     if (this.sides.some((p) => !this.decided[p]) || this.done) return;
     // 0x407a94: then a hundred ticks before the battle, or story mode's
-    // first step (0x407b1f).
+    // first step (0x407b1f); VS multi's first members (0x40772a).
     if (this.wait++ > 100)
-      this.done = [
-        ROSTER[this.hover[0]]!,
-        ROSTER[this.hover[this.sides.at(-1)!]]!,
-      ];
+      this.done = this.team
+        ? [ROSTER[this.members[0][0]]!, ROSTER[this.members[1][0]]!]
+        : [ROSTER[this.hover[0]]!, ROSTER[this.hover[this.sides.at(-1)!]]!];
+  }
+
+  // 0x406e70 moves a cursor a cell at a time, wrapping at the edges. Leaving
+  // a cell clears its player (0x406520) for a tick; resting on a selectable
+  // one stands its select face at the side's spot (0x4079ad), as its seat's
+  // player (VS multi's 4 × side + 3, 0x40746b). Whether it rests on one.
+  private rest(p: number, directions: number) {
+    const cell = this.cells[p];
+    if (directions & 4) this.moveCell(cell, 0, -1);
+    if (directions & 8) this.moveCell(cell, 0, 1);
+    if (directions & 1) this.moveCell(cell, -1, 0);
+    if (directions & 2) this.moveCell(cell, 1, 0);
+    const index = LAYOUT.cols * cell[1] + cell[0];
+    if (index === this.hover[p]) return true;
+    const seat = this.team ? 4 * p + 3 : p;
+    if (this.hover[p] !== -1) {
+      for (const o of this.objects)
+        if (o.owner === seat && o.container !== 'kgt') o.alive = false;
+      this.hover[p] = -1;
+      return false;
+    }
+    if (!selectable(index, this.story ? 1 : 2)) return false;
+    this.hover[p] = index;
+    const who = ROSTER[index]!;
+    const [x, y] = LAYOUT.sides[p];
+    this.spawn(who, CHARACTERS[who].selectFace, x, y, 0x50, p ? -1 : 1, seat);
+    return true;
+  }
+
+  // VS multi's button (0x40754c) seats the player as the side's next member
+  // in its button's palette (0x406f20). Each member but the last stands its
+  // face above the side's spot, the further up the more are left to pick
+  // (0x40760d); the last decides.
+  private pick(p: number, pressed: number) {
+    const picks = this.members[p];
+    const seat = 4 * p + picks.length;
+    picks.push(this.hover[p]);
+    this.seat(seat, buttonIndex(pressed));
+    const left = TEAM_SIZE - picks.length;
+    if (!left) return this.decide(p);
+    const who = ROSTER[this.hover[p]]!;
+    const [x, y] = LAYOUT.sides[p];
+    const [dx, dy] = LAYOUT.members[p];
+    this.spawn(
+      who,
+      CHARACTERS[who].selectFace,
+      x + dx * left,
+      y + dy * left,
+      0x50 + left,
+      p ? -1 : 1,
+      seat,
+    );
+  }
+
+  // The cursor gives way to its decided form (0x407834).
+  private decide(p: number) {
+    const cursor = this.cursors[p];
+    cursor.alive = false;
+    this.cursors[p] = this.spawn(
+      'kgt',
+      LAYOUT.cursors[2 + p],
+      cursor.x,
+      cursor.y,
+      0x65,
+    );
+    this.decided[p] = true;
+    // The 2P cursor takes over the keys as they are held, so the press that
+    // chose isn't fresh for it too.
+    if (p === 0) {
+      this.active = 1;
+      this.previous[1] = this.previous[0];
+      this.held[1] = this.held[0];
+      this.countdown[1] = this.countdown[0];
+    }
+  }
+
+  // 0x406f20: a palette another seat holds moves on to the next of the eight.
+  private seat(seat: number, palette: number) {
+    while (this.drawn.some((held, i) => i !== seat && held === palette))
+      palette = (palette + 1) % 8;
+    this.drawn[seat] = palette;
   }
 
   private moveCell(cell: [number, number], dx: number, dy: number) {
@@ -630,11 +707,8 @@ export class Title extends Screen {
     } else if (pressed & 0xa && !this.latch) {
       place = place < last ? place + 1 : 0;
       this.latch = true;
-    } else if (pressed & BUTTONS && !this.latch) {
-      // Authored: VS multi isn't ported, so it chooses nothing.
-      const mode = MODES[this.items[place]];
-      if (mode !== 'multi') this.done = mode;
-    }
+    } else if (pressed & BUTTONS && !this.latch)
+      this.done = MODES[this.items[place]];
     [this.cursor!.x, this.cursor!.y] = TITLE.items[this.items[place]];
     // T2 lasts until a press, so no countdown returns the menu to T1.
     if (this.countdown && --this.countdown === 0) this.restart();
@@ -771,8 +845,8 @@ function buttonIndex(pressed: number) {
   for (let bit = 0; bit < 6; bit++) if (pressed & (0x10 << bit)) index = bit;
   return index;
 }
-// 0x406f20 and 0x412056: a palette the other player holds moves on to the
-// next of the eight.
+// 0x412056: a palette the other player holds moves on to the next of the
+// eight.
 const apart = (palette: number, other: number) =>
   palette === other ? (palette + 1) % 8 : palette;
 // A story's 1P keeps its button's palette, and each slot's player enters
@@ -788,7 +862,8 @@ export function storyPalettes(first: number, count: number) {
   }
   return palettes;
 }
-// The battle sets each player's palette to its button (0x408a9f), and each
+// The battle sets each player's palette to its button (0x40789a, 0x408a9f),
+// or in VS multi to the one its member's seat took (0x407577), and each
 // fighter, player 1's first, moves off the other's as it enters (0x412056):
 // the same button twice turns player 1's.
 export function battlePalettes([first, second]: number[]) {

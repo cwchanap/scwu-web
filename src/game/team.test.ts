@@ -256,3 +256,80 @@ describe('Vs. results', () => {
     expect(match.winner).toBe('opponent');
   });
 });
+
+describe('VS multi (TEAM VS)', () => {
+  // A round's result: player 2's member (or both) out at once.
+  const finish = (match: Match, ...losers: number[]) => {
+    for (const i of losers) match.fighters[i].hp = 0;
+    const { round } = match;
+    for (let t = 0; t < 5000 && match.round === round; t++) match.step();
+  };
+  const branches = (match: Match, ticks: number) => {
+    const seen: Fighter['branch'][] = [];
+    for (let t = 0; t < ticks; t++) {
+      match.step();
+      const { branch } = match.fighters[0];
+      if (seen.at(-1) !== branch) seen.push(branch);
+    }
+    return seen;
+  };
+
+  it('moves on the member of the side that lost or drew, to its team size in wins', () => {
+    const match = Match.team(
+      [
+        ['ryuko', 'zoma', 'kiki'],
+        ['chung', 'amiro', 'anmc'],
+      ],
+      'court',
+    );
+    expect(match.rounds).toBe(3);
+    expect(match.fighters.map((f) => f.who)).toEqual(['ryuko', 'chung']);
+    const first = match.cpu;
+    fight(match);
+    match.fighters[1].power = 37;
+    match.fighters[1].stock = 2;
+    finish(match, 1);
+    // Amiro takes the seat at full life with its stock and power, and
+    // player 2's CPU her table, rolling on.
+    expect(match.members).toEqual([0, 1]);
+    expect(match.fighters.map(({ who, hp }) => [who, hp])).toEqual([
+      ['ryuko', LIFE],
+      ['amiro', 470],
+    ]);
+    expect(match.fighters[1]).toMatchObject({ stock: 2 });
+    expect(match.fighters[1].power).toBeGreaterThanOrEqual(37);
+    expect(match.cpu).not.toBe(first);
+    expect(match.cpu.seed).toBe(first.seed);
+    // A double KO is a draw: both move on.
+    fight(match);
+    finish(match, 0, 1);
+    expect([match.wins, match.members]).toEqual([
+      [2, 1],
+      [1, 2],
+    ]);
+    expect(match.fighters.map((f) => f.who)).toEqual(['zoma', 'anmc']);
+    fight(match);
+    match.fighters[1].hp = 0;
+    while (!match.winner) match.step();
+    expect([match.matchOver, match.matchWinner]).toEqual([true, 'player']);
+  });
+
+  it("leaves global 3 at 100, so every round's 開始時 takes its TEAM VS path (PCs 5, 100)", () => {
+    // VS single's round 1 enters 33 at 100 ticks; round 2 skips the VS
+    // intro.
+    const vs = new Match('cpu', true, 0, ['ryuko', 'ryuko'], 'court', true);
+    expect(branches(vs, 400)).toEqual([30, '30+9', 33, null]);
+    finish(vs, 1);
+    expect(branches(vs, 400)).toEqual([30, null]);
+    const team = Match.team(
+      [
+        ['ryuko', 'zoma', 'kiki'],
+        ['ryuko', 'amiro', 'anmc'],
+      ],
+      'court',
+    );
+    expect(branches(team, 400)).toEqual([30, '30+9', 34, null]);
+    finish(team, 1);
+    expect(branches(team, 400)).toEqual([30, '30+9', 34, null]);
+  });
+});

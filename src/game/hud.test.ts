@@ -74,6 +74,7 @@ it('exports every HUD and lettering texture at its original dimensions', () => {
     transition,
     ...vs.first,
     ...vs.later,
+    ...vs.team,
   ])
     for (const frame of frames) {
       expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
@@ -199,5 +200,50 @@ it("opens a VS round with KGT 13's VS splash, then demo black (117)", () => {
   // VS L's slide plays 12 in round 1 only; demo black is silent.
   expect(heard.filter(([, , sounds]) => sounds.includes(12))).toEqual([
     [1, 150, [12]],
+  ]);
+});
+
+it('opens every VS multi round with the VS splash, and between rounds slides VS L and VS R in (120, 121)', () => {
+  // KGT 14's TEAM VS path (PC 102) spawns them from the screen's edges
+  // (PCs 110–111); they meet where the splash stands 23 ticks in and hold.
+  const { first, team } = ui.calls.vs;
+  expect(
+    team.map(({ z, loop, frames }) => [
+      z,
+      loop,
+      frames[0].image,
+      frames[0].dx,
+      frames.at(-1)!.dx,
+      frames.reduce((ticks, frame) => ticks + frame.duration, 0),
+    ]),
+  ).toEqual([
+    [0x7f, 7, 191, -440, 0, 28],
+    [0x7f, 7, 192, 646, first[1].frames[0].dx, 28],
+  ]);
+  const match = Match.team(
+    [
+      ['ryuko', 'zoma', 'kiki'],
+      ['zoma', 'kiki', 'chung'],
+    ],
+    'court',
+  );
+  const heard: [number, number, number[]][] = [];
+  while (match.round === 1 || match.roundTicks < DRESS_TICK) {
+    if (match.round === 1 && match.roundTicks === FIGHT_TICK)
+      match.fighters[1].hp = 0;
+    match.step();
+    const sounds = letteringSounds(match);
+    if (sounds.length)
+      heard.push([
+        match.round,
+        match.winner ? match.endingTicks - match.roundEnd : match.roundTicks,
+        sounds,
+      ]);
+  }
+  // VS L's slide plays 12 each round, and 120 as it meets VS R.
+  expect(heard.filter(([, , sounds]) => sounds.includes(12))).toEqual([
+    [1, 150, [12]],
+    [1, 23, [12]],
+    [2, 150, [12]],
   ]);
 });

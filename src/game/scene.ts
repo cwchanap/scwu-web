@@ -11,6 +11,7 @@ import {
   Continue,
   storyPalettes,
   StoryDemo,
+  TEAM_DEMO,
   Title,
 } from './select';
 import type { Demo, SelectObject } from './select';
@@ -60,6 +61,8 @@ export interface GameStatus {
   fighters: [Who, Who];
   // In a story battle.
   story: boolean;
+  // The match's mode: TEAM VS's is always Vs. CPU.
+  mode: Mode;
 }
 export const initialStatus: GameStatus = {
   ready: false,
@@ -77,6 +80,7 @@ export const initialStatus: GameStatus = {
   selecting: true,
   fighters: ['ryuko', 'zoma'],
   story: false,
+  mode: 'practice',
 };
 const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t1, t2 };
@@ -152,8 +156,10 @@ export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
   // Whether the select screen chose the pair: its Vs. CPU battles take the
-  // VS paths (global 3 at 50), as VS single's do.
+  // VS paths (global 3 at 50), as VS single's do. VS multi's teams, whose
+  // first members are the pair, with the palettes their seats took.
   private chosen = false;
+  private teams: { who: Who; palette: number }[][] | null = null;
   private stage: Stage = 'court';
   private wantedStage = this.stage;
   match = new Match(
@@ -298,7 +304,9 @@ export class TrainingScene extends Phaser.Scene {
     }
     if (!e.repeat && e.code === 'KeyR')
       if (this.select instanceof CharacterSelect)
-        this.open(new CharacterSelect(undefined, this.select.story));
+        this.open(
+          new CharacterSelect(undefined, this.select.story, this.select.team),
+        );
       else if (this.select) this.openTitle();
       else this.reset(this.match.mode);
   };
@@ -342,6 +350,13 @@ export class TrainingScene extends Phaser.Scene {
   openSelect() {
     this.open(new CharacterSelect());
   }
+  // VS multi's, once its demo loads.
+  private openTeamSelect() {
+    this.openDemo(
+      TEAM_DEMO,
+      (demo) => new CharacterSelect(undefined, false, demo),
+    );
+  }
   private openTitle() {
     this.open(new Title());
   }
@@ -383,7 +398,9 @@ export class TrainingScene extends Phaser.Scene {
     if (select instanceof Title)
       return select.done === 'story'
         ? this.open(new CharacterSelect(undefined, true))
-        : this.openSelect();
+        : select.done === 'multi'
+          ? this.openTeamSelect()
+          : this.openSelect();
     if (select instanceof StoryDemo)
       return this.runStory(this.story!.next(this.storyLife, this.storyLost));
     if (select instanceof Continue)
@@ -398,9 +415,10 @@ export class TrainingScene extends Phaser.Scene {
     }
     [this.fighter, this.opponent] = select.done;
     this.chosen = true;
+    this.teams = select.team ? select.teams : null;
     this.palettes = battlePalettes(select.palettes);
     this.leaveScreen();
-    this.reset(this.match.mode);
+    this.reset(this.teams ? 'cpu' : this.match.mode);
   }
 
   private leaveScreen() {
@@ -432,12 +450,13 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // A won Vs. match returns to the select screen (state 902 spawns object
-  // type 10, 0x40982b); a story battle runs the story on, unless the 1P won
-  // no more rounds than the CPUs and the step's flag bit 0 opens the
-  // continue screen (0x40983b).
+  // type 10, 0x40982b), VS multi's to its own; a story battle runs the story
+  // on, unless the 1P won no more rounds than the CPUs and the step's flag
+  // bit 0 opens the continue screen (0x40983b).
   private matchOver() {
     const { battle, fighters, lost } = this.match;
-    if (!battle) return this.openSelect();
+    if (!battle)
+      return this.match.teams ? this.openTeamSelect() : this.openSelect();
     [this.storyLife, this.storyLost] = [fighters[0].hp, lost];
     if (this.match.matchWinner !== 'player' && battle.flags & 1)
       return this.openDemo(9, (demo) => new Continue(demo));
@@ -448,7 +467,7 @@ export class TrainingScene extends Phaser.Scene {
   // last screen stays until then.
   private openDemo(
     index: number,
-    make: (demo: StoryDemoData) => StoryDemo | Continue,
+    make: (demo: StoryDemoData) => StoryDemo | Continue | CharacterSelect,
   ) {
     this.loading = true;
     void STORY_DEMOS[`./generated/demos/${index}.json`]().then((demo) => {
@@ -530,11 +549,13 @@ export class TrainingScene extends Phaser.Scene {
   setFighter(who: Who) {
     this.fighter = who;
     this.chosen = false;
+    this.teams = null;
     this.reset(this.match.mode);
   }
   setOpponent(who: Who) {
     this.opponent = who;
     this.chosen = false;
+    this.teams = null;
     this.reset(this.match.mode);
   }
   // A stage's images load when it is first picked; the current one plays on
@@ -564,18 +585,25 @@ export class TrainingScene extends Phaser.Scene {
     }
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
     this.begin(
-      new Match(
-        mode,
-        mode === 'cpu',
-        randomSeed(),
-        [this.fighter, this.opponent],
-        this.stage,
-        this.chosen && mode === 'cpu',
-      ),
+      this.teams && mode === 'cpu'
+        ? Match.team(
+            this.teams.map((team) => team.map(({ who }) => who)),
+            this.stage,
+            randomSeed(),
+          )
+        : new Match(
+            mode,
+            mode === 'cpu',
+            randomSeed(),
+            [this.fighter, this.opponent],
+            this.stage,
+            this.chosen && mode === 'cpu',
+          ),
     );
   }
   private begin(match: Match) {
     this.match = match;
+    this.memberPalettes();
     this.match.practice = { ...this.practice };
     this.sound.stopAll();
     this.cue = undefined;
@@ -585,6 +613,16 @@ export class TrainingScene extends Phaser.Scene {
     this.paused = false;
     this.clearInput();
     this.report();
+  }
+
+  // VS multi's round start gives each fighter its member's palette; free
+  // practice has the first members.
+  private memberPalettes() {
+    if (!this.teams) return;
+    const members = this.match.teams ? this.match.members : [0, 0];
+    this.palettes = battlePalettes(
+      members.map((m, p) => this.teams![p][m].palette),
+    );
   }
 
   // Each round's fighters start their idle programs afresh.
@@ -863,7 +901,10 @@ export class TrainingScene extends Phaser.Scene {
           this.match.step(
             Object.fromEntries([...controls].map((control) => [control, true])),
           );
-          if (this.match.round !== round) this.resetIdle();
+          if (this.match.round !== round) {
+            this.resetIdle();
+            this.memberPalettes();
+          }
           if (this.match.resultReady) this.matchOver();
           for (const { owner, index } of this.match.sounds)
             if (owner < 0) this.stageSound(index);
@@ -1089,6 +1130,7 @@ export class TrainingScene extends Phaser.Scene {
       selecting: !!this.select,
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
+      mode: this.match.mode,
     };
     const serialized = JSON.stringify(status);
     if (serialized !== this.lastStatus) {

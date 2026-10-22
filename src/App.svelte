@@ -64,6 +64,7 @@
     selecting: true,
     fighters: ['ryuko', 'zoma'],
     story: false,
+    mode: 'practice',
   });
   let help = $state(false);
   const asset = `${import.meta.env.BASE_URL}assets/`;
@@ -533,6 +534,7 @@
           session = createGame(host, (next) => {
             status = next;
             [fighter, opponent] = next.fighters;
+            if (next.mode !== 'story') mode = next.mode;
           });
       })
       .catch((error: unknown) => {
