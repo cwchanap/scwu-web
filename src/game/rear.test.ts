@@ -191,13 +191,16 @@ describe('REAR (24 REAR.PLAYER)', () => {
 
   it('rises unseen and glides in through his Vs. intro, landing into Round BR + 9, charged to two stocks', () => {
     const { path, ticks, f, match, heights } = brIntro('rear');
-    expect([path, ticks]).toEqual([[31, '33+10', '36+9'], 198]);
-    // After 開始時's (31) blank display, 140 source pixels up, 54 down
-    // gliding; the fall passes the floor on its 17th move, and the landing
-    // (0x41187f) enters Round BR + 9 (slot 1, PC 374) a tick later.
+    expect([path, ticks]).toEqual([[31, 33, '36+9'], 241]);
+    // After 開始時's (31) blank display, 140 source pixels up; KGT 13's
+    // global 14 fails 開始時 BR's jump to + 10 (PC 336), so he stops there
+    // unseen for 43 ticks (PCs 339–340). Then 54 down gliding; the fall
+    // passes the floor on its 17th move, and the landing (0x41187f) enters
+    // Round BR + 9 (slot 1, PC 374) a tick later.
     expect(heights[7] / 1.5).toBeCloseTo(-139.923, 3);
-    expect(heights[34] / 1.5).toBeCloseTo(-85.953, 3);
-    expect([heights[51] > 0, heights[52]]).toEqual([true, 0]);
+    expect(heights[50]).toBe(heights[7]);
+    expect(heights[77] / 1.5).toBeCloseTo(-85.953, 3);
+    expect([heights[94] > 0, heights[95]]).toEqual([true, 0]);
     // The glide carries him 539.85 on.
     expect(f.x).toBeCloseTo(390 * 1.5 + 539.85, 2);
     // OP super Charge (41) runs on past it.

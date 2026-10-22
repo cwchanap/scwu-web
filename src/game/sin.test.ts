@@ -233,19 +233,20 @@ describe('SIN (10 SIN.PLAYER)', () => {
   it('rises from his shadow in his Vs. intro, entering EX mode with down held as it checks (PC 403)', () => {
     expect(animationDuration('35+3', 'sin')).toBe(200);
     expect(animationFrame('35+3', 75, 'sin').image).toBe(365);
-    // After 開始時's (33) blank display, Round 1's check enters hanshin
+    // After 開始時's (33) blank display and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PC 388), Round 1's check enters hanshin
     // change (40); STAND DEMO 2 (30) then jumps to STAND DEMO (29, PC 324):
     // images 113–117 for 123 ticks (PCs 315–322) in place of 365's 125.
     const { path, ticks, f, images } = brIntro('sin', 0, (t) =>
       t >= 60 ? { crouch: true } : {},
     );
     expect([path, ticks, f.x, exMode(f)]).toEqual([
-      [33, '35+3', 40],
-      200,
+      [33, 35, 40],
+      250,
       390 * 1.5,
       true,
     ]);
-    expect([76, 106, 198].map((t) => images[t])).toEqual([113, 114, 114]);
+    expect([126, 156, 248].map((t) => images[t])).toEqual([113, 114, 114]);
   });
 
   it('wins with STAND DEMO 2 (30), then loops PCs 617–618 with WIN RP spawned once (PC 616)', () => {

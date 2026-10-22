@@ -371,11 +371,12 @@ describe('SWW (26 SWW.PLAYER)', () => {
   it('charges two stocks through his Vs. intro and starts in EX mode while down is held at its check (PC 330)', () => {
     expect(animationDuration('32+3', 'sww')).toBe(200);
     for (const crouch of [false, true]) {
-      // The check enters EX CHANGE (37).
+      // 開始時 BR keeps its 50-tick display, as KGT 13's global 14 fails its
+      // jump past it (PC 317). The check enters EX CHANGE (37).
       const { path, f } = brIntro('sww', 0, () => ({ crouch }));
       // OP super Charge (39, PC 320) runs alongside.
       expect([path, exMode(f), f.stock]).toEqual([
-        [30, '32+3', ...(crouch ? [37] : [])],
+        [30, 32, ...(crouch ? [37] : [])],
         crouch,
         2,
       ]);

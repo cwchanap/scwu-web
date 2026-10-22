@@ -351,7 +351,9 @@ describe('TTRO (39 TTRO.PLAYER)', () => {
   it('charges two stocks through his Vs. intro, 開始時 BR (33)', () => {
     expect(animationDuration('33+3', 'ttro')).toBe(268);
     const { path, ticks, f } = brIntro('ttro');
-    expect([path, ticks, f.stock]).toEqual([[31, '33+3'], 270, 2]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 314).
+    expect([path, ticks, f.stock]).toEqual([[31, 33], 320, 2]);
     // Round 1 (34) + 2 stamps through his stance, then calls DEMO ACT
     // twice (PC 333).
     expect(

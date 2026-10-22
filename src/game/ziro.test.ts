@@ -298,31 +298,35 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
 
   it('rolls his Vs. intro (PC 428): dropping in from the sky or RANDOM OP1, charged with two stocks, in EX mode while down is held (PCs 486, 343)', () => {
     for (const crouch of [false, true]) {
-      // Two thirds of the time 開始時 BR + 18 (PC 429), after 開始時's (36)
-      // blank display, rises unseen at raw −20000 for 8 ticks (PC 445):
-      // 1599 source pixels. Round 1 (39) + 6 falls at 2000 under gravity 30
-      // (PC 459); a tick past the floor, the landing (0x41187f) enters 39 +
-      // 11 (slot 1, PC 458), whose check (PC 486) enters Change EX (43).
+      // Two thirds of the time 開始時 BR, after 開始時's (36) blank display,
+      // fails its jump to + 18 (PC 429) on KGT 13's global 14: it rises
+      // unseen at raw −20000 for 8 ticks (PC 430), 1599 source pixels, and
+      // stops there 42 ticks (PCs 432–433), 22 more than + 18 would. Round
+      // 1 (39) + 6 falls at 2000 under gravity 30 (PC 459); a tick past the
+      // floor, the landing (0x41187f) enters 39 + 11 (slot 1, PC 458), whose
+      // check (PC 486) enters Change EX (43).
       const drop = brIntro('ziro', 1, () => ({ crouch }));
       expect(drop.heights[8] / 1.5).toBeCloseTo(-1599.12, 1);
+      expect(drop.heights[50]).toBe(drop.heights[8]);
       expect([
-        drop.heights[118] < 0,
-        drop.heights[119] > 0,
-        drop.heights[120],
+        drop.heights[140] < 0,
+        drop.heights[141] > 0,
+        drop.heights[142],
       ]).toEqual([true, true, 0]);
       expect([drop.path, drop.ticks, exMode(drop.f), drop.f.stock]).toEqual([
-        [36, '38+18', '39+11', ...(crouch ? [43] : [])],
-        280,
+        [36, 38, '39+11', ...(crouch ? [43] : [])],
+        302,
         crouch,
         2,
       ]);
-      // A third of the time + 14 enters RANDOM OP1 (31) + 2 (PC 444), which
-      // steps back at raw −200 for 8 ticks (PC 341) past its check (PC 343),
-      // into Change EX + 3.
+      // A third of the time + 12 holds image 466 for 50 ticks (PC 440), as
+      // its global 14 = 0 check fails too (PC 439), and enters RANDOM OP1
+      // (31) + 2 (PC 444), which steps back at raw −200 for 8 ticks (PC 341)
+      // past its check (PC 343), into Change EX + 3.
       const op1 = brIntro('ziro', 0, () => ({ crouch }));
       expect([op1.path, op1.ticks, exMode(op1.f), op1.f.stock]).toEqual([
-        [36, '38+14', ...(crouch ? ['43+3'] : [])],
-        202,
+        [36, '38+12', ...(crouch ? ['43+3'] : [])],
+        252,
         crouch,
         2,
       ]);

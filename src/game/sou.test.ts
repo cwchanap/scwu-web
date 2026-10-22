@@ -259,19 +259,18 @@ describe('SOU (16 SOU.PLAYER)', () => {
       [0, 5, 19, 90].map((age) => animationFrame('37+10', age, 'sou').image),
     ).toEqual([124, 123, 115, 116]);
     for (const crouch of [false, true]) {
-      // After 開始時's (34) blank display; the fall passes the floor 319
-      // source pixels down, and the landing (0x41187f) enters Round 1 + 10
-      // (slot 1, PC 409) a tick later, whose check (PC 415) enters Change
-      // Character (41) for down.
+      // After 開始時's (34) blank display, KGT 13's global 14 fails 開始時
+      // BR's jump to + 10 (PC 392): up 2 ticks, then stopped 50 on image
+      // 306 (PCs 395–396). The fall passes the floor 319 source pixels down,
+      // and the landing (0x41187f) enters Round 1 + 10 (slot 1, PC 409) a
+      // tick later, whose check (PC 415) enters Change Character (41) for
+      // down.
       const { path, ticks, f, match, heights } = brIntro('sou', 0, () => ({
         crouch,
       }));
       expect(Math.min(...heights) / 1.5).toBeCloseTo(-319.824, 3);
-      expect([heights[109] > 0, heights[110]]).toEqual([true, 0]);
-      expect([path, ticks]).toEqual([
-        [34, '36+10', crouch ? 41 : '37+10'],
-        202,
-      ]);
+      expect([heights[159] > 0, heights[160]]).toEqual([true, 0]);
+      expect([path, ticks]).toEqual([[34, 36, crouch ? 41 : '37+10'], 252]);
       // OP super Charge (43, PC 398) charges the second stock the tick
       // after.
       expect(f.stock).toBe(1);

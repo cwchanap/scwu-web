@@ -680,28 +680,35 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       );
       return { path, ticks, stock: f.stock, ex: exMode(f) };
     };
-    // 開始時 BR (41) jumps past its display (PC 621) to Round 1 (42) + 7
-    // (PC 624).
+    // 開始時 BR (41) keeps its 48-tick display, as KGT 13's global 14 fails
+    // its jump past it (PC 621), then jumps to Round 1 (42) + 7 (PC 624).
     expect(intro()).toEqual({
-      path: [38, 41, '41+12'],
-      ticks: 204,
+      path: [38, 41],
+      ticks: 252,
       stock: 2,
       ex: false,
     });
     // Round 1's op 0x16 (PC 648) checks down as its 190-tick display ends,
     // after 開始時's (38) blank display, entering 開始時 SELECT (40) + 8.
-    expect([192, 193, 194].map((down) => intro(down).ex)).toEqual([
+    expect([240, 241, 242].map((down) => intro(down).ex)).toEqual([
       false,
       true,
       false,
     ]);
-    // 開始時 BR's first display, then Round 1 from PC 647. Her friends pass
-    // their global 14 = 0 tests (PCs 625–637) past their first poses.
+    // 開始時 BR's displays, then Round 1 from PC 647. Her friends, spawned
+    // 2 ticks in (PCs 616–620), fail their global 14 = 0 tests (PCs
+    // 625–637) as well, so none branches: each shows its first pose 50
+    // ticks (PC 626) before jumping to its own action, which shows it 50
+    // more (43 + 2).
     const { images, objects } = brIntro('yinan');
-    expect([...objects]).toEqual(
-      expect.arrayContaining(['43+2', '44+2', '45+2', '46+2', '46+6']),
+    expect([...objects].sort()).toEqual(
+      [57, 59, '41+13', '41+16', '41+19', '41+22', '41+25'].sort(),
     );
-    expect([1, 2, 3, 192, 193, 198, 199, 202].map((t) => images[t])).toEqual([
+    expect(
+      [0, 99, 100].map((age) => animationFrame('41+13', age, 'yinan').image),
+    ).toEqual([4389, 4389, 4390]);
+    expect(animationFrame('43+2', 50, 'yinan').image).toBe(4390);
+    expect([1, 2, 3, 240, 241, 246, 247, 250].map((t) => images[t])).toEqual([
       4007, 4007, 4007, 4007, 4006, 4006, 4000, 4000,
     ]);
   });

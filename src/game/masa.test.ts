@@ -214,8 +214,10 @@ describe('MASA (29 MASA.PLAYER)', () => {
 
   it('charges two stocks through his Vs. intro, OP normal + 3 (PC 458)', () => {
     expect(animationDuration('52+4', 'masa')).toBe(200);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 453).
     const { path, ticks, f } = brIntro('masa');
-    expect([path, ticks, f.stock]).toEqual([[44, '52+4'], 202, 2]);
+    expect([path, ticks, f.stock]).toEqual([[44, 52], 252, 2]);
     expect(
       [0, 10, 20, 30, 33, 145, 150].map(
         (age) => animationFrame('52+4', age, 'masa').image,

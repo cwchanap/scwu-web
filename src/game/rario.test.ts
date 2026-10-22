@@ -295,18 +295,16 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
 
   it('hops twice through his Vs. intro, charging two stocks', () => {
     const { path, ticks, f, heights, images } = brIntro('rario');
-    // The second hop's fall passes the floor on its 56th move, and the
-    // landing (0x41187f) enters Round 1 + 19 (slot 1, PC 250) a tick later.
-    expect([path, ticks, f.stock, f.y]).toEqual([
-      [24, '26+3', '27+19'],
-      202,
-      2,
-      0,
-    ]);
-    expect([heights[175] > 0, heights[176]]).toEqual([true, 0]);
-    // After 開始時's (24) blank display: Round 1's crouch, the hop, the
-    // hang, the second hop's wait for landing, then Round 1 + 19.
-    expect([1, 25, 45, 120, 175, 176, 186].map((t) => images[t])).toEqual([
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 229). The second hop's fall passes the floor on its 56th move,
+    // and the landing (0x41187f) enters Round 1 + 19 (slot 1, PC 250) a tick
+    // later.
+    expect([path, ticks, f.stock, f.y]).toEqual([[24, 26, '27+19'], 252, 2, 0]);
+    expect([heights[225] > 0, heights[226]]).toEqual([true, 0]);
+    // After 開始時's (24) blank display and that display: Round 1's crouch,
+    // the hop, the hang, the second hop's wait for landing, then Round 1 +
+    // 19.
+    expect([51, 75, 95, 170, 225, 226, 236].map((t) => images[t])).toEqual([
       220, 223, 224, 169, 169, 139, 140,
     ]);
   });

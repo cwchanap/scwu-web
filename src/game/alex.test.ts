@@ -242,13 +242,12 @@ describe('ALEX (15 ALEX.PLAYER)', () => {
       ),
     ).toEqual([0, 323, 324, 333, 158, 334, 335]);
     for (const crouch of [false, true]) {
-      // After 開始時's (30) blank display; Round 1's check (PC 356) enters EX
-      // change (39) for down.
+      // After 開始時's (30) blank display, 開始時 BR (32) plays the records
+      // its global 14 = 0 check skips (PC 325), as KGT 13 holds it at 10,
+      // 48 ticks more than + 9; Round 1's check (PC 356) enters EX change
+      // (39) for down.
       const { path, ticks, f, match } = brIntro('alex', 0, () => ({ crouch }));
-      expect([path, ticks]).toEqual([
-        [30, '32+9', ...(crouch ? [39] : [])],
-        202,
-      ]);
+      expect([path, ticks]).toEqual([[30, 32, ...(crouch ? [39] : [])], 250]);
       // OP super Charge, spawned 2 ticks in (PC 336), adds its last 2 power
       // (42, PC 434) the tick after.
       expect([f.stock, f.power]).toEqual([1, 98]);

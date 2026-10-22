@@ -185,11 +185,12 @@ describe('Yo (09 YO.PLAYER)', () => {
     // The round's set-up places her at 390 source pixels (0x408ac3).
     expect(yo.x).toBe(390 * 1.5);
     expect(animationDuration('34+3', 'yo')).toBe(115 + 3 * 35);
-    // After 開始時's (32) blank display, PC 388 spawns RObort (31), which
-    // drives off.
-    for (let t = 0; t < 117; t++) match.step({ crouch: true });
+    // After 開始時's (32) blank display and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PC 367), PC 388 spawns RObort (31),
+    // which drives off.
+    for (let t = 0; t < 167; t++) match.step({ crouch: true });
     expect(match.effects.map((e) => e.clip)).toContain(31);
-    for (let t = 117; t < 222; t++) match.step({ crouch: true });
+    for (let t = 167; t < 272; t++) match.step({ crouch: true });
     expect(yo.action).toBe('idle');
     // Round 1 + 5: raw 110 for six 15-tick displays (PCs 378–385).
     expect(yo.x - 390 * 1.5).toBeCloseTo(110 * 90 * VELOCITY, 6);

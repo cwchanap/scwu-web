@@ -371,7 +371,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('pops out, rises and lands through his Vs. intro, charging four stocks', () => {
-    expect(animationDuration('intro', 'dora')).toBe(287);
+    expect(animationDuration('intro', 'dora')).toBe(337);
     const match = new Match('cpu', true, 0, ['dora', 'zoma']);
     const dora = match.fighters[0];
     let ticks = 0;
@@ -380,11 +380,12 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       ticks++;
     }
     // OP super Charge (46) clears his power and adds 360 (PCs 573–574).
-    expect([ticks, dora.stock, dora.y]).toEqual([287, 4, 0]);
-    // Round 1's pocket pose, the rise, OP RP, the wait for landing, then
-    // Round 1 + 27 and STAND DEMO.
+    expect([ticks, dora.stock, dora.y]).toEqual([337, 4, 0]);
+    // 開始時 BR's display and Round 1's pocket pose (image 263, PC 365),
+    // the rise, OP RP, the wait for landing, then Round 1 + 27 and STAND
+    // DEMO.
     expect(
-      [0, 99, 100, 127, 207, 216, 217, 226, 286].map(
+      [0, 149, 150, 177, 257, 266, 267, 276, 336].map(
         (age) => animationFrame('intro', age, 'dora').image,
       ),
     ).toEqual([263, 263, 264, 268, 268, 125, 124, 124, 184]);

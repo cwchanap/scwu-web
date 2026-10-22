@@ -233,26 +233,28 @@ describe('KAY (12 KAY.PLAYER)', () => {
   it('walks in from Round 1 + 5 at raw 200 (PC 356) and calls Demo stand twice, charged with two stocks', () => {
     expect(animationDuration('32+3', 'kay')).toBe(200);
     const { path, ticks, f, match } = brIntro('kay');
-    // From 390 source pixels (0x408ac3), raw 200 for 56 ticks.
-    expect([path, ticks]).toEqual([[30, '32+3'], 202]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 345). From 390 source pixels (0x408ac3), raw 200 for 56 ticks.
+    expect([path, ticks]).toEqual([[30, 32], 252]);
     expect(f.x - 390 * 1.5).toBeCloseTo(56 * 200 * (655 / 65536) * 1.5, 6);
     for (let t = 0; t < 100; t++) match.step({});
     expect([f.stock, f.power]).toEqual([2, 0]);
   });
 
   it('enters EX CH (36) with down held as Round 1’s op 0x16 checks (PC 367)', () => {
-    // After 開始時's (30) blank display, 82 ticks into Round 1 + 5.
+    // After 開始時's (30) blank display and 開始時 BR's 50-tick display, 82
+    // ticks into Round 1 + 5.
     expect(
-      [82, 83, 84].map((down) => {
+      [132, 133, 134].map((down) => {
         const { path, f } = brIntro('kay', 0, (t) =>
           t === down ? { crouch: true } : {},
         );
         return [path.at(-1), exMode(f)];
       }),
     ).toEqual([
-      ['32+3', false],
+      [32, false],
       [36, true],
-      ['32+3', false],
+      [32, false],
     ]);
   });
 

@@ -182,16 +182,18 @@ describe('LIZARD (11 LIZARD.PLAYER)', () => {
     ).toEqual([0, 396, 132]);
     const { path, ticks, f, match, heights, images } = brIntro('lizard');
     // Up 80 source pixels in two ticks (PC 372), after 開始時's (31) blank
-    // display; the leap's fall passes the floor on its 62nd move, and the
-    // landing (0x41187f) enters OP lend (36, slot 1 at PC 383) a tick later.
-    expect(heights[5] / 1.5).toBeCloseTo(-79.96, 2);
-    expect(heights[165] / 1.5).toBeCloseTo(-9.23, 2);
-    expect([heights[166] > 0, heights[167], images[167]]).toEqual([
+    // display and 開始時 BR's 48-tick display, which KGT 13's global 14
+    // keeps (PC 365); the leap's fall passes the floor on its 62nd move, and
+    // the landing (0x41187f) enters OP lend (36, slot 1 at PC 383) a tick
+    // later.
+    expect(heights[53] / 1.5).toBeCloseTo(-79.96, 2);
+    expect(heights[213] / 1.5).toBeCloseTo(-9.23, 2);
+    expect([heights[214] > 0, heights[215], images[215]]).toEqual([
       true,
       0,
       126,
     ]);
-    expect([path, ticks]).toEqual([[31, '33+3', 36], 218]);
+    expect([path, ticks]).toEqual([[31, 33, 36], 266]);
     // From 390 source pixels (0x408ac3), raw 400 through the leap.
     expect(f.x).toBeCloseTo(390 * 1.5 + 62 * 400 * (655 / 65536) * 1.5, 6);
     // OP super Charge (42, PC 369) takes 300 power, borrowing stocks down to

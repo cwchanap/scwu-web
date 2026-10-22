@@ -258,19 +258,20 @@ describe('GON (21 GON.PLAYER)', () => {
       const { heights, path, ticks, f } = brIntro('gon', 1, () =>
         crouch ? { crouch: true } : {},
       );
-      // After 開始時's (36) blank display, 265 source pixels up at the
+      // After 開始時's (36) blank display and 開始時 BR's 50-tick display,
+      // which KGT 13's global 14 keeps (PC 433), 265 source pixels up at the
       // peak, a tick past the floor before the landing (0x41187f) enters 39
       // + 25 (slot 1, PC 451), whose check enters TYPE CHANGE (49).
       expect(Math.min(...heights)).toBeCloseTo(-397.641, 3);
-      expect([heights[179] < 0, heights[180] > 0, heights[181], f.x]).toEqual([
+      expect([heights[229] < 0, heights[230] > 0, heights[231], f.x]).toEqual([
         true,
         true,
         0,
         390 * 1.5,
       ]);
       expect([path, ticks, f.variables[0] ?? 0, f.stock]).toEqual([
-        [36, '38+3', crouch ? 49 : '39+25'],
-        202,
+        [36, 38, crouch ? 49 : '39+25'],
+        252,
         crouch ? 100 : 0,
         2,
       ]);
@@ -280,16 +281,16 @@ describe('GON (21 GON.PLAYER)', () => {
     expect(
       [1, 0].map((seed) => {
         const { path, sounds } = brIntro('gon', seed);
-        return [path, sounds.find(([t]) => t === 129)];
+        return [path, sounds.find(([t]) => t === 179)];
       }),
     ).toEqual([
       [
-        [36, '38+3', '39+25'],
-        [129, 26],
+        [36, 38, '39+25'],
+        [179, 26],
       ],
       [
-        [36, '38+3', '39+20', '39+25'],
-        [129, 15],
+        [36, 38, '39+20', '39+25'],
+        [179, 15],
       ],
     ]);
   });

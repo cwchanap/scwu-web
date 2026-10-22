@@ -300,13 +300,10 @@ describe('KATE (22 KATE.PLAYER)', () => {
 
   it('stands through her Vs. intro, charged to two stocks', () => {
     expect(animationDuration('32+3', 'kate')).toBe(200);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 333).
     const { path, ticks, f } = brIntro('kate');
-    expect([path, ticks, f.x, f.stock]).toEqual([
-      [30, '32+3'],
-      202,
-      390 * 1.5,
-      2,
-    ]);
+    expect([path, ticks, f.x, f.stock]).toEqual([[30, 32], 252, 390 * 1.5, 2]);
   });
 
   it('wins after two calls of sTAND demo, looping images 265 and 266 (PC 620), holds her draw and shows face 2001', () => {

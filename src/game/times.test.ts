@@ -191,7 +191,9 @@ describe('3-TIMES (30 3-TIMES.PLAYER)', () => {
   it('charges two stocks through his Vs. intro, OP normal + 2 (PC 374)', () => {
     expect(animationDuration('52+4', 'times')).toBe(208);
     const { path, ticks, f } = brIntro('times');
-    expect([path, ticks, f.stock]).toEqual([[44, '52+4'], 210, 2]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 369).
+    expect([path, ticks, f.stock]).toEqual([[44, 52], 260, 2]);
     // A 26-tick fade in, then DEMO STAND seven times (PC 525).
     expect(
       [0, 10, 23, 26, 36, 49, 207].map(

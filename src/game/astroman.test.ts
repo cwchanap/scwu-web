@@ -495,16 +495,17 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
         (age) => animationFrame('33+3', age, 'astroman').image,
       ),
     ).toEqual([151, 151, 150, 149, 148, 147, 146, 146, 145, 145]);
-    // After 開始時's (31) blank display, Round 1's rand % 3 > 1 (PC 402)
-    // enters Round 1 + 5, voicing 3; otherwise 4 (PC 403).
+    // After 開始時's (31) blank display and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PC 394), Round 1's rand % 3 > 1 (PC
+    // 402) enters Round 1 + 5, voicing 3; otherwise 4 (PC 403).
     expect(
       [1, 0].map((seed) => {
         const { path, ticks, f, sounds } = brIntro('astroman', seed);
         return [path, ticks, f.stock, sounds[0]];
       }),
     ).toEqual([
-      [[31, '33+3'], 275, 2, [1, 4]],
-      [[31, '34+5'], 275, 2, [1, 3]],
+      [[31, 33], 325, 2, [51, 4]],
+      [[31, 33, '34+5'], 325, 2, [51, 3]],
     ]);
   });
 

@@ -249,7 +249,9 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     // OP super Charge (49) clears her power and adds 400 (PCs 586–587):
     // four of her five stocks (+0x7cb2).
     const { path, ticks, f } = brIntro('zenka');
-    expect([path, ticks, f.stock]).toEqual([[30, '32+3'], 386, 4]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 464).
+    expect([path, ticks, f.stock]).toEqual([[30, 32], 436, 4]);
     // demo speak rp (38) ten times (PC 470), then her stance (284–287).
     expect(
       [0, 15, 30, 299, 300, 334, 383].map(

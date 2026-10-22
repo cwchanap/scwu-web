@@ -230,14 +230,16 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
   it('enters EX mode with down held as his Vs. intro checks it (PC 338)', () => {
     // ROUND 1 then calls Demo stand once.
     expect(animationDuration('32+3', 'chung')).toBe(200);
-    // After 開始時's (30) blank display, ROUND 1's check comes 150 ticks in.
+    // After 開始時's (30) blank display and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PC 324), ROUND 1's check comes 150
+    // ticks in.
     const ex = (down: number) =>
       brIntro('chung', 0, (t) => (t >= down ? { crouch: true } : {}));
     const { images, f, ticks } = ex(0);
-    expect([ticks, f.action, exMode(f)]).toEqual([202, 'idle', true]);
+    expect([ticks, f.action, exMode(f)]).toEqual([252, 'idle', true]);
     // There Demo stand jumps to Demo stand EX (28, PC 259): images 372–374
     // (PCs 271–274) in place of 113–115.
-    expect([151, 163, 176, 189].map((t) => images[t])).toEqual([
+    expect([201, 213, 226, 239].map((t) => images[t])).toEqual([
       372, 373, 374, 373,
     ]);
     expect(
@@ -245,7 +247,7 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
         (age) => animationFrame('32+3', age, 'chung').image,
       ),
     ).toEqual([113, 114, 115, 114]);
-    expect([151, 152].map((down) => exMode(ex(down).f))).toEqual([true, false]);
+    expect([201, 202].map((down) => exMode(ex(down).f))).toEqual([true, false]);
   });
 
   it('wins with Demo stand (27), then smoke behind a blank display (PCs 543–548)', () => {

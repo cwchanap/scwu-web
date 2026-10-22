@@ -255,16 +255,18 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     ).toEqual([130, 130, 129, 116, 118, 118]);
     // A third of the time Round 1 (35) + 4 (PC 475).
     expect(animationDuration('33+10', 'alpha')).toBe(298);
-    // After 開始時's (31) blank display, OP super Charge (54) clears his
-    // power and adds 400 (PCs 800–801): four of his five stocks (+0x7cb2).
+    // After 開始時's (31) blank display, and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PCs 464, 470), OP super Charge (54)
+    // clears his power and adds 400 (PCs 800–801): four of his five stocks
+    // (+0x7cb2).
     expect(
       [1, 0].map((seed) => {
         const { path, ticks, f } = brIntro('alpha', seed);
         return [path, ticks, f.stock];
       }),
     ).toEqual([
-      [[31, '33+4'], 348, 4],
-      [[31, '33+10'], 300, 4],
+      [[31, 33], 398, 4],
+      [[31, '33+8'], 350, 4],
     ]);
   });
 

@@ -358,7 +358,9 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     // OP super Charge (48) clears his power and adds 400 (PCs 479–480):
     // four of his five stocks (+0x7cb2).
     const { path, ticks, f } = brIntro('zmega');
-    expect([path, ticks, f.stock]).toEqual([[33, '35+3'], 260, 4]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 402).
+    expect([path, ticks, f.stock]).toEqual([[33, 35], 310, 4]);
     // Round 1 (36) + 2 (PC 407).
     expect(
       [0, 159, 160, 170, 178, 257].map(

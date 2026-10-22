@@ -218,11 +218,12 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
       [0, 80, 173, 183].map((age) => animationFrame('33+4', age, 'dido').image),
     ).toEqual([343, 344, 353, 113]);
     // 開始時 (31) shows its blank display a tick (PC 323) before 開始時 BR,
-    // and the script runs out a tick after its last display.
+    // whose 50-tick display KGT 13's global 14 keeps (PCs 361, 367), and
+    // the script runs out a tick after its last display.
     const stance = brIntro('dido', 1);
     expect([stance.path, stance.ticks, stance.f.x, stance.f.stock]).toEqual([
-      [31, '33+4'],
-      202,
+      [31, 33],
+      252,
       390 * 1.5,
       2,
     ]);
@@ -232,8 +233,8 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     // (PC 510), image 113 for 10 ticks.
     const hop = brIntro('dido', 0);
     expect([hop.path, hop.ticks, hop.f.x, hop.f.stock]).toEqual([
-      [31, '33+10', '44+26'],
-      202,
+      [31, '33+8', '44+26'],
+      252,
       390 * 1.5,
       2,
     ]);
@@ -241,7 +242,7 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
       (-16 * 300 * 655) / 65536,
       3,
     );
-    expect(hop.images.indexOf(113)).toBe(163 + 28);
+    expect(hop.images.indexOf(113)).toBe(50 + 163 + 28);
   });
 
   it('wins after a call of Demo Stand (PC 681), holding image 330, and draws holding 382', () => {

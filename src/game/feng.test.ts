@@ -282,12 +282,19 @@ describe('OS FENG (19 OS FENG.PLAYER)', () => {
       animationDuration('34+4', 'feng'),
       animationDuration('34+10', 'feng'),
     ]).toEqual([198, 208]);
+    // KGT 13's global 14 keeps what their global 14 = 0 checks skip: a
+    // 50-tick display from 開始時 BR (PC 361), and from + 8 (PC 367) two
+    // 21-tick calls of 44 (PC 368).
+    expect([
+      animationDuration(34, 'feng'),
+      animationDuration('34+8', 'feng'),
+    ]).toEqual([248, 250]);
     // 開始時 (32) shows its blank display a tick first. Round 1's check (PC
-    // 393) comes 128 ticks into it, entering OP TYPE CHANGE (52), and OP2's
-    // (PC 538) 142, entering 52 + 7; each sets variable 0 (PC 582).
+    // 393) comes 178 ticks into it, entering OP TYPE CHANGE (52), and OP2's
+    // (PC 538) 184, entering 52 + 7; each sets variable 0 (PC 582).
     for (const [seed, path, check, change] of [
-      [1, '34+4', 129, 52],
-      [0, '34+10', 143, '52+7'],
+      [1, 34, 179, 52],
+      [0, '34+8', 185, '52+7'],
     ] as const)
       for (const down of [check - 1, check]) {
         const run = brIntro('feng', seed, (t) =>

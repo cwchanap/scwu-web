@@ -251,7 +251,8 @@ describe('OGI (27 OGI.PLAYER)', () => {
   it("rolls his Vs. intro's path (PC 381), charging two stocks", () => {
     // 開始時 BR + 4 into Round 1 (37) + 4 (PC 387), or half the time + 10
     // into RANDON OP1 (31) + 2 (PC 393): 200 ticks each, after 開始時's (34)
-    // blank display.
+    // blank display. KGT 13's global 14 keeps the 50-tick display each global
+    // 14 = 0 check skips (PCs 382, 388), from 開始時 BR or + 8.
     expect([
       animationDuration('36+4', 'ogi'),
       animationDuration('36+10', 'ogi'),
@@ -263,8 +264,8 @@ describe('OGI (27 OGI.PLAYER)', () => {
     // Black (47) and OP super Charge (43) either way; Round 1 spawns *OP obj
     // (33) twice (PCs 401–402), RANDON OP1 its 375 (PC 320).
     expect(runs).toEqual([
-      [[34, '36+4'], 202, 2, [47, 43, 33, '33+6']],
-      [[34, '36+10'], 202, 2, [47, 43, 375]],
+      [[34, 36], 252, 2, [47, 43, 33, '33+6']],
+      [[34, '36+8'], 252, 2, [47, 43, 375]],
     ]);
   });
 

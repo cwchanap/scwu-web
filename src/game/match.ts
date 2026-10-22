@@ -367,14 +367,14 @@ const OWN_REACTION_POWER: Partial<
 const reactionPower = (f: Fighter): [number, number] =>
   OWN_REACTION_POWER[f.who]?.[f.action] ?? REACTION_POWER[f.action] ?? [0, 0];
 // DoraEmon's Br. intro's op 0x01 runs, as [ticks, raw vy, gravity] from the
-// clip's start: Round 1 (34) rises at −50 for 27 ticks (PC 381) after its
-// first 100, stops (PC 393) and falls under gravity 50 (PC 398) until he
-// lands (DORA_LANDING).
+// clip's start: after 開始時 BR's 50-tick display (PC 365), Round 1 (34)
+// rises at −50 for 27 ticks (PC 381) after its first 100, stops (PC 393)
+// and falls under gravity 50 (PC 398) until he lands (DORA_LANDING).
 const DORA_MOTION = [
-  [100, 0, 0],
+  [150, 0, 0],
   [27, -50, 0],
   [81, 0, 0],
-  [DORA_LANDING - 208, 0, 50],
+  [DORA_LANDING - 258, 0, 50],
 ];
 // The win's and draw's timelines when they roll, test or move
 // (export_fighter).
@@ -1520,10 +1520,10 @@ export class Match {
   // strike's tick, a KO enters make hikari; ALPHA's KO sets global 10 to
   // 10000 or 20000. At 11 = 10, which MASA's and 3-TIMES's 開始時 set, the
   // stage plays no track; while 14 is 200, which SIN's, KAY's and DIDO's
-  // supers hold, it stops every sound (export_stage). ponytail: each match
+  // supers hold, it stops every sound (export_stage), and KGT 13 holds it at
+  // 10 for each round's first 10 ticks (`step`). ponytail: each match
   // starts them at 0, where the source keeps global 10 until the select
-  // screen's 2P cursor clears it (KGT PCs 542, 590), and KGT 13 holds global
-  // 14 at 10 for its first 10 ticks (PCs 70, 78).
+  // screen's 2P cursor clears it (KGT PCs 542, 590).
   globals: Record<number, number> = {};
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
@@ -3862,7 +3862,14 @@ export class Match {
       this.record(1, opponent ?? {});
       this.previous = [{ ...player }, { ...opponent }];
       for (const f of this.fighters) this.pause(f, this.koStop);
-      this.stepObjects(after);
+      // KGT 13, which round setup spawns after the players at priority 0x65
+      // (0x408ce9), steps after the objects below it: it holds global 14 at
+      // 10 for its first 10 ticks (PCs 70, 78, 88, 97), so a 開始時 BR that
+      // tests it after the first tick keeps its display (Ryuko's PC 323).
+      this.stepObjects(after.filter((e) => e.z < 0x65));
+      if (this.roundTicks === 1) this.globals[14] = 10;
+      if (this.roundTicks === 11) this.globals[14] = 0;
+      this.stepObjects(after.filter((e) => e.z >= 0x65));
       for (const f of this.fighters)
         if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
       this.moveObjects();

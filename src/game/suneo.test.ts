@@ -197,7 +197,9 @@ describe('G Suneo (08 G SUNEO.PLAYER)', () => {
     // 開始時 BR's two 2-tick displays (PCs 382, 384) come first.
     expect(animationDuration('34+7', 'suneo')).toBe(204);
     for (const crouch of [false, true]) {
-      // After 開始時's (32) blank display; change character (41) sets
+      // After 開始時's (32) blank display, KGT 13's global 14 fails 開始時
+      // BR's jump to + 7 (PC 375): images 394 and 395 for 46 ticks under op
+      // 0x23 colour (PCs 376–380). Change character (41) sets
       // variable 0 (PC 463) and jumps back (PC 464), and Round 1's test of it
       // (PC 410) then ends on BR's last pose (34 + 16, PC 390), 113 in
       // place of 194.
@@ -205,8 +207,8 @@ describe('G Suneo (08 G SUNEO.PLAYER)', () => {
         crouch && t >= 150 ? { crouch: true } : {},
       );
       expect([path, ticks, f.x, exMode(f), images.at(-1)]).toEqual([
-        [32, '34+7', ...(crouch ? [41, '34+16'] : [])],
-        206,
+        [32, 34, ...(crouch ? [41, '34+16'] : [])],
+        252,
         390 * 1.5,
         crouch,
         crouch ? 113 : 194,

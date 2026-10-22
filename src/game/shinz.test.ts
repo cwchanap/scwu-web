@@ -269,7 +269,9 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     // OP super Charge (46) clears his power and adds 500 (PCs 521–522):
     // five of his six stocks (+0x7cb2).
     const { path, ticks, f } = brIntro('shinz');
-    expect([path, ticks, f.stock]).toEqual([[31, '33+3'], 260, 5]);
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 336).
+    expect([path, ticks, f.stock]).toEqual([[31, 33], 310, 5]);
     // Round 1 (34) + 2 (PC 342).
     expect(
       [0, 159, 160, 170, 178, 257].map(

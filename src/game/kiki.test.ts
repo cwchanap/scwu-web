@@ -196,9 +196,11 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
       ),
     ).toEqual([273, 274, 275, 276, 277, 278, 278]);
     // The round's set-up places them at 390 and 890 source pixels
-    // (0x408ac3); Ryuko walks 50 ticks at raw 200 (PC 339).
+    // (0x408ac3); Ryuko walks 50 ticks at raw 200 (PC 339). Both first
+    // show 開始時 BR's display (49 and 50 ticks), which KGT 13's global 14
+    // keeps (PCs 323, 318).
     expect(kiki).toMatchObject({ action: 'script', x: 890 * 1.5 });
-    for (let t = 0; t < 202; t++) match.step({}, { crouch: true });
+    for (let t = 0; t < 252; t++) match.step({}, { crouch: true });
     expect(ryuko.x).toBeCloseTo(390 * 1.5 + 50 * 200 * VELOCITY, 6);
     expect(kiki.x).toBe(890 * 1.5);
     expect(kiki).toMatchObject({ action: 'idle', variables: {} });

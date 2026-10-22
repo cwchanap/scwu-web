@@ -355,11 +355,12 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
   it('charges two stocks through his Vs. intro and starts his Change form while down is held at its check (PC 361)', () => {
     expect(animationDuration('32+3', 'gigi')).toBe(200);
     for (const crouch of [false, true]) {
-      // The check jumps to 開始時 2P (31) + 13.
+      // 開始時 BR keeps its 50-tick display, as KGT 13's global 14 fails its
+      // jump past it (PC 348). The check jumps to 開始時 2P (31) + 13.
       const { path, f } = brIntro('gigi', 0, () => ({ crouch }));
       // OP super Charge (38, PC 351) runs alongside.
       expect([path, exMode(f), f.stock]).toEqual([
-        [30, '32+3', ...(crouch ? ['31+13'] : [])],
+        [30, 32, ...(crouch ? ['31+13'] : [])],
         crouch,
         2,
       ]);

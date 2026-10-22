@@ -198,11 +198,13 @@ describe('SEAN (20 SEAN.PLAYER)', () => {
   it('rises out of sight and falls into his Vs. intro, landing as the fall reaches the floor (PC 390)', () => {
     const { path, ticks, f, match, heights } = brIntro('sean');
     // After 開始時's (33) blank display, 800 source pixels up in four
-    // ticks; 開始時 BR + 6 loops its fall (PC 397) until it reaches the
+    // ticks; KGT 13's global 14 fails 開始時 BR's jump to + 6 (PC 369), so
+    // he stops there unseen for 50 ticks (PCs 370–371). Round 1 (36) + 5
+    // then falls at raw 500 (PC 391), looping (PC 397) until it reaches the
     // floor, into Round 1 + 15 (slot 1, PC 390).
-    expect(Math.min(...heights)).toBeCloseTo(-1199.341, 3);
-    expect([heights[163] < 0, heights[164], f.x]).toEqual([true, 0, 390 * 1.5]);
-    expect([path, ticks]).toEqual([[33, 35, '35+6', '36+15'], 202]);
+    expect(Math.min(...heights) / 1.5).toBeCloseTo(-799.561, 3);
+    expect([heights[213] < 0, heights[214], f.x]).toEqual([true, 0, 390 * 1.5]);
+    expect([path, ticks]).toEqual([[33, 35, '36+15'], 252]);
     // OP super Charge (41, PC 373) calls its RP a hundred times for 2 power
     // each, two ticks apart: two stocks three ticks after the intro.
     match.step({});

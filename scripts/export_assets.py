@@ -1223,9 +1223,10 @@ FIGHTERS = {
         # Results: WIN calls DEMO Stand (28) once, then 'win rp' (57) three
         # times (PCs 534, 536), and the draw calls DEMO Stand once (PC 620).
         # Her darkening panel, image 1009 (action 42). The Vs. intro: 30
-        # jumps to 32 for global 3 = 0 (PC 283), past its display for global
-        # 14 = 0 (PC 318), spawns Black and OP super Charge (38, PCs 320–321),
-        # then jumps to Round 1 (33) + 2 (PC 323).
+        # jumps to 32 for global 3 = 0 (PC 283), which shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 318), spawns Black and
+        # OP super Charge (38, PCs 320–321), then jumps to Round 1 (33) + 2 (PC
+        # 323).
         actions=dict(win=56, winStand=28, winRp=57, draw=64, black=42),
         # 2001: the HUD face action 71 shows (PC 666); 217: *name (65, PC 627).
         image_ids={2001, 217},
@@ -1265,9 +1266,10 @@ FIGHTERS = {
         # Results: WIN calls Demo stand (27) once (PC 543), spawns P3 smoke1
         # (188) behind a blank display and holds image 293; the draw calls 27
         # once (PC 628). Her darkening panel, image 1009 (action 43). The Vs.
-        # intro, as Kiki's: 30 jumps to 32 (PC 287), past its display (PC
-        # 324), spawns Black and OP super Charge (39, PCs 326–327), then jumps
-        # to ROUND 1 (33) + 2 (PC 329), which calls Demo stand.
+        # intro, as Kiki's: 30 jumps to 32 (PC 287), which shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 324), spawns Black and
+        # OP super Charge (39, PCs 326–327), then jumps to ROUND 1 (33) + 2 (PC
+        # 329), which calls Demo stand.
         actions=dict(win=57, winStand=27, draw=64, black=43),
         # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
         # 675–692), as Ryuko's; 375: *name (65, PC 635).
@@ -1314,9 +1316,10 @@ FIGHTERS = {
         # (PC 649); the draw calls 27 once (PC 736) and steps forward at raw
         # 500 (PC 738, resultScripts). Her darkening panel, image
         # 1009 (action 45). The Vs. intro: 29 jumps to 31 for global 3 = 0 (PC
-        # 307), past its display for global 14 = 0 (PC 345), spawns Black and
-        # OP super Charge (41, PCs 347–348), then jumps to Round BR (33, PC
-        # 350), which drives her in on her car and calls Demo stand.
+        # 307), which shows its 50-tick display, as KGT 13 holds global 14 at
+        # 10 (PC 345), spawns Black and OP super Charge (41, PCs 347–348), then
+        # jumps to Round BR (33, PC 350), which drives her in on her car and
+        # calls Demo stand.
         actions=dict(win=59, winStand=27, draw=66, black=45),
         # 2000–2002: the HUD faces action 75 shows, cycling in EX mode (PCs
         # 786–803), as Ryuko's; 427: *name (67, PC 746).
@@ -1363,9 +1366,9 @@ FIGHTERS = {
         # Win 2 (60, PC 572), a jetpack flight up at raw vy −300 (PC 586),
         # rolls in the match (resultScripts). His darkening panel, image 1009
         # (action 45). The Vs. intro: 32 jumps to 開始時 BR (34) for global 3 = 0
-        # (PC 310), past its display for global 14 = 0 (PC 348), spawns Black
-        # and OP SUPER CHARGE (41, PCs 350–351), then jumps to Round 1 (35) + 2
-        # (PC 353).
+        # (PC 310), which shows its 50-tick display, as KGT 13 holds global 14
+        # at 10 (PC 348), spawns Black and OP SUPER CHARGE (41, PCs 350–351),
+        # then jumps to Round 1 (35) + 2 (PC 353).
         actions=dict(win=59, winStand=30, draw=68, black=45),
         # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
         # 717–735), as Ryuko's; 183: *name (69, PC 682).
@@ -1418,9 +1421,9 @@ FIGHTERS = {
         # Results: WIN calls Demo Stand (28) once (PC 553) and loops PCs
         # 560–563 (PC 564); the draw calls 28 once (PC 645). His darkening
         # panel, image 1009 (action 43). The Vs. intro, as Kiki's: 30 jumps to
-        # 32 for global 3 = 0 (PC 268), past its display for global 14 = 0 (PC
-        # 305), spawns Black and OP super Charge (39, PCs 307–308), then jumps
-        # to Round 1 (33) + 2 (PC 310).
+        # 32 for global 3 = 0 (PC 268), which shows its 50-tick display, as KGT
+        # 13 holds global 14 at 10 (PC 305), spawns Black and OP super Charge
+        # (39, PCs 307–308), then jumps to Round 1 (33) + 2 (PC 310).
         actions=dict(win=60, winStand=28, winLoop=(60, 9), draw=67, black=43),
         # 2000–2002: the HUD faces action 74 shows, cycling in EX mode (PCs
         # 690–707), as Ryuko's; 349: *name (68, PC 652).
@@ -1478,11 +1481,12 @@ FIGHTERS = {
         # 696) and its rand % 3 > 1 between sounds 10 and 11 (PC 702) roll in
         # the match (resultScripts). Her darkening panel, image 1009 (action
         # 47). The Vs. intro: 開始時 (32) jumps to 開始時 BR (34) for global 3 = 0
-        # (PC 337), past its displays for global 14 = 0 (PC 375) to two 2-tick
-        # displays (PCs 382, 384) around its spawn of OP obj (30, PC 383),
-        # spawns Black and OP super Charge (43, PCs 386–387), then jumps to
-        # Round 1 (35) + 3 (PC 389), which in EX mode ends on BR's last pose (34
-        # + 16, PC 390) for variable 0 = 100 (PC 410).
+        # (PC 337), which, as KGT 13 holds global 14 at 10 (PC 375), shows
+        # images 394 and 395 for 46 ticks under op 0x23 colour (PCs 376–380),
+        # then two 2-tick displays (PCs 382, 384) around its spawn of OP obj
+        # (30, PC 383), spawns Black and OP super Charge (43, PCs 386–387),
+        # then jumps to Round 1 (35) + 3 (PC 389), which in EX mode ends on
+        # BR's last pose (34 + 16, PC 390) for variable 0 = 100 (PC 410).
         actions=dict(win=66, winStand=49, winRp=67, draw=75, black=47),
         # 2000–2002 and 2006: the HUD faces action 81 shows, cycling 2002,
         # 2006, 2000 and 2006 in EX mode (PCs 845–863); 601: *name (76, PC 808).
@@ -1525,10 +1529,10 @@ FIGHTERS = {
         # Results: 勝ち (58) calls Demo Stand (29) once (PC 596) and holds image
         # 350 (PC 602); the draw calls 29 once (PC 681). The darkening panel,
         # image 1009 (action 44). The Vs. intro: 開始時 (32) jumps to 開始時 BR
-        # (34) for global 3 = 0 (PC 331), past its display for global 14 = 0
-        # (PC 367), spawns Black and OP super Charge (40, PCs 369–370), then
-        # jumps to Round 1 (35) + 5 (PC 372), which walks in (PC 378) and calls
-        # Demo Stand three times (PC 392).
+        # (34) for global 3 = 0 (PC 331), which shows its 50-tick display, as
+        # KGT 13 holds global 14 at 10 (PC 367), spawns Black and OP super
+        # Charge (40, PCs 369–370), then jumps to Round 1 (35) + 5 (PC 372),
+        # which walks in (PC 378) and calls Demo Stand three times (PC 392).
         actions=dict(win=58, winStand=29, draw=65, black=44),
         # 2001: the HUD face action 73 shows (PC 728); 390: *name (66, PC 688).
         image_ids={2001, 390},
@@ -1576,9 +1580,10 @@ FIGHTERS = {
         # (PC 703); in EX mode STAND DEMO 2 plays STAND DEMO (29) for variable
         # 0 = 10 (PC 324, winStandEx). The darkening panel, image 1009 (action
         # 46). The Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0
-        # (PC 349), past its display for global 14 = 0 (PC 388), spawns Black
-        # and OP super Charge (42, PCs 390–391), then jumps to Round 1 (36) + 2
-        # (PC 393), which calls STAND DEMO 2 once (PC 404).
+        # (PC 349), which shows its 50-tick display, as KGT 13 holds global 14
+        # at 10 (PC 388), spawns Black and OP super Charge (42, PCs 390–391),
+        # then jumps to Round 1 (36) + 2 (PC 393), which calls STAND DEMO 2
+        # once (PC 404).
         actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46),
         # 2000–2002 and 2006: the HUD faces action 73 shows, cycling as G
         # Suneo's in EX mode (PCs 756–774); 368: *name (70, PC 721).
@@ -1621,8 +1626,9 @@ FIGHTERS = {
         # its call of DEMO STAND (29, PC 627); it holds image 409 (PC 638).
         # The draw calls 29 once (PC 719). The darkening panel, image 1009
         # (action 46). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for
-        # global 3 = 0 (PC 329), past its display for global 14 = 0 (PC 365);
-        # it leaps in and lands into OP lend (36, slot 1 at PC 383).
+        # global 3 = 0 (PC 329), which shows its 48-tick display, as KGT 13
+        # holds global 14 at 10 (PC 365); it leaps in and lands into OP lend
+        # (36, slot 1 at PC 383).
         actions=dict(win=60, winStand=29, draw=68, black=46),
         flat={"win"},
         # 2001: the HUD face action 73 shows (PC 764); 217: *name (69, PC 727).
@@ -1683,10 +1689,10 @@ FIGHTERS = {
         # flattened up to the hop, the match its landing (resultScripts).
         # The draw calls 28 once (PC 681) and holds image 201 (PC 684). The darkening
         # panel, image 1013 (action 43). The Vs. intro: 開始時 (30) jumps to
-        # 開始時 BR (32) for global 3 = 0 (PC 307), past its display for
-        # global 14 = 0 (PC 345), spawns OP super Charge (39, PC 348) and
-        # jumps to Round 1 (33) + 5 (PC 350), which walks in (PC 356) and
-        # calls Demo stand twice (PC 368).
+        # 開始時 BR (32) for global 3 = 0 (PC 307), which shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 345), spawns OP super
+        # Charge (39, PC 348) and jumps to Round 1 (33) + 5 (PC 350), which
+        # walks in (PC 356) and calls Demo stand twice (PC 368).
         actions=dict(win=57, winStand=28, draw=65, black=43),
         flat={"win"},
         # 2000–2002: the HUD faces action 73 shows, cycling in EX mode (PCs
@@ -1730,10 +1736,10 @@ FIGHTERS = {
         # (PC 769) and holds image 382 (PC 773). The darkening panel, image
         # 1009 (action 41). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33)
         # for global 3 = 0 (PC 324), which rolls rand % 3 > 1 (PC 360), then
-        # skips its display for global 14 = 0 (PC 361), spawns OP super
-        # Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC 366); the
-        # win plays flattened. The roll's other third hops through op2 (44, PC
-        # 372).
+        # shows its 50-tick display, as KGT 13 holds global 14 at 10 (PC 361),
+        # spawns OP super Charge (37, PC 364) and jumps to Round 1 (34) + 3 (PC
+        # 366); the win plays flattened. The roll's other third, after its own
+        # 50-tick display (PC 368), hops through op2 (44, PC 372).
         actions=dict(win=61, winStand=29, draw=68, black=41),
         flat={"win"},
         # 2001: the HUD face action 76 shows (PC 817); 258: *name (69, PC 777).
@@ -1796,10 +1802,11 @@ FIGHTERS = {
         # 800). The darkening panel, image 1009 (action 55). The Vs. intro: 開始時
         # (36) jumps to 開始時 BR (39) for global 3 = 0 (PC 338), which rolls rand
         # % 4 > 1 (PC 380), then skips its display for global 14 = 0 (PC 381),
-        # spawns Black (55) and OP super Charge (51, PCs 383–384) and jumps to
-        # Round 1 (40) + 3 (PC 386), or to Random OP3 (45, PC 380), and Round 1's
-        # roll enters RANDOM OP1 (41, PC 403); the win plays flattened, and its
-        # roll into random win2 (70, PC 686) rolls in the match (resultScripts).
+        # tested on the first tick before KGT 13 sets it, spawns Black (55) and
+        # OP super Charge (51, PCs 383–384) and jumps to Round 1 (40) + 3 (PC
+        # 386), or to Random OP3 (45, PC 380), and Round 1's roll enters RANDOM
+        # OP1 (41, PC 403); the win plays flattened, and its roll into random
+        # win2 (70, PC 686) rolls in the match (resultScripts).
         actions=dict(win=69, winStand=31, draw=78, black=55),
         flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX
@@ -1860,11 +1867,12 @@ FIGHTERS = {
         # 3 > 1 for its sound (PC 589) and holds image 330 (PC 593). The draw
         # calls 27 once (PC 687) and holds image 332 (PC 689). The darkening
         # panel, image 1009 (action 45). The Vs. intro: 開始時 (30) jumps to
-        # 開始時 BR (32) for global 3 = 0 (PC 287), which skips its display
-        # for global 14 = 0 (PC 325), spawns chicken (37), Black (45) and OP
-        # super Charge (41, PCs 334–336) and jumps to Round 1 (33) + 4 (PC
-        # 338); the win plays flattened, and its roll, which picks a sound, rolls
-        # in the match (resultScripts).
+        # 開始時 BR (32) for global 3 = 0 (PC 287), which, as KGT 13 holds global
+        # 14 at 10 (PC 325), spawns chicken (37, PC 327), shows image 323 for
+        # 48 ticks (PC 328), spawns Black (45) and OP super Charge (41, PCs
+        # 329–330) and jumps to Round 1 (33) + 4 (PC 332); the win plays
+        # flattened, and its roll, which picks a sound, rolls in the match
+        # (resultScripts).
         actions=dict(win=59, winStand=27, draw=67, black=45),
         flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 75 shows, cycling in EX
@@ -1911,12 +1919,12 @@ FIGHTERS = {
         # image 310 (PC 650). The draw calls 29 once (PC 734) and holds image
         # 318 (PC 743). The darkening panel, image 1009 (action 47). The Vs.
         # intro: 開始時 (34) jumps to 開始時 BR (36) for global 3 = 0 (PC 354),
-        # which for global 14 = 0 (PC 392) rises past its display (PC 401),
-        # jumps back to spawn Black (47) and OP super Charge (43, PCs
-        # 397–398), then to Round 1 (37) + 5 (PC 400), which falls (PC 410)
-        # and lands into 37 + 10 (slot 1, PC 409); the win plays flattened.
-        # The win's roll, to RANDOM WIN (48, PC 644), rolls in the match
-        # (resultScripts).
+        # which, as KGT 13 holds global 14 at 10 (PC 392), rises (PC 393),
+        # stops on image 306 for 50 ticks (PCs 395–396), spawns Black (47) and
+        # OP super Charge (43, PCs 397–398), then jumps to Round 1 (37) + 5 (PC
+        # 400), which falls (PC 410) and lands into 37 + 10 (slot 1, PC 409);
+        # the win plays flattened. The win's roll, to RANDOM WIN (48, PC 644),
+        # rolls in the match (resultScripts).
         actions=dict(win=62, winStand=29, draw=70, black=47),
         flat={"win"},
         # 2000–2002: the HUD faces action 79 shows, cycling in EX mode (PCs
@@ -1988,9 +1996,9 @@ FIGHTERS = {
         # while airborne (op 0x16, PCs 584, 685); the match lands winners
         # first. The darkening panel, image 1009 (action 42). The Vs. intro:
         # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 294), which
-        # skips its display for global 14 = 0 (PC 330), spawns Black (42) and
-        # OP super Charge (38, PCs 332–333) and jumps to Round 1 (33) + 2 (PC
-        # 335); the win plays flattened.
+        # shows its 50-tick display, as KGT 13 holds global 14 at 10 (PC 330),
+        # spawns Black (42) and OP super Charge (38, PCs 332–333) and jumps to
+        # Round 1 (33) + 2 (PC 335); the win plays flattened.
         actions=dict(win=58, winStand=27, draw=65, black=42),
         flat={"win"},
         # 2001: the HUD face action 76 shows (PC 736), as DIDO's; 445: *name
@@ -2055,11 +2063,12 @@ FIGHTERS = {
         # draw calls 28 once (PC 694). Each first enters DEMO air (29) while
         # airborne (op 0x16, PCs 602, 693). The darkening panel, image 1009
         # (action 45). The Vs. intro: 開始時 (31) jumps to 開始時 BR (34) for
-        # global 3 = 0 (PC 294), which for global 14 = 0 (PC 336) jumps past
-        # its display (PC 344) to spawn Black (45) and OP super Charge (41,
-        # PCs 340–341), then to Round 1 (35) + 3 (PC 343); the win plays
-        # flattened, and its roll, to Random WIN (46, PC 604), rolls in the
-        # match (resultScripts), as does the draw's hop (PCs 701–707).
+        # global 3 = 0 (PC 294), which for global 14 = 0 (PC 336), tested on
+        # the first tick before KGT 13 sets it, jumps past its display (PC 344)
+        # to spawn Black (45) and OP super Charge (41, PCs 340–341), then to
+        # Round 1 (35) + 3 (PC 343); the win plays flattened, and its roll, to
+        # Random WIN (46, PC 604), rolls in the match (resultScripts), as does
+        # the draw's hop (PCs 701–707).
         actions=dict(win=60, winStand=28, draw=67, black=45),
         flat={"win"},
         # 2000–2002: the HUD faces action 77 shows, cycling in EX mode (PCs
@@ -2114,10 +2123,12 @@ FIGHTERS = {
         # first enters DEMO air (30) while airborne (op 0x16, PCs 723, 820).
         # The darkening panel, image 1009 (action 51). The Vs. intro: 開始時
         # (32) jumps to 開始時 BR (34) for global 3 = 0 (PC 322), which rolls
-        # rand % 3 > 1 (PC 360), then skips its display for global 14 = 0 (PC
-        # 361), spawns Black (51) and OP super Charge (47, PCs 363–364) and
-        # jumps to Round 1 (35) + 3 (PC 366); the win plays flattened. The
-        # roll's other third runs through OP2 (43, PC 372).
+        # rand % 3 > 1 (PC 360), then shows its 50-tick display, as KGT 13
+        # holds global 14 at 10 (PC 361), spawns Black (51) and OP super Charge
+        # (47, PCs 363–364) and jumps to Round 1 (35) + 3 (PC 366); the win
+        # plays flattened. The roll's other third first calls 44 twice (PC
+        # 368), as its own global 14 = 0 test (PC 367) fails too, then runs
+        # through OP2 (43, PC 372).
         actions=dict(win=67, winStand=28, draw=75, black=51),
         flat={"win"},
         # 2000–2002 and 2006: the HUD faces action 85 shows, cycling in EX
@@ -2179,10 +2190,11 @@ FIGHTERS = {
         # holds the blank 8191 (PCs 709–711). Each first enters DEMO air (30)
         # while airborne (op 0x16, PCs 616, 705). The darkening panel, image
         # 1009 (action 45). The Vs. intro: 開始時 (33) jumps to 開始時 BR (35)
-        # for global 3 = 0 (PC 330), which rises (PC 367) and, for global 14
-        # = 0, jumps past its display (PCs 369–371) to spawn Black (45) and OP
-        # super Charge (41, PCs 372–373), then to Round 1 (36) + 5 (PC 375),
-        # which falls (PC 391) and lands into 36 + 15 (slot 1, PC 390).
+        # for global 3 = 0 (PC 330), which rises (PC 367) and, as KGT 13 holds
+        # global 14 at 10 (PC 369), stops there for its 50-tick display (PCs
+        # 370–371), spawns Black (45) and OP super Charge (41, PCs 372–373),
+        # then jumps to Round 1 (36) + 5 (PC 375), which falls (PC 391) and
+        # lands into 36 + 15 (slot 1, PC 390).
         actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45),
         # 2001: the HUD face action 75 shows (PC 756); 247: *name (67, PC 715).
         image_ids={2001, 247},
@@ -2247,11 +2259,12 @@ FIGHTERS = {
         # holds image 653 (PCs 837–838). Each first enters DEMO air (33) while
         # airborne (op 0x16, PCs 692, 816). The darkening panel, Black (48).
         # The Vs. intro: 開始時 (36) jumps to 開始時 BR (38) for global 3 = 0 (PC
-        # 395), which skips its display for global 14 = 0 (PC 433), spawns
-        # Black (48) and OP super Charge (44, PCs 435–436) and jumps to Round 1
-        # (39) + 2 (PC 438), which leaps (PC 452) and lands into 39 + 25 (slot
-        # 1, PC 451), with a roll (PC 456) that picks its voice. The win's roll,
-        # to RANDOM WIN (68, PC 693), rolls in the match (resultScripts).
+        # 395), which shows its 50-tick display, as KGT 13 holds global 14 at
+        # 10 (PC 433), spawns Black (48) and OP super Charge (44, PCs 435–436)
+        # and jumps to Round 1 (39) + 2 (PC 438), which leaps (PC 452) and
+        # lands into 39 + 25 (slot 1, PC 451), with a roll (PC 456) that picks
+        # its voice. The win's roll, to RANDOM WIN (68, PC 693), rolls in the
+        # match (resultScripts).
         actions=dict(win=65, winStand=31, winLoop=(65, 8), draw=75, black=48),
         # 2000–2002 and 2006: the HUD faces action 82 shows, cycling in EX
         # mode (PCs 884–897), as OS FENG's; 654: *name (76, PC 842).
@@ -2328,11 +2341,11 @@ FIGHTERS = {
         # draw calls 27 once (PC 704) and holds image 267 (PC 707). Each first
         # enters DEMO air (28) while airborne (op 0x16, PCs 601, 703). The
         # darkening panel, Black (42). The Vs. intro: 開始時 (30) jumps to
-        # 開始時 BR (32) for global 3 = 0 (PC 297), which skips its display
-        # for global 14 = 0 (PC 333), spawns Black (42) and OP super Charge
-        # (38, PCs 335–336) and jumps to Round 1 (33) + 2 (PC 338), which
-        # calls sTAND demo once (PC 353). The win's roll,
-        # to RANDOM WIN (44, PC 603), and its second (PC 613), which only picks
+        # 開始時 BR (32) for global 3 = 0 (PC 297), which shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 333), spawns Black (42)
+        # and OP super Charge (38, PCs 335–336) and jumps to Round 1 (33) + 2
+        # (PC 338), which calls sTAND demo once (PC 353). The win's roll, to
+        # RANDOM WIN (44, PC 603), and its second (PC 613), which only picks
         # its voice, roll in the match (resultScripts).
         actions=dict(win=58, winStand=27, winLoop=(58, 18), draw=65, black=42),
         # 2001: the HUD face action 76 shows (PC 754), as HISO's; 276: *name
@@ -2404,12 +2417,13 @@ FIGHTERS = {
         # *eff time up (67, PC 746) and holds image 419 (PCs 747–748). Each
         # first enters DEMO air (31) while airborne (op 0x16, PCs 646, 742).
         # The darkening panel, Black (46). The Vs. intro: 開始時 (33) jumps
-        # to 開始時 BR (35) for global 3 = 0 (PC 343), which jumps on to 35 +
-        # 10 for global 14 = 0 (PC 379), rises (PC 388), spawns Black (46)
-        # and OP super Charge (42, PCs 384–385) and jumps to Round 1 (36) + 5
-        # (PC 387), which calls OP movie rp (40) fifteen times (PCs 404–406)
-        # and lands into 36 + 44 (slot 1, PC 430), with rolls (PCs 396, 399)
-        # that pick its voice.
+        # to 開始時 BR (35) for global 3 = 0 (PC 343), which, as KGT 13 holds
+        # global 14 at 10 (PC 379), rises (PC 380), stops there through seven
+        # calls of OP movie rp (40, PCs 382–383), spawns Black (46) and OP
+        # super Charge (42, PCs 384–385) and jumps to Round 1 (36) + 5 (PC
+        # 387), which calls OP movie rp (40) fifteen times (PCs 404–406) and
+        # lands into 36 + 44 (slot 1, PC 430), with rolls (PCs 396, 399) that
+        # pick its voice.
         actions=dict(win=60, winStand=30, winLoop=(60, 7), draw=68, black=46),
         # 2001: the HUD face action 76 shows (PC 792), as KATE's; 428: *name
         # (69, PC 752).
@@ -2478,11 +2492,12 @@ FIGHTERS = {
         # 678), shows image 126 and holds image 386 (PCs 680–681). Each first
         # enters DEMO air (30) while airborne (op 0x16, PCs 590, 677). The
         # darkening panel, Black (45). The Vs. intro: 開始時 (31) jumps to
-        # 開始時 BR (33) for global 3 = 0 (PC 299), which jumps on to 33 + 10
-        # for global 14 = 0 (PC 336), rises unseen (PC 345), spawns Black (45)
-        # and OP super Charge (41, PCs 341–342) and jumps to Round BR (36, PC
-        # 344), which glides in (PCs 375, 380) and lands into 36 + 9 (slot 1,
-        # PC 374), calling STAND DEMO twice (PC 386).
+        # 開始時 BR (33) for global 3 = 0 (PC 299), which, as KGT 13 holds global
+        # 14 at 10 (PC 336), rises unseen (PC 337), stops there for 43 ticks
+        # (PCs 339–340), spawns Black (45) and OP super Charge (41, PCs
+        # 341–342) and jumps to Round BR (36, PC 344), which glides in (PCs
+        # 375, 380) and lands into 36 + 9 (slot 1, PC 374), calling STAND DEMO
+        # twice (PC 386).
         actions=dict(win=59, winStand=29, winLoop=(59, 6), draw=66, black=45),
         # 2001: the HUD face action 75 shows (PC 726); 387: *name (67, PC
         # 685).
@@ -2538,9 +2553,10 @@ FIGHTERS = {
         # UP RUN (64, PC 661) and holds image 2000 (PC 663). Each first enters
         # DEMO air (29) while airborne (op 0x16, PCs 571, 658). The darkening
         # panel, Black (42). The Vs. intro: 開始時 (30) jumps to 開始時 BR (32)
-        # for global 3 = 0 (PC 308), past its display for global 14 = 0 (PC
-        # 348), spawns Black and OP super Charge (38, PCs 350–351), then jumps
-        # to Round 1 (33) + 2 (PC 353), which calls Demo stand once (PC 362).
+        # for global 3 = 0 (PC 308), which shows its 50-tick display, as KGT 13
+        # holds global 14 at 10 (PC 348), spawns Black and OP super Charge (38,
+        # PCs 350–351), then jumps to Round 1 (33) + 2 (PC 353), which calls
+        # Demo stand once (PC 362).
         actions=dict(win=56, winStand=28, winLoop=(56, 7), draw=63, black=42),
         # 2000–2002: the HUD faces action 72 shows, cycling in his Change form
         # (PCs 730–746), as Ryuko's in EX mode; 328: *name (68, PC 694).
@@ -2608,9 +2624,10 @@ FIGHTERS = {
         # images 288–289 (PC 646). Each first enters DEMO air (29) while
         # airborne (op 0x16, PCs 538, 641). The darkening panel, Black (43).
         # The Vs. intro, as GIGI's: 開始時 (30) jumps to 開始時 BR (32) for
-        # global 3 = 0 (PC 279), past its display for global 14 = 0 (PC 317),
-        # spawns Black and OP super Charge (39, PCs 319–320), then jumps to
-        # Round 1 (33) + 2 (PC 322), which calls Demo stand once (PC 334).
+        # global 3 = 0 (PC 279), which shows its 50-tick display, as KGT 13
+        # holds global 14 at 10 (PC 317), spawns Black and OP super Charge (39,
+        # PCs 319–320), then jumps to Round 1 (33) + 2 (PC 322), which calls
+        # Demo stand once (PC 334).
         actions=dict(win=57, winStand=28, winLoop=(57, 5), draw=64, black=43),
         # 2000–2002: the HUD faces action 72 shows, cycling in EX mode (PCs
         # 690–705), as GIGI's; 399: *name (65, PC 649).
@@ -2663,11 +2680,12 @@ FIGHTERS = {
         # 142 (PC 745). Each first enters DEMO air (30) while airborne (op
         # 0x16, PCs 637, 740). The darkening panel, Black (47). The Vs.
         # intro: 開始時 (34) jumps to 開始時 BR (36) for global 3 = 0 (PC 345),
-        # which rolls rand % 4 > 1 (PC 381), then skips its display for global
-        # 14 = 0 (PC 382), spawns Black and OP super Charge (43, PCs 384–385)
-        # and jumps to Round 1 (37) + 4 (PC 387), which spawns *OP obj (33)
-        # twice (PCs 401–402) and calls OP motion RP (41) 14 times (PC 403);
-        # the roll's other half jumps to RANDON OP1 (31) + 2 (PC 393), as long.
+        # which rolls rand % 4 > 1 (PC 381), then shows its 50-tick display, as
+        # KGT 13 holds global 14 at 10 (PC 382), spawns Black and OP super
+        # Charge (43, PCs 384–385) and jumps to Round 1 (37) + 4 (PC 387),
+        # which spawns *OP obj (33) twice (PCs 401–402) and calls OP motion RP
+        # (41) 14 times (PC 403); the roll's other half, after its own 50-tick
+        # display (PC 389), jumps to RANDON OP1 (31) + 2 (PC 393), as long.
         actions=dict(win=62, winStand=29, winLoop=(62, 23), draw=69, black=47),
         # 2001: the HUD face action 77 shows (PC 789); 648: *name (70, PC
         # 749).
@@ -2730,13 +2748,15 @@ FIGHTERS = {
         # PCs 947–948). Each first enters DEMO air (52)
         # while airborne (op 0x16, PCs 756, 938). The darkening panel, Black
         # (49). The Vs. intro: 開始時 (36) jumps to 開始時 BR (38) for global 3 =
-        # 0 (PC 390), which rolls rand % 6 > 3 (PC 428) and, for global 14 = 0,
-        # jumps to 38 + 18 (PC 429): it rises (PC 445), spawns Black and OP
-        # super Charge (45, PCs 434–435) and enters Round 1 (39) + 6 (PC 438),
-        # which falls (PC 459) and lands into 39 + 11 (slot 1, PC 458); the
-        # roll's other third enters RANDOM OP1 (31) + 2 (PC 444). His KO down rolls (PCs 828, 834) and runs on into
-        # ko DOWN2, ko down 2 fly and ko DOWN3 (71–73), which the match plays
-        # from its timeline.
+        # 0 (PC 390), which rolls rand % 6 > 3 (PC 428) and, as KGT 13 holds
+        # global 14 at 10 (PC 429), rises (PC 430), stops there for 42 ticks
+        # (PCs 432–433), spawns Black and OP super Charge (45, PCs 434–435) and
+        # enters Round 1 (39) + 6 (PC 438), which falls (PC 459) and lands into
+        # 39 + 11 (slot 1, PC 458); the roll's other third shows image 466 for
+        # 50 ticks, as its own global 14 = 0 test (PC 439) fails too (PC 440),
+        # and enters RANDOM OP1 (31) + 2 (PC 444). His KO down rolls (PCs 828,
+        # 834) and runs on into ko DOWN2, ko down 2 fly and ko DOWN3 (71–73),
+        # which the match plays from its timeline.
         actions=dict(win=66, winStand=30, winLoop=(66, 10), draw=78, drawLoop=32, black=49),
         # 2000–2002 and 2006: the HUD faces action 87 shows, cycling in EX mode
         # (PCs 994–1008); 478: *name (79, PC 952).
@@ -2821,12 +2841,12 @@ FIGHTERS = {
         # (PC 1006) and holds image 122 (PC 1008). Each first enters DEMO air
         # (33) while airborne (op 0x16, PCs 860, 1005). The darkening panel,
         # Black (75). The Vs. intro: 開始時 (44) jumps to 開始時 BR (52) for
-        # global 3 = 0 (PC 348), which, for global 14 = 0, jumps past its
-        # display (PC 453), spawns Black and OP super Charge (71, PCs
-        # 455–456) and enters OP normal (65) + 3 (PC 458), which calls TVS S
-        # 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
-        # flattened. 開始時's test of global 10 for 10 (PC 347), into
-        # 開始時 SELECT (51), never passes: no script sets global 10 to 10.
+        # global 3 = 0 (PC 348), which, shows its 50-tick display, as KGT 13
+        # holds global 14 at 10 (PC 453), spawns Black and OP super Charge (71,
+        # PCs 455–456) and enters OP normal (65) + 3 (PC 458), which calls TVS
+        # S 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
+        # flattened. 開始時's test of global 10 for 10 (PC 347), into 開始時 SELECT
+        # (51), never passes: no script sets global 10 to 10.
         actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75),
         flat={"win"},
         # 2001: the HUD face action 117 shows (PC 1056); 139: *name (106, PC
@@ -2910,12 +2930,12 @@ FIGHTERS = {
         # (104) calls 32 twice (PC 907) and holds image 122 (PC 909). Each
         # first enters DEMO air (33) while airborne (op 0x16, PCs 768, 906).
         # The darkening panel, Black (75). The Vs. intro: 開始時 (44) jumps
-        # to 開始時 BR (52) for global 3 = 0 (PC 267), which, for global 14 =
-        # 0, jumps past its display (PC 369), spawns Black and OP super Charge
-        # (71, PCs 371–372) and enters OP normal (65) + 2 (PC 374), which
-        # fades him in and calls DEMO STAND 7 times (PC 525); it plays
-        # flattened. 開始時's test of global 10 for 10 (PC 266),
-        # into 開始時 SELECT (51), never passes: no script sets global 10 to 10.
+        # to 開始時 BR (52) for global 3 = 0 (PC 267), which, shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 369), spawns Black and
+        # OP super Charge (71, PCs 371–372) and enters OP normal (65) + 2 (PC
+        # 374), which fades him in and calls DEMO STAND 7 times (PC 525); it
+        # plays flattened. 開始時's test of global 10 for 10 (PC 266), into 開始時
+        # SELECT (51), never passes: no script sets global 10 to 10.
         actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75),
         # 2001: the HUD face action 114 shows (PC 953); 139: *name (105, PC
         # 913).
@@ -2992,12 +3012,12 @@ FIGHTERS = {
         # (PCs 799–800); it plays flattened. The draw (84) holds 283 after the
         # stance (PC 887). Each first enters DEMO air (29) while airborne (op
         # 0x16, PCs 786, 879). The darkening panel, Black (54). The Vs. intro:
-        # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 427), which,
-        # for global 14 = 0, jumps past its display (PC 464), spawns Black and
-        # OP super Charge (49, PCs 466–467), calls demo speak rp ten times
-        # (PC 470) and takes her stance. 開始時's test of global 10 for 10
-        # (PC 428), into 開始時 BR + 2, never passes: no script sets global
-        # 10 to 10.
+        # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 427), which, shows
+        # its 50-tick display, as KGT 13 holds global 14 at 10 (PC 464), spawns
+        # Black and OP super Charge (49, PCs 466–467), calls demo speak rp ten
+        # times (PC 470) and takes her stance. 開始時's test of global 10 for 10
+        # (PC 428), into 開始時 BR + 2, never passes: no script sets global 10 to
+        # 10.
         actions=dict(win=77, winStand=28, draw=84, black=54),
         flat={"win"},
         # 2001: the HUD face action 92 shows (PC 934); 333: *name (85, PC
@@ -3081,10 +3101,10 @@ FIGHTERS = {
         # variable 0 into DEMO stand sp (31, PC 342), his winStandEx, which the
         # match plays for his Shin form (clipEx). The darkening panel, Black
         # (52). The Vs. intro: 開始時 (33) jumps to 開始時 BR (35) for global 3 = 0 (PC 367),
-        # which, for global 14 = 0, jumps past its display (PC 402), spawns
-        # Black and OP super Charge (48, PCs 404–405) and enters Round 1 (36) +
-        # 2 (PC 407). 開始時's test of global 10 for 10 (PC 368), into 開始時
-        # BR + 2, never passes: no script sets global 10 to 10.
+        # which, shows its 50-tick display, as KGT 13 holds global 14 at 10 (PC
+        # 402), spawns Black and OP super Charge (48, PCs 404–405) and enters
+        # Round 1 (36) + 2 (PC 407). 開始時's test of global 10 for 10 (PC 368),
+        # into 開始時 BR + 2, never passes: no script sets global 10 to 10.
         actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52),
         # 2001: the HUD face action 82 shows (PC 767); 322: *name (74, PC
         # 723).
@@ -3147,11 +3167,12 @@ FIGHTERS = {
         # and holds image 130 (PC 1285). Each first enters DEMO air (29) while
         # airborne (op 0x16, PCs 1001, 1281). The darkening panel, Black (59).
         # The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3 = 0
-        # (PC 426), which, for global 14 = 0, jumps past its display (PC
-        # 464), spawns Black and OP super Charge (54, PCs 466–467) and enters
-        # OP2 (30) + 2 (PC 469), or for its rand % 3 > 1 (PC 463) Round 1 (35)
-        # + 4 (PC 475). 開始時's test of global 10 for 10 (PC 427), into
-        # 開始時 BR + 14, never passes: no script sets global 10 to 10.
+        # (PC 426), which, shows its 50-tick display, as KGT 13 holds global 14
+        # at 10 (PC 464), spawns Black and OP super Charge (54, PCs 466–467)
+        # and enters OP2 (30) + 2 (PC 469), or for its rand % 3 > 1 (PC 463),
+        # after its own 50-tick display (PC 471), Round 1 (35) + 4 (PC 475).
+        # 開始時's test of global 10 for 10 (PC 427), into 開始時 BR + 14, never
+        # passes: no script sets global 10 to 10.
         actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59),
         # 2001: the HUD face action 108 shows (PC 1333); 576: *name (99, PC
         # 1289).
@@ -3210,10 +3231,10 @@ FIGHTERS = {
         # draw (74) calls 29 once (PC 781) and holds image 236 (PC 783). Each
         # first enters DEMO air (30) while airborne (op 0x16, PCs 695, 780).
         # The darkening panel, Black (50). The Vs. intro: 開始時 (31) jumps to
-        # 開始時 BR (33) for global 3 = 0 (PC 300), which, for global 14 = 0,
-        # jumps past its display (PC 336), spawns Black and OP super Charge
-        # (46, PCs 338–339) and enters Round 1 (34) + 2 (PC 342); it plays
-        # flattened. 開始時's test of global 10 for 10 (PC 301),
+        # 開始時 BR (33) for global 3 = 0 (PC 300), which, shows its 50-tick
+        # display, as KGT 13 holds global 14 at 10 (PC 336), spawns Black and
+        # OP super Charge (46, PCs 338–339) and enters Round 1 (34) + 2 (PC
+        # 342); it plays flattened. 開始時's test of global 10 for 10 (PC 301),
         # into 開始時 BR + 2, never passes: no script sets global 10 to 10.
         actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50),
         # 2001: the HUD face action 84 shows (PC 846); 323: *name (75, PC
@@ -3483,11 +3504,11 @@ FIGHTERS = {
         # and loops its pose (PCs 631–632). Each first enters DEMO air (30)
         # while airborne (op 0x16, PCs 534, 627). The darkening panel, Black
         # (43). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3
-        # = 0 (PC 279), which, for global 14 = 0, jumps past its display (PC
-        # 314), spawns Black and OP super Charge (39, PCs 316–317) and enters
-        # Round 1 (34) + 2 (PC 319), which calls DEMO ACT twice (PC 333).
-        # 勝ち's rand % 3 > 1 (PC 537), into WIN 2 (58),
-        # rolls in the match (resultScripts).
+        # = 0 (PC 279), which, shows its 50-tick display, as KGT 13 holds
+        # global 14 at 10 (PC 314), spawns Black and OP super Charge (39, PCs
+        # 316–317) and enters Round 1 (34) + 2 (PC 319), which calls DEMO ACT
+        # twice (PC 333). 勝ち's rand % 3 > 1 (PC 537), into WIN 2 (58), rolls in
+        # the match (resultScripts).
         actions=dict(win=57, winStand=29, winLoop=(57, 11), draw=65, drawLoop=(65, 5), black=43),
         # His jumps (4) leave their takeoff for J RP (7, PC 55), so the jump
         # plays flattened too.
@@ -3531,11 +3552,11 @@ FIGHTERS = {
         # loops its last pose from PC 746 (PC 747). Each first enters DEMO air
         # (30) while airborne (op 0x16, PCs 619, 739). The darkening panel,
         # Black (43). The Vs. intro: 開始時 (31) jumps to 開始時 BR (33) for global 3
-        # = 0 (PC 359), which, for global 14 = 0, jumps past its display (PC
-        # 394), spawns Black and OP super Charge (39, PCs 396–397) and enters
-        # Round 1 (34) + 2 (PC 399), whose roll (PC 402) picks its voice. 勝ち's
-        # rand % 3 > 1 (PC 632), which only picks its voice, rolls in the match
-        # (resultScripts).
+        # = 0 (PC 359), which, shows its 50-tick display, as KGT 13 holds
+        # global 14 at 10 (PC 394), spawns Black and OP super Charge (39, PCs
+        # 396–397) and enters Round 1 (34) + 2 (PC 399), whose roll (PC 402)
+        # picks its voice. 勝ち's rand % 3 > 1 (PC 632), which only picks its
+        # voice, rolls in the match (resultScripts).
         actions=dict(win=57, winStand=29, winLoop=(57, 18), draw=64, drawLoop=(64, 8), black=43),
         # 2001: the HUD face action 69 shows (PC 769); 170: VS NAME (56, PC
         # 610), since he has no *name.
@@ -3601,12 +3622,14 @@ FIGHTERS = {
         # (37) while airborne (op 0x16, PCs 905, 1161). The darkening panel,
         # Black (57). The Vs. intro: 開始時 (38) jumps to 開始時 BR (41) for global 3
         # = 0 (PC 566), which spawns Black and OP super Charge (59, PCs
-        # 614–615) and her four friends (PCs 616–620) and, for global 14 = 0,
-        # jumps past its display (PC 621) to Round 1 (42) + 7 (PC 624). 勝ち's rand % 6 > 3
-        # rolls into Win 2 (82) and Win 3 (90) (PCs 906–907) roll in the match
-        # (resultScripts), which takes each win's test of variable 0 = 100 into
-        # its EX form (PCs 909, 957, 1048), and the draw's into Stop (97, PC
-        # 1163).
+        # 614–615) and her four friends (PCs 616–620) and, as KGT 13 holds
+        # global 14 at 10 (PC 621), shows its 48-tick display (PC 622) before
+        # its jump to Round 1 (42) + 7 (PC 624); her friends (41 + 13 to + 25)
+        # fail their global 14 = 0 tests (PCs 625–637) as well, running their
+        # 50-tick displays first. 勝ち's rand % 6 > 3 rolls into Win 2 (82) and
+        # Win 3 (90) (PCs 906–907) roll in the match (resultScripts), which
+        # takes each win's test of variable 0 = 100 into its EX form (PCs 909,
+        # 957, 1048), and the draw's into Stop (97, PC 1163).
         actions=dict(win=79, winStand=36, winLoop=(79, 18), draw=98, drawLoop=(98, 17), black=57),
         # 2001, 2002, 2007 and 2008: the HUD faces action 104 shows (PCs
         # 1240–1254); 349: *name (99, PC 1197).
@@ -3643,9 +3666,10 @@ FIGHTERS = {
         # enters DEMO air (30) while airborne (op 0x16, PCs 599, 697). The
         # darkening panel, Black (50). The Vs. intro: 開始時 (31) jumps to
         # 開始時 BR (34) for global 3 = 0 (PC 315), which spawns Black and OP
-        # super Charge (52, PCs 361–362) and, for global 14 = 0 (PC 363),
-        # jumps past its display (PC 364) to its fader, Round 1 (35, PC 366)
-        # and 開始時 + 23 (PC 368), which calls Demo Stand once (PC 340).
+        # super Charge (52, PCs 361–362) and, as KGT 13 holds global 14 at 10
+        # (PC 363), shows its 48-tick display (PC 364) before its fader, Round
+        # 1 (35, PC 366) and 開始時 + 23 (PC 368), which calls Demo Stand once (PC
+        # 340).
         actions=dict(win=74, winStand=29, draw=92, drawLoop=(92, 3), black=50),
         # 2001: the HUD face action 100 shows (PC 747); 349: *name (93, PC
         # 705).
@@ -3704,12 +3728,13 @@ FIGHTERS = {
         # 開始時 (30) jumps to 開始時 BR (32) for global 3 = 0 (PC 320), whose
         # first record jumps to Start KO (38, PC 363), a scene in which SEAN
         # beats him down and he takes 1000 life himself (PC 547). Authored:
-        # the intro plays 開始時 BR past that jump and its global 14 = 0 test
-        # (PC 364), from its spawns of Black and OP super Charge (46, PCs
-        # 366–367) into Round 1 (34) + 3 (PC 369), which rises (PC 381) and
-        # lands into Round 1 + 27 (slot 1, PC 399), calling STAND DEMO once
-        # (PC 404); both play flattened.
-        actions=dict(win=67, winStand=28, winLoop=(67, 12), draw=81, black=50, intro=(32, 4),
+        # the intro plays 開始時 BR past that jump, from the 50-tick display
+        # its global 14 = 0 test (PC 364) keeps while KGT 13 holds global 14
+        # at 10 (PC 365), through its spawns of Black and OP super Charge (46,
+        # PCs 366–367) into Round 1 (34) + 3 (PC 369), which rises (PC 381)
+        # and lands into Round 1 + 27 (slot 1, PC 399), calling STAND DEMO
+        # once (PC 404); both play flattened.
+        actions=dict(win=67, winStand=28, winLoop=(67, 12), draw=81, black=50, intro=(32, 3),
                      introLand=(34, 27)),
         flat={"intro", "introLand"},
         # 2001: the HUD face action 95 shows (PC 1085); 247: *name (83, PC
@@ -3758,11 +3783,11 @@ FIGHTERS = {
         # (57) calls 22 once (PC 537) and loops image 227 from PC 541 (PC
         # 542). Each first enters DEMO air (23) while airborne (op 0x16, PCs
         # 451, 536). The darkening panel, Black (36). The Vs. intro: 開始時
-        # (24) jumps to 開始時 BR (26) for global 3 = 0 (PC 193), which, for
-        # global 14 = 0, jumps past its display (PC 229), spawns Black and OP
-        # super Charge (32, PCs 231–232) and enters Round 1 (27) + 3 (PC
-        # 234), which hops (PC 246), hangs (PC 248) and hops again (PC 251),
-        # landing into Round 1 + 19 (slot 1, PC 250).
+        # (24) jumps to 開始時 BR (26) for global 3 = 0 (PC 193), which, shows its
+        # 50-tick display, as KGT 13 holds global 14 at 10 (PC 229), spawns
+        # Black and OP super Charge (32, PCs 231–232) and enters Round 1 (27) +
+        # 3 (PC 234), which hops (PC 246), hangs (PC 248) and hops again (PC
+        # 251), landing into Round 1 + 19 (slot 1, PC 250).
         actions=dict(win=50, winStand=22, winLoop=(50, 6), draw=57, drawLoop=(57, 6), black=36),
         # 2001: the HUD face action 63 shows (PC 584); 235: *name (58, PC
         # 546).

@@ -240,7 +240,9 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     const match = new Match('cpu', true, 0, ['giant', 'zoma']);
     const giant = match.fighters[0];
     const { x } = giant;
-    for (let t = 0; t < 202; t++) match.step({ crouch: t >= 140 });
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps it
+    // (PC 305).
+    for (let t = 0; t < 252; t++) match.step({ crouch: t >= 190 });
     // Round 1 (33) has no op 0x01: he stands where he starts. Chung Style
     // (37) sets variable 0 (PC 367) and jumps back (PC 368).
     expect([giant.action, giant.x, exMode(giant)]).toEqual(['idle', x, true]);

@@ -263,34 +263,37 @@ describe('REMU (23 REMU.PLAYER)', () => {
     // 399) enters 36 + 11: voices 5, 6 or 4 (PCs 397, 400, 402).
     expect(runs.map(({ path, sounds }) => [path, sounds[0]])).toEqual([
       [
-        [33, '35+10', '36+44'],
-        [3, 5],
+        [33, 35, '36+44'],
+        [52, 5],
       ],
       [
-        [33, '35+10', '36+8', '36+44'],
-        [3, 6],
+        [33, 35, '36+8', '36+44'],
+        [52, 6],
       ],
       [
-        [33, '35+10', '36+11', '36+44'],
-        [3, 4],
+        [33, 35, '36+11', '36+44'],
+        [52, 4],
       ],
     ]);
     const [{ ticks, f }] = runs;
     const heights = runs[0].heights.map((y) => y / 1.5);
-    // After 開始時's (33) blank display, 300 source pixels up, 280 down, then
-    // 989 up and back, a tick past the floor before the landing (0x41187f)
-    // enters 36 + 44 (slot 1, PC 430).
+    // After 開始時's (33) blank display, 300 source pixels up; KGT 13's
+    // global 14 fails 開始時 BR's jump to + 10 (PC 379), so he stops there
+    // through seven calls of 40 (PCs 382–383). Then 280 down, then 989 up and
+    // back, a tick past the floor before the landing (0x41187f) enters 36 +
+    // 44 (slot 1, PC 430).
     expect(heights[2]).toBeCloseTo(-299.835, 3);
-    expect(heights[72]).toBeCloseTo(-19.99, 2);
+    expect(heights[51]).toBe(heights[2]);
+    expect(heights[121]).toBeCloseTo(-19.99, 2);
     expect(Math.min(...heights)).toBeCloseTo(-1009.445, 2);
     expect([
-      heights[245] < 0,
-      heights[246] > 0,
-      heights[247],
+      heights[294] < 0,
+      heights[295] > 0,
+      heights[296],
       f.x,
       f.stock,
       ticks,
-    ]).toEqual([true, true, 0, 390 * 1.5, 2, 283]);
+    ]).toEqual([true, true, 0, 390 * 1.5, 2, 332]);
   });
 
   it('wins after two calls of stand demo, then flies up at raw −1450 (PC 651); holds his draw and shows face 2001', () => {

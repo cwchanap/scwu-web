@@ -257,14 +257,10 @@ describe('HISO (17 HISO.PLAYER)', () => {
     expect(
       [0, 10, 60, 199].map((age) => animationFrame('32+3', age, 'hiso').image),
     ).toEqual([414, 415, 419, 414]);
-    // OP super Charge (38, PC 333) charges two stocks.
+    // 開始時 BR's 50-tick display comes first, as KGT 13's global 14 keeps
+    // it (PC 330). OP super Charge (38, PC 333) charges two stocks.
     const { path, ticks, f } = brIntro('hiso');
-    expect([path, ticks, f.x, f.stock]).toEqual([
-      [30, '32+3'],
-      202,
-      390 * 1.5,
-      2,
-    ]);
+    expect([path, ticks, f.x, f.stock]).toEqual([[30, 32], 252, 390 * 1.5, 2]);
   });
 
   it('wins holding image 436 (PC 603), draws holding 201, and shows face 2001', () => {

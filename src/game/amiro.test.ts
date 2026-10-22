@@ -67,10 +67,10 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
     const amiro = match.fighters[0];
     // The round's set-up places her at 390 source pixels (0x408ac3).
     expect(amiro.x).toBe(390 * 1.5);
-    // After 開始時's (29) blank display, PC 364: her car (35) follows her in
-    // slot 9 (op 0x04 flags 0x21).
-    match.step();
-    match.step();
+    // After 開始時's (29) blank display and 開始時 BR's 50-tick display,
+    // which KGT 13's global 14 keeps (PC 345), PC 364: her car (35) follows
+    // her in slot 9 (op 0x04 flags 0x21).
+    for (let t = 0; t < 52; t++) match.step();
     expect(match.effects.find((e) => e.clip === 35)).toMatchObject({
       owner: 0,
       slot: 9,
@@ -78,11 +78,11 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
     });
     // Round BR then calls Demo stand once (PC 388).
     expect(animationDuration('31+3', 'amiro')).toBe(198);
-    for (let t = 2; t < 117; t++) match.step({ crouch: t >= 60 });
+    for (let t = 52; t < 167; t++) match.step({ crouch: t >= 110 });
     // PCs 375–377: a free copy (35 + 10) replaces it and drives away.
     expect(match.effects.map((e) => e.clip)).toContain('35+10');
     expect(match.effects.map((e) => e.clip)).not.toContain(35);
-    for (let t = 117; t < 200; t++) match.step({ crouch: true });
+    for (let t = 167; t < 250; t++) match.step({ crouch: true });
     expect(amiro.action).toBe('idle');
     // Raw 600 for 32 ticks (PC 367), then 60 for 15 (PC 372).
     expect(amiro.x - 390 * 1.5).toBeCloseTo((600 * 32 + 60 * 15) * VELOCITY, 6);

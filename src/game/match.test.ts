@@ -497,9 +497,14 @@ describe('recovered neutral and round animations', () => {
         (age) => animationFrame('32+3', age).image,
       ),
     ).toEqual([353, 356, 358, 359, 295, 364, 365, 295, 295]);
-    // 開始時 (30) shows its blank display a tick, then jumps to 開始時 BR + 3.
+    // 開始時 (30) shows its blank display a tick, then enters 開始時 BR,
+    // whose display (image 353 for 49 ticks) KGT 13's global 14 of 10
+    // keeps (PC 323) before + 3.
+    expect(animationDuration(32)).toBe(49 + 199);
     expect(match.fighters.map((f) => f.action)).toEqual(['script', 'script']);
-    ticks(match, 52, { punch: true, right: true });
+    ticks(match, 1 + 49);
+    expect(player).toMatchObject({ branch: 32, x: 390 * 1.5 });
+    ticks(match, 51, { punch: true, right: true });
     // From 390 and 890 source pixels (0x408ac3), each raw 200 for 50 ticks.
     const walk = 50 * 200 * (655 / 65536) * 1.5;
     expect(player.x).toBeCloseTo(390 * 1.5 + walk, 3);
@@ -510,7 +515,7 @@ describe('recovered neutral and round animations', () => {
     match.step({ punch: true });
     expect(match.fighters.map((f) => f.action)).toEqual(['idle', 'idle']);
     // Round phase 0 lasts until the fight lettering: no commands or clock.
-    ticks(match, FIGHT_TICK - 202, { punch: true });
+    ticks(match, FIGHT_TICK - 251, { punch: true });
     expect(player.action).toBe('idle');
     expect(match).toMatchObject({ roundTicks: FIGHT_TICK - 1, ticks: 0 });
     match.step({ punch: true });
@@ -6688,9 +6693,10 @@ describe('EX mode', () => {
   });
 
   it('starts a Vs. CPU round in EX mode for down held at PC 348', () => {
-    // After 開始時's (30) blank display, 162 ticks into 開始時 BR + 3.
+    // After 開始時's (30) blank display, 開始時 BR's 49-tick display and 162
+    // ticks into + 3.
     expect(
-      [162, 163, 164].map((down) => {
+      [211, 212, 213].map((down) => {
         const { f, match } = brIntro('ryuko', 0, (t) =>
           t === down ? { crouch: true } : {},
         );

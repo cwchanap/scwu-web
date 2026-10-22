@@ -370,11 +370,11 @@ export function heldFrame(
   };
 }
 
-// DoraEmon's, 100 ticks still, 27 rising at raw vy −50 (PC 381), 81 still
-// (PC 393), then falling under gravity 50 (PC 398) until the fall reaches
-// the floor 13 source pixels down on his 9th move, into Round 1 + 27 (slot
-// 1, PC 399).
-export const DORA_LANDING = 217;
+// DoraEmon's, 150 ticks still (開始時 BR's display, PC 365, and Round 1's
+// first 100), 27 rising at raw vy −50 (PC 381), 81 still (PC 393), then
+// falling under gravity 50 (PC 398) until the fall reaches the floor 13
+// source pixels down on his 9th move, into Round 1 + 27 (slot 1, PC 399).
+export const DORA_LANDING = 267;
 // How many times each win calls its stand demo: twice, ZAKU's and
 // PAC-HELO's four times, TRAINING's three (PC 366), otherwise once.
 const winStands = (who: Who) =>
@@ -628,7 +628,7 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
-    // DoraEmon's 開始時 BR (32) from PC 366 (authored, export_assets.py)
+    // DoraEmon's 開始時 BR (32) from PC 365 (authored, export_assets.py)
     // runs into Round 1 + 3, rises and lands out of the wait at PC 400 at
     // DORA_LANDING into Round 1 + 27.
     ...(who === 'dora' && {

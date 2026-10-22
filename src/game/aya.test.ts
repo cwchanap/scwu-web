@@ -317,10 +317,11 @@ describe('AYA (42 AYA.PLAYER)', () => {
 
   it('charges two stocks through her Vs. intro', () => {
     const { path, ticks, f, images } = brIntro('aya');
-    // 開始時 BR (34) jumps past its display at PC 364 (PC 363).
-    expect([path, ticks, f.stock]).toEqual([[31, 34, '34+6'], 254, 2]);
+    // 開始時 BR (34) keeps its 48-tick display at PC 364, as KGT 13's global
+    // 14 fails its jump past it (PC 363).
+    expect([path, ticks, f.stock]).toEqual([[31, 34], 302, 2]);
     // 開始時 BR's first display, then 開始時 from PC 335 and Demo Stand.
-    expect([1, 2, 3, 52, 53, 124, 125, 252].map((t) => images[t])).toEqual([
+    expect([1, 2, 3, 100, 101, 172, 173, 300].map((t) => images[t])).toEqual([
       4001, 4001, 4001, 4001, 4002, 4008, 4001, 4005,
     ]);
   });
