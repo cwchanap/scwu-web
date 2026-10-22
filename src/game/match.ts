@@ -1709,7 +1709,8 @@ export class Match {
     // Authored: after the lettering, wait for each fighter to take its result
     // or lie KO'd, as moves now run on past the round's end; a KO timeline
     // (KO_TIMELINES) once it stops moving on the floor: ZIRO's in ko DOWN3,
-    // or standing in Random lose; or vanished there in make hikari.
+    // or standing in Random lose; or vanished there in make hikari. A victim
+    // its settled holder still holds (+0x40 at -1) or shocks never takes it.
     return (
       this.winner !== null &&
       this.matchOver &&
@@ -1718,6 +1719,10 @@ export class Match {
         (f) =>
           f.action === 'win' ||
           f.action === 'draw' ||
+          (!f.pending &&
+            (f.hitStop < 0 ||
+              f.action === 'shock' ||
+              f.action === 'musicAttack')) ||
           (f.action === 'koLand' && (!f.branch || settled(f))) ||
           (f.action === 'script' && f.hp === 0 && settled(f)),
       )
@@ -2078,27 +2083,17 @@ export class Match {
       f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
   }
 
-  // A held or shocked victim follows its holder's script, or is released
-  // without it (authored: when the holder is hit, KO'd or done).
+  // A victim follows its holder's script until an action is queued for it
+  // (0x412331), by the holder's op 0x14 or a strike, whatever the holder
+  // does meanwhile: one op 0x07 holds stays stopped (+0x40 at -1, 0x412397),
+  // and HIT SHOCK INFIN (88) and GIANT!! MUSIC ATTACK (133) loop.
   private holdVictims() {
-    this.fighters.forEach((target, index) => {
-      // A queued action takes the victim at its next step.
+    this.fighters.forEach((target) => {
       if (target.pending) return;
-      const holder = this.fighters[1 - index];
-      const held =
-        target.action === 'superHeld' ||
-        target.action === 'shock' ||
-        target.action === 'musicAttack' ||
-        Boolean(target.held?.pose);
-      if (held && (holder.action !== 'script' || holder.hp === 0)) {
-        // One held below the floor is set on it.
-        target.y = Math.min(0, target.y);
-        this.action(target, target.y < 0 ? 'airHit' : 'hit');
-      }
       // No op 0x07 holding it, CHUCK HIT runs its 10- and 30-tick displays
       // (Ryuko's PCs 1733, 1737; every twin's alike) out into neutral
       // (0x4126de): KATE's Dash att Hit (245) never holds its victim.
-      else if (
+      if (
         target.action === 'superHeld' &&
         !target.held?.pose &&
         target.age >= animationDuration('superHeld', target.who) &&
@@ -2497,7 +2492,7 @@ export class Match {
         };
         // The hold replaces the victim's stop (+0x40 at -1, 0x41303a) and
         // zeroes its motion (0x412f66).
-        other.hitStop = 0;
+        other.hitStop = -1;
         Object.assign(other, { vx: 0, vy: 0, ax: 0, gravity: 0, moving: 0 });
         this.placeHeld(self, other);
         break;
@@ -3424,12 +3419,20 @@ export class Match {
     if (f.pending) this.enterPending(f, other);
     else {
       // Held by op 0x07 (+0x40 at -1), the step returns at once (0x412397).
-      if (f.held?.pose) return;
+      if (f.hitStop < 0) return;
       if (f.hitStop === 0) {
         // 0x4123c5: an unstopped step drops the word a stop saved.
         f.stopInput = null;
         if (this.cpuDriven && f === this.fighters[1])
           input = this.think(f, other);
+        // An op 0x1a stop adds to the -1 (0x4136fb), as a struck holder's
+        // reaction does to its victim, which counts it down and then runs on
+        // from where op 0x07 left it, action 0's offset 1 (0x412fc5), past
+        // its end, into neutral; with no fall, it doesn't land (0x41187f).
+        if (f.held?.pose) {
+          if (!this.runOut(f)) this.action(f, 'idle');
+          return;
+        }
         f.age++;
         f.moving = 0;
         if (this.land(f)) return;
@@ -3602,7 +3605,7 @@ export class Match {
   // action runs just before it (supers run their whole timelines in
   // fireEvents). The script steps into it before the hit test, so a fighter
   // enters it as it moves, a queued reaction or handler too; one the tick's
-  // end starts (a released hold) is entered then.
+  // end starts (CHUCK HIT run out) is entered then.
   private enter(f: Fighter, index: number) {
     const pose = fighterPose(f);
     if (pose === f.entered) return;

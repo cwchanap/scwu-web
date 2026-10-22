@@ -2663,7 +2663,7 @@ describe('recovered supers', () => {
     expect(target.hp).toBeLessThan(LIFE - 40);
   });
 
-  it('loses the beam objects when Ryuko is hit, and releases a held opponent', () => {
+  it('loses the beam objects when Ryuko is hit', () => {
     const { match, ryuko, target } = superMatch(250);
     match.step({ getterBeam: true });
     // Behind Ryuko, the opponent is out of the beam and punches after the freeze.
@@ -2673,13 +2673,35 @@ describe('recovered supers', () => {
     ticks(match, 1, {}, { punch: true });
     until(match, () => named(ryuko) !== 'getterBeam', 20);
     expect(match.effects.filter((e) => e.slot >= 7 && e.slot <= 9)).toEqual([]);
-    const held = superMatch(130);
-    held.match.step({ musashi: true });
-    until(held.match, () => held.target.action === 'superHeld');
-    // Any interruption of the holder's script lets go of the victim.
-    held.ryuko.action = 'hit';
-    held.match.step();
-    expect(held.target.action).toBe('hit');
+  });
+
+  it('keeps a held victim stopped when its holder is struck, until a stop counts down', () => {
+    const hold = (attackerStop: number) => {
+      const { match, ryuko, target } = superMatch(130);
+      match.step({ musashi: true });
+      until(match, () => Boolean(target.held?.pose));
+      // Op 0x07 stops the victim for good (+0x40 at -1, 0x41303a). A
+      // struck holder's reaction adds its op 0x1a other-stop to that
+      // (0x4136fb): -1 + 13 counts down 12 steps, the first this tick.
+      ryuko.pending = { action: 'hit', stop: 13, attackerStop, power: 0 };
+      const actions: string[] = [];
+      for (let tick = 0; tick < 40; tick++) {
+        match.step();
+        actions.push(target.held?.pose ? 'held' : target.action);
+      }
+      return actions;
+    };
+    // Then it runs on from action 0's offset 1 (0x412fc5), past its end:
+    // neutral, standing where it was held, and turns to face Ryuko, as
+    // Musashi's hold (flag bit 4) faced it his way.
+    expect(hold(13)).toEqual([
+      ...Array(12).fill('held'),
+      'idle',
+      ...Array(10).fill('turn'),
+      ...Array(17).fill('idle'),
+    ]);
+    // Without one, nothing frees it: no box can reach it (0x40e540).
+    expect(hold(0)).toEqual(Array(40).fill('held'));
   });
 });
 
@@ -6437,6 +6459,7 @@ describe('recovered CPU', () => {
     Object.assign(match.fighters[1], {
       action: 'superHeld',
       held: { pose: 1, flags: 0, x: 0, y: 0 },
+      hitStop: -1,
     });
     match.step({});
     expect(think).toHaveBeenCalledTimes(2);
