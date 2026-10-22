@@ -861,9 +861,8 @@ const TWIN_ANIMATIONS = {
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.
-// ponytail: 'time stop sit EX' (195) also spawns 365 and slides at raw −650
-// (PCs 2566–2567), which only the hidden super's guard reaches; the port
-// draws its images over the normal guard's rules.
+// 'time stop sit EX' (195) also spawns 365, from its frame's events, and
+// slides (EX_SLIDES in match.ts).
 // Demo stands jump to their EX stance while variable 0 holds the EX value
 // (op 0x1f, export_fighter), so in EX mode each call of one in a result
 // plays that stance: SAKUYA's STAND DEMO plays Skill1 (32, PC 296).

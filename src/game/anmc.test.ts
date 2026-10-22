@@ -171,6 +171,24 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
     expect([image('block'), image('crouchBlock')]).toEqual([262, 264]);
   });
 
+  it('smokes and slides in time stop sit EX (195, PCs 2566–2567), where time stop sit (190) holds still', () => {
+    for (const [ex, vx, smoke] of [
+      [0, 0, false],
+      [100, -650 + (8 * 393) / 655, true],
+    ] as const) {
+      const { match, anmc } = anmcPlayer(300);
+      anmc.variables[0] = ex;
+      react(match, anmc, 'crouchTimeStopGuard');
+      const smoked = () => match.effects.some((e) => e.clip === 365);
+      while (anmc.age < 8) match.step();
+      expect([raw(anmc)[0], smoked()]).toEqual([0, false]);
+      match.step();
+      expect(anmc).toMatchObject({ action: 'crouchTimeStopGuard', age: 9 });
+      expect(raw(anmc)[0]).toBeCloseTo(vx, 9);
+      expect(smoked()).toBe(smoke);
+    }
+  });
+
   it('takes 5 power and gives 3 in Tatumaki >> (PC 1229), and flies out of HISA Down at −800 (PC 1631)', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'anmc']);
     const [ryuko, anmc] = match.fighters;

@@ -151,6 +151,12 @@ const OWN_SLIDES: Partial<Record<Who, typeof reactionSlides>> = {
     crouchBlockRapid: slide(9, -250, 8),
   },
 };
+// ANMC P's time stop sit EX (195), which time stop sit (190) jumps to in EX
+// mode (PC 2499), spawns SMOKE (365) and slides as his heavy guards do (PCs
+// 2566–2567); the hidden super's guard alone reaches it.
+const EX_SLIDES: Partial<Record<Who, typeof reactionSlides>> = {
+  anmc: { crouchTimeStopGuard: slide(9, -650, 8) },
+};
 // Reactions whose op 0x16 enters their air form off the floor.
 const AIR_FORMS: Partial<Record<Action, Action>> = {
   inatuma: 'airInatuma',
@@ -2049,7 +2055,9 @@ export class Match {
   }
 
   private slideReaction(f: Fighter) {
-    const slide = OWN_SLIDES[f.who]?.[f.action] ?? reactionSlides[f.action];
+    const slide =
+      (clipEx(f) && EX_SLIDES[f.who]?.[f.action]) ||
+      (OWN_SLIDES[f.who]?.[f.action] ?? reactionSlides[f.action]);
     if (slide) {
       if (
         f.age >=
