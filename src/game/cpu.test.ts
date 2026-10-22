@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { CPU_CONTROLS, CPU_TABLES, CpuVM, RYUKO_CPU } from './cpu';
 import type { CpuEntry, CpuStep } from './cpu';
+import { Match } from './match';
+import { rand } from './standing';
 
 describe('recovered CPU table', () => {
   it("exports Zoma's 44 used entries", () => {
@@ -172,6 +174,38 @@ describe('CPU decision and playback', () => {
     expect([always.guards(), always.guards()]).toEqual([true, true]);
     expect(never.guards()).toBe(false);
     expect(never.seed).not.toBe(0);
+  });
+
+  it('clears its timers and entry on reset, so it draws again at once', () => {
+    const vm = new CpuVM([entry([step(2, 0, 90)])]);
+    run(vm, 30);
+    vm.reset(CPU_TABLES.zoma, CPU_CONTROLS.zoma);
+    const fresh = new CpuVM(CPU_TABLES.zoma, 50, vm.seed, CPU_CONTROLS.zoma);
+    expect(run(vm, 300)).toEqual(run(fresh, 300));
+    expect(vm.seed).toBe(fresh.seed);
+  });
+
+  it('draws on the first fighting tick of every round (0x411f82)', () => {
+    // The rolls a tick takes: a draw takes the timer's and every slot's.
+    const rolls = (match: Match) => {
+      let seed = match.cpu.seed;
+      match.step();
+      let count = 0;
+      for (; seed !== match.cpu.seed && count < 1000; count++)
+        [seed] = rand(seed);
+      return count;
+    };
+    const match = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court');
+    const counts: number[] = [];
+    for (const round of [1, 2]) {
+      while (match.round < round || match.roundTicks < match.fightTick - 1)
+        match.step();
+      counts.push(rolls(match));
+      // Mid-entry when the round ends: Zoma's CPU runs on through the KO.
+      for (let t = 0; t < 345; t++) match.step();
+      match.fighters[0].hp = 0;
+    }
+    expect(counts.every((count) => count > 100)).toBe(true);
   });
 
   it("plays Ryuko's table at the authored level", () => {

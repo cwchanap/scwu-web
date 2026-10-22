@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DRESS_TICK } from './hud';
+import { CPU_TABLES } from './cpu';
 import { LIFE, Match } from './match';
 import type { Fighter } from './match';
 import { scenarioOf } from './story';
@@ -284,7 +285,6 @@ describe('VS multi (TEAM VS)', () => {
     );
     expect(match.rounds).toBe(3);
     expect(match.fighters.map((f) => f.who)).toEqual(['ryuko', 'chung']);
-    const first = match.cpu;
     fight(match);
     match.fighters[1].power = 37;
     match.fighters[1].stock = 2;
@@ -298,8 +298,7 @@ describe('VS multi (TEAM VS)', () => {
     ]);
     expect(match.fighters[1]).toMatchObject({ stock: 2 });
     expect(match.fighters[1].power).toBeGreaterThanOrEqual(37);
-    expect(match.cpu).not.toBe(first);
-    expect(match.cpu.seed).toBe(first.seed);
+    expect(match.cpu.entries).toBe(CPU_TABLES.amiro);
     // A double KO is a draw: both move on.
     fight(match);
     finish(match, 0, 1);

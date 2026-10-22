@@ -212,7 +212,7 @@ export class CpuVM {
   private last: Input = {};
 
   constructor(
-    private entries: readonly CpuEntry[] = RYUKO_CPU,
+    public entries: readonly CpuEntry[] = RYUKO_CPU,
     public level = CPU_LEVEL,
     public seed = 0,
     private controls = CONTROLS,
@@ -268,6 +268,17 @@ export class CpuVM {
   // 0x40f3a2: a CPU victim ignores its input and guards on rand % 100 < level.
   guards() {
     return this.random() % 100 < this.level;
+  }
+
+  // Each player's set-up (0x411f82–0x411fa0) clears its decision timer,
+  // entry and step timer, so a CPU draws on its first fighting tick of every
+  // round; the step (+0xdf81) stays, as each entry starts it afresh. VS
+  // multi's player 2 takes its new member's table.
+  reset(entries = this.entries, controls = this.controls) {
+    [this.entries, this.controls] = [entries, controls];
+    this.timer = this.stepTimer = 0;
+    this.entry = null;
+    this.last = {};
   }
 
   // A step holds its direction, and a command step adds its command, as

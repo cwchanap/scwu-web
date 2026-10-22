@@ -1880,9 +1880,10 @@ export class Match {
   // and power: as many as the other side's wins. The life, power and stock
   // it saves of the winner (0x4097ab) are never restored, as round setup
   // clears whose they are (0x4089e6) before the players' set-up reads it
-  // (0x4120ce).
+  // (0x4120ce). Every set-up clears its CPU's state (0x411f82).
   // Authored: player 2's CPU plays the new member's table, rolling on.
   private nextRound() {
+    for (const vm of this.cpus) vm?.reset();
     if (this.teams) {
       this.members = [this.wins[1], this.wins[0]];
       this.characters = [
@@ -1890,12 +1891,7 @@ export class Match {
         this.teams[1][this.members[1]],
       ];
       const who = this.characters[1];
-      this.cpu = new CpuVM(
-        CPU_TABLES[who],
-        CPU_LEVEL,
-        this.cpu.seed,
-        CPU_CONTROLS[who],
-      );
+      this.cpu.reset(CPU_TABLES[who], CPU_CONTROLS[who]);
     }
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
