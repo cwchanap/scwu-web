@@ -216,7 +216,7 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
     // His CPU's own cpu dash, and cpu dash jump into his high jump (PC 3062).
     for (const [seed, wanted] of [
       [5, [263, 264, 16, 201]],
-      [1, [197, 264, 16]],
+      [0, [197, 264, 16]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'zaku']);
       const zaku = match.fighters[1];

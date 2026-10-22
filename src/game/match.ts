@@ -1035,11 +1035,10 @@ export interface Fighter {
   // The cancel counter (+0xdf85): op 0x18 arms it with r[10] bit 0 or
   // disarms it (0x412d2b, 0x412d37), and a contact by any of the player's
   // boxes, its objects' too, raises an armed one to 2 (0x40f384), which an
-  // op 0x1e mode 1 window needs (0x41194d). A run-out (0x412713) and a
-  // window's cancel (0x4119f7) clear it; other action changes keep it.
-  // ponytail: the port clears it entering any neutral action, where the
-  // free state's moves (0x411a01) and an air reaction's landing (0x4124c3)
-  // keep it until a run-out or the next op 0x18.
+  // op 0x1e mode 1 window needs (0x41194d). A run-out (0x412713, runOut
+  // and the free state's) and a window's cancel (0x4119f7) clear it; other
+  // action changes keep it: the free state's moves (0x411a01), an air
+  // reaction's landing (0x4124c3) and op 0x0a jumps, until the next op 0x18.
   contact: number;
   // The op 0x20 branch this reaction rolled on entry, drawn instead of its
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
@@ -1755,10 +1754,7 @@ export class Match {
     f.connected = false;
     // Air reactions land straight into idle, as landing without a handler
     // clears the bits too (0x4124c3).
-    if (neutralActions.has(action)) {
-      toNeutral(f);
-      f.contact = 0;
-    }
+    if (neutralActions.has(action)) toNeutral(f);
     f.branch =
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     f.copy = null;
@@ -2991,6 +2987,7 @@ export class Match {
 
   // Running out airborne, the free state falls; false on foot.
   private runOut(f: Fighter) {
+    f.contact = 0;
     if (f.y < 0) {
       this.fall(f);
       return true;
@@ -3490,6 +3487,9 @@ export class Match {
       f.age < animationDuration(f.action, f.who)
     )
       return;
+    // One that ran out did so into the free state (0x412713).
+    if (reactions.has(f.action) || f.action === 'land' || f.action === 'getUp')
+      f.contact = 0;
     const airborne = f.y < 0 || f.vy < 0;
     // An air reaction that ends airborne falls (0x411a80), which frees the
     // fighter.

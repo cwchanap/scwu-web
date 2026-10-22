@@ -1929,6 +1929,31 @@ describe('recovered cancels', () => {
     }).toMatchObject({ action: 'drill', age: 0 });
   });
 
+  it('keeps the cancel counter through a landing, clearing it only at a run-out (0x412713)', () => {
+    // Her earlier strike connected (2); punch 1 then whiffs, the drill
+    // pressed at its fourth tick, before its op 0x18 re-arms the counter.
+    const drill = (action: 'airHit' | 'hit', start: Partial<Fighter> = {}) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 600;
+      Object.assign(f, { action, age: 0, contact: 2, ...start });
+      while (f.action !== 'idle' && f.age < animationDuration(action) - 1)
+        match.step();
+      match.step({ punch: true });
+      expect(playing(f)).toBe(RYUKO.punch);
+      const kept = f.contact;
+      while (f.age < 3) match.step();
+      match.step({ drill: true });
+      match.step();
+      return [kept, named(f)];
+    };
+    // An air hit lands without a handler (0x4124c3), keeping it, so punch
+    // 1's mode 1 window (PC 2357) takes the drill before its box (PC 2367).
+    expect(drill('airHit', { y: -3, vy: 2 })).toEqual([2, 'drill']);
+    // A hit runs out into the free state, which clears it.
+    expect(drill('hit')).toEqual([0, 'punch']);
+  });
+
   // Musashi, the Change Attack and the hidden super check variable 6 (PCs
   // 3775, 4702, 4177) and jump into action 254 (+ 0, 14, 9), which spends two
   // stocks, spawns GENGAI! and plays on into their cancel versions (260, 318,
