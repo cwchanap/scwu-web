@@ -910,7 +910,8 @@ describe('Daisetsuzan Oroshi command throw', () => {
     // and takes no life.
     expect([...poses]).toEqual([0, 1, 8, 12, 6]);
     expect([...objects]).toEqual(expect.arrayContaining([340, 400]));
-    // PC 3233 jumps into DST Hit at PC 3104, which re-applies response 30.
+    // PC 3233 jumps into DST Hit at PC 3104, which re-applies response 30:
+    // CHUCK HIT again, whose op 0x01 sinks the victim a tick's motion.
     expect({ ...attacker, action: named(attacker) }).toMatchObject({
       action: 'evilDstHit',
       age: 165,
@@ -919,7 +920,7 @@ describe('Daisetsuzan Oroshi command throw', () => {
     expect(target).toMatchObject({
       action: 'superHeld',
       x: attacker.x + 90,
-      y: 0,
+      y: 80 * (393 / 65536) * 1.5,
       hp: LIFE,
     });
     ticks(match, 185);
@@ -2989,6 +2990,11 @@ describe('prototype training rules', () => {
       // step.
       ticks(match, 9, { throw: true });
       // PC 2765: response 30 holds the victim 60 source pixels ahead.
+      // CHUCK HIT's op 0x01 (PC 1730) drops it from rest at gravity 80 on
+      // the floor too, and the response's queued CHUCK HIT runs it again,
+      // so it sinks a second tick's motion and lands at the next step into
+      // its display again (PC 1729), before action 199 holds it.
+      const sink = 80 * (393 / 65536) * 1.5;
       expect({ ...attacker, action: named(attacker) }).toMatchObject({
         action: 'throw',
         age: 0,
@@ -2996,18 +3002,25 @@ describe('prototype training rules', () => {
       expect(target).toMatchObject({
         action: 'superHeld',
         x: attacker.x + facing * 90,
-        y: 0,
+        y: sink,
       });
       const poses = new Set<number>();
       const offsets = new Set<number>();
+      const sunk: number[][] = [];
       // Chuck Hit tosses at its age 65 (PC 2769).
       for (let tick = 1; tick < 65; tick++) {
         match.step({ punch: true, jump: true }, { jump: true, dash: true });
+        if (tick < 4) sunk.push([target.y, target.age]);
         expect(named(attacker)).toBe('throw');
         expect(target).toMatchObject({ action: 'superHeld', hp: LIFE });
         poses.add(animationFrame(RYUKO.throw, attacker.age).image);
         offsets.add(Math.round((target.x - attacker.x) * facing));
       }
+      expect(sunk).toEqual([
+        [2 * sink, 0],
+        [0, 0],
+        [0, 1],
+      ]);
       expect(poses).toEqual(new Set([106, 107, 108, 110]));
       // Op 0x07 holds at 60, −10, −60 and 0 source pixels, scaled by 1.5.
       expect([...offsets]).toEqual([90, -15, -90, 0]);

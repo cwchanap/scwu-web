@@ -1790,13 +1790,13 @@ export class Match {
       f.vx = f.vy = 0;
       f.gravity = 0;
       f.moving = 0;
-      // CHUCK HIT's op 0x01 drops its victim at gravity 80 (Ryuko's PC 1730;
-      // every twin's alike) until op 0x07 holds it; one already held
-      // returns from its step at once (0x412397), so it never runs.
-      // ponytail: only one in the air; on the floor it sinks a tick or two
-      // before landing restarts its displays (0x41187f), which the port
-      // holds still.
-      if (action === 'superHeld' && !f.held && f.y < 0) {
+      // CHUCK HIT's op 0x01 drops its victim from rest at gravity 80
+      // (Ryuko's PC 1730; every twin's alike), on the floor too, where it
+      // sinks a tick's motion and lands at the next step (0x41187f). Op
+      // 0x14 holds nothing (only op 0x07 sets +0x40), so Chuck Hit's (PC
+      // 2765) runs it again for another tick before action 199 holds it;
+      // one op 0x07 holds is stopped for good (0x40f963) and never moves.
+      if (action === 'superHeld' && !f.held?.pose) {
         f.gravity = 80 * SOURCE_ACCELERATION_SCALE;
         f.moving = 'velocity';
       }
@@ -2092,7 +2092,7 @@ export class Match {
       // (0x4126de): KATE's Dash att Hit (245) never holds its victim.
       else if (
         target.action === 'superHeld' &&
-        !target.held &&
+        !target.held?.pose &&
         target.age >= animationDuration('superHeld', target.who) &&
         !this.runOut(target)
       )
@@ -2936,11 +2936,14 @@ export class Match {
       this.rollResult(f);
       return true;
     }
-    // CHUCK HIT's landing handler (PC 1729) enters 128 + 11, its displays
-    // again; the landing zeroes its gravity (0x411894).
+    // CHUCK HIT's landing handlers enter 128 + 11 (PC 1729) or, once its
+    // first display has run out, + 15 (PC 1734): the display it lands in,
+    // again. The controller lands it before the display counts (0x41251d),
+    // and the landing zeroes its gravity (0x411894).
     if (f.action === 'superHeld') {
+      const first = animationFrame('superHeld', 0, f.who).duration;
       f.gravity = 0;
-      f.age = 0;
+      f.age = f.age > first ? first : 0;
       return true;
     }
     f.gravity = 0.24;
@@ -3431,7 +3434,8 @@ export class Match {
         return;
       }
     }
-    if (f.action === 'superHeld' && !f.held && f.gravity) f.moving = 'velocity';
+    if (f.action === 'superHeld' && !f.held?.pose && f.gravity)
+      f.moving = 'velocity';
     if (f.action === 'superHeld' || f.action === 'shock') return;
     // A fighter holds its result (0x410ff1), moving only by its own runs
     // from the tick their op 0x01 runs, and lands as the source's step does
