@@ -297,6 +297,9 @@ export function createHud(
   // UNDER PW adds image 135 (mode 2) at 202, or mirrored at 364, its colours
   // raised 10 every other 15 ticks (PCs 713–716, 719–722). Under the bars,
   // it shows where a bar's inner 74 pixels have drained, below 29% life.
+  // The layouts (KGT 57–66, 0x4066c9) spawn with type 0, which their
+  // children keep (0x412c0a) and draws whole (0x40de7f), so with no enemy
+  // the 2P strip stays lit, its bar gone.
   const underPower = [
     image(135, 202, 20),
     image(135, 364, 20).setFlipX(true),
