@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
-import { base, brIntro } from './testing';
+import { base, brIntro, enter } from './testing';
 
 // Z-MEGA as player 1, `gap` from a standing Ryuko as player 2.
 function zmegaPlayer(gap = 90) {
@@ -400,5 +400,23 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
       if (zmega.action === 'script') entered.add(zmega.branch);
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
+  });
+
+  it('rolls rand % 6 > 2 as his Down Get up (157) starts (PC 1937), as SHIN-Z does his (159)', () => {
+    // The shared rand's next two draws 100 ticks after a knockdown (158),
+    // against none.
+    const draws = (who: 'zmega' | 'shinz' | 'ryuko', knockdown?: number) => {
+      const match = new Match('practice', false, 3, ['ryuko', who]);
+      const [ryuko, f] = match.fighters;
+      f.x = ryuko.x + 300;
+      if (knockdown) enter(match, f, knockdown);
+      for (let t = 0; t < 100; t++) match.step();
+      const { cpu } = match as unknown as { cpu: { random(): number } };
+      return [cpu.random(), cpu.random()];
+    };
+    const [first, second] = draws('ryuko');
+    expect(draws('ryuko', 146)).toEqual([first, second]);
+    expect(draws('zmega', 158)[0]).toBe(second);
+    expect(draws('shinz', 160)[0]).toBe(second);
   });
 });

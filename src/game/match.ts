@@ -403,6 +403,19 @@ const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // GAISA FINAL ends in his (157) + 5 (PC 4137), at its roll.
 const KNOCKDOWN = 146;
 const GET_UP = 145;
+// MASA's and 3-TIMES's Down Get up (190, 187) picks its voice by a chain of
+// rolls (PCs 2205–2226, 2114–2135); Z-MEGA's and SHIN-Z's (157, 159) roll
+// rand % 6 > 2 and > 4 (PCs 1937, 2013) past a one-tick display whose hit
+// and guard handlers and box (PCs 1938–1940), 9869 source pixels down, meet
+// nothing, 30 ticks either way. Each rolls as it is entered (Match.action)
+// and draws its clip, as every path does.
+const GET_UP_ROLLS = new Set(
+  (Object.keys(CHARACTERS) as Who[]).filter(
+    (who) =>
+      exported(twin(who, GET_UP), who) &&
+      script(twin(who, GET_UP), who).events.some((e) => e.op === 'random'),
+  ),
+);
 // 'fly side wall hit', which Chuck OGI BALL's wall handler enters (slot 4,
 // PC 1885), as Chung's chuck's does (PC 1079).
 const FLY_SIDE_WALL = 95;
@@ -1745,6 +1758,8 @@ export class Match {
     f.branch =
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     f.copy = null;
+    if (action === 'getUp' && GET_UP_ROLLS.has(f.who))
+      this.rollPass(f, twin(f.who, GET_UP), true);
     // 0x410d50 stops a player entering an action on the ground, and keeps an
     // airborne one's motion: Zoma's moves take this.
     const flying = action === 'script' && (f.y < 0 || f.vy !== 0);
@@ -1932,22 +1947,28 @@ export class Match {
   private musicAttack(f: Fighter) {
     if (f.action !== 'musicAttack') return false;
     if (f.age % animationDuration('musicAttack', f.who)) return true;
-    this.musicPass(f, twin(f.who, 133));
+    this.rollPass(f, twin(f.who, 133));
     return true;
   }
 
-  // A pass's records, through its rolls and its jumps with no display.
-  private musicPass(f: Fighter, key: ObjectKey): void {
+  // A pass's first records (or only its sounds), through its rolls and its
+  // jumps with no display.
+  private rollPass(f: Fighter, key: ObjectKey, sounds = false): void {
     const { events, frames, end, next, offset = 0 } = script(key, f.who);
     for (const event of events) {
       if (event.t) return;
-      if (event.op !== 'random')
+      if (event.op === 'random') {
+        if (this.cpu.random() % event.divisor > event.above)
+          return this.rollPass(
+            f,
+            sourceKey(event.action, event.offset),
+            sounds,
+          );
+      } else if (!sounds || event.op === 'sound')
         this.runEvent(f, this.fighters.indexOf(f), event);
-      else if (this.cpu.random() % event.divisor > event.above)
-        return this.musicPass(f, sourceKey(event.action, event.offset));
     }
     if (!frames.length && end === 'jump' && next !== null)
-      this.musicPass(f, sourceKey(next, offset));
+      this.rollPass(f, sourceKey(next, offset), sounds);
   }
 
   // Chuck 消える (143) holds its blank display for 100 ticks, then jumps into

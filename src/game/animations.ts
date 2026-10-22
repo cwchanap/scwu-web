@@ -690,7 +690,15 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
     twistBounce: clip([z.twist[1], ...z.twisting2], 1),
     superHeld: clip(z.grabbed),
     knockdown: clip(z.knockdown),
-    getUp: clip(z.getUp),
+    // MASA's and 3-TIMES's voice comes from their rolls (Match.action).
+    getUp: clip(
+      who === 'masa' || who === 'times'
+        ? z.getUp.map((pose) => ({
+            ...pose,
+            events: pose.events?.filter((e) => e.op !== 'sound'),
+          }))
+        : z.getUp,
+    ),
     down: clip(z.ko, false, waits(z.ko)),
     // ASTROMAN's lies on a 0-tick display (PC 694).
     koAgain: clip(z.koAgain, false, waits(z.koAgain)),

@@ -408,4 +408,25 @@ describe('MASA (29 MASA.PLAYER)', () => {
       [800, 13],
     ]);
   });
+
+  it('picks his Down Get up voice by its chain of rolls (PCs 2205–2226), as 3-TIMES does his (PCs 2114–2135)', () => {
+    // The voice each get-up after a knockdown (191, 188) cries, seeds 0–5.
+    const voices = (who: Who, knockdown: number) =>
+      [0, 1, 2, 3, 4, 5].map((seed) => {
+        const match = new Match('practice', false, seed, ['ryuko', who]);
+        const [ryuko, f] = match.fighters;
+        f.x = ryuko.x + 300;
+        enter(match, f, knockdown);
+        const heard: number[] = [];
+        while (f.action !== 'idle') {
+          match.step();
+          if (f.action === 'getUp')
+            for (const s of match.sounds)
+              if (s.owner === 1) heard.push(s.index);
+        }
+        return heard;
+      });
+    expect(voices('masa', 191)).toEqual([[19], [17], [18], [18], [18], [17]]);
+    expect(voices('times', 188)).toEqual([[13], [11], [12], [12], [12], [11]]);
+  });
 });
