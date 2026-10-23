@@ -1538,6 +1538,16 @@ const stageObjects = (stage: Stage) =>
     }),
   );
 
+// The HUD faces' points in viewport coordinates, KGT 72's and 73's (31, 36)
+// and (609, 36) (0x409f84, 0x409ff6), which their objects keep to.
+export const HUD_FACES: Spawner[] = [31, 609].map((x) => ({
+  x: x * 1.5,
+  y: 36 * 1.5,
+  facing: 1,
+  screen: true,
+  z: 0x65,
+}));
+
 // Every round set-up places the players at 390 and 890 source pixels
 // (0x408a2e, 0x408ac3), and their Br. intros move them from there.
 const introFighters = ([a, b]: [Who, Who]): [Fighter, Fighter] => [
@@ -1858,6 +1868,40 @@ export class Match {
     }
     this.action(f, 'script', true, start);
     f.age = -1;
+  }
+
+  // Round set-up makes the HUD manager (type 15, 0x408c4a), whose first
+  // step makes each player's HUD face (+0x75a6) in the Vs. modes (0x470058 1
+  // and 2; a story's only the 1P's, 0x40a059) at KGT 72's and 73's points,
+  // (31, 36) and (609, 36), at 0x65, owned by that player (+0x156, 0x409fca,
+  // 0x40a036). The face's first step spawns the object in front of it that
+  // keeps to it (op 0x04 flags 0x65: Ryuko's 70 + 26, PC 708), which first
+  // steps in the round's third tick: past x 320 (PC 733) it sets player
+  // variable 2 to 1 (Team VS 2P + 2, PC 481), which each 開始時 tests in its
+  // sixth (PC 289), so player 2 enters 開始時 2P. SWW's sets 13, ALPHA's
+  // 12 as well, and Z-MEGA's sets 2 again every 5 ticks. In TEAM VS (global
+  // 3 above 99, PC 732) it enters Team VS 1P or 2P (44, 49) from the start,
+  // which spawns the check of the round's winner (44 + 4, 49 + 5) as well.
+  // ponytail: the match runs no 通常立ち, whose clears (Ryuko's PCs 3–8)
+  // would end the mark outside a VS 開始時 at once; until a move clears it,
+  // player 2's DoraEmon passes SP1 6LP's and SP2 6LK's tests (PCs 3137,
+  // 3189). A story makes none: its 1P face takes its point from another
+  // table (0x40a098), and at x 31 the object acts only on its global 3 tests
+  // (SWW's sets variable 12 above 1).
+  private spawnFaces() {
+    HUD_FACES.forEach((face, owner) => {
+      const [action, offset] = CHARACTERS[this.fighters[owner].who].faceHelper;
+      if (action === undefined) return;
+      this.spawnObject(face, owner, {
+        flags: 0x65,
+        action,
+        offset,
+        x: 0,
+        y: 0,
+        slot: 0,
+        z: 0,
+      });
+    });
   }
 
   // The rounds to win (0x470048): a story step's (+2), VS multi's team
@@ -2671,17 +2715,17 @@ export class Match {
     { selector, compare, value, pre }: Extract<SourceEvent, { op: 'test' }>,
   ) {
     // Each 開始時 copies the round (0x470044) into its variable 1 first, and
-    // YINAN's Flash Att its own x in source pixels ([esi + 8] >> 16).
-    if (pre)
-      this.setLocal(
-        actor,
-        selector,
-        pre.round
-          ? { value: this.round, add: false }
-          : pre.x
-            ? { value: Math.floor(actor.x / 1.5), add: false }
-            : pre,
-      );
+    // YINAN's Flash Att its own x in source pixels ([esi + 8] >> 16), as
+    // ANMC P's HUD face object does into global 7 (PC 738).
+    if (pre) {
+      const set = pre.round
+        ? { value: this.round, add: false }
+        : pre.x
+          ? { value: Math.floor(actor.x / 1.5), add: false }
+          : pre;
+      if (selector < 0x80) this.setLocal(actor, selector, set);
+      else this.globals[selector & 0x3f] = set.value;
+    }
     const variable =
       selector < 0x40
         ? (actor.locals[selector] ?? 0)
@@ -4304,6 +4348,7 @@ export class Match {
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
     // fighters finish their intro and stand.
     this.roundTicks++;
+    if (this.roundTicks === 2 && !this.battle) this.spawnFaces();
     this.cpuDriven =
       !opponent &&
       (this.mode !== 'practice' || this.practice.partner === 'cpu');

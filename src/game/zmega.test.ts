@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
-import { base, brIntro, enter } from './testing';
+import { base, brIntro, enter, fightObjects } from './testing';
 
 // Z-MEGA as player 1, `gap` from a standing Ryuko as player 2.
 function zmegaPlayer(gap = 90) {
@@ -153,7 +153,7 @@ describe('Z-MEGA (32 Z-MEGA.PLAYER)', () => {
     for (let t = 0; t < 400; t++) {
       match.step(t ? {} : { axe: true }, t ? {} : { dst: true });
       if (mine.at(-1) !== now(zmega)) mine.push(now(zmega));
-      for (const e of match.effects)
+      for (const e of fightObjects(match))
         if (e.owner === 1 && !clips.includes(e.clip)) clips.push(e.clip);
     }
     // *Refl obj (230) meets FIRE BALL CALL 2000 pixels down, entering

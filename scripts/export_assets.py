@@ -98,8 +98,9 @@ def decode_event(record):
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
     # (0x413813–0x4138cf): 0xc7 is the round (0x470044), which each 開始時 sets its variable 1 to and tests for 1
     # (Ryuko's PCs 290, 305), and 0xc0 the object's own x ([esi + 8] >> 16), which YINAN's Flash Att tests
-    # against the stage's ends (PCs 5785–5786).
-    if op == 0x1f and record[4] >> 6 == 0 and record[5] & 0x80 and record[6] in (0xc0, 0xc7) \
+    # against the stage's ends (PCs 5785–5786) and each HUD face's object against 320 (Ryuko's PC 733;
+    # ANMC P's in global 7, PC 738, as Giant's and G Suneo's).
+    if op == 0x1f and (record[4] >> 6 == 0 or record[4] == 0x87) and record[5] & 0x80 and record[6] in (0xc0, 0xc7) \
             and record[5] & 3 == 1 and record[5] & 0xc:
         source = dict(round=True) if record[6] == 0xc7 else dict(x=True)
         return dict(test_event(record), pre=dict(value=0, add=False, **source))
@@ -442,7 +443,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     return dict(result, frames=frames, events=events)
 
 
-def player_tables(data, c, image_ids):
+def player_tables(data, c, p, image_ids):
     """The tables the loader reads after a player's images (0x403b64), adding the images they show."""
     # The command table it reads into player +0x4da2: the entry count, then
     # entries of 82 bytes, each a name, the window of input-history ticks
@@ -525,6 +526,7 @@ def player_tables(data, c, image_ids):
                 commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
                 scenario=scenario(data, block + 0x7cc9),
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
+                faceHelper=face_helper(p, u16(data, block + 0x75a6)),
                 jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)],
                 walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)], fall=u16(data, block + 0x7586))
 
@@ -591,6 +593,13 @@ def jump_target(record):
     if record[0] == 0x09:
         return u16(record, 2), record[4]
     return (u16(record, 1), record[3]) if record[0] in (0x0a, 0x0b, 0x1f) else None
+
+
+def face_helper(p, face):
+    """The object a player's HUD face (+0x75a6) spawns just in front of it (op 0x04 flags 1), as
+    [action, offset], or none: TRAINING's spawns only its display."""
+    action = p.action(face)
+    return next(([u16(r, 2), r[4]] for r in p.records[action.start:action.end] if r[0] == 0x04 and r[1] & 3 == 1), [])
 
 
 def select_program(p, face, image_ids):
@@ -3904,7 +3913,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                    flat=(), endless=()):
     data, c, p = player(*source)
     image_ids = set(image_ids)
-    tables = player_tables(data, c, image_ids)
+    tables = player_tables(data, c, p, image_ids)
     # Giant's reactions open by testing his counter's variable 4 (op 0x1f ==
     # 100, PCs 723, 763, ...), which counter start (278) holds at 100 for its
     # window (PCs 4271–4282), to enter counter hit (279); most others clear it
@@ -4000,6 +4009,9 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
                               *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],
                               *tables["walks"], tables["fall"]]]
+    # The object the HUD face spawns, which the match makes for each player in the Vs. modes.
+    if tables["faceHelper"]:
+        queue.append(tuple(tables["faceHelper"]))
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -4123,7 +4135,7 @@ def main():
     }
     # 2000–2002: the HUD faces action 70 shows (EX mode cycles them, PCs 712–730).
     image_ids = {419, 464, 2000, 2001, 2002}
-    tables = player_tables(data, c, image_ids)
+    tables = player_tables(data, c, p, image_ids)
     # Her forward and back jumps (5, 6), which the match draws by the
     # direction taken, and her fall (7), which a move's last jump still
     # enters by its timeline.
@@ -4149,6 +4161,8 @@ def main():
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
                               # 開始時, which a VS round plays from the start.
                               tables["start"], *tables["jumps"], *tables["walks"], tables["fall"]]]
+    # The object her HUD face spawns (70 + 26, PC 708), which the match makes in the Vs. modes.
+    queue.append(tuple(tables["faceHelper"]))
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.

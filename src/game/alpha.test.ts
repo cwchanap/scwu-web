@@ -202,7 +202,8 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     steps({}, 2);
     steps({ blackRush: true });
     // No super rp's test (PC 4475) skips op 0x15 (PC 4477) in each of its
-    // five calls (PC 4471); only Team VS 2P (65, PC 872) sets variable 12.
+    // five calls (PC 4471); only Team VS 2P (65, PC 872), which player 2's
+    // HUD face object enters, sets variable 12.
     steps({}, 39);
     expect([alpha.branch, alpha.age, alpha.power]).toEqual([283, 39, 10]);
     // Authored: a key's command enters once, though SCC's 90-tick window
@@ -350,8 +351,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     // ends on a loss.
     const { path } = knockOut(match, [3], 700);
     expect(path).toEqual([
-      [0, 'turn', 1],
-      [10, 'idle', 0],
+      [0, 'idle', 1],
       [11, '84', 1],
       [121, '92', 1],
       [616, 'idle', 149],
@@ -360,7 +360,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 2, ['ryuko', 'alpha']);
+    const match = new Match('cpu', false, 12, ['ryuko', 'alpha']);
     const alpha = match.fighters[1];
     const entered = new Set<unknown>();
     // His CPU's own cpu nc (412), and SCC's grab.

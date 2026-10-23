@@ -31,6 +31,7 @@ import {
   base,
   brIntro,
   enter,
+  fightObjects,
   named,
   objects,
   playing,
@@ -2232,7 +2233,8 @@ describe('recovered power gauge', () => {
       const sounds: number[] = [];
       for (let i = 0; i < 150; i++) {
         match.step();
-        for (const e of match.effects) if (e.owner === 1) spawned.add(e.clip);
+        for (const e of fightObjects(match))
+          if (e.owner === 1) spawned.add(e.clip);
         for (const s of match.sounds) if (s.owner === 1) sounds.push(s.index);
         if (target.copy) branches.add(target.branch);
       }
@@ -2269,7 +2271,8 @@ describe('recovered power gauge', () => {
       const sounds: number[] = [];
       for (let i = 0; i < 60; i++) {
         match.step();
-        for (const e of match.effects) if (e.owner === 1) spawned.add(e.clip);
+        for (const e of fightObjects(match))
+          if (e.owner === 1) spawned.add(e.clip);
         if (!target.copy) continue;
         reactions.add(`${target.action} ${target.branch}`);
         for (const s of match.sounds) if (s.owner === 1) sounds.push(s.index);
@@ -3389,7 +3392,7 @@ describe('prototype training rules', () => {
         // 0: 38 % 3 mirrors, 7719 % 6 moves on to 349, 21238 % 5 mirrors,
         // 2437 % 4 stays.
         ticks(match, 2);
-        expect(match.effects.map((e) => e.clip)).toEqual(
+        expect(fightObjects(match).map((e) => e.clip)).toEqual(
           blocked ? [370] : [339, '349+17'],
         );
         ticks(match, animationDuration(clip) - 2);
@@ -3412,9 +3415,9 @@ describe('prototype training rules', () => {
       // 345 spawns the streak at its first step and small stars 351 at 4
       // and 14; each rolls at its own first step, the tick after.
       ticks(match, 10, { kick: true });
-      streaks.add(match.effects[1].clip);
+      streaks.add(fightObjects(match)[1].clip);
       ticks(match, 14);
-      for (const { clip } of match.effects)
+      for (const { clip } of fightObjects(match))
         if (typeof clip === 'number' && clip > 350 && clip < 360)
           stars.add(clip);
     }

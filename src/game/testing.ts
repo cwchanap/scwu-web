@@ -3,7 +3,7 @@
 // spawn (the axe, DST's missiles).
 import type { ObjectKey } from './animations';
 import type { Who } from './characters';
-import { fighterPose, firstStrike, Match } from './match';
+import { fighterPose, firstStrike, HUD_FACES, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
 
 export const RYUKO = {
@@ -140,6 +140,13 @@ export function named(f: Fighter): string {
   return found ? found[0] : String(f.branch);
 }
 
+// The match's objects but those keeping to the HUD faces (spawnFaces), which
+// every round outside a story has.
+export const fightObjects = (match: Match) =>
+  match.effects.filter(
+    (e) => !HUD_FACES.some((face) => face === e.follow?.parent),
+  );
+
 // A fighter's objects of one source action, its branches included.
 export const objects = (match: Match, index: number, owner?: number) =>
   match.effects.filter(
@@ -198,7 +205,7 @@ export function brIntro(
     match.step(input(ticks++));
     for (const { owner, index } of match.sounds)
       if (owner === 0) sounds.push([ticks - 1, index]);
-    for (const e of match.effects) if (e.owner === 0) objects.add(e.clip);
+    for (const e of fightObjects(match)) if (e.owner === 0) objects.add(e.clip);
     if (f.action !== 'script') break;
     if (path.at(-1) !== f.branch) path.push(f.branch!);
     images.push(fighterPose(f).image);
@@ -235,7 +242,9 @@ export function chuckKO(side: number, victim: Who) {
     if (path.length === 7)
       entry = {
         sounds: match.sounds,
-        screen: match.effects.filter((e) => e.screen).map((e) => e.clip),
+        screen: fightObjects(match)
+          .filter((e) => e.screen)
+          .map((e) => e.clip),
       };
   }
   return { match, path, entry };

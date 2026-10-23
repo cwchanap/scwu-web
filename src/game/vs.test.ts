@@ -5,7 +5,7 @@ import type { Stage, Who } from './characters';
 import { FIGHT_TICK } from './hud';
 import { EX_MODE, exMode, Match } from './match';
 import type { Fighter, Input } from './match';
-import { enter, named } from './testing';
+import { base, enter, named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
@@ -16,52 +16,63 @@ const steps = (match: Match, ticks: number, input: Input = {}) => {
 };
 // Source pixels.
 const at = (f: Fighter) => f.x / 1.5;
-// The VS 1P banners: Ryuko's 54, Zoma's 53.
+// The VS 1P banners, Ryuko's 54 and Zoma's 53, and the VS 2P ones after.
 const banners = (match: Match, vs = 54) =>
   match.effects
-    .filter((e) => e.clip === vs || e.clip === `${vs}+9`)
+    .filter((e) =>
+      [vs, `${vs}+9`, vs + 1, `${vs + 1}+9`].includes(e.clip as never),
+    )
     .map((e) => [e.owner, e.clip, e.facing]);
+// Both pairs, player 2's facing left (+0x5c, 0x411cd9).
+const both = (vs: number) => [
+  [0, vs, 1],
+  [0, `${vs}+9`, 1],
+  [1, vs + 1, -1],
+  [1, `${vs + 1}+9`, -1],
+];
 // Op 0x01 velocity, 16.16 scaled by floor(65536 / 100), per tick.
 const speed = (raw: number) => (raw * 655) / 65536;
 
 describe("Ryuko's VS 開始時 (30)", () => {
-  it('vanishes, dashes to the window edges and crosses, then walks in Round 1', () => {
+  it('vanishes and dashes back as player 2 charges past and backs off, then walks in Round 1', () => {
     const match = vsMatch();
     const [p1, p2] = match.fighters;
     // VS single places the players at 390 and 890 (0x408ac3).
     expect([at(p1), at(p2), p1.facing, p2.facing]).toEqual([390, 890, 1, -1]);
-    steps(match, 5);
+    // Player 2's HUD face object first steps in the third tick, setting its
+    // variable 2 (Team VS 2P + 2, PC 481).
+    steps(match, 2);
+    expect(p2.variables[2] ?? 0).toBe(0);
+    match.step();
+    expect([p1.variables[2] ?? 0, p2.variables[2]]).toEqual([0, 1]);
+    steps(match, 2);
     expect([p1.branch, p2.branch, at(p1), at(p2)]).toEqual([30, 30, 390, 890]);
     expect(animationFrame(30, p1.age).image).toBe(0);
     // Round 1 (PC 290) spawns VS 1P's two banners (PCs 293–294) and dashes
-    // back at −10000: the camera window (320 + 50, 320 + 590) stops both.
+    // back at −10000, which the camera window (320 + 50) stops. Player 2's
+    // test of variable 2 (PC 289) takes 開始時 2P (31), which clears it (PC
+    // 310), spawns VS 2P's two (55, PCs 314–315) and dashes forward at 10000.
     match.step();
-    expect([p1.branch, p2.branch, at(p1), at(p2)]).toEqual([
+    expect([p1.branch, p2.branch, at(p1), p2.variables[2]]).toEqual([
       '30+9',
-      '30+9',
+      '31+5',
       370,
-      910,
+      0,
     ]);
+    expect(at(p2)).toBeCloseTo(890 - speed(10000), 6);
     match.step();
-    // Both take the 1P path (player variable 2 is 0, PC 289): player 2's
-    // banners face left and leave the world.
-    expect(banners(match)).toEqual([
-      [0, 54, 1],
-      [0, '54+9', 1],
-      [1, 54, -1],
-      [1, '54+9', -1],
-    ]);
-    // Then 2870 for 15 ticks: they cross and stand facing away.
+    expect(banners(match)).toEqual(both(54));
+    // Player 2's charge drags the camera to the stage's end, where both stop
+    // at 50 (0x40fba2); 2870 for 15 ticks then walks player 1 in, and −10500
+    // for 10 backs player 2 off to the window's right edge, scroll 277 + 590.
     steps(match, 23);
     const cross = 15 * speed(2870);
-    expect(at(p1)).toBeCloseTo(370 + cross, 6);
-    expect(at(p2)).toBeCloseTo(910 - cross, 6);
+    expect(at(p1)).toBeCloseTo(50 + cross, 6);
+    expect(at(p2)).toBe(867);
     expect([p1.facing, p2.facing]).toEqual([1, -1]);
-    expect(banners(match)).toEqual([
-      [0, 54, 1],
-      [0, '54+9', 1],
-    ]);
-    // Image 3 for 70 ticks, then Round 1 (33) from its start (PC 305).
+    expect(banners(match)).toEqual(both(54));
+    // Image 3 for 70 ticks, then Round 1 (33) from its start (PC 305), which
+    // 開始時 2P jumps back into (PC 321).
     steps(match, 70);
     expect([p1.branch, animationFrame('30+9', p1.age - 1).image]).toEqual([
       '30+9',
@@ -74,31 +85,29 @@ describe("Ryuko's VS 開始時 (30)", () => {
     expect(
       match.effects.filter((e) => e.clip === 38).map((e) => e.owner),
     ).toEqual([0, 1]);
-    // Round 1 steps back at −2000 for 5 ticks, then walks in at 200 for 50.
+    // Round 1 steps back at −2000 for 5 ticks, which the window's left edge
+    // stops: the camera nears its aim, trunc((480.26 + 867) / 2) − 320 =
+    // 353, by halves, truncating to 352. Then it walks in at 200 for 50.
     steps(match, 48);
-    expect(at(p1)).toBeCloseTo(370 + cross, 6);
+    expect(at(p1)).toBeCloseTo(50 + cross, 6);
     steps(match, 5);
-    expect(at(p1)).toBeCloseTo(370 + cross - 5 * speed(2000), 6);
+    expect(at(p1)).toBe(352 + 50);
     steps(match, 50);
-    expect(at(p1)).toBeCloseTo(
-      370 + cross - 5 * speed(2000) + 50 * speed(200),
-      6,
-    );
+    expect(at(p1)).toBeCloseTo(352 + 50 + 50 * speed(200), 6);
     // 100 ticks of 開始時 and Round 1's 254 run out into idle.
     steps(match, 149);
     expect([named(p1), named(p2)]).toEqual(['33', '33']);
     match.step();
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
-    // No stocks, where OP super Charge charges two; they turn once the
-    // round starts.
+    // No stocks, where OP super Charge charges two; they face each other as
+    // the round starts.
     while (match.roundTicks < FIGHT_TICK - 1) match.step();
     expect(match.fighters.map((f) => [f.stock, f.power])).toEqual([
       [0, 0],
       [0, 0],
     ]);
-    expect(p1.facing).toBe(1);
     match.step();
-    expect([p1.action, p1.facing]).toEqual(['turn', -1]);
+    expect([p1.action, p1.facing, p2.facing]).toEqual(['idle', 1, -1]);
   });
 
   it("enters EX mode while down is held at Round 1's check (PC 348)", () => {
@@ -121,13 +130,15 @@ describe("Ryuko's VS 開始時 (30)", () => {
     const [p1, p2] = match.fighters;
     expect([at(p1), at(p2), p1.branch]).toEqual([390, 890, 30]);
     steps(match, 6);
-    // No banners past round 1; the same dash.
-    expect([p1.branch, at(p1), at(p2), banners(match)]).toEqual([
+    // No banners past round 1; the same dashes, player 2's from 開始時 2P +
+    // 7 (PC 313).
+    expect([p1.branch, p2.branch, at(p1), banners(match)]).toEqual([
       30,
+      31,
       370,
-      910,
       [],
     ]);
+    expect(at(p2)).toBeCloseTo(890 - speed(10000), 6);
     steps(match, 95);
     // Demo (28) inlined from age 100: images 3, 6, 8, 7, 6, 2, 1, 295.
     expect(animationFrame(30, p1.age).image).toBe(3);
@@ -138,7 +149,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
     expect([p1.branch, exMode(p1), p2.branch, exMode(p2)]).toEqual([
       '37+3',
       true,
-      30,
+      31,
       false,
     ]);
     steps(match, 124);
@@ -156,12 +167,14 @@ describe("Ryuko's VS 開始時 (30)", () => {
 });
 
 // The 開始時 the other fighters share with Ryuko's: VS 1P twice, the dash
-// and cross, an image held 70 ticks while Black and OP super Charge spawn,
-// then in round 1 the action the round copy jumps to, from its start. Each
-// row: those actions and images, round 2's images by age, the ticks to idle
-// in rounds 1 and 2, how far round 1's action walks, and the action it runs
-// out of when that action jumps on, with a seed whose rolls both take it,
-// the timeline the round copy jumps to, and how many VS CHARGEs each has.
+// back, an image held 70 ticks while Black and OP super Charge spawn, then
+// in round 1 the action the round copy jumps to, from its start; player 2's
+// 開始時 2P (start + 1) charges in under VS 2P (banner + 1). Each row: those
+// actions and images, round 2's images by age, the ticks to idle in rounds 1
+// and 2, how far round 1's action walks in from the window's left edge, and
+// the action it runs out of when that action jumps on, with a seed whose
+// rolls both take it, the timelines the round copy and 開始時 2P jump to,
+// and how many VS CHARGEs each has.
 const TEMPLATE: {
   who: Who;
   start: number;
@@ -175,6 +188,7 @@ const TEMPLATE: {
   ends?: number | string;
   seed?: number;
   copy?: ObjectKey;
+  twoP?: ObjectKey | false;
   charges?: number;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
@@ -340,8 +354,9 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
-  // Round 1 (35, PC 350) steps back at −2000 for 5 ticks and walks in at
-  // 110 for 90 (PCs 374–385), 255 ticks in all. From round 2 image 117 for
+  // Round 1 (35, PC 350) steps back at −2000 for 5 ticks, which the window's
+  // left edge stops, and walks in at 110 for 90 (PCs 374–385), 255 ticks in
+  // all. From round 2 image 117 for
   // 5 ticks (PC 351), then Demo Stand (29) seven times (PC 352): 113 to 117
   // for 7 ticks each.
   {
@@ -363,7 +378,7 @@ const TEMPLATE: {
       [349, 117],
     ],
     idle: [356, 351],
-    walk: -5 * speed(2000) + 90 * speed(110),
+    walk: 90 * speed(110),
   },
   // Round 1 (36, PC 368): 125 ticks of blanks and displays, its EX check
   // (PC 403), then STAND DEMO 2 (30) once. From round 2 STAND DEMO 2 once
@@ -407,8 +422,8 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
-  // Round 1 (33, PC 326) steps back at −2250 for 5 ticks, waits 45, walks
-  // in at 200 for 56 (PCs 352–365), shows image 113 for 26, checks down
+  // Round 1 (33, PC 326) steps back at −2250 for 5 ticks, which the window's
+  // left edge stops, waits 45, walks in at 200 for 56 (PCs 352–365), shows image 113 for 26, checks down
   // (PC 367) and calls Demo stand (28) from + 2. From round 2 image 113 for
   // 14 ticks (PC 327), Demo stand from + 2 (PC 328), the EX check (PC 329),
   // then Demo stand again (PC 330).
@@ -433,7 +448,7 @@ const TEMPLATE: {
       [349, 113],
     ],
     idle: [351, 351],
-    walk: -5 * speed(2250) + 56 * speed(200),
+    walk: 56 * speed(200),
   },
   // Round 1 (34, PC 343): 250 ticks of displays, unless its roll takes op2
   // (below). From round 2 image 113 for 14 ticks (PC 344), then Demo Stand
@@ -460,7 +475,7 @@ const TEMPLATE: {
     seed: 1,
   },
   // 開始時 jumps into 開始時 1P (37, PC 340), the template from + 8, holding
-  // a blank. Round 1 (40, PC 360): 170 ticks of displays unless its rolls
+  // a blank, and player 2's into 開始時 2P (38). Round 1 (40, PC 360): 170 ticks of displays unless its rolls
   // take others (below), its EX check (PC 413), then STAND DEMO (31) once.
   // From round 2 image 116 for 10 ticks (PC 362), STAND DEMO from + 2
   // twice (PC 363), the EX check (PC 364), then STAND DEMO once (PC 365):
@@ -469,6 +484,7 @@ const TEMPLATE: {
     who: 'sakuya',
     start: 36,
     copy: '37+8',
+    twoP: '38+5',
     round1: 40,
     banner: 66,
     image: 0,
@@ -564,7 +580,8 @@ const TEMPLATE: {
     ],
     idle: [351, 351],
   },
-  // 開始時 jumps into 開始時 1P (32, PC 296), the template from + 8. Round 1
+  // 開始時 jumps into 開始時 1P (32, PC 296), the template from + 8, and
+  // player 2's into 開始時 2P (33). Round 1
   // (35, PC 317): 145 ticks of displays, its EX check (PC 357), images 258
   // and 341, then stand demo (28) from + 1. From round 2 image 115 for 10
   // ticks (PC 318), stand demo from + 2 twice (PC 319), the EX check (PC
@@ -574,6 +591,7 @@ const TEMPLATE: {
     who: 'erus',
     start: 31,
     copy: '32+8',
+    twoP: '33+5',
     round1: 35,
     banner: 57,
     image: 116,
@@ -902,6 +920,8 @@ const TEMPLATE: {
       [349, 123],
     ],
     idle: [485, 351],
+    // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 455).
+    twoP: '31+4',
   },
   // Round 1 (36, PC 386): images 183 for 210 ticks, 177, 176 and 175 for
   // 80, 308 ticks in all. From round 2 DEMO stand (30) from + 2 twice (PC
@@ -951,6 +971,8 @@ const TEMPLATE: {
     ],
     idle: [449, 357],
     seed: 2,
+    // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 454).
+    twoP: '32+4',
   },
   // Its global 10 = 10 tests (PCs 277, 294) pass over Single Start. Round 1
   // (39, PC 296): a blank for 50 ticks, images 113 to 115, then DEMO STAND
@@ -1123,6 +1145,8 @@ const TEMPLATE: {
       [349, 4005],
     ],
     idle: [351, 351],
+    // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 593).
+    twoP: '39+4',
   },
   // Round 1 (35, PC 368) jumps back into 開始時 at + 23 (PC 335), where
   // round 2 runs on: image 4001 for 50 more, 4002 to 4005, then Demo Stand
@@ -1149,6 +1173,8 @@ const TEMPLATE: {
       [349, 4005],
     ],
     idle: [351, 351],
+    // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 345).
+    twoP: '32+4',
   },
   // Black (36) and ＺＡ (34, PC 208), whose box sits 20000 below it. Round 1
   // (27, PC 213): a blank for 50 ticks, images 220 to 224 and 169, then his
@@ -1201,6 +1227,9 @@ const TEMPLATE: {
     ],
     idle: [351, 321],
     ends: '27+18',
+    // His HUD face spawns only its display, so player 2 takes the 1P path
+    // as well, crossing to stand facing away.
+    twoP: false,
   },
 ];
 
@@ -1219,31 +1248,38 @@ describe.each(TEMPLATE)(
     ends = round1,
     seed = 0,
     copy = `${start}+9`,
+    twoP = `${start + 1}+5`,
     charges = 1,
   }) => {
-    it('dashes, crosses and stands, then plays its round 1 action', () => {
+    const ones: unknown[] = [
+      [0, banner, 1],
+      [0, `${banner}+9`, 1],
+    ];
+    it('dashes back as player 2 charges in, then plays its round 1 action', () => {
       const match = vsMatch(who, seed);
       const [p1, p2] = match.fighters;
       steps(match, 5);
       expect([p1.branch, p2.branch]).toEqual([start, start]);
-      // The round copy passes in round 1: VS 1P twice, and the dash.
+      // The round copy passes in round 1: VS 1P twice and the dash back, and
+      // 開始時 2P's VS 2P twice and the charge.
       match.step();
-      expect([p1.branch, at(p1), at(p2)]).toEqual([copy, 370, 910]);
+      expect([p1.branch, p2.branch, at(p1)]).toEqual([copy, twoP || copy, 370]);
+      expect(at(p2)).toBeCloseTo(twoP ? 890 - speed(10000) : 910, 6);
       match.step();
-      expect(banners(match, banner)).toEqual([
-        [0, banner, 1],
-        [0, `${banner}+9`, 1],
-        [1, banner, -1],
-        [1, `${banner}+9`, -1],
-      ]);
+      expect(banners(match, banner)).toEqual(
+        twoP
+          ? both(banner)
+          : [...ones, [1, banner, -1], [1, `${banner}+9`, -1]],
+      );
+      // Player 1 stops at the stage's end and walks in; player 2 backs off
+      // to the window's right edge. TRAINING's cross instead, player 2's
+      // banners leaving with him.
       steps(match, 23);
       const cross = 15 * speed(2870);
-      expect(at(p1)).toBeCloseTo(370 + cross, 6);
-      expect(at(p2)).toBeCloseTo(910 - cross, 6);
-      expect(banners(match, banner)).toEqual([
-        [0, banner, 1],
-        [0, `${banner}+9`, 1],
-      ]);
+      const stand = twoP ? 50 + cross : 370 + cross;
+      expect(at(p1)).toBeCloseTo(stand, 6);
+      expect(at(p2)).toBeCloseTo(twoP ? 867 : 910 - cross, 6);
+      expect(banners(match, banner)).toEqual(twoP ? both(banner) : ones);
       steps(match, 70);
       expect(animationFrame(copy, p1.age, who).image).toBe(image);
       match.step();
@@ -1257,7 +1293,8 @@ describe.each(TEMPLATE)(
       expect([named(p1), named(p2)]).toEqual([`${ends}`, `${ends}`]);
       match.step();
       expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
-      expect(at(p1)).toBeCloseTo(370 + cross + walk, 6);
+      // The window's left edge, scroll 352 + 50, stops a step back.
+      expect(at(p1)).toBeCloseTo(walk ? 352 + 50 + walk : stand, 6);
       while (match.roundTicks < FIGHT_TICK - 1) match.step();
       expect(match.fighters.map((f) => [f.stock, f.power])).toEqual([
         [0, 0],
@@ -1271,19 +1308,21 @@ describe.each(TEMPLATE)(
       match.fighters[1].hp = 0;
       while (match.round === 1) match.step();
       const [p1, p2] = match.fighters;
+      const start2 = twoP ? base(twoP) : start;
       steps(match, 6);
-      expect([p1.branch, at(p1), at(p2), banners(match, banner)]).toEqual([
+      expect([p1.branch, p2.branch, at(p1), banners(match, banner)]).toEqual([
         start,
+        start2,
         370,
-        910,
         [],
       ]);
+      expect(at(p2)).toBeCloseTo(twoP ? 890 - speed(10000) : 910, 6);
       const ages: [number, number][] = [[29, 0], [30, image], ...demo];
       expect(
         ages.map(([age]) => [age, animationFrame(start, age, who).image]),
       ).toEqual(ages);
       steps(match, idle[1] - 7);
-      expect([p1.branch, p2.branch]).toEqual([start, start]);
+      expect([p1.branch, p2.branch]).toEqual([start, start2]);
       match.step();
       expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
     });
@@ -1291,7 +1330,8 @@ describe.each(TEMPLATE)(
 );
 
 // MASA's PCs; 3-TIMES's 開始時 is the same at PCs 268, 271, 315, 316, 319,
-// 270, 276, 279, 280, 668, 292, 389, 313 and 294.
+// 270, 276, 279, 280, 668, 292, 389, 313 and 294, and its 開始時 2P and OP
+// Alpha at PCs 331, 333, 344 and 391.
 describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
   // 開始時 spawns itself from + 7 (PC 349), whose global 3 = 50 test takes
   // 開始時 D50 (47, PC 352): in round 1 it sets variable 0 to 10 (PC 400),
@@ -1334,31 +1374,39 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
     const [p1, p2] = match.fighters;
     steps(match, 4);
     expect([p1.variables[0], p1.variables[14] ?? 0]).toEqual([10, 0]);
+    // Player 2's 開始時 2P (49) clears variable 2 and sets it again (PCs
+    // 415, 417), spawns VS 2P twice (PCs 421–422), the first taking VS
+    // Alpha's second half, charges in and rejoins 開始時 1P at + 12 (PC
+    // 428), whose OP's OP Alpha tests variable 2 (PC 475) into OP Zenka 2P
+    // (57).
     steps(match, 2);
-    expect([named(p1), at(p1), at(p2)]).toEqual(['46', 370, 910]);
+    expect([named(p1), named(p2), at(p1)]).toEqual(['46', '49+7', 370]);
+    expect(at(p2)).toBeCloseTo(890 - speed(10000), 6);
     match.step();
     expect(
       match.effects
-        .filter((e) => e.clip === 88 || e.clip === '86+12')
+        .filter((e) =>
+          [88, '86+12', '88+12', '87+12'].includes(e.clip as never),
+        )
         .map((e) => [e.owner, e.clip]),
     ).toEqual([
       [0, 88],
       [0, '86+12'],
-      [1, 88],
-      [1, '86+12'],
+      [1, '88+12'],
+      [1, '87+12'],
     ]);
     steps(match, 94);
-    expect([named(p1), named(p2)]).toEqual(['53', '53']);
+    expect([named(p1), named(p2)]).toEqual(['53', '57']);
     // OP super Charge takes VS CHARGE for global 3 > 40 (PC 653).
     match.step();
     expect(
       match.effects.filter((e) => e.clip === 70).map((e) => e.owner),
     ).toEqual([0, 1]);
     steps(match, 248);
-    expect([named(p1), named(p2)]).toEqual(['53', '53']);
+    expect([named(p1), named(p2)]).toEqual(['53', '57']);
     match.step();
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
-    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
+    expect([at(p1), at(p2)]).toEqual([50 + 15 * speed(2870), 867]);
   });
 
   // From round 2 開始時 D50 skips its sets (PC 394) and 開始時 1P its
@@ -1371,8 +1419,8 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
     while (match.round === 1) match.step();
     const [p1, p2] = match.fighters;
     steps(match, 6);
-    expect([p1.branch, at(p1), at(p2), p1.variables[0] ?? 0]).toEqual([
-      44, 370, 910, 0,
+    expect([p1.branch, p2.branch, at(p1), p1.variables[0] ?? 0]).toEqual([
+      44, 49, 370, 0,
     ]);
     const ages: [number, number][] = [
       [29, 0],
@@ -1390,7 +1438,7 @@ describe.each(['masa', 'times'] as const)("%s's VS 開始時 (44)", (who) => {
       ages.map(([age]) => [age, animationFrame(44, age, who).image]),
     ).toEqual(ages);
     steps(match, 344);
-    expect([p1.branch, p2.branch]).toEqual([44, 44]);
+    expect([p1.branch, p2.branch]).toEqual([44, 49]);
     match.step();
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
   });
@@ -1654,7 +1702,7 @@ describe("DIDO's Round 1 roll", () => {
     expect([named(p1), named(p2)]).toEqual(['44+26', '34']);
     steps(match, 10);
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
-    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
+    expect(at(p1)).toBeCloseTo(50 + 15 * speed(2870), 6);
   });
 });
 
@@ -1920,7 +1968,7 @@ describe("ALPHA's Round 1 rolls", () => {
     expect(p1.action).toBe('script');
     match.step();
     expect(p1.action).toBe('idle');
-    expect(at(p1)).toBeCloseTo(370 + 15 * speed(2870), 6);
+    expect(at(p1)).toBeCloseTo(50 + 15 * speed(2870), 6);
   });
 
   it("passes over the set for seed 4's player 1, whose player 2 takes OP2", () => {
