@@ -247,3 +247,26 @@ it('opens every VS multi round with the VS splash, and between rounds slides VS 
     [2, 150, [12]],
   ]);
 });
+
+it('slides VS L and VS R in after the last round too, then ends the match (states 900, 902)', () => {
+  const match = Match.team(
+    [
+      ['ryuko', 'zoma', 'kiki'],
+      ['zoma', 'kiki', 'chung'],
+    ],
+    'court',
+  );
+  const heard: number[][] = [];
+  while (!match.resultReady) {
+    if (match.roundTicks === FIGHT_TICK) match.fighters[1].hp = 0;
+    match.step();
+    if (match.winner && letteringSounds(match).includes(12))
+      heard.push([match.round, match.endingTicks - match.roundEnd]);
+  }
+  expect(heard).toEqual([
+    [1, 23],
+    [2, 23],
+    [3, 23],
+  ]);
+  expect(match.endingTicks - match.roundEnd).toBe(NEXT_ROUND_TICKS);
+});

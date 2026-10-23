@@ -53,7 +53,7 @@ export const FIGHT_TICK = DRESS_TICK + calls.rounds[0].wait;
 // PERFECT (27) and wait it out the tick after; a draw or double KO waits out
 // DRAW or DOUBLE KO (32, 33). The tick after, state 900 (0x4096c0) spawns the
 // transition (KGT 14), and when its wait runs out state 902 returns to round
-// setup (state 100) for the next tick.
+// setup (state 100) for the next tick, or ends the match.
 export function roundEndTick(winner: Match['winner'], perfect: boolean) {
   const { win, perfect: bonus, draw } = calls.results;
   if (winner === 'draw') return draw + 1;
@@ -92,8 +92,9 @@ export const koFrame = (age: number) => letteringFrame(ko, age);
 // and 'SHOW TIME', which a story step shows by its letterings' bits 0 and 1
 // (0x408d4b, 0x408dde); then every result's KO lettering (26, or 32 and 33,
 // which jump to it), a story's YOU WIN or YOU LOSE (28, 29) in its place,
-// and before another round 14's logo wipe back in (116), or VS multi's VS L
-// and VS R sliding in (120, 121). A match lasts at most five rounds.
+// and after it 14's logo wipe back in (116), or VS multi's VS L and VS R
+// sliding in (120, 121), the last round's too. A match lasts at most five
+// rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
   const opening = match.vs
@@ -122,7 +123,7 @@ function letterings(match: Match): [Lettering, number][] {
         : ko,
       match.endingTicks,
     ]);
-  if (match.winner && !match.matchOver)
+  if (match.winner && match.calls)
     for (const lettering of match.teams ? calls.vs.team : [calls.transition])
       shown.push([lettering, match.endingTicks - match.roundEnd]);
   return shown;

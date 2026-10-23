@@ -1885,9 +1885,9 @@ export class Match {
     return a && b ? 'draw' : a ? 'player' : b ? 'opponent' : null;
   }
 
-  // Ticks after the KO until the transition to another round, or the match's
-  // end: authored, the port ends where the source wipes to its post-match
-  // screen, and a single round after the KO lettering and one more second.
+  // Ticks after the KO until the transition (state 900, 0x4096c0) to another
+  // round or the match's end; free practice's single round is authored: the
+  // KO lettering and one more second.
   get roundEnd() {
     if (!this.calls) return ROUND_END_TICKS;
     if (this.battle) return storyEndTick(this.winner);
@@ -2041,14 +2041,22 @@ export class Match {
   }
 
   get resultReady() {
-    // Authored: after the lettering, wait for each fighter to take its result
-    // or lie KO'd, as moves now run on past the round's end; a KO timeline
-    // (KO_TIMELINES) once it stops moving on the floor: ZIRO's in ko DOWN3,
-    // or standing in Random lose; or vanished there in make hikari. A victim
-    // its settled holder still holds (+0x40 at -1) or shocks never takes it.
+    // State 902 (0x40970a) ends a match as it would start another round,
+    // once the transition's wait runs out, however the fighters stand.
+    if (this.calls)
+      return (
+        this.winner !== null &&
+        this.matchOver &&
+        this.endingTicks >= this.roundEnd + NEXT_ROUND_TICKS
+      );
+    // Authored: free practice waits after the lettering for each fighter to
+    // take its result or lie KO'd, as moves now run on past the round's end;
+    // a KO timeline (KO_TIMELINES) once it stops moving on the floor: ZIRO's
+    // in ko DOWN3, or standing in Random lose; or vanished there in make
+    // hikari. A victim its settled holder still holds (+0x40 at -1) or
+    // shocks never takes it.
     return (
       this.winner !== null &&
-      this.matchOver &&
       this.endingTicks >= this.roundEnd &&
       this.fighters.every(
         (f) =>

@@ -768,7 +768,8 @@ describe('recovered neutral and round animations', () => {
         matchOver: true,
         matchWinner: 'player',
       });
-      ticks(match, 651);
+      // A PERFECT again, then the transition, as between rounds.
+      ticks(match, 652 + 50);
       expect(match.resultReady).toBe(false);
       match.step();
       expect(match.resultReady).toBe(true);
