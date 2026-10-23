@@ -371,7 +371,63 @@ describe('VS multi (TEAM VS)', () => {
       'court',
     );
     expect(branches(team, 400)).toEqual([30, '30+9', 34, null]);
+    // The member that won stays, marked by its Team VS 1P (below), so Team
+    // VS Start jumps to Skill4 (36), past the entrance.
     finish(team, 1);
-    expect(branches(team, 400)).toEqual([30, '30+9', 34, null]);
+    expect(branches(team, 400)).toEqual([30, '30+9', 36, null]);
+  });
+
+  it("carries the winner's life into the next round in fifths, and skips its entrance (Team VS 1P/2P, Skill4)", () => {
+    // Round 1's winner at this life, against a loser on that side.
+    const next = (life: number, loser: number) => {
+      const match = Match.team(
+        [
+          ['ryuko', 'zoma', 'kiki'],
+          ['ryuko', 'amiro', 'anmc'],
+        ],
+        'court',
+      );
+      fight(match);
+      match.fighters[1 - loser].hp = life;
+      match.fighters[loser].hp = 0;
+      const global = 8 + (1 - loser);
+      // 1P or 2P WIN sets its side's global 1 the tick after KO's 240-tick
+      // wait; the winner's Team VS 1P or 2P (44 + 4, 49 + 5) finds it and
+      // writes its life's level there.
+      const set: number[] = [];
+      while (match.round === 1) {
+        match.step();
+        const value = match.globals[global] ?? 0;
+        if (value !== (set.at(-2) ?? 0)) set.push(value, match.endingTicks);
+      }
+      expect(set.slice(0, 2)).toEqual([1, 241]);
+      const winner = () => match.fighters[1 - loser];
+      const lives = [];
+      while (match.roundTicks < 4) {
+        match.step();
+        lives.push(winner().hp);
+      }
+      const seen = new Set<Fighter['branch']>();
+      while (match.roundTicks < 101) {
+        match.step();
+        seen.add(winner().branch);
+      }
+      // Skill4 clears both globals and the mark.
+      expect(seen.has(36)).toBe(true);
+      expect([match.globals[8], match.globals[9]]).toEqual([0, 0]);
+      expect(winner().variables[15]).toBe(0);
+      // The loser's next member, Amiro or Zoma, enters at full life.
+      return [lives[2], lives[3], match.fighters[loser].hp];
+    };
+    // Above 408 (four fifths of 510) it keeps its full life; at or below
+    // 408, 306 or 204 it enters with 102, 204 or 306 less (Team VS 1P 400,
+    // 300, 200: 46 + 5, 47 + 5, 48 + 4), so even 1 comes back as 204.
+    expect(next(510, 1)).toEqual([LIFE, LIFE, 470]);
+    expect(next(409, 1)).toEqual([LIFE, LIFE, 470]);
+    expect(next(408, 1)).toEqual([LIFE, 408, 470]);
+    expect(next(306, 1)).toEqual([LIFE, 306, 470]);
+    expect(next(204, 1)).toEqual([LIFE, 204, 470]);
+    expect(next(1, 1)).toEqual([LIFE, 204, 470]);
+    expect(next(300, 0)).toEqual([LIFE, 306, 490]);
   });
 });

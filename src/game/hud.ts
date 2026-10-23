@@ -60,6 +60,8 @@ export function roundEndTick(winner: Match['winner'], perfect: boolean) {
   return ko.wait + win + (perfect ? bonus + 1 : 0) + 1;
 }
 export const NEXT_ROUND_TICKS = calls.transition.wait + 1;
+// A win's 1P or 2P WIN spawns as KO's wait runs out.
+export const WIN_TICK = ko.wait;
 
 // A story's result states (410, 420, 430; 0x4091fc–0x40933d) wait out YOU
 // WIN, YOU LOSE or DRAW (28, 29, 32) alone.

@@ -64,6 +64,7 @@ import {
   ROUND_END_TICKS,
   storyEndTick,
   storyFightTick,
+  WIN_TICK,
 } from './hud';
 import { ROSTER, takePalette } from './select';
 import type { Battle, Slot } from './story';
@@ -1881,7 +1882,8 @@ export class Match {
   // sixth (PC 289), so player 2 enters 開始時 2P. SWW's sets 13, ALPHA's
   // 12 as well, and Z-MEGA's sets 2 again every 5 ticks. In TEAM VS (global
   // 3 above 99, PC 732) it enters Team VS 1P or 2P (44, 49) from the start,
-  // which spawns the check of the round's winner (44 + 4, 49 + 5) as well.
+  // which spawns its side's checker (44 + 4, 49 + 5): it reads the round's
+  // winner's life from global 8 or 9 (see the result's 1P and 2P WIN).
   // ponytail: the match runs no 通常立ち, whose clears (Ryuko's PCs 3–8)
   // would end the mark outside a VS 開始時 at once; until a move clears it,
   // player 2's DoraEmon passes SP1 6LP's and SP2 6LK's tests (PCs 3137,
@@ -1947,7 +1949,8 @@ export class Match {
   // and power: as many as the other side's wins. The life, power and stock
   // it saves of the winner (0x4097ab) are never restored, as round setup
   // clears whose they are (0x4089e6) before the players' set-up reads it
-  // (0x4120ce). Every set-up clears its CPU's state (0x411f82).
+  // (0x4120ce); the winner's own Team VS objects carry its life instead
+  // (spawnFaces). Every set-up clears its CPU's state (0x411f82).
   // Authored: player 2's CPU plays the new member's table, rolling on.
   private nextRound() {
     for (const vm of this.cpus) vm?.reset();
@@ -4448,6 +4451,20 @@ export class Match {
     // Applied after both steps, so a double KO holds once.
     for (const f of this.fighters) this.pause(f, this.koStop);
     this.stepObjects(objects);
+    // The Vs. result states spawn 1P or 2P WIN (KGT 30, 31; 0x4094ad,
+    // 0x409582), whose first step, at 0x65, sets global 8 or 9 to 1 (KGT PCs
+    // 251, 254), for the TEAM VS winner's objects to carry its life.
+    // ponytail: a match starts with its globals clear, where only Skill4
+    // (and TRAINING's Team VS Start) clears 8 and 9, so a round won in an
+    // earlier match marks a TEAM VS match's first members; carry them over
+    // as `held` is if that matters.
+    if (
+      this.calls &&
+      !this.battle &&
+      this.endingTicks === WIN_TICK + 1 &&
+      (this.winner === 'player' || this.winner === 'opponent')
+    )
+      this.globals[this.winner === 'player' ? 8 : 9] = 1;
     // The round controller (type 0xe, 0x4086a0) steps last, at priority
     // 0x7f: its fight state reads the lives after every step (0x408e90), so
     // a lose action that restores life on its first step (ALPHA's KO Boss,
