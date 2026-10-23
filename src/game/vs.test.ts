@@ -164,6 +164,15 @@ describe("Ryuko's VS 開始時 (30)", () => {
     const other = new Match('cpu', true, 0, ['zoma', 'dora'], 'court', true);
     expect(other.fighters.map((f) => f.action)).toEqual(['script', 'intro']);
   });
+
+  it("ends player 2's mark as DoraEmon's intro runs out into 通常立ち, which clears it (PC 6)", () => {
+    const match = vsMatch('dora');
+    const p2 = match.fighters[1];
+    steps(match, 3);
+    expect(p2.variables[2]).toBe(1);
+    while (p2.action === 'intro') match.step();
+    expect([p2.action, p2.variables[2]]).toEqual(['idle', 0]);
+  });
 });
 
 // The 開始時 the other fighters share with Ryuko's: VS 1P twice, the dash

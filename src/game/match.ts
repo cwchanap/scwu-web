@@ -1884,10 +1884,8 @@ export class Match {
   // 3 above 99, PC 732) it enters Team VS 1P or 2P (44, 49) from the start,
   // which spawns its side's checker (44 + 4, 49 + 5): it reads the round's
   // winner's life from global 8 or 9 (see the result's 1P and 2P WIN).
-  // ponytail: the match runs no 通常立ち, whose clears (Ryuko's PCs 3–8)
-  // would end the mark outside a VS 開始時 at once; until a move clears it,
-  // player 2's DoraEmon passes SP1 6LP's and SP2 6LK's tests (PCs 3137,
-  // 3189). A story makes none: its 1P face takes its point from another
+  // Where a 開始時 leaves the mark, 通常立ち's clears (Ryuko's PCs 2–8,
+  // which its idle clip's first frame carries) end it. A story makes none: its 1P face takes its point from another
   // table (0x40a098), and at x 31 the object acts only on its global 3 tests
   // (SWW's sets variable 12 above 1).
   private spawnFaces() {
