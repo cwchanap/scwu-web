@@ -347,19 +347,11 @@ export function createHud(
   const stocks = [image(17, 49, 434), image(17, 545, 434)];
   // The timer (0x40a7ec) shows the round timer, which starts at its seconds
   // × 100 − 1 (0x408a7e, 0x408c26), over 100: one less than `seconds`. Its
-  // one, two or three digits sit 20 apart, centred on 320.
+  // one, two or three digits sit 20 apart, centred on 320. With no time
+  // (−1) it spawns KGT 34 at its anchor (KGT 71: 310, 16; 0x40a6d2), which
+  // shows nothing (image 1000) but spawns 'num 0' (113) on it, the 0 digit
+  // (image 47) over the TIME box (109, z 0x14) at z 0x19.
   const digits = [0, 1, 2].map(() => image(47, 310, 16));
-  const infinity = scene.add
-    .text(320 * scale, 27 * scale, '∞', {
-      fontFamily: 'Arial',
-      fontSize: '45px',
-      color: '#bbf0ff',
-      stroke: '#10283b',
-      strokeThickness: 3,
-    })
-    .setScrollFactor(0)
-    .setOrigin(0.5)
-    .setDepth(101);
   // Four at once: the VS splash's VS L, VS R, V and S.
   const shown = [0, 1, 2, 3].map(() =>
     image(97, 0, 0).setDepth(110).setVisible(false),
@@ -415,17 +407,17 @@ export function createHud(
           .setPosition((marks[index][i] + won) * scale, (40 + won) * scale);
       }),
     );
-    const finite = Number.isFinite(match.seconds);
-    const value = String(Math.max(0, match.seconds - 1));
+    const value = Number.isFinite(match.seconds)
+      ? String(Math.max(0, match.seconds - 1))
+      : '0';
     digits.forEach((digit, i) => {
-      const shown = finite && i < value.length;
+      const shown = i < value.length;
       digit.setVisible(shown);
       if (shown)
         digit
           .setTexture(`ui-${47 + Number(value[i]) * 5}`)
           .setX((310 + 20 * i - 10 * (value.length - 1)) * scale);
     });
-    infinity.setVisible(!finite);
     // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds, 4 fades
     // by r[5] of 32, after its offsets tint the image: KO's blue, V's and
     // S's flash (PCs 916–922). KGT 13's objects draw by their z among the
