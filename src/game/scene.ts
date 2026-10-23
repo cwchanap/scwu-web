@@ -16,7 +16,7 @@ import {
 import type { Demo, SelectObject } from './select';
 import { Story } from './story';
 import type { Battle, Next } from './story';
-import { createHud, letteringSounds } from './hud';
+import { createHud, letteringSounds, screenDepth } from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
@@ -102,7 +102,7 @@ const TRACK_SECONDS = 5;
 // background (304, z 49).
 const worldDepth = (z: number, slot: number) => 1 + (z + slot / 4) / 1000;
 const effectDepth = (e: Effect) =>
-  e.screen ? (e.z >= FIGHTER_Z ? 5 : 0.6) + e.z / 1000 : worldDepth(e.z, 2);
+  e.screen ? screenDepth(e.z) : worldDepth(e.z, 2);
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,

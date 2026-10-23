@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import { lifeOf, perStockOf } from './characters';
 import type { Who } from './characters';
-import { LIFE, ROUNDS_TO_WIN } from './match';
+import { FIGHTER_Z, LIFE, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -275,6 +275,12 @@ const STOCK_OFFSETS = [
   [-2, -1],
 ];
 
+// The draw walks the priority lists lowest first (0x404df1). scene.ts draws
+// world objects at 1–1.2, so a viewport object below the fighters' priority
+// sits over the court under them all, and one from it over them all, by its z
+// within either band.
+export const screenDepth = (z: number) => (z >= FIGHTER_Z ? 5 : 0.6) + z / 1000;
+
 // `tint` makes a texture with op 0x23's colour offsets (scene.ts).
 export function createHud(
   scene: Phaser.Scene,
@@ -283,18 +289,22 @@ export function createHud(
   // SCWU.KGT actions 60, 71–77, 103, 106–112 use a 640 × 480 screen.
   // Keep the recovered screen positions and pixels at a uniform 1.5× scale.
   const scale = 1.5;
-  const image = (index: number, x: number, y: number) =>
+  // The layouts (KGT 57–68) and the HUD's own objects spawn at 0x65
+  // (0x406722, 0x409de1–0x40a73f), over the fighters; the layouts' children
+  // take their spawns' z (op 0x04 flags 2, 0x412b91), under them. Within a z,
+  // a later spawn draws later.
+  const image = (index: number, x: number, y: number, z = 0x65) =>
     scene.add
       .image(x * scale, y * scale, `ui-${index}`)
       .setScrollFactor(0)
       .setOrigin(0)
       .setScale(scale)
-      .setDepth(100);
-  // KGT 63–68 lay the bars out by priority (PCs 402–417): the backing (106,
+      .setDepth(screenDepth(z));
+  // KGT 62–68 lay the bars out by priority (PCs 399–417): the backing (106,
   // z 0x12), averaged with the screen (op 0x23 mode 1, PC 725), UNDER PW
-  // (104/105, 0x13), the frame (103, 0x14), and the life bars (107/108,
-  // 0x15) on top.
-  image(25, 22, 20).setAlpha(0.5);
+  // (104/105, 0x13), the TIME box (109, 0x14), averaged too (PC 737), the
+  // frame (103, 0x14), and the life bars (107/108, 0x15) on top.
+  image(25, 22, 20, 0x12).setAlpha(0.5);
   // UNDER PW adds image 135 (mode 2) at 202, or mirrored at 364, its colours
   // raised 10 every other 15 ticks (PCs 713–716, 719–722). Under the bars,
   // it shows where a bar's inner 74 pixels have drained, below 29% life.
@@ -302,16 +312,20 @@ export function createHud(
   // children keep (0x412c0a) and draws whole (0x40de7f), so with no enemy
   // the 2P strip stays lit, its bar gone.
   const underPower = [
-    image(135, 202, 20),
-    image(135, 364, 20).setFlipX(true),
+    image(135, 202, 20, 0x13),
+    image(135, 364, 20, 0x13).setFlipX(true),
   ].map((bar) => bar.setBlendMode('ADD'));
-  image(24, 10, 5);
-  const life = [image(27, 22, 20), image(28, 364, 20)];
-  image(39, 292, 13);
-  image(40, 31, 37);
-  image(41, 472, 37);
+  image(39, 292, 13, 0x14).setAlpha(0.5);
+  image(24, 10, 5, 0x14);
+  const life = [image(27, 22, 20, 0x15), image(28, 364, 20, 0x15)];
+  // The face strips (110/111, 0x19) add (mode 2) over the faces, dimmed 0,
+  // 5, 10, 15, 20, 15, 10 and 5 for 10 ticks each (PCs 741–756, 759–774).
+  const strips = [image(40, 31, 37, 0x19), image(41, 472, 37, 0x19)].map(
+    (strip) => strip.setBlendMode('ADD'),
+  );
   // The faces' display offsets put each image's top-left corner on the
-  // anchor; mirrored, the top-right one, at 609.
+  // anchor; mirrored, the top-right one, at 609. Each face action spawns its
+  // faces at z 0x14 (op 0x04 flags 0x66: Ryuko's 70, PC 707), after the frame.
   const faces = [31, 539].map((x) =>
     scene.add
       .image(x * scale, 36 * scale, 'ryuko-2001')
@@ -319,28 +333,30 @@ export function createHud(
       .setOrigin(0)
       .setScale(scale)
       .setFlipX(x > 320)
-      .setDepth(101),
+      .setDepth(screenDepth(0x14)),
   );
-  // Name placement is authored; portrait anchors above come from actions 72/73.
+  // Name placement is authored, over the strips; portrait anchors above come
+  // from actions 72/73.
   const names = [106, 474].map((x) =>
     scene.add
       .image(x * scale, 38 * scale, 'ryuko-464')
       .setScrollFactor(0)
       .setOrigin(0)
       .setScale(scale * 0.7)
-      .setDepth(101),
+      .setDepth(screenDepth(0x19)),
   );
   // Type 13 (0x409d82) lines up a mark per round to win from the KGT 76/77
   // headers: 1P from (240, 40) stepping −35, 2P from (370, 40) stepping 35.
   // Each shows KGT 56 (112: image 30) until that round is won, when state 1
-  // (0x40a584) switches the next to 55 (112 + 4: image 29 at +1, +1).
+  // (0x40a584) switches the next to 55 (112 + 4: image 29 at +1, +1), at
+  // z 0x19 (op 0x04 flags 0x22, PCs 347, 350).
   const marks = [-35, 35].map((step, side) =>
     Array.from(
       { length: ROUNDS_TO_WIN },
       (_, i) => (side ? 370 : 240) + step * i,
     ),
   );
-  const wins = marks.map((xs) => xs.map((x) => image(30, x, 40)));
+  const wins = marks.map((xs) => xs.map((x) => image(30, x, 40, 0x19)));
   image(26, 30, 443);
   const gauges = [image(31, 99, 443), image(31, 414, 443).setFlipX(true)];
   // Stock anchors come from KGT actions 74/75.
@@ -397,6 +413,12 @@ export function createHud(
       names[index].setVisible(name !== null);
       if (name !== null) names[index].setTexture(`${f.who}-${name}`);
     });
+    const dim = [0, -5, -10, -15, -20, -15, -10, -5][
+      Math.floor(match.ticks / 10) % 8
+    ];
+    strips.forEach((strip, index) =>
+      strip.setTexture(tint(`ui-${40 + index}`, { r: dim, g: dim, b: dim })),
+    );
     // A mark per round to win (0x470048).
     wins.forEach((side, index) =>
       side.forEach((mark, i) => {
@@ -416,13 +438,13 @@ export function createHud(
       if (shown)
         digit
           .setTexture(`ui-${47 + Number(value[i]) * 5}`)
-          .setX((310 + 20 * i - 10 * (value.length - 1)) * scale);
+          .setX((310 + 20 * i - 10 * (value.length - 1)) * scale)
+          .setDepth(screenDepth(Number.isFinite(match.seconds) ? 0x65 : 0x19));
     });
     // Blitters by op 0x23 mode: 1 averages with the screen, 2 adds, 4 fades
     // by r[5] of 32, after its offsets tint the image: KO's blue, V's and
     // S's flash (PCs 916–922). KGT 13's objects draw by their z among the
-    // screen objects (scene.ts's effectDepth), under the fighters' VS 1P
-    // banners.
+    // screen objects, over the HUD and under the fighters' VS 1P banners.
     const current = letterings(match).flatMap(([lettering, age]) => {
       const frame = letteringFrame(lettering, age);
       return frame ? [{ ...frame, z: lettering.z }] : [];
@@ -442,7 +464,7 @@ export function createHud(
               : `ui-${frame.image}`,
           )
           .setPosition(frame.dx * scale, frame.dy * scale)
-          .setDepth(frame.z === undefined ? 110 : 5 + frame.z / 1000)
+          .setDepth(frame.z === undefined ? 110 : screenDepth(frame.z))
           .setBlendMode(frame.mode === 2 ? 'ADD' : 'NORMAL')
           .setAlpha(
             frame.mode === 1
