@@ -34,6 +34,11 @@ def u16(record, offset):
     return struct.unpack_from("<H", record, offset)[0]
 
 
+# The op 0x1f globals (0x4456b0) the match keeps beside 3 and 6 (0x80 up): 15, which KGT 13 clears each round
+# (PC 69), isn't one.
+GLOBALS = (0x80, 0x81, 0x82, 0x84, 0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8e)
+
+
 def decode_event(record):
     """Decode the gameplay-relevant opcodes a super timeline needs; None skips one."""
     op = record[0]
@@ -90,10 +95,11 @@ def decode_event(record):
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
     # hounds) and 15 (a TEAM VS winner's mark, which its Team VS Start tests, as SEAN's cc hit
-    # does) and globals 0 (10 sends a KO to make hikari), 5 (MASA's and 3-TIMES's VS openings), 6
-    # (the freeze), 8 and 9 (a TEAM VS winner's life, 1P's and 2P's), 10 (ALPHA's KO Boss), 11 (10
-    # or above 99 turns the stage's track off) and 14 (200 stops it, which each 開始時 BR tests
-    # for 0); other tests keep their fall-through path.
+    # does) and globals 0 (10 sends a KO to make hikari), 1, 2 and 4 (below), 3 (0 takes each 開始時
+    # BR, above 0 the ZA hits), 5 (MASA's and 3-TIMES's VS openings), 6 (the freeze), 8 and 9 (a TEAM
+    # VS winner's life, 1P's and 2P's), 10 (10, as story's select screen leaves it, takes each
+    # 開始時's and stage object's story path), 11 (10 or above 99 turns the stage's track off) and 14
+    # (200 stops it, which each 開始時 BR tests for 0); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -111,19 +117,18 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
-                                                                              0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x80, 0x83, 0x86,
-                                                                              0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8e):
-        # Only ALPHA's KO writes global 10 (10000, 20000; PCs 1040, 1130), and the select screen's 2P
-        # cursor 0 (KGT PCs 542, 590), so its 257 tests for 10 never pass and keep their fall-through.
-        if record[4] == 0x8a and record[5] >> 2 & 3 == 1 and s16(record, 9) == 10:
-            return None
+                                                                              0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x83, 0x86,
+                                                                              *GLOBALS):
         return test_event(record)
-    # Global 0 = r[7:9] (at 10 a KO enters make hikari), 5 (in VS, 12, 13, 14 or 15 from the SP BGM actions of
-    # Boss Base, ZM Office, ZM Office T2 and BR Boss Base), 8 and 9 (the Team VS objects' life levels, which
-    # Skill4 clears), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's 開始時 set 10, their OPs 100) and 14
-    # (SIN's, KAY's and DIDO's supers hold 200, then clear it).
-    if op == 0x1f and record[4] in (0x80, 0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8e) and record[5] == 1:
-        return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7))
+    # Global r[4] & 0x3f = (1) or += (2) r[7:9], clamped to ±30000 (0x4138f0): 0 (at 10 a KO enters make hikari),
+    # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai
+    # at 1 = 1000, PCs 443, 442, and ZAKU's BR its round by 4, PCs 316–319), 5 (in VS, 12, 13, 14 or 15 from the
+    # SP BGM actions of Boss Base, ZM Office, ZM Office T2 and BR Boss Base), 8 and 9 (the Team VS objects' life
+    # levels, which Skill4 clears), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's 開始時 set 10, their OPs 100) and
+    # 14 (SIN's, KAY's and DIDO's supers hold 200, then clear it).
+    if op == 0x1f and record[4] in GLOBALS and record[5] in (1, 2):
+        return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7),
+                    **({"add": True} if record[5] == 2 else {}))
     if op == 0x1f and record[4] == 0x86 and record[5] in (1, 2):  # global 6 (0x4456bc) = (1) or += (2) r[7:9], the freeze
         return dict(op="freeze", add=s16(record, 7), **({"set": True} if record[5] == 1 else {}))
     if op == 0x1f and record[4] >> 6 == 1 and record[5] == 1:  # player variable r[4] & 0x3f = r[7:9]
@@ -377,7 +382,7 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                     known[record[4] & 0x3f] = s16(record, 7)
                 else:
                     known.pop(record[4] & 0x3f, None)
-            event = decode_event(record)
+            event = audible(c, decode_event(record))
             # A call's op 0x16 and 0x24 checks branch as its caller's do where their target's
             # run-out finds no call to return into and ends the action (0x4126de): in the caller's
             # last call, whose return runs the caller out (0x4125ea), as GIGI's Ranbu start calls
@@ -587,6 +592,12 @@ def scenario(data, at):
     return steps
 
 
+def audible(c, event):
+    """The event, or None for a sound past the container's: the loader sizes the table to their count
+    (0x403846), so ZAKU's DEMO air's cue of his 62 of 23 (PC 271) reads beyond it. Authored: none plays."""
+    return None if event and event["op"] == "sound" and event["index"] >= len(c.sounds) else event
+
+
 def jump_target(record):
     """The (action, offset) an op 0x09, 0x0a, 0x0b, 0x16, 0x1f, 0x20 or 0x24 may enter, decoded or not."""
     event = decode_event(record) or {}
@@ -661,7 +672,7 @@ def pose_clips(p, c, actions, image_ids):
             # display's age: TRAINING's (PC 24).
             elif (p.records[pc][0] in (0x03, 0x04, 0x0e, 0x1e, 0x1f, 0x25) or p.records[pc][0] == 0x15
                   and name == "idle") and pc >= action.start + offset:
-                event = decode_event(p.records[pc])
+                event = audible(c, decode_event(p.records[pc]))
                 if event and (event["op"] in POSE_EVENTS or event["op"] == "power"):
                     events.append(event)
             elif p.records[pc][0] == 12 and pc >= action.start + offset:
@@ -4058,8 +4069,10 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 sys.exit(f"{source[0]}'s {name} enters a reaction past a display; refusing to export.")
     # The idle program's cues too: GIGI's sound 8 (PC 24).
     idle = p.action(1)
-    sounds = export_sounds(c, key, cued(clips, scripts) | {u16(r, 2) for r in p.records[idle.start:idle.end]
-                                                         if r[0] == 0x03})
+    # An empty sound (type 0) stops every sound (0x4034e0), as the scene plays any it lacks: TRAINING's
+    # 開始時 ERROR cues his sound 0 (PC 256).
+    sounds = export_sounds(c, key, {i for i in cued(clips, scripts) | {u16(r, 2) for r in p.records[idle.start:idle.end]
+                                                                     if r[0] == 0x03} if c.sounds[i]["size"]})
     select = select_program(p, tables["selectFace"], image_ids)
     images = export_images(c, key, image_ids)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
@@ -4303,13 +4316,13 @@ def export_sounds(c, prefix, indices):
     return sounds
 
 
-def kgt_timeline(p, action):
-    """A KGT lettering's displays, following op 0x0a jumps until op 0x05 or its end: each
+def kgt_timeline(p, action, offset=0):
+    """A KGT lettering's displays from `offset`, following op 0x0a jumps until op 0x05 or its end: each
     with the op 0x23 blit mode (and mode 4's fade, r[5]) and colour offsets (r[2:5]) in force and the op 0x03
     sounds just before it, and the
     header's r[1:3], the wait the round manager counts for it (0x4068e0). A jump
     back to a record already run ends it, with `loop` the frame it repeats from."""
-    current, pc = action, p.action(action).start
+    current, pc = action, p.action(action).start + offset
     frames, sounds, mode, fade, tint, seen, loop = [], [], 0, 0, [0, 0, 0], {}, None
     for _ in range(1000):
         if pc >= p.action(current).end or p.records[pc][0] == 0x05:
@@ -4367,17 +4380,19 @@ def export_ui():
     # ticks and its wipe; each at its spawn record's place (r[8:12]) and z (r[13]). Their op 0x1f
     # loops wait on global 15 = 10, which 13 clears (PC 69). 13's own displays only repeat them: the
     # halves joined (199) is VS L's and VS R's images where they stand, for 50 of their 150 still
-    # ticks, and the logo (182) is demo black's first, held 10 of its 50.
-    def spawned(pc):
+    # ticks, and the logo (182) is demo black's first, held 10 of its 50. At global 10 = 10, as a
+    # story's select screen leaves it, 13 takes demo black in every round (PC 71), which skips its
+    # first 70 ticks (117 + 7, PC 824): `brief`.
+    def spawned(pc, offset=0):
         record = p.records[pc]
-        timeline = kgt_timeline(p, u16(record, 2))
+        timeline = kgt_timeline(p, u16(record, 2), offset)
         return dict(timeline, z=record[13], frames=[dict(f, dx=f["dx"] + s16(record, 8), dy=f["dy"] + s16(record, 10))
                                                    for f in timeline["frames"]])
     # TEAM VS's demo leaves global 3 at 100, which the 2P cursor keeps (KGT PCs 540, 547, 584): 13
     # takes the VS splash every round (PC 74), and between rounds 14 (PC 102) slides VS L and VS R
     # in from the screen's edges (120, 121, PCs 110-111) to join where they stand; 14's own displays
     # only repeat them.
-    calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)],
+    calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)], brief=[spawned(76, 7)],
                        team=[spawned(pc) for pc in (110, 111)])
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"],
                  *(t for path in calls["vs"].values() for t in path), *calls["story"].values()]

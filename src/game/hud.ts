@@ -32,7 +32,7 @@ const { ko, calls } = ui as unknown as {
     rounds: Lettering[];
     results: Record<'win' | 'perfect' | 'draw', number>;
     story: Record<'win' | 'lose', Lettering>;
-    vs: Record<'first' | 'later' | 'team', Lettering[]>;
+    vs: Record<'first' | 'later' | 'brief' | 'team', Lettering[]>;
   } & Record<'logo' | 'fight' | 'transition', Lettering>;
 };
 export const KO_TICKS = ko.frames.reduce(
@@ -88,10 +88,11 @@ function letteringFrame({ frames, loop }: Lettering, age: number) {
 }
 export const koFrame = (age: number) => letteringFrame(ko, age);
 
-// The letterings a match shows, by age: in Vs. CPU and a story the
-// round-start logo wipe (13's 115), or on the VS path its VS splash in round
-// 1, or every round in VS multi, and demo black after, the round's 'DRESS'
-// and 'SHOW TIME', which a story step shows by its letterings' bits 0 and 1
+// The letterings a match shows, by age: KGT 13's by its tests of the
+// globals (PCs 71–74), at global 10 = 10 demo black from + 7, at global 3 =
+// 0 the round-start logo wipe (115), and otherwise its VS splash in round 1,
+// or every round at 3 above 99 (VS multi), and demo black after; the
+// round's 'DRESS' and 'SHOW TIME', which a story step shows by its letterings' bits 0 and 1
 // (0x408d4b, 0x408dde); then every result's KO lettering (26, or 32 and 33,
 // which jump to it), a story's YOU WIN or YOU LOSE (28, 29) in its place,
 // and after it 14's logo wipe back in (116), or VS multi's VS L and VS R
@@ -99,9 +100,13 @@ export const koFrame = (age: number) => letteringFrame(ko, age);
 // rounds.
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
-  const opening = match.vs
-    ? calls.vs[match.round === 1 || match.teams ? 'first' : 'later']
-    : [calls.logo];
+  const { globals } = match;
+  const opening =
+    globals[10] === 10
+      ? calls.vs.brief
+      : !globals[3]
+        ? [calls.logo]
+        : calls.vs[match.round === 1 || globals[3] > 99 ? 'first' : 'later'];
   const bits = match.battle?.letterings ?? 3;
   if (match.calls) {
     shown.push(

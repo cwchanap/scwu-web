@@ -231,7 +231,7 @@ export type SourceEvent =
       steps: number[];
     }
   | { op: 'freeze'; add: number; set?: boolean }
-  | { op: 'global'; index: number; value: number }
+  | { op: 'global'; index: number; value: number; add?: true }
   | ({ op: 'color' } & Color)
   | ({ op: 'trail' } & TrailSpec)
   | { op: 'variable'; index: number; value: number }

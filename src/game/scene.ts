@@ -142,10 +142,12 @@ const keyMap: Record<string, Control> = {
 };
 
 // The free state's program (action 1), which reads the fighter's variable 0
-// (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
-const idleVM = (f: Fighter, seed?: number) =>
+// (EX mode), the globals (0x80 up) and, for SIN and SOU, its life: SOU's on
+// its first tick (PC 8).
+const idleVM = (f: Fighter, globals: readonly number[], seed?: number) =>
   Object.assign(
     new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
+      ...Object.fromEntries(globals.map((value, i) => [0x80 + i, value])),
       0x40: f.variables[0] ?? 0,
     }),
     { life: f.hp },
@@ -186,7 +188,9 @@ export class TrainingScene extends Phaser.Scene {
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
   private quake: Match['quake'] = { x: null, y: null };
   private frame = 0;
-  private idle = this.match.fighters.map((f, i) => idleVM(f, i));
+  private idle = this.match.fighters.map((f, i) =>
+    idleVM(f, this.match.globals, i),
+  );
   // Whether each fighter's idle program ran on the last unfrozen step.
   private idling = [true, true];
   private ready = false;
@@ -217,6 +221,9 @@ export class TrainingScene extends Phaser.Scene {
   private storyHeld: number[] = [];
   private storyLife = 0;
   private storyLost = 0;
+  // Op 0x1f's globals (0x4456b0), which every screen and the matches they
+  // start share, as the engine keeps one set for the session.
+  private globals = Array<number>(64).fill(0);
   private loading = false;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
@@ -361,6 +368,7 @@ export class TrainingScene extends Phaser.Scene {
     this.open(new Title());
   }
   private open(screen: NonNullable<TrainingScene['select']>) {
+    screen.globals = this.globals;
     this.select = screen;
     this.sound.stopAll();
     this.paused = false;
@@ -442,11 +450,18 @@ export class TrainingScene extends Phaser.Scene {
 
   // A story battle on its stage, once the stage's images load.
   private startBattle(battle: Battle) {
+    // ponytail: story's select screen leaves global 10 at 10, which makes
+    // the first battle its mode select (ZAKU's and PAC-HELO's Single paths,
+    // their logos and image 8000), chosen by Hit Mode's reactions (177–183)
+    // and global 15, which the match lacks, so nothing could end it. Cleared
+    // until they're ported; the demos after set their own.
+    if (this.globals[10] === 10) this.globals[10] = 0;
     const match = Match.story(
       this.story!.who,
       battle,
       randomSeed(),
       this.storyHeld,
+      this.globals,
     );
     this.whenLoaded(match.stage, () => {
       this.leaveScreen();
@@ -589,12 +604,16 @@ export class TrainingScene extends Phaser.Scene {
       return;
     }
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
+    // Authored: free practice and the CPU match no select screen chose keep
+    // their own globals.
+    const vs = this.chosen && mode === 'cpu';
     this.begin(
       this.teams && mode === 'cpu'
         ? Match.team(
             this.teams.map((team) => team.map(({ who }) => who)),
             this.stage,
             randomSeed(),
+            this.globals,
           )
         : new Match(
             mode,
@@ -602,7 +621,10 @@ export class TrainingScene extends Phaser.Scene {
             randomSeed(),
             [this.fighter, this.opponent],
             this.stage,
-            this.chosen && mode === 'cpu',
+            vs,
+            null,
+            undefined,
+            vs ? this.globals : undefined,
           ),
     );
   }
@@ -635,7 +657,9 @@ export class TrainingScene extends Phaser.Scene {
 
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
-    this.idle = this.match.fighters.map((f, i) => idleVM(f, i));
+    this.idle = this.match.fighters.map((f, i) =>
+      idleVM(f, this.match.globals, i),
+    );
     this.idling = this.match.fighters.map(() => true);
     this.idle.forEach((vm) => vm.tick());
   }
@@ -912,13 +936,14 @@ export class TrainingScene extends Phaser.Scene {
           if (this.match.round !== round) this.resetIdle();
           this.roundPalettes();
           if (this.match.resultReady) this.matchOver();
-          for (const { owner, index } of this.match.sounds)
+          // A sound a fighter's export lacks is an empty one, which stops
+          // every sound (0x4034e0): TRAINING's 開始時 ERROR's (PC 256).
+          for (const { owner, index } of this.match.sounds) {
+            const key = `${this.match.fighters[owner]?.who}-sound-${index}`;
             if (owner < 0) this.stageSound(index);
-            else
-              this.play(
-                `${this.match.fighters[owner].who}-sound-${index}`,
-                owner,
-              );
+            else if (this.cache.audio.exists(key)) this.play(key, owner);
+            else this.sound.stopAll();
+          }
           for (const index of letteringSounds(this.match))
             this.play(`kgt-sound-${index}`);
           this.idle.forEach((vm, i) => {
@@ -929,7 +954,8 @@ export class TrainingScene extends Phaser.Scene {
               return;
             }
             // Entering action 1 starts its program again (0x410cf0).
-            if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
+            if (vm.ended || !this.idling[i])
+              this.idle[i] = idleVM(f, this.match.globals, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
             this.idle[i].tick();

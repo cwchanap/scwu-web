@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DRESS_TICK } from './hud';
+import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
 import { LIFE, Match } from './match';
 import type { Fighter } from './match';
@@ -285,6 +285,64 @@ describe('story battles', () => {
       expect(match.cameraX / 1.5).toBeLessThan(500);
       expect(zaku.x / 1.5).toBe(letterings ? match.cameraX / 1.5 + 590 : 1100);
     }
+  });
+
+  // Story's select screen leaves global 3 at 10 and 10 at 10 (CHAR SELECT's
+  // BackBlue), which a demo before a battle may set again (--NEXT--'s 10 at
+  // 100); the title's demos leave both 0.
+  const left = (globals: Record<number, number>) =>
+    Object.assign(Array<number>(64).fill(0), globals);
+  const SCREENS: Record<number, number>[] = [
+    {},
+    { 3: 10, 10: 10 },
+    { 3: 10, 10: 100 },
+  ];
+
+  it("takes each 開始時's path and KGT 13's by the globals the screens left", () => {
+    // Ryuko's 開始時 takes BR at global 3 = 0 (PC 286), from + 2 at 10 = 10
+    // (PC 287), and otherwise its VS path; KGT 13 the logo wipe at 3 = 0
+    // (PC 72), demo black at 10 = 10 (PC 71), or else the VS splash, whose
+    // VS L slides in with sound 12.
+    expect(
+      SCREENS.map((globals) => {
+        const match = Match.story('ryuko', FIRST, 0, undefined, left(globals));
+        const heard: number[] = [];
+        while (match.roundTicks < 200) {
+          match.step();
+          if (letteringSounds(match).includes(12)) heard.push(match.roundTicks);
+          if (match.roundTicks === 6)
+            heard.push(match.fighters[0].branch as never);
+        }
+        return heard;
+      }),
+    ).toEqual([[32], ['32+2'], ['30+9', 150]]);
+  });
+
+  it("hides Sport Court's dancers at global 10 = 10 (PCs 36–351)", () => {
+    expect(
+      SCREENS.map((globals) => {
+        const match = Match.story('ryuko', FIRST, 0, undefined, left(globals));
+        for (let t = 0; t < 10; t++) match.step();
+        return match.layers.slice(6).map(({ clip }) => `${clip}`);
+      }),
+    ).toEqual([
+      ['7', '8+26', '9', '10', '11', '12+26', '13', '14'],
+      Array(8).fill('6+4'),
+      ['7', '8+26', '9', '10', '11', '12+26', '13', '14'],
+    ]);
+  });
+
+  it("makes the 1P's HUD face, where SWW's sets variable 12 above global 3 = 1", () => {
+    // His face helper (72 + 26) takes Team VS 1P + 2 (PC 710), which sets
+    // the variable One Only tests (380).
+    const sww = scenarioOf('sww').find(({ type }) => type === 1) as Battle;
+    expect(
+      SCREENS.map((globals) => {
+        const match = Match.story('sww', sww, 0, undefined, left(globals));
+        for (let t = 0; t < 3; t++) match.step();
+        return match.fighters[0].variables[12];
+      }),
+    ).toEqual([undefined, 1, 1]);
   });
 });
 

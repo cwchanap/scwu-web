@@ -9,8 +9,17 @@ import { base, enter, named } from './testing';
 
 // A Vs. match the select screen started: global 3 is 50 (KGT PCs 541, 548,
 // 585), global 10 is 0 (PC 542), so each 開始時 takes its VS path.
-const vsMatch = (who: Who = 'ryuko', seed = 0, stage: Stage = 'court') =>
-  new Match('cpu', true, seed, [who, who], stage, true);
+// A VS as its select screen leaves the globals, with any changed.
+const vsMatch = (
+  who: Who = 'ryuko',
+  seed = 0,
+  stage: Stage = 'court',
+  globals?: Record<number, number>,
+) => {
+  const match = new Match('cpu', true, seed, [who, who], stage, true);
+  Object.assign(match.globals, globals);
+  return match;
+};
 const steps = (match: Match, ticks: number, input: Input = {}) => {
   for (let t = 0; t < ticks; t++) match.step(input);
 };
@@ -198,6 +207,7 @@ const TEMPLATE: {
   seed?: number;
   copy?: ObjectKey;
   twoP?: ObjectKey | false;
+  globals?: Record<number, number>;
   charges?: number;
 }[] = [
   // Start N (31, PC 284): 250 ticks of displays (PCs 308–321). From round 2
@@ -898,7 +908,7 @@ const TEMPLATE: {
     idle: [351, 351],
     ends: '39+11',
   },
-  // Its global 1 = 1000 test (PC 443) passes over 開始時 yowai. Round 1 (34,
+  // Global 1 below 1000 passes over 開始時 yowai (PC 443, below). Round 1 (34,
   // PC 448): image 327 for 50 ticks, demo speak rp (38) from + 5 in two
   // calls (PCs 488, 490), then images 284 to 287, 384 ticks in all, past
   // FIGHT. From round 2 image 123 for 18 ticks (PC 449), then DEMO STAND
@@ -931,6 +941,7 @@ const TEMPLATE: {
     idle: [485, 351],
     // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 455).
     twoP: '31+4',
+    globals: { 1: 0 },
   },
   // Round 1 (36, PC 386): images 183 for 210 ticks, 177, 176 and 175 for
   // 80, 308 ticks in all. From round 2 DEMO stand (30) from + 2 twice (PC
@@ -957,7 +968,7 @@ const TEMPLATE: {
     ],
     idle: [409, 343],
   },
-  // Its global 1 = 1000 test (PC 442) passes over 開始時 yowai. Round 1 (35,
+  // Global 1 below 1000 passes over 開始時 yowai (PC 442). Round 1 (35,
   // PC 447) rolls for Round 1-2-1 and OP2 (below); seed 2's take neither:
   // images 574 to 571 and back, then demo stand (28) from + 1, 348 ticks
   // in all. From round 2 demo stand from + 1 (PC 448), then image 118 for
@@ -982,6 +993,7 @@ const TEMPLATE: {
     seed: 2,
     // Its 開始時 2P keeps variable 2, its VS path from + 4 (PC 454).
     twoP: '32+4',
+    globals: { 1: 0 },
   },
   // Its global 10 = 10 tests (PCs 277, 294) pass over Single Start. Round 1
   // (39, PC 296): a blank for 50 ticks, images 113 to 115, then DEMO STAND
@@ -1259,13 +1271,14 @@ describe.each(TEMPLATE)(
     copy = `${start}+9`,
     twoP = `${start + 1}+5`,
     charges = 1,
+    globals,
   }) => {
     const ones: unknown[] = [
       [0, banner, 1],
       [0, `${banner}+9`, 1],
     ];
     it('dashes back as player 2 charges in, then plays its round 1 action', () => {
-      const match = vsMatch(who, seed);
+      const match = vsMatch(who, seed, 'court', globals);
       const [p1, p2] = match.fighters;
       steps(match, 5);
       expect([p1.branch, p2.branch]).toEqual([start, start]);
@@ -1312,7 +1325,7 @@ describe.each(TEMPLATE)(
     });
 
     it('plays its round 2 images where round 1 has the banners', () => {
-      const match = vsMatch(who, seed);
+      const match = vsMatch(who, seed, 'court', globals);
       while (match.roundTicks < FIGHT_TICK) match.step();
       match.fighters[1].hp = 0;
       while (match.round === 1) match.step();
@@ -1953,6 +1966,47 @@ describe("ZIRO's EX checks", () => {
   });
 });
 
+describe('開始時 yowai (global 1 = 1000)', () => {
+  // VS's select screen leaves global 1 at 1000 (KGT PC 549), which ZENKA's
+  // and ALPHA's 開始時 test (PCs 443, 442) for 開始時 yowai (33, 34). It
+  // sets variable 14 to 10, which their stand, walks and jumps test
+  // (通常立ち's PC 11), and spawns 技名7 or 技名15 and OP super Charge from
+  // + 5, whose global 3 > 40 test takes 技名3 or 技名7 (PCs 589, 803) for VS
+  // CHARGE, before Round 1 (34) or Round 1 Yowai (36), which rolls for OP2
+  // (30) and Round 1-2-1 (PCs 506, 507).
+  it.each([
+    ['zenka', ['34', '34'], [39, '49+5'], 48, 47, 485],
+    ['alpha', ['30', '36'], [41, '54+5'], 53, 52, 497],
+  ] as const)("%s's", (who, rounds, spawns, call, charge, idle) => {
+    const match = vsMatch(who);
+    const [p1, p2] = match.fighters;
+    steps(match, 100);
+    expect([named(p1), named(p2), p1.variables[14]]).toEqual([
+      `${who === 'zenka' ? 30 : 31}+9`,
+      `${who === 'zenka' ? 31 : 32}+4`,
+      undefined,
+    ]);
+    match.step();
+    expect([named(p1), named(p2), p1.variables[14], p2.variables[14]]).toEqual([
+      ...rounds,
+      10,
+      10,
+    ]);
+    const clips = () => match.effects.map((e) => e.clip);
+    expect(
+      spawns.map((clip) => clips().filter((c) => c === clip).length),
+    ).toEqual([2, 2]);
+    match.step();
+    expect(
+      [call, charge].map((clip) => clips().filter((c) => c === clip).length),
+    ).toEqual([2, 0]);
+    steps(match, idle - 103);
+    expect(p1.action).toBe('script');
+    match.step();
+    expect(p1.action).toBe('idle');
+  });
+});
+
 describe("ALPHA's Round 1 rolls", () => {
   // Round 1 (35) rolls rand % 3 > 1 for Round 1-2-1 (37, PC 488), then the
   // same for OP2 (30, PC 489), 396 ticks of displays. Round 1-2-1 shows
@@ -1961,9 +2015,9 @@ describe("ALPHA's Round 1 rolls", () => {
   // Obj, then jumps to Round 1-2-2 (38, PC 546), whose variable 1 = 1 test
   // (PC 553) takes + 30, image 645 for image 644 (PCs 577, 554), before
   // their HP hit and HISA Hit objects and Round 1-2-3 (39): 466 ticks in
-  // all. Each fighter rolls for itself.
+  // all. Each fighter rolls for itself. Global 1 below 1000 takes Round 1.
   it("takes Round 1-2-1 and its variable 1 set for seed 0's player 1", () => {
-    const match = vsMatch('alpha', 0);
+    const match = vsMatch('alpha', 0, 'court', { 1: 0 });
     const [p1, p2] = match.fighters;
     steps(match, 101);
     expect([named(p1), named(p2)]).toEqual(['37', '35']);
@@ -1981,7 +2035,7 @@ describe("ALPHA's Round 1 rolls", () => {
   });
 
   it("passes over the set for seed 4's player 1, whose player 2 takes OP2", () => {
-    const match = vsMatch('alpha', 4);
+    const match = vsMatch('alpha', 4, 'court', { 1: 0 });
     const [p1, p2] = match.fighters;
     steps(match, 101);
     expect([named(p1), named(p2)]).toEqual(['37', '30']);

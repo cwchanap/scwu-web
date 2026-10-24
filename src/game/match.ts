@@ -300,6 +300,15 @@ export const LIFE = 510;
 // Vs. single play's rounds to win (0x470048, 0x4087da): GAME.INI's
 // Editor.TestPlay.VSSinglePlay, 3 (0x414afc).
 export const ROUNDS_TO_WIN = 3;
+// The globals a match starts with when no screen has run: 0, as the title's
+// demos leave them, or as VS single's select screen leaves them (CHAR
+// SELECT's 2 at 50, its 2P cursor's 1 at 1000 and 3 at 50, KGT PCs 549,
+// 541) or VS multi's (TEAM VS's demo, 3 at 100).
+const selected = (global3: number) => {
+  const globals = Array<number>(64).fill(0);
+  if (global3) Object.assign(globals, { 1: 1000, 2: 50, 3: global3 });
+  return globals;
+};
 // Victim reaction scripts add opcode 0x15 power to themselves and the attacker.
 const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
   hit: [3, 2],
@@ -1576,16 +1585,6 @@ export class Match {
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
   freeze = 0;
-  // Globals 0 (0x4456b0), 10, 11 and 14 by index. At global 0 = 10, which
-  // LIZARD's, HISO's, SEAN's and G Suneo's lethal blows hold for their
-  // strike's tick, a KO enters make hikari; ALPHA's KO sets global 10 to
-  // 10000 or 20000. At 11 = 10, which MASA's and 3-TIMES's 開始時 set, the
-  // stage plays no track; while 14 is 200, which SIN's, KAY's and DIDO's
-  // supers hold, it stops every sound (export_stage), and KGT 13 holds it at
-  // 10 for each round's first 10 ticks (`step`). ponytail: each match
-  // starts them at 0, where the source keeps global 10 until the select
-  // screen's 2P cursor clears it (KGT PCs 542, 590).
-  globals: Record<number, number> = {};
   // PC 611's hold this tick, applied to both fighters after they move.
   private koStop = 0;
   // This tick's op 0x03 cues: each fighter's sound table (+0x221c), or the
@@ -1648,6 +1647,25 @@ export class Match {
     // Each seat's palette (+0xe00b), −1 for none, which a story keeps from
     // battle to battle.
     readonly held = Array<number>(8).fill(-1),
+    // Op 0x1f's globals (0x4456b0) by index, which nothing in the engine
+    // clears: the session's, shared with the screens (select.ts). The
+    // title's demos clear all but 6 (T1's and T2's System V); CHAR SELECT
+    // sets 3 and 10 to 10, which VS single's 2P cursor makes 50 and 0 (KGT
+    // PCs 541, 542) and story mode, with no 2P cursor, keeps; TEAM VS's demo
+    // sets 3 to 100 and clears 8–11; a story's demos set theirs (its NEXT
+    // demos 10 to 100). Global 3 above 0 plays the ZA hits (Chuck Hit ZA,
+    // 198, PC 2761, and the like), and it and global 10 at 10 pick each
+    // 開始時's path (Ryuko's PCs 286, 287); at global 1 = 1000, which both
+    // select screens set, ZENKA's and ALPHA's take 開始時 yowai (PCs 443,
+    // 442).
+    // At global 0 = 10, which LIZARD's, HISO's, SEAN's and G Suneo's lethal
+    // blows hold for their strike's tick, a KO enters make hikari; ALPHA's
+    // KO sets global 10 to 10000 or 20000. At 11 = 10, which MASA's and
+    // 3-TIMES's 開始時 set, the stage plays no track; while 14 is 200,
+    // which SIN's, KAY's and DIDO's supers hold, it stops every sound
+    // (export_stage), and KGT 13 holds it at 10 for each round's first 10
+    // ticks (`step`).
+    readonly globals = selected(vs ? 50 : 0),
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
@@ -1668,7 +1686,13 @@ export class Match {
   // A story battle (0x406aa3) on its stage (+1: stage file n − 1, in the
   // export's order), with the story's player as the 1P, its seats holding
   // the palettes the story's select screen and earlier battles left.
-  static story(who: Who, battle: Battle, seed = 0, held?: number[]) {
+  static story(
+    who: Who,
+    battle: Battle,
+    seed = 0,
+    held?: number[],
+    globals?: number[],
+  ) {
     return new Match(
       'story',
       true,
@@ -1678,13 +1702,13 @@ export class Match {
       false,
       battle,
       held,
+      globals,
     );
   }
 
   // VS multi (TEAM VS, mode 2) pits each side's first member against the
-  // other's (0x408a07); the select screen leaves global 3 at 100 (KGT PCs
-  // 540, 547, 584).
-  static team(teams: Who[][], stage: Stage, seed = 0) {
+  // other's (0x408a07); its select screen leaves global 3 at 100.
+  static team(teams: Who[][], stage: Stage, seed = 0, globals = selected(100)) {
     const match = new Match(
       'cpu',
       true,
@@ -1692,6 +1716,9 @@ export class Match {
       [teams[0][0], teams[1][0]],
       stage,
       true,
+      null,
+      undefined,
+      globals,
     );
     match.teams = teams;
     return match;
@@ -1885,11 +1912,12 @@ export class Match {
   // which spawns its side's checker (44 + 4, 49 + 5): it reads the round's
   // winner's life from global 8 or 9 (see the result's 1P and 2P WIN).
   // Where a 開始時 leaves the mark, 通常立ち's clears (Ryuko's PCs 2–8,
-  // which its idle clip's first frame carries) end it. A story makes none: its 1P face takes its point from another
-  // table (0x40a098), and at x 31 the object acts only on its global 3 tests
-  // (SWW's sets variable 12 above 1).
+  // which its idle clip's first frame carries) end it. A story's 1P face
+  // takes KGT 72's point too (0x40a098 reads its start), where only SWW's
+  // object acts, at global 3 above 1 (PC 710): his Team VS 1P + 2 sets
+  // variable 12, which One Only tests (380, PC 6014).
   private spawnFaces() {
-    HUD_FACES.forEach((face, owner) => {
+    HUD_FACES.slice(0, this.battle ? 1 : 2).forEach((face, owner) => {
       const [action, offset] = CHARACTERS[this.fighters[owner].who].faceHelper;
       if (action === undefined) return;
       this.spawnObject(face, owner, {
@@ -2732,15 +2760,9 @@ export class Match {
         ? (actor.locals[selector] ?? 0)
         : selector === 0x86
           ? this.freeze
-          : selector === 0x83
-            ? this.teams
-              ? 100
-              : this.vs
-                ? 50
-                : 0
-            : selector >= 0x80
-              ? (this.globals[selector & 0x3f] ?? 0)
-              : (self.variables[selector & 0x3f] ?? 0);
+          : selector >= 0x80
+            ? (this.globals[selector & 0x3f] ?? 0)
+            : (self.variables[selector & 0x3f] ?? 0);
     return compare === 1
       ? variable === value
       : compare === 2
@@ -2870,7 +2892,12 @@ export class Match {
         this.freeze = (event.set ? 0 : this.freeze) + event.add;
         break;
       case 'global':
-        this.globals[event.index] = event.value;
+        this.globals[event.index] = event.add
+          ? Math.max(
+              -30000,
+              Math.min(30000, this.globals[event.index] + event.value),
+            )
+          : event.value;
         break;
       // Action 0 clears the slot (0x40f6e6 tests it): LIZARD's SHOOT OBJ
       // EXPLO (290) clears its own (PCs 3940–3942) before it strikes. Slot 5
@@ -4349,7 +4376,7 @@ export class Match {
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
     // fighters finish their intro and stand.
     this.roundTicks++;
-    if (this.roundTicks === 2 && !this.battle) this.spawnFaces();
+    if (this.roundTicks === 2) this.spawnFaces();
     this.cpuDriven =
       !opponent &&
       (this.mode !== 'practice' || this.practice.partner === 'cpu');
@@ -4452,10 +4479,6 @@ export class Match {
     // The Vs. result states spawn 1P or 2P WIN (KGT 30, 31; 0x4094ad,
     // 0x409582), whose first step, at 0x65, sets global 8 or 9 to 1 (KGT PCs
     // 251, 254), for the TEAM VS winner's objects to carry its life.
-    // ponytail: a match starts with its globals clear, where only Skill4
-    // (and TRAINING's Team VS Start) clears 8 and 9, so a round won in an
-    // earlier match marks a TEAM VS match's first members; carry them over
-    // as `held` is if that matters.
     if (
       this.calls &&
       !this.battle &&

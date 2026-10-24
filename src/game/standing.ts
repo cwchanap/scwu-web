@@ -231,9 +231,9 @@ export class StandingVM {
       } else if (op === 31) {
         // A player variable's or global's test (r[5] bits 2-3: 1 ==, 2 >, 3
         // <) jumps to r[1:3] + r[3]: Chung's checks EX mode (variable 0 at
-        // 100, PC 9), and ZAKU's and PAC-HELO's global 10 for 10 (PC 3), which
-        // only KGT PCs 542 and 590 write, to 0, as an unseeded selector reads
-        // here.
+        // 100, PC 9), and ZAKU's and PAC-HELO's global 10 for 10 (PC 3), as
+        // story's select screen leaves it, into their Single path's image
+        // 8000 (PCs 17–22). An unseeded selector reads 0.
         const compare = (r[5] >> 2) & 3;
         if ((r[4] >> 6 === 1 || r[4] >> 6 === 2) && compare && !(r[5] & 3)) {
           const variable = this.variables[r[4]] ?? 0;
