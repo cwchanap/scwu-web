@@ -577,7 +577,9 @@ const copyPower = (f: Fighter) =>
 // KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
 // (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
 const knockedOut = (wasOut: boolean): Action => (wasOut ? 'koAgain' : 'down');
-// 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1).
+// 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1). One
+// that leaves life adds to what the life bar shows lost and holds it 20
+// steps (0x40ea79); one that empties it clears both (0x40e855).
 // +0xdf09, life per mille (0x408f68); a story's waiting slot keeps its full
 // life over a maximum of 1 (0x4089a3, 0x411e4c).
 const perMille = (f: Fighter) =>
@@ -587,10 +589,24 @@ function loseLife(f: Fighter, loss: number) {
   if (loss && f.hp <= desperationOf(f.who))
     loss = Math.max(1, Math.trunc((loss * 60) / 100));
   f.hp = Math.max(0, f.hp - loss);
+  if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
   // A loss that leaves no life drops the player to priority 0x3c (0x40e8cd),
   // behind the other.
   if (f.hp === 0) f.z = 0x3c;
   return loss;
+}
+// A gain, up to full life (0x40ea9f), takes from what the bar shows lost,
+// even one of 0.
+function gainLife(f: Fighter, life: number) {
+  f.hp = Math.min(lifeOf(f.who), f.hp + life);
+  [f.lost, f.lostDelay] = [Math.max(0, f.lost - life), 20];
+}
+// 0x412522: each step a stop or a queued action doesn't skip counts the
+// hold down, then drains what the bar shows lost by 1.
+function drainLost(f: Fighter) {
+  if (!f.lost) return;
+  if (f.lostDelay) f.lostDelay--;
+  else f.lost--;
 }
 // 0x40f010: a hit takes the box's damage scaled by the struck body box's
 // percentage `taken`; a guard takes 20% (+0x7ca5) only from a box of kind bit 2.
@@ -1008,6 +1024,10 @@ export interface Fighter {
   vy: number;
   gravity: number;
   hp: number;
+  // +0xdf25: life a loss took that a story's life bar still shows in red,
+  // and +0xdf29, the steps before it drains (lifeBars).
+  lost: number;
+  lostDelay: number;
   facing: -1 | 1;
   action: Action;
   age: number;
@@ -1386,6 +1406,8 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   vy: 0,
   gravity: 0.24,
   hp: lifeOf(who),
+  lost: 0,
+  lostDelay: 0,
   facing,
   action: 'idle',
   age: 0,
@@ -1939,6 +1961,15 @@ export class Match {
     return this.battle?.rounds ?? this.teams?.[0].length ?? ROUNDS_TO_WIN;
   }
 
+  // 0x404e2d: in a story, a life bar under each player past the 1P whose
+  // slot sets bit 0 (+0xdf0d), the allies, once it has entered and shown a
+  // display, while it has life.
+  get lifeBars() {
+    return this.fighters.filter(
+      (f, i) => (this.slots[i]?.flags ?? 0) & 1 && f.present && f.shown && f.hp,
+    );
+  }
+
   // State 902 (0x40970a) ends a Vs. match once either side has won enough
   // rounds; a single round otherwise.
   // The fighter the HUD's 2P side shows: player 2, or in a story the enemy
@@ -2213,7 +2244,7 @@ export class Match {
       slot && [null, this.fighters[0], striker][(slot.flags >> 7) & 3];
     if (!bonus) return;
     // ponytail: every story's bonus life is a gain.
-    bonus.hp = Math.min(lifeOf(bonus.who), bonus.hp + slot.life);
+    gainLife(bonus, slot.life);
     addPower(bonus, slot.power);
   }
 
@@ -3048,8 +3079,7 @@ export class Match {
         // own first: a double KO. TRAINING's K refills the opponent's life
         // (PC 1633), his P takes 100 (PC 1629) and his chuck KOs himself
         // (PC 1662).
-        if (event.selfLife > 0)
-          self.hp = Math.min(lifeOf(self.who), self.hp + event.selfLife);
+        if (event.selfLife > 0) gainLife(self, event.selfLife);
         if (event.selfLife < 0) {
           const wasOut = self.hp === 0;
           loseLife(self, -event.selfLife);
@@ -3059,8 +3089,7 @@ export class Match {
           addPower(self, event.selfPower);
           break;
         }
-        if (event.otherLife > 0)
-          other.hp = Math.min(lifeOf(other.who), other.hp + event.otherLife);
+        if (event.otherLife > 0) gainLife(other, event.otherLife);
         if (event.otherLife < 0) {
           const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
@@ -3958,6 +3987,7 @@ export class Match {
       if (f.hitStop === 0) {
         // 0x4123c5: an unstopped step drops the word a stop saved.
         f.stopInput = null;
+        drainLost(f);
         f.shown = true;
         this.retarget(f);
         if (this.driven(f)) input = this.think(f);
@@ -4430,6 +4460,7 @@ export class Match {
           f.hitStop--;
           continue;
         }
+        drainLost(f);
         f.shown = true;
         this.retarget(f);
         // A VS 開始時 steps as any script does, and runs out into idle.

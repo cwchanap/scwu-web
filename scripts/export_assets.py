@@ -4205,6 +4205,7 @@ def main():
         **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
     demo_name = export_ui()
+    export_text()
     for key, (name, sha256) in DEMOS.items():
         export_demo(key, name, sha256, GENERATED / f"{key}.json")
     (GENERATED / "demos").mkdir(exist_ok=True)
@@ -4366,6 +4367,20 @@ def kgt_timeline(p, action, offset=0):
         pc += 1
     timeline = dict(wait=u16(p.records[p.action(action).start], 1), frames=frames)
     return timeline if loop is None else dict(timeline, loop=loop)
+
+
+def export_text():
+    """The EXE's bitmap RC_BMP_text (0x409a98), whose 10x16 digits 16 apart on its top row count a
+    story's life bars (0x40bed0): 8-bit, bottom-up, black drawing nothing (0x40b5ad)."""
+    data = (RESEARCH / "extracted/SCWU.EXE").read_bytes()
+    if hashlib.sha256(data).hexdigest() != "9a191b142f219ffe6cdac0ea4f5df34585f57f4dcd4a3478d8c471dfae66d131":
+        sys.exit("SCWU.EXE's hash differs from the handoff; refusing to export.")
+    # The resource's data, which the hash fixes in .rsrc (RVA 0x2272f8).
+    at = 0x1042f8
+    size, width, height = struct.unpack_from("<Iii", data, at)
+    pixels = data[at + size + 1024:at + size + 1024 + width * height]
+    rows = b"".join(pixels[width * (height - 1 - y):width * (height - y)] for y in range(height))
+    write_if_changed(PUBLIC / "text.png", indexed_png(width, height, rows, data[at + size:at + size + 1024], True))
 
 
 def export_ui():

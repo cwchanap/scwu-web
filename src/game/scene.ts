@@ -12,6 +12,7 @@ import {
   StoryDemo,
   TEAM_DEMO,
   Title,
+  TITLE,
 } from './select';
 import type { Demo, SelectObject } from './select';
 import { Story } from './story';
@@ -181,6 +182,9 @@ export class TrainingScene extends Phaser.Scene {
   private effectSprites: Phaser.GameObjects.Image[] = [];
   private layerSprites: Phaser.GameObjects.Image[] = [];
   private trailSprites: Phaser.GameObjects.Image[] = [];
+  // A story's life bars (lifeBars) and their digits.
+  private bars?: Phaser.GameObjects.Graphics;
+  private digitSprites: Phaser.GameObjects.Image[] = [];
   // Op 0x0e's shake, stepped once per drawn frame like the source's draw
   // loop, and the drawn-frame count whose parity flips it.
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
@@ -240,6 +244,7 @@ export class TrainingScene extends Phaser.Scene {
         this.load.image(`${who}-${image.index}`, BASE + image.filename);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
+    this.load.image('text', BASE + 'text.png');
     for (const [demo, { images, sounds }] of Object.entries(DEMOS)) {
       for (const image of images)
         this.load.image(`${demo}-${image.index}`, BASE + image.filename);
@@ -773,6 +778,68 @@ export class TrainingScene extends Phaser.Scene {
     return this.tint(this.recolored(image, who, palette), color);
   }
 
+  // 0x404e2d draws each bar after every object, in source pixels from the
+  // player's feet less the scroll, not the shake: a 50×10 box at half
+  // brightness, the life left on its inner row in green, then what the bar
+  // shows lost in red. SCWU.KGT's system flag 0x20 (0x4438a4) adds the
+  // life's digits 18 left of it and the lost life's, 32 redder (0x40b5cf),
+  // 40 into it, each counted leftward from its units (0x40bed0).
+  // ponytail: at the player's position after its step, a tick's motion
+  // ahead of the copy the bar reads (+0xdf41, 0x412552); keep that copy if
+  // the lag shows.
+  private drawLifeBars() {
+    const bars = (this.bars ??= this.add
+      .graphics()
+      .setScrollFactor(0)
+      .setDepth(150));
+    bars.clear();
+    const { cameraX, cameraY } = this.match;
+    const screen = (x: number, y: number) => [
+      Math.round(x * ART_SCALE - cameraX),
+      Math.round(y * ART_SCALE - cameraY),
+    ];
+    const rect = (x: number, y: number, w: number, h: number) => {
+      const [left, top] = screen(x, y);
+      const [right, bottom] = screen(x + w, y + h);
+      bars.fillRect(left, top, right - left, bottom - top);
+    };
+    const digits: { key: string; digit: number; x: number; y: number }[] = [];
+    const count = (value: number, x: number, y: number, key: string) => {
+      for (; value > 0; value = Math.trunc(value / 10), x -= 10)
+        digits.push({ key, digit: value % 10, x, y });
+    };
+    for (const f of this.match.lifeBars) {
+      const life = lifeOf(f.who);
+      const x = Math.trunc(f.x / ART_SCALE) - 25;
+      const y = Math.trunc((GROUND + f.y) / ART_SCALE);
+      const green = Math.trunc((f.hp * 50) / life);
+      bars.fillStyle(0, 0.5);
+      rect(x, y, 50, 10);
+      bars.fillStyle(0x00ff00);
+      rect(x, y + 1, green, 8);
+      bars.fillStyle(0xff0000);
+      rect(x + green, y + 1, Math.trunc((f.lost * 50) / life), 8);
+      if (!(TITLE.flags & 0x20)) continue;
+      count(f.hp, x - 18, y, 'text');
+      count(f.lost, x + 40, y, this.tint('text', { r: 32, g: 0, b: 0 }));
+    }
+    this.pool(this.digitSprites, digits.length).forEach((sprite, index) => {
+      const digit = digits[index];
+      sprite.setVisible(!!digit);
+      if (!digit) return;
+      const texture = this.textures.get(digit.key);
+      const frame = String(digit.digit);
+      if (!texture.has(frame))
+        texture.add(frame, 0, digit.digit * 16, 0, 10, 16);
+      sprite
+        .setTexture(digit.key, frame)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(150.1)
+        .setPosition(...screen(digit.x, digit.y));
+    });
+  }
+
   // Op 0x23's offsets add to each 5-bit palette channel, clamped (0x40d070);
   // each tinted image is drawn once and cached.
   private tint(key: string, { r, g, b }: Pick<Color, 'r' | 'g' | 'b'>) {
@@ -1114,6 +1181,7 @@ export class TrainingScene extends Phaser.Scene {
           );
         },
       );
+      this.drawLifeBars();
       this.frame++;
       this.updateHud?.(this.match);
       this.report();

@@ -116,6 +116,28 @@ describe('story battles', () => {
     expect(match.cameraX / 1.5).toBe(305);
   });
 
+  it('draws a life bar only under a slot that sets bit 0, once present, while it has life (0x404e2d)', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        slots: [
+          slot({ flags: 0x201 }),
+          slot(),
+          slot({ flags: 0x205 }),
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    const [, ally, , waiting] = match.fighters;
+    expect(waiting.present).toBe(false);
+    expect(match.lifeBars).toEqual([ally]);
+    ally.hp = 0;
+    expect(match.lifeBars).toEqual([]);
+  });
+
   it('brings in a waiting slot once its watched seat falls below its mark', () => {
     const match = Match.story('ryuko', FIRST);
     fight(match);

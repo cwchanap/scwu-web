@@ -1394,7 +1394,7 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     else pose(match, f, 'iori', 20);
     // The strike, then the step that enters the reaction it queued.
     ticks(match, 2, {}, defense);
-    return { f, victim };
+    return { match, f, victim };
   }
 
   it("takes a hit box's byte 12 through a 100% body box: punch 1 does 10 of 510", () => {
@@ -1425,6 +1425,40 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     const { f, victim } = struck('iori', 'idle', { guard: true }, 1);
     expect(victim).toMatchObject({ action: 'down', hp: 0 });
     expect(f.hits).toBe(0);
+  });
+
+  it('shows a loss as lost for 20 unstopped steps, then drains it 1 a step (0x40ea79, 0x412522)', () => {
+    const { match, victim } = struck('punch');
+    // The step that entered the reaction skips the drain (0x412342), and
+    // the 10 contact-pause steps return before it (0x4123a0).
+    expect([victim.lost, victim.lostDelay, victim.hitStop]).toEqual([
+      10, 20, 10,
+    ]);
+    const seen = Array.from({ length: 41 }, () => {
+      match.step();
+      return [victim.lost, victim.lostDelay];
+    });
+    expect(seen[9]).toEqual([10, 20]);
+    expect(seen[10]).toEqual([10, 19]);
+    expect(seen[29]).toEqual([10, 0]);
+    expect(seen.slice(30)).toEqual(
+      [9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0].map((lost) => [lost, 0]),
+    );
+  });
+
+  it('adds a loss to what is still shown lost, and a KO clears it (0x40e855)', () => {
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 200;
+    pose(match, victim, 'idle', 12);
+    [victim.lost, victim.lostDelay] = [7, 3];
+    strike(match, f, RYUKO.punch);
+    // The victim's step holds on (3 to 2) before the strike lands.
+    ticks(match, 2);
+    expect([victim.lost, victim.lostDelay]).toEqual([17, 20]);
+    // 60% of punch 1's 10 empties 6.
+    const out = struck('punch', 'idle', {}, 6).victim;
+    expect([out.hp, out.lost, out.lostDelay]).toEqual([0, 0, 0]);
   });
 });
 
