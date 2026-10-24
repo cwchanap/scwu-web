@@ -3,7 +3,8 @@ import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
 import { LIFE, Match } from './match';
 import type { Fighter } from './match';
-import { scenarioOf } from './story';
+import type { Who } from './characters';
+import { scenarioOf, Story } from './story';
 import type { Battle, Slot } from './story';
 
 // A third player borrowed from another match: a story battle seats up to
@@ -329,6 +330,61 @@ describe('story battles', () => {
       ['7', '8+26', '9', '10', '11', '12+26', '13', '14'],
       Array(8).fill('6+4'),
       ['7', '8+26', '9', '10', '11', '12+26', '13', '14'],
+    ]);
+  });
+
+  it('picks the mode by the Chii the 1P strikes at global 10 = 10', () => {
+    // Story's mode select: each Chii's 通常立ち takes its stance (PC 3), and
+    // a strike enters Hit Mode (177, 178; PCs 751, 758), whose box meets the
+    // 1P's VS CHARGE far below and whose skill sets global 9. The Chii's
+    // logo then KOs it, the pair watching it enter its modes (Easy and
+    // Hard, BR ZERO and BR Another), and KOing one costs the 1P the life
+    // that steps 1–3 read (Single Start's 1, then 100, 346, 347 or 348).
+    const STANCE = /^1\+(1[56]|3[2367])$/;
+    const mode = (picks: Who[]) => {
+      const match = Match.story(
+        'ryuko',
+        FIRST,
+        0,
+        undefined,
+        left({ 2: 50, 3: 10, 10: 10 }),
+      );
+      for (let t = 0; t < 10; t++) match.step();
+      const stances = match.fighters.slice(1, 3).map(({ branch }) => branch);
+      for (let t = 0; !match.resultReady && t < 5000; t++) {
+        const [one, ...rest] = match.fighters;
+        const pick = picks[rest.filter((f) => f.present && !f.hp).length];
+        const target = rest.find(
+          (f) => f.who === pick && f.hp && STANCE.test(`${f.branch}`),
+        );
+        const dx = target ? target.x - one.x : 0;
+        match.step(
+          !target || match.winner
+            ? {}
+            : Math.abs(dx) > 90
+              ? { [dx < 0 ? 'left' : 'right']: true }
+              : { punch: t % 20 === 0 },
+        );
+      }
+      const story = new Story('ryuko');
+      story.next();
+      story.next(match.fighters[0].hp);
+      return [...stances, match.fighters[0].hp, story.step];
+    };
+    expect(
+      (
+        [
+          ['zaku', 'zaku'],
+          ['zaku', 'pachelo'],
+          ['pachelo', 'zaku'],
+          ['pachelo', 'pachelo'],
+        ] as Who[][]
+      ).map(mode),
+    ).toEqual([
+      ['1+16', '1+15', 409, 4],
+      ['1+16', '1+15', 163, 21],
+      ['1+16', '1+15', 162, 47],
+      ['1+16', '1+15', 161, 62],
     ]);
   });
 

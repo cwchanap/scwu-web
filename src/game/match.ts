@@ -35,6 +35,7 @@ import {
   desperationOf,
   twinOf,
   lifeOf,
+  neutralTestsOf,
   perStockOf,
   responseEffectsOf,
   responsesOf,
@@ -2253,6 +2254,15 @@ export class Match {
     branch?: ObjectKey | null,
   ) {
     if (f.action === action && !restart) return;
+    // A neutral action takes its tests of a global first (export_fighter):
+    // ZAKU's and PAC-HELO's of global 10 for 10, as story's select screen
+    // leaves it, enter their mode select's stance from 通常立ち (PC 3), which
+    // ends each tick back into neutral (PC 22), and from their turns
+    // ボタンガード立ち (31, PCs 246, 250), which runs out.
+    const test = neutralTestsOf(f.who)[action]?.find((e) =>
+      this.passes(f, f, e),
+    );
+    if (test) return this.enterSource(f, test.action, test.offset);
     if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
     if (action === 'down') this.pauseOthers(f, 10);
@@ -3906,12 +3916,18 @@ export class Match {
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.
     // Most others clear it (PCs 744, 788, ...). ERUS's also clear her Book's
-    // variable 2 or test it at 10 (PCs 787, 1254, ...).
+    // variable 2 or test it at 10 (PCs 787, 1254, ...). ZAKU's and PAC-HELO's
+    // test global 10 for 10 (PCs 751, 758, ...), as story's select screen
+    // leaves it, into their mode select's Hit Mode (177, 178).
     for (const [index, value, target] of own === undefined
       ? []
       : (countersOf(f.who)[own] ?? [])) {
       if (!target) f.variables[index] = value;
-      else if (f.variables[index] === value) return this.enterSource(f, target);
+      else if (
+        (index & 0x80 ? this.globals[index & 0x3f] : f.variables[index]) ===
+        value
+      )
+        return this.enterSource(f, target);
     }
     // ERUS INATUMA's op 0x16 (PC 1541) enters its AIR form off the floor, as
     // HISO stop's does (PC 1455).

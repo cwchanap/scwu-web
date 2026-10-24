@@ -796,13 +796,13 @@ def write_json(path, value):
 def counter_records(p, index):
     """The PCs of the op 0x1f records on variables 2 and 4 that open one of
     Giant's or ERUS's reactions, before its first display (PCs 723, 744,
-    ...; ERUS's 787, 789, ...)."""
+    ...; ERUS's 787, 789, ...), and on global 10 (ZAKU's PC 751, ...)."""
     action, pcs = p.action(index), []
     for pc in range(action.start + 1, action.end):
         record = p.records[pc]
         if record[0] == 0x0c:
             break
-        if record[0] == 0x1f and record[4] in (0x42, 0x44):
+        if record[0] == 0x1f and record[4] in (0x42, 0x44, 0x8a):
             pcs.append(pc)
     return pcs
 
@@ -2923,7 +2923,7 @@ FIGHTERS = {
         # PCs 455–456) and enters OP normal (65) + 3 (PC 458), which calls TVS
         # S 2 (68) 20 times (PC 607) and DEMO STAND twice (PC 609); it plays
         # flattened. 開始時's test of global 10 for 10 (PC 347), into 開始時 SELECT
-        # (51), never passes: no script sets global 10 to 10.
+        # (51), passes only in story's mode select.
         actions=dict(win=94, winStand=32, winLoop=(95, 7), draw=105, black=75),
         flat={"win"},
         # 2001: the HUD face action 117 shows (PC 1056); 139: *name (106, PC
@@ -3012,7 +3012,7 @@ FIGHTERS = {
         # OP super Charge (71, PCs 371–372) and enters OP normal (65) + 2 (PC
         # 374), which fades him in and calls DEMO STAND 7 times (PC 525); it
         # plays flattened. 開始時's test of global 10 for 10 (PC 266), into 開始時
-        # SELECT (51), never passes: no script sets global 10 to 10.
+        # SELECT (51), passes only in story's mode select.
         actions=dict(win=94, winStand=32, winLoop=(94, 22), draw=104, black=75),
         # 2001: the HUD face action 114 shows (PC 953); 139: *name (105, PC
         # 913).
@@ -3093,8 +3093,7 @@ FIGHTERS = {
         # its 50-tick display, as KGT 13 holds global 14 at 10 (PC 464), spawns
         # Black and OP super Charge (49, PCs 466–467), calls demo speak rp ten
         # times (PC 470) and takes her stance. 開始時's test of global 10 for 10
-        # (PC 428), into 開始時 BR + 2, never passes: no script sets global 10 to
-        # 10.
+        # (PC 428), into 開始時 BR + 2, passes only in story's mode select.
         actions=dict(win=77, winStand=28, draw=84, black=54),
         flat={"win"},
         # 2001: the HUD face action 92 shows (PC 934); 333: *name (85, PC
@@ -3181,7 +3180,7 @@ FIGHTERS = {
         # which, shows its 50-tick display, as KGT 13 holds global 14 at 10 (PC
         # 402), spawns Black and OP super Charge (48, PCs 404–405) and enters
         # Round 1 (36) + 2 (PC 407). 開始時's test of global 10 for 10 (PC 368),
-        # into 開始時 BR + 2, never passes: no script sets global 10 to 10.
+        # into 開始時 BR + 2, passes only in story's mode select.
         actions=dict(win=65, winStand=30, winLoop=(65, 9), draw=73, drawLoop=(73, 4), black=52),
         # 2001: the HUD face action 82 shows (PC 767); 322: *name (74, PC
         # 723).
@@ -3248,8 +3247,8 @@ FIGHTERS = {
         # at 10 (PC 464), spawns Black and OP super Charge (54, PCs 466–467)
         # and enters OP2 (30) + 2 (PC 469), or for its rand % 3 > 1 (PC 463),
         # after its own 50-tick display (PC 471), Round 1 (35) + 4 (PC 475).
-        # 開始時's test of global 10 for 10 (PC 427), into 開始時 BR + 14, never
-        # passes: no script sets global 10 to 10.
+        # 開始時's test of global 10 for 10 (PC 427), into 開始時 BR + 14, passes
+        # only in story's mode select.
         actions=dict(win=82, winStand=28, winLoop=(82, 10), draw=98, black=59),
         # 2001: the HUD face action 108 shows (PC 1333); 576: *name (99, PC
         # 1289).
@@ -3312,7 +3311,7 @@ FIGHTERS = {
         # display, as KGT 13 holds global 14 at 10 (PC 336), spawns Black and
         # OP super Charge (46, PCs 338–339) and enters Round 1 (34) + 2 (PC
         # 342); it plays flattened. 開始時's test of global 10 for 10 (PC 301),
-        # into 開始時 BR + 2, never passes: no script sets global 10 to 10.
+        # into 開始時 BR + 2, passes only in story's mode select.
         actions=dict(win=67, winStand=29, winLoop=(67, 4), draw=74, black=50),
         # 2001: the HUD face action 84 shows (PC 846); 323: *name (75, PC
         # 787).
@@ -3325,9 +3324,8 @@ FIGHTERS = {
         twins=ZAKU_TWINS,
         # His reactions clear variable 13, his darkening's, where Ryuko's clear
         # 14, and test global 10 for 10 into his story modes' Hit Mode (177,
-        # 178; PCs 751, 920, ...) where hers clear 6, which nothing of his
-        # sets; only KGT PCs 542 and 590 write global 10, to 0. With those
-        # swaps:
+        # 178; PCs 751, 920, ...; counter_records) where hers clear 6, which
+        # nothing of his sets. With those swaps:
         differ={
             # Ryuko's.
             "hit", "airHit", "jumpHit", "drillDown", "dstToss", "twist", "hitPull", "launchUp", "sweep",
@@ -3374,8 +3372,8 @@ FIGHTERS = {
         # spawns Black and OP super Charge (44, PCs 312–313) and, past its
         # tests of globals 4 and 5 (PCs 316–320), which character select sets
         # to 0 (CHAR SELECT.DEMO, PCs 7–8), enters Round 1 (39, PC 321).
-        # 開始時's test of global 10 for 10 (PC
-        # 277), into Single Start (75), never passes: no script sets global 10 to 10.
+        # 開始時's test of global 10 for 10 (PC 277), as story's select screen
+        # leaves it, enters Single Start (75), his mode select's.
         actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 645); 139: *name (68, PC
         # 609).
@@ -3437,8 +3435,8 @@ FIGHTERS = {
         # jumps to 開始時 BR (38) for global 3 = 0 (PC 286), which spawns
         # Black and OP super Charge (44, PCs 322–323) and, past its tests of
         # globals 4 and 5 (PCs 326–329), enters Round 1 (39, PC 330).
-        # 開始時's test of global 10 for 10 (PC
-        # 287), into BR Start (75), never passes: no script sets global 10 to 10.
+        # 開始時's test of global 10 for 10 (PC 287), as story's select screen
+        # leaves it, enters BR Start (75), his mode select's.
         actions=dict(win=56, winStand=34, winLoop=(56, 5), draw=67, drawLoop=67, black=55),
         # 2001: the HUD face action 72 shows (PC 652); 149: *name (68, PC
         # 617).
@@ -3936,15 +3934,18 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # (PC 1146), which changes nothing. SWW's rambu AIR sets it to 0 and then
     # tests it for 100 (PC 1722), which never passes, since the handler sets
     # before it compares (0x4138df–0x413962). YINAN's test it at 100 for BTK
-    # S (314, PC 5552) or at 50 for Driver Shield df (412, PC 7488). Each
-    # reaction maps to these records in order: [variable, value, the test's
-    # target or 0 for a set].
+    # S (314, PC 5552) or at 50 for Driver Shield df (412, PC 7488). ZAKU's
+    # and PAC-HELO's test global 10 for 10 (PCs 751, 758, ...), as story's
+    # select screen leaves it, into their mode select's Hit Mode (177, 178).
+    # Each reaction maps to these records in order: [variable, or a global's
+    # selector (0x80 up), value, the test's target or 0 for a set].
     counters = {}
     for own in set(tables["responses"]) - {0}:
         for pc in counter_records(p, own):
             record = p.records[pc]
             if record[5] == 4 and u16(record, 9) in ((50, 100, 200, 300) if record[4] == 0x44 else (10,)):
-                counters.setdefault(own, []).append([record[4] & 0x3f, u16(record, 9), u16(record, 1)])
+                counters.setdefault(own, []).append([record[4] if record[4] & 0x80 else record[4] & 0x3f,
+                                                     u16(record, 9), u16(record, 1)])
             elif record[5] in (1, 5) and u16(record, 7) == 0 and (record[5] == 1 or u16(record, 9)):
                 counters.setdefault(own, []).append([record[4] & 0x3f, 0, 0])
             elif record[5] == 2 and u16(record, 7) == 0:
@@ -4025,6 +4026,19 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # The object the HUD face spawns, which the match makes for each player in the Vs. modes.
     if tables["faceHelper"]:
         queue.append(tuple(tables["faceHelper"]))
+    # The neutral actions' tests of a global before their first display, which the match takes as it
+    # enters them: ZAKU's and PAC-HELO's of global 10 for 10, as story's select screen leaves it, from
+    # 通常立ち into their mode select's stance (PC 3: 1 + 16, 1 + 15) and from their turns into
+    # ボタンガード立ち (31, PCs 246, 250), which runs out.
+    neutral_tests = {}
+    for name, index in neutral.items():
+        for record in p.records[p.action(index).start:p.action(index).end]:
+            if record[0] == 0x0c:
+                break
+            event = decode_event(record)
+            if event and event["op"] == "test" and event["selector"] >= 0x80:
+                neutral_tests.setdefault(name, []).append(event)
+                queue.append((event["action"], event["offset"]))
     # A move that jumps into one of the player's reactions enters it as the
     # match's: Giant's chuck ends in his FLY NO HIT (101, PC 3291). The match
     # skips the reaction's opening records, so a jump may pass only those: his
@@ -4077,7 +4091,7 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     images = export_images(c, key, image_ids)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, resultScripts=result_scripts, twins=pairs, aliases=aliases,
-        counters=counters, select=select, palettes=export_palettes(c, image_ids),
+        counters=counters, neutralTests=neutral_tests, select=select, palettes=export_palettes(c, image_ids),
         neutral={i: name for name, i in neutral.items()}, levels=levels,
         idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
     # Its type, so TypeScript needn't infer it from the JSON.

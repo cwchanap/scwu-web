@@ -142,12 +142,10 @@ const keyMap: Record<string, Control> = {
 };
 
 // The free state's program (action 1), which reads the fighter's variable 0
-// (EX mode), the globals (0x80 up) and, for SIN and SOU, its life: SOU's on
-// its first tick (PC 8).
-const idleVM = (f: Fighter, globals: readonly number[], seed?: number) =>
+// (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
+const idleVM = (f: Fighter, seed?: number) =>
   Object.assign(
     new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
-      ...Object.fromEntries(globals.map((value, i) => [0x80 + i, value])),
       0x40: f.variables[0] ?? 0,
     }),
     { life: f.hp },
@@ -188,9 +186,7 @@ export class TrainingScene extends Phaser.Scene {
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
   private quake: Match['quake'] = { x: null, y: null };
   private frame = 0;
-  private idle = this.match.fighters.map((f, i) =>
-    idleVM(f, this.match.globals, i),
-  );
+  private idle = this.match.fighters.map((f, i) => idleVM(f, i));
   // Whether each fighter's idle program ran on the last unfrozen step.
   private idling = [true, true];
   private ready = false;
@@ -450,12 +446,6 @@ export class TrainingScene extends Phaser.Scene {
 
   // A story battle on its stage, once the stage's images load.
   private startBattle(battle: Battle) {
-    // ponytail: story's select screen leaves global 10 at 10, which makes
-    // the first battle its mode select (ZAKU's and PAC-HELO's Single paths,
-    // their logos and image 8000), chosen by Hit Mode's reactions (177–183)
-    // and global 15, which the match lacks, so nothing could end it. Cleared
-    // until they're ported; the demos after set their own.
-    if (this.globals[10] === 10) this.globals[10] = 0;
     const match = Match.story(
       this.story!.who,
       battle,
@@ -657,9 +647,7 @@ export class TrainingScene extends Phaser.Scene {
 
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
-    this.idle = this.match.fighters.map((f, i) =>
-      idleVM(f, this.match.globals, i),
-    );
+    this.idle = this.match.fighters.map((f, i) => idleVM(f, i));
     this.idling = this.match.fighters.map(() => true);
     this.idle.forEach((vm) => vm.tick());
   }
@@ -954,8 +942,7 @@ export class TrainingScene extends Phaser.Scene {
               return;
             }
             // Entering action 1 starts its program again (0x410cf0).
-            if (vm.ended || !this.idling[i])
-              this.idle[i] = idleVM(f, this.match.globals, vm.seed);
+            if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
             this.idle[i].tick();

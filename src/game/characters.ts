@@ -168,6 +168,16 @@ export type FighterData = typeof ryuko & {
   twins: Record<string, number>;
   aliases: Record<string, number>;
   counters: Record<string, [number, number, number][]>;
+  neutralTests: Record<string, GlobalTest[]>;
+};
+// An op 0x1f test of a global.
+export type GlobalTest = {
+  op: 'test';
+  selector: number;
+  compare: number;
+  value: number;
+  action: number;
+  offset: number;
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
@@ -271,13 +281,21 @@ const twins = Object.fromEntries(
   }),
 );
 // The op 0x1f records on variables 2 and 4 that open Giant's and ERUS's
-// reactions, in order: [variable, value, the action a test enters at that
+// reactions, and on global 10 ZAKU's and PAC-HELO's, in order: [variable, or
+// a global's selector (0x80 up), value, the action a test enters at that
 // value, or 0 for a set] (export_fighter).
 export const countersOf = (
   who: Who,
 ): Record<string, [number, number, number][]> =>
   (CHARACTERS[who] as { counters?: Record<string, [number, number, number][]> })
     .counters ?? {};
+// Each neutral action's tests of a global before its first display, which
+// entering it takes (export_fighter).
+export const neutralTestsOf = (
+  who: Who,
+): Record<string, readonly GlobalTest[] | undefined> =>
+  (CHARACTERS[who] as { neutralTests?: Record<string, GlobalTest[]> })
+    .neutralTests ?? {};
 const named = (who: Who) => who[0].toUpperCase() + who.slice(1);
 // Ryuko's source action `index` in the player's own container.
 export function twin(who: Who, index: number) {
