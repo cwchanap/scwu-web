@@ -340,6 +340,8 @@ describe('story battles', () => {
     // logo then KOs it, the pair watching it enter its modes (Easy and
     // Hard, BR ZERO and BR Another), and KOing one costs the 1P the life
     // that steps 1–3 read (Single Start's 1, then 100, 346, 347 or 348).
+    // The other Chii vanishes, and loses into INAI (11, PC 492) as the round
+    // ends.
     const STANCE = /^1\+(1[56]|3[2367])$/;
     const mode = (picks: Who[]) => {
       const match = Match.story(
@@ -369,7 +371,8 @@ describe('story battles', () => {
       const story = new Story('ryuko');
       story.next();
       story.next(match.fighters[0].hp);
-      return [...stances, match.fighters[0].hp, story.step];
+      const vanished = match.fighters[picks[0] === 'zaku' ? 2 : 1];
+      return [...stances, vanished.branch, match.fighters[0].hp, story.step];
     };
     expect(
       (
@@ -381,10 +384,10 @@ describe('story battles', () => {
         ] as Who[][]
       ).map(mode),
     ).toEqual([
-      ['1+16', '1+15', 409, 4],
-      ['1+16', '1+15', 163, 21],
-      ['1+16', '1+15', 162, 47],
-      ['1+16', '1+15', 161, 62],
+      ['1+16', '1+15', 11, 409, 4],
+      ['1+16', '1+15', 11, 163, 21],
+      ['1+16', '1+15', 11, 162, 47],
+      ['1+16', '1+15', 11, 161, 62],
     ]);
   });
 

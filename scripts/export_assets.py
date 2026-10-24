@@ -94,8 +94,9 @@ def decode_event(record):
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
-    # hounds) and 15 (a TEAM VS winner's mark, which its Team VS Start tests, as SEAN's cc hit
-    # does) and globals 0 (10 sends a KO to make hikari), 1, 2 and 4 (below), 3 (0 takes each 開始時
+    # hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
+    # story stance's vanish, PC 28; every other test of 14 is for 10 or 100) and 15 (a TEAM VS
+    # winner's mark, which its Team VS Start tests, as SEAN's cc hit does) and globals 0 (10 sends a KO to make hikari), 1, 2 and 4 (below), 3 (0 takes each 開始時
     # BR, above 0 the ZA hits), 5 (MASA's and 3-TIMES's VS openings), 6 (the freeze), 8 and 9 (a TEAM
     # VS winner's life, 1P's and 2P's), 10 (10, as story's select screen leaves it, takes each
     # 開始時's and stage object's story path), 11 (10 or above 99 turns the stage's track off) and 14
@@ -118,7 +119,8 @@ def decode_event(record):
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
                                                                               0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x83, 0x86,
-                                                                              *GLOBALS):
+                                                                              *GLOBALS) \
+            or op == 0x1f and record[4] == 0x4e and record[5] == 8:
         return test_event(record)
     # Global r[4] & 0x3f = (1) or += (2) r[7:9], clamped to ±30000 (0x4138f0): 0 (at 10 a KO enters make hikari),
     # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai

@@ -3994,7 +3994,15 @@ export class Match {
     if (this.musicAttack(f) || this.vanish(f)) return;
     if (this.moveKO(f)) return;
     if (this.counter(f, history)) return;
-    if (f.action === 'script' && this.moveScripted(f)) return;
+    // 通常立ち's own branches stay neutral, where the free state takes the
+    // round's result whatever their PC (0x410ff1): the vanished Chii's loop
+    // (ZAKU's 1 + 27, PC 31) enters his lose action, and so INAI (11).
+    const neutral =
+      f.action === 'script' &&
+      NEUTRAL[f.who][String(f.branch).split('+')[0]] === 'idle' &&
+      this.winner &&
+      this.result(f);
+    if (f.action === 'script' && !neutral && this.moveScripted(f)) return;
     if (this.gonMiss(f)) return;
     if (this.moveLaunch(f)) return;
     this.slideReaction(f);
