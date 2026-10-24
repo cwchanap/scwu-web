@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
-import { LIFE, Match } from './match';
+import { firstStrike, LIFE, Match } from './match';
 import type { Fighter } from './match';
 import type { Who } from './characters';
 import { scenarioOf, Story } from './story';
+import { enter, RYUKO } from './testing';
 import type { Battle, Slot } from './story';
 
 // A third player borrowed from another match: a story battle seats up to
@@ -259,6 +260,33 @@ describe('story battles', () => {
       knockOut(match, zaku, other);
       const gainer = flags === 0x80 ? ryuko : other;
       expect(gainer).toMatchObject({ hp: 150, power: 10 });
+    }
+  });
+
+  it("pays a KO again for each hit that takes life from a KO'd player, but not for one without damage (0x40f747)", () => {
+    for (const damage of [10, 0]) {
+      const match = Match.story(
+        'ryuko',
+        battle({ slots: [slot({ flags: 0x80, life: 50, power: 10 }), null] }),
+      );
+      fight(match);
+      const [ryuko, zaku] = match.fighters;
+      zaku.x = ryuko.x + 120 * ryuko.facing;
+      ryuko.hp = 100;
+      ryuko.stock = 0;
+      zaku.hp = 0;
+      // At punch's first box, which the next step's hit test reads.
+      const { from } = firstStrike('ryuko', RYUKO.punch, 'ryuko');
+      enter(match, ryuko, RYUKO.punch, from);
+      ryuko.box = { ...ryuko.box!, damage };
+      match.step();
+      expect(ryuko.connected).toBe(true);
+      expect(ryuko).toMatchObject(
+        damage ? { hp: 150, power: 10 } : { hp: 100, power: 0 },
+      );
+      expect(zaku.pending).toMatchObject({
+        action: damage ? 'koAgain' : 'hit',
+      });
     }
   });
 

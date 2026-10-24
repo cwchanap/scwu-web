@@ -4634,13 +4634,16 @@ export class Match {
       const body = source === f;
       if (damaging) target.hitStop = source.hitStop = 0;
       const wasOut = target.hp === 0;
-      f.damage += loseLife(target, strength);
+      const loss = loseLife(target, strength);
+      f.damage += loss;
       if (!blocked) f.hits++;
       // A loss that empties life, a chip's too (0x40e7c0), queues the lose
       // action instead (0x40e84b), so the reaction's records never run: no
       // op 0x15 power, no op 0x1a stops. The last box to reach the victim
-      // sets its reaction, so DST's two missiles stop it once.
-      if (target.hp === 0) this.knockOut(target, wasOut);
+      // sets its reaction, so DST's two missiles stop it once. A KO'd
+      // victim KOs again, scoring again, but a box without damage takes
+      // nothing and so doesn't (0x40f689, 0x40f747).
+      if (loss && target.hp === 0) this.knockOut(target, wasOut);
       else if (timeline) target.pending = { key: timeline };
       else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
       target.reaction = blocked
