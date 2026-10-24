@@ -1,7 +1,7 @@
 import type Phaser from 'phaser';
 import { lifeOf, perStockOf } from './characters';
 import type { Who } from './characters';
-import { FIGHTER_Z, LIFE, ROUNDS_TO_WIN } from './match';
+import { LIFE, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
 import ui from './generated/ui.json';
 
@@ -282,11 +282,14 @@ const STOCK_OFFSETS = [
   [-2, -1],
 ];
 
-// The draw walks the priority lists lowest first (0x404df1). scene.ts draws
-// world objects at 1–1.2, so a viewport object below the fighters' priority
-// sits over the court under them all, and one from it over them all, by its z
-// within either band.
-export const screenDepth = (z: number) => (z >= FIGHTER_Z ? 5 : 0.6) + z / 1000;
+// The draw walks the 128 priority lists lowest first (0x404df1), stage,
+// HUD, viewport and world objects alike. Within one go the players by slot,
+// then objects by slot (0x406570): round setup makes the stage objects
+// (0x406610, 0x408c3f) before the HUD's, and the round spawns the rest. The
+// HUD's objects hold no slot in the port, so they take HUD_ORDER, between.
+export const HUD_ORDER = 1000;
+export const depthOf = (z: number, order: number) => 1 + z / 1000 + order / 1e7;
+export const screenDepth = (z: number) => depthOf(z, HUD_ORDER);
 
 // `tint` makes a texture with op 0x23's colour offsets (scene.ts).
 export function createHud(

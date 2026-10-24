@@ -17,7 +17,13 @@ import {
 import type { Demo, SelectObject } from './select';
 import { Story } from './story';
 import type { Battle, Next } from './story';
-import { createHud, letteringSounds, screenDepth } from './hud';
+import {
+  createHud,
+  depthOf,
+  HUD_ORDER,
+  letteringSounds,
+  screenDepth,
+} from './hud';
 import { StandingVM, heldPlacement, placement } from './standing';
 import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
@@ -25,7 +31,6 @@ import {
   afterimageColor,
   faderColor,
   fighterPose,
-  FIGHTER_Z,
   FixedClock,
   GROUND,
   HEIGHT,
@@ -96,15 +101,12 @@ const STORY_DEMOS = import.meta.glob<StoryDemoData>(
 // Authored: a story demo's sounds of five seconds or more are its tracks,
 // which play only with Music ticked, as the stages' and the title's do.
 const TRACK_SECONDS = 5;
-// The draw walks the priority lists lowest first, the players' slots before
-// any object's within one (0x404df1). A viewport object behind the fighters
-// (the KO flash, z 15 like action 43) sits over the court. Within its band a
-// higher z draws in front: ANMC P's EN300 cut-in (305, z 50) over its
-// background (304, z 49). Equal z draws in slot order (0x406570), which
-// the depth carries: a reused sprite keeps a stale place in Phaser's list.
-const worldDepth = (z: number, slot: number) => 1 + (z + slot / 4) / 1000;
-const effectDepth = (e: Effect) =>
-  (e.screen ? screenDepth(e.z) : worldDepth(e.z, 2)) + e.index / 1e7;
+// Objects draw by priority, then slot (hud.ts `depthOf`): the slots below
+// `setup`, round setup's stage objects, before the HUD, later ones after it.
+// The depth carries the slot, as a reused sprite keeps a stale place in
+// Phaser's list.
+const objectDepth = (e: Effect, setup: number) =>
+  depthOf(e.z, e.index < setup ? 8 + e.index : HUD_ORDER + e.index);
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
@@ -712,7 +714,7 @@ export class TrainingScene extends Phaser.Scene {
           .image(0, 0, 'ryuko-294')
           .setScale(ART_SCALE)
           .setScrollFactor(0)
-          .setDepth(0.5)
+          .setDepth(screenDepth(15))
           .setVisible(false),
       );
       this.shadows.push(this.add.ellipse(0, GROUND - 1, 94, 13, 0x171311, 0.3));
@@ -1043,6 +1045,7 @@ export class TrainingScene extends Phaser.Scene {
       // moving opposite the world objects, where Phaser takes it from the
       // camera scaled by the percentages.
       const { layers } = this.match;
+      const setup = 2 + STAGES[this.match.stage].objects.length;
       const shake = {
         x: this.shake.x.offset * ART_SCALE,
         y: this.shake.y.offset * ART_SCALE,
@@ -1055,7 +1058,7 @@ export class TrainingScene extends Phaser.Scene {
         const { x, y } = layer.stage!;
         this.paint(sprite, pose, layer.color, layer.who)
           .setOrigin(0)
-          .setDepth((layer.z < FIGHTER_Z ? 0.1 : 4.5) + layer.index / 1e7)
+          .setDepth(objectDepth(layer, setup))
           .setScrollFactor(x / 100, y / 100)
           .setPosition(
             layer.x + pose.dx * ART_SCALE + shake.x * (1 + x / 100),
@@ -1096,7 +1099,7 @@ export class TrainingScene extends Phaser.Scene {
           f.who,
           this.palettes[i],
         )
-          .setDepth(worldDepth(f.z, i))
+          .setDepth(depthOf(f.z, i))
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
         const { shown } = f.black;
@@ -1128,7 +1131,7 @@ export class TrainingScene extends Phaser.Scene {
         const pose = animationFrame(effect.clip, effect.age, effect.who);
         this.place(
           sprite
-            .setDepth(effectDepth(effect))
+            .setDepth(objectDepth(effect, setup))
             .setScrollFactor(effect.screen ? 0 : 1),
           effect.who,
           pose,
@@ -1147,7 +1150,7 @@ export class TrainingScene extends Phaser.Scene {
           if (!trail) return [];
           const object = 'clip' in actor ? actor : null;
           const depth = object
-            ? effectDepth(object)
+            ? objectDepth(object, setup)
             : this.sprites[index].depth;
           const skipped = trail.spec.count - trail.samples.length;
           const owner = object?.owner ?? index;
@@ -1155,7 +1158,7 @@ export class TrainingScene extends Phaser.Scene {
             ...sample,
             who: actor.who,
             palette: this.paletteOf(actor.who, owner),
-            depth: depth - 1e-4,
+            depth: depth - 1e-8 + i * 1e-10,
             screen: object?.screen ?? false,
             color: afterimageColor(
               trail,
