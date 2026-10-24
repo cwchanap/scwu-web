@@ -100,10 +100,11 @@ const TRACK_SECONDS = 5;
 // any object's within one (0x404df1). A viewport object behind the fighters
 // (the KO flash, z 15 like action 43) sits over the court. Within its band a
 // higher z draws in front: ANMC P's EN300 cut-in (305, z 50) over its
-// background (304, z 49).
+// background (304, z 49). Equal z draws in slot order (0x406570), which
+// the depth carries: a reused sprite keeps a stale place in Phaser's list.
 const worldDepth = (z: number, slot: number) => 1 + (z + slot / 4) / 1000;
 const effectDepth = (e: Effect) =>
-  e.screen ? screenDepth(e.z) : worldDepth(e.z, 2);
+  (e.screen ? screenDepth(e.z) : worldDepth(e.z, 2)) + e.index / 1e7;
 const still = (): ShakeAxis => ({
   type: 0,
   amplitude: 0,
@@ -1054,7 +1055,7 @@ export class TrainingScene extends Phaser.Scene {
         const { x, y } = layer.stage!;
         this.paint(sprite, pose, layer.color, layer.who)
           .setOrigin(0)
-          .setDepth(layer.z < FIGHTER_Z ? 0.1 : 4.5)
+          .setDepth((layer.z < FIGHTER_Z ? 0.1 : 4.5) + layer.index / 1e7)
           .setScrollFactor(x / 100, y / 100)
           .setPosition(
             layer.x + pose.dx * ART_SCALE + shake.x * (1 + x / 100),
