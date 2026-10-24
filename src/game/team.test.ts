@@ -245,6 +245,19 @@ describe('story battles', () => {
     expect(ryuko.target).toBe(zaku);
   });
 
+  it("holds no waiting slot with KO Normal's stop, so it enters unheld", () => {
+    const match = Match.story('ryuko', FIRST);
+    fight(match);
+    const [ryuko, zaku, , three] = match.fighters;
+    knockOut(match, ryuko, zaku);
+    for (let t = 0; t < 100 && zaku.hitStop < 20; t++) match.step();
+    // PC 611's 40 for the others (op 0x1a, 0x4136ae) reaches only seats
+    // whose set-up ran (+0x2238, 0x411fb0); the story step clears it
+    // (0x4069eb).
+    expect(zaku.hitStop).toBeGreaterThan(20);
+    expect(three).toMatchObject({ present: false, hitStop: 0 });
+  });
+
   it("gives a slot's KO bonus to the 1P (bit 7) or the striker (bit 8)", () => {
     for (const flags of [0x80, 0x100]) {
       const match = Match.story(

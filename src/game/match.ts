@@ -4481,7 +4481,7 @@ export class Match {
       // pressed again once control begins.
       this.inputs.forEach((input, i) => this.record(i, input));
       this.previous = this.inputs.map((input) => ({ ...input }));
-      for (const f of this.fighters) this.pause(f, this.koStop);
+      for (const f of this.fighters) if (f.present) this.pause(f, this.koStop);
       // KGT 13, which round setup spawns after the players at priority 0x65
       // (0x408ce9), steps after the objects below it: it holds global 14 at
       // 10 for its first 10 ticks (PCs 70, 78, 88, 97), so a 開始時 BR that
@@ -4528,8 +4528,9 @@ export class Match {
       this.move(f, inputs[i], this.previous[i], this.history[i]);
       this.enter(f, i);
     }
-    // Applied after both steps, so a double KO holds once.
-    for (const f of this.fighters) this.pause(f, this.koStop);
+    // Applied after both steps, so a double KO holds once; like op 0x1a's
+    // other stop it skips a slot still waiting to enter (+0x2238, 0x4136ae).
+    for (const f of this.fighters) if (f.present) this.pause(f, this.koStop);
     this.stepObjects(objects);
     // The Vs. result states spawn 1P or 2P WIN (KGT 30, 31; 0x4094ad,
     // 0x409582), whose first step, at 0x65, sets global 8 or 9 to 1 (KGT PCs
