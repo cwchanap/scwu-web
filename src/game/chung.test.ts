@@ -261,7 +261,7 @@ describe('Chung (04 CHUNG.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'chung']);
+    const match = new Match('cpu', false, 1, ['ryuko', 'chung']);
     const chung = match.fighters[1];
     const entered = new Set<unknown>();
     // Fire ball, lee and cpu jump wall (410), which has no key.

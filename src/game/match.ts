@@ -420,6 +420,10 @@ const doraFall = (age: number) => {
 };
 // Ryuko's lose action (+0x75a0), which jumps into KO Normal (60).
 const LOSE = 59;
+// Ryuko's and LIZARD's HISA Down Down lands into Chuck DOWN DOWN (147, PC
+// 1664); every other player's into their Down normal (Zoma's 146, PC 1585),
+// which lies 30 ticks less.
+const BOUNCE_DOWN: readonly Who[] = ['ryuko', 'lizard'];
 // The KOs that launch straight up and sink without sliding (moveKO).
 const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // Ryuko's knockdown, 'DOWN normal', and its get-up, 'Down Get up': Z-MEGA's
@@ -2696,7 +2700,9 @@ export class Match {
       } else if (f.slideBase)
         f.moving = f.vx = f.facing * f.slideBase * SOURCE_VELOCITY_SCALE;
     }
-    if (f.action === 'bounceDown' && f.age <= 10)
+    // Down normal and Chuck DOWN DOWN slide at raw −200 for their first 10
+    // ticks (146, 147; PCs 1985, 2001), as every player's do.
+    if ((f.action === 'knockdown' || f.action === 'bounceDown') && f.age <= 10)
       f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
   }
 
@@ -3595,7 +3601,13 @@ export class Match {
     }
     f.variables[1] = 0;
     const launch = launchMotion[f.action];
-    if (launch) this.action(f, launch.land);
+    if (launch)
+      this.action(
+        f,
+        f.action === 'slamBounce' && !BOUNCE_DOWN.includes(f.who)
+          ? 'knockdown'
+          : launch.land,
+      );
     // The air reactions have no handler; the free state reads commands on
     // the same tick.
     else if (AIR_REACTIONS[f.action]) {

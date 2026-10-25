@@ -224,7 +224,7 @@ describe('REAR (24 REAR.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'rear']);
+    const match = new Match('cpu', false, 75, ['ryuko', 'rear']);
     const rear = match.fighters[1];
     const entered = new Set<unknown>();
     // Viper start, FIRE BALL start, sama start, Churaka start and EN300

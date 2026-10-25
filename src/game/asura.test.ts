@@ -353,8 +353,8 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
     // His CPU's own cpu dash, and cpu DJ, which runs into his high jump (PC
     // 2579).
     for (const [seed, wanted] of [
-      [6, [154, 168, 152, 226, 160, 227]],
-      [2, [160, 152, 154, 156, 227]],
+      [0, [154, 168, 152, 226, 160, 227]],
+      [1, [160, 152, 154, 156, 227]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'asura']);
       const asura = match.fighters[1];

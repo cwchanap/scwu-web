@@ -560,8 +560,8 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
   it('plays his own CPU table in Vs. CPU', () => {
     // His CPU's own CPU D F (306), as well as his moves.
     for (const [seed, wanted] of [
-      [5, [205, 201, 306, 164, 170, 181, 188, 193, 213, 167, 216]],
-      [10, [175]],
+      [5, [205, 201, 306, 164, 170, 181, 193, 213, 167, 216]],
+      [10, [175, 188]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'astroman']);
       const astroman = match.fighters[1];

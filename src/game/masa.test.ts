@@ -345,7 +345,7 @@ describe('MASA (29 MASA.PLAYER)', () => {
     // His CPU's own CPU 3Fire, CPU 3HIT and CPU SR, and SC Super's RAMBU
     // (287 + 5) out of CPU 3HIT 2 or 3, which set variable 6 (PCs 5823, 5868).
     const wanted = [401, 402, 406, '287+5'];
-    for (const seed of [64, 6]) {
+    for (const seed of [64, 46]) {
       const match = new Match('cpu', false, seed, ['ryuko', 'masa']);
       const masa = match.fighters[1];
       for (let t = 0; t < 30000 && !wanted.every((b) => entered.has(b)); t++) {

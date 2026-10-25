@@ -340,7 +340,7 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
   it('plays his own CPU table in Vs. CPU', () => {
     const wanted = [158, 159, 160, 163, 168, 186, 193, 200];
     const entered = new Set<unknown>();
-    for (const seed of [1, 13]) {
+    for (const seed of [1, 2]) {
       const match = new Match('cpu', true, seed, ['ryuko', 'rario']);
       const rario = match.fighters[1];
       for (let t = 0; t < 4000 && !wanted.every((b) => entered.has(b)); t++) {

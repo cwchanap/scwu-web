@@ -479,10 +479,11 @@ describe('recovered neutral and round animations', () => {
         apex = Math.min(apex, target.y);
         match.step();
       }
-      // Raw −300/−1020 with gravity 90: 18 rising steps and 37 in the air.
+      // Raw −300/−1020 with gravity 90: 18 rising steps and 37 in the air,
+      // then the knockdown's 10 at raw −200 (146, PC 1985).
       expect(apex).toBeCloseTo(-136.8148, 3);
       expect((target.x - startX) * facing).toBeCloseTo(
-        37 * 300 * (655 / 65536) * 1.5,
+        (37 * 300 + 10 * 200) * (655 / 65536) * 1.5,
         3,
       );
       expect(seen).toEqual(new Set(['sweep', 'knockdown', 'getUp', 'idle']));
@@ -1691,6 +1692,31 @@ describe('recovered victim responses', () => {
     }
     const { victim } = hit('punch3', { guard: true });
     expect(victim).toMatchObject({ action: 'blockHeavy', hp: LIFE });
+  });
+
+  it('lands a slam bounce in each player’s own knockdown, sliding back 30 pixels', () => {
+    // Every HISA Down Down (124) but Ryuko's and LIZARD's lands into Down
+    // normal (Zoma's 146, PC 1585), theirs into Chuck DOWN DOWN (147, PC
+    // 1664), 30 ticks longer; both slide at raw −200 for 10 (PCs 1985, 2001).
+    const slam = (who: Who) => {
+      const match = new Match('practice', false, 0, ['ryuko', who]);
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 120;
+      enter(match, f, RYUKO.punch3, 13, 18);
+      for (let t = 0; t < 100 && victim.action !== 'slamBounce'; t++)
+        match.step();
+      for (let t = 0; t < 100 && victim.action === 'slamBounce'; t++)
+        match.step();
+      const { action, x } = victim;
+      let ticks = 0;
+      for (; victim.action === action && ticks < 200; ticks++) match.step();
+      return [action, ticks, Math.round(victim.x - x)];
+    };
+    expect([slam('zoma'), slam('ryuko'), slam('lizard')]).toEqual([
+      ['knockdown', 60, 30],
+      ['bounceDown', 90, 30],
+      ['bounceDown', 90, 30],
+    ]);
   });
 
   it('lets a strike reach a slam bounce once its body box opens (124, PC 1668)', () => {

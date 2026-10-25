@@ -282,7 +282,7 @@ describe('PAC-HELO (36 PAC-HELO.PLAYER)', () => {
     // 0x411681), and enters Super roo cpu (214) and its own dashes.
     for (const [seed, wanted] of [
       [28, [196, 192, 214, 271, 272]],
-      [2, [196, 192, 193, 214]],
+      [3, [196, 192, 193, 214]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'pachelo']);
       const pac = match.fighters[1];

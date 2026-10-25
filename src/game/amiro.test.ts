@@ -179,7 +179,7 @@ describe('Amiro (05 AMIRO.PLAYER)', () => {
     const entered = new Set<unknown>();
     // BEAM, funnal and cpu mornign (445), which has no key, over two seeds.
     const wanted = [230, 275, 445];
-    for (const seed of [0, 1]) {
+    for (const seed of [0, 37]) {
       const match = new Match('cpu', false, seed, ['ryuko', 'amiro']);
       const amiro = match.fighters[1];
       for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {

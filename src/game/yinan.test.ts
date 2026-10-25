@@ -841,7 +841,7 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
   it('plays her own CPU table in Vs. CPU', () => {
     // Her CPU's own CPU Driver Far (658) and its ARX-7 (660).
     for (const [seed, wanted] of [
-      [17, [337, 658, 394, 252, 212, 213, 214, 216, 276]],
+      [27, [337, 658, 394, 252, 212, 213, 214, 216, 276]],
       [26, ['660+3', 661]],
       [6, [411, 249]],
     ] as const) {

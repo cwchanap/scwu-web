@@ -318,7 +318,7 @@ describe('KATE (22 KATE.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'kate']);
+    const match = new Match('cpu', false, 1, ['ryuko', 'kate']);
     const kate = match.fighters[1];
     const entered = new Set<unknown>();
     // DASH ATTACK, af add, EN slash start and counter start.

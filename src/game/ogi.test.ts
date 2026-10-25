@@ -285,7 +285,7 @@ describe('OGI (27 OGI.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 5, ['ryuko', 'ogi']);
+    const match = new Match('cpu', false, 39, ['ryuko', 'ogi']);
     const ogi = match.fighters[1];
     const entered = new Set<unknown>();
     // Shoot start K, shoot start P, Crush start, S SHOOT START and his CPU's

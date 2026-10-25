@@ -261,7 +261,7 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     const entered = new Set<unknown>();
     // H PUNCH, base ball and counter, over two seeds.
     const wanted = [254, 235, 278];
-    for (const seed of [0, 3]) {
+    for (const seed of [0, 2]) {
       const match = new Match('cpu', false, seed, ['ryuko', 'giant']);
       const giant = match.fighters[1];
       for (let t = 0; t < 8000 && !wanted.every((b) => entered.has(b)); t++) {

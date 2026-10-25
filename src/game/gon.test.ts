@@ -309,7 +309,7 @@ describe('GON (21 GON.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'gon']);
+    const match = new Match('cpu', false, 1, ['ryuko', 'gon']);
     const gon = match.fighters[1];
     const entered = new Set<unknown>();
     // CPU D, CPU DJ into High Jump (7), CPU DRill and CPU Dra.

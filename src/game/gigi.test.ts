@@ -412,7 +412,7 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'gigi']);
+    const match = new Match('cpu', false, 16, ['ryuko', 'gigi']);
     const gigi = match.fighters[1];
     const entered = new Set<unknown>();
     // Dragon start, Bike start P, super chuck start and his CPU's own cpu

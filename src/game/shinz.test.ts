@@ -303,7 +303,7 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
     // air add (PC 4243).
     for (const [seed, wanted] of [
       [9, [318, 236]],
-      [14, [319, 206]],
+      [34, [319, 206]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'shinz']);
       const shinz = match.fighters[1];
