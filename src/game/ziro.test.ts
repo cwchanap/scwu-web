@@ -443,7 +443,7 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 11, ['ryuko', 'ziro']);
+    const match = new Match('cpu', false, 23, ['ryuko', 'ziro']);
     const ziro = match.fighters[1];
     const entered = new Set<unknown>();
     // TALE K N, NATAKU FIST K, Shoot start, CC START and his CPU's own cpu

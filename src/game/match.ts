@@ -149,11 +149,12 @@ const reactionSlides: Partial<
   // Unclamped: the beam hit stops at its 25th moving tick, then drifts back in.
   hitRapid: slide(0, -150, 10), // 83, PC 954
 };
-// KAY's HISO stop holds 33 ticks (116, PC 1559) to Ryuko's 36; GIGI's
-// heavy and rapid crouching guards slide at raw −320 unslowed (160, PC 2251)
-// and −250 (169, PC 2382).
+// KAY's and ASTROMAN's HISO stop hold 33 ticks (116, 112; PCs 1559, 1499)
+// to Ryuko's 36; GIGI's heavy and rapid crouching guards slide at raw −320
+// unslowed (160, PC 2251) and −250 (169, PC 2382).
 const OWN_SLIDES: Partial<Record<Who, typeof reactionSlides>> = {
   kay: { hisoStop: slide(39, -650, 10) },
+  astroman: { hisoStop: slide(39, -650, 10) },
   gigi: {
     crouchBlockHeavy: slide(9, -320),
     crouchBlockRapid: slide(9, -250, 8),
@@ -2546,11 +2547,7 @@ export class Match {
       return true;
     }
     if (f.action === 'koLand') {
-      if (
-        !STRAIGHT_KO.includes(f.who) &&
-        f.age <= (f.who === 'amiro' ? 12 : 10)
-      )
-        f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
+      this.slideDown(f);
       return true;
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
@@ -2700,10 +2697,24 @@ export class Match {
       } else if (f.slideBase)
         f.moving = f.vx = f.facing * f.slideBase * SOURCE_VELOCITY_SCALE;
     }
-    // Down normal and Chuck DOWN DOWN slide at raw −200 for their first 10
-    // ticks (146, 147; PCs 1985, 2001), as every player's do.
-    if ((f.action === 'knockdown' || f.action === 'bounceDown') && f.age <= 10)
-      f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
+    this.slideDown(f);
+  }
+
+  // Down normal and Chuck DOWN DOWN (146, 147; PCs 1985, 2001), every
+  // player's, and KO DOWN (62, PC 641) slide back at raw −200 for their first
+  // 10 ticks, Amiro's KO DOWN for 12 (PCs 710–714), from the tick they're
+  // entered, a landing's too: the landing step enters them before the motion
+  // pass (0x412564).
+  private slideDown(f: Fighter) {
+    const ticks =
+      f.action === 'knockdown' || f.action === 'bounceDown'
+        ? 10
+        : f.action === 'koLand' && !f.branch && !STRAIGHT_KO.includes(f.who)
+          ? f.who === 'amiro'
+            ? 12
+            : 10
+          : 0;
+    if (f.age < ticks) f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
   }
 
   // A victim follows its holder's script until an action is queued for it
@@ -3597,17 +3608,20 @@ export class Match {
       const timeline = KO_TIMELINES.has(f.who) && twin(f.who, KO_DOWN);
       this.action(f, 'koLand', false, timeline || undefined);
       if (f.branch) this.rollResult(f);
+      this.slideDown(f);
       return true;
     }
     f.variables[1] = 0;
     const launch = launchMotion[f.action];
-    if (launch)
+    if (launch) {
       this.action(
         f,
         f.action === 'slamBounce' && !BOUNCE_DOWN.includes(f.who)
           ? 'knockdown'
           : launch.land,
       );
+      this.slideDown(f);
+    }
     // The air reactions have no handler; the free state reads commands on
     // the same tick.
     else if (AIR_REACTIONS[f.action]) {

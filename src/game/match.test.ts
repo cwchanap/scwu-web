@@ -1697,7 +1697,8 @@ describe('recovered victim responses', () => {
   it('lands a slam bounce in each player’s own knockdown, sliding back 30 pixels', () => {
     // Every HISA Down Down (124) but Ryuko's and LIZARD's lands into Down
     // normal (Zoma's 146, PC 1585), theirs into Chuck DOWN DOWN (147, PC
-    // 1664), 30 ticks longer; both slide at raw −200 for 10 (PCs 1985, 2001).
+    // 1664), 30 ticks longer; both slide at raw −200 for 10 (PCs 1985, 2001),
+    // from the landing step, which enters them before the motion pass.
     const slam = (who: Who) => {
       const match = new Match('practice', false, 0, ['ryuko', who]);
       const [f, victim] = match.fighters;
@@ -1705,17 +1706,26 @@ describe('recovered victim responses', () => {
       enter(match, f, RYUKO.punch3, 13, 18);
       for (let t = 0; t < 100 && victim.action !== 'slamBounce'; t++)
         match.step();
-      for (let t = 0; t < 100 && victim.action === 'slamBounce'; t++)
+      let x = victim.x;
+      for (let t = 0; t < 100 && victim.action === 'slamBounce'; t++) {
+        x = victim.x;
         match.step();
-      const { action, x } = victim;
+      }
+      const { action } = victim;
+      const moves: number[] = [];
       let ticks = 0;
-      for (; victim.action === action && ticks < 200; ticks++) match.step();
-      return [action, ticks, Math.round(victim.x - x)];
+      for (; victim.action === action && ticks < 200; ticks++) {
+        if (moves.length < 11) moves.push(Math.round(victim.x - x));
+        x = victim.x;
+        match.step();
+      }
+      return [action, ticks, moves];
     };
+    const slide = [...Array<number>(10).fill(3), 0];
     expect([slam('zoma'), slam('ryuko'), slam('lizard')]).toEqual([
-      ['knockdown', 60, 30],
-      ['bounceDown', 90, 30],
-      ['bounceDown', 90, 30],
+      ['knockdown', 60, slide],
+      ['bounceDown', 90, slide],
+      ['bounceDown', 90, slide],
     ]);
   });
 
@@ -5786,8 +5796,12 @@ describe('prototype training rules', () => {
         apex = Math.min(apex, target.y);
       }
       expect(apex).toBeCloseTo(-309.369965, 4);
+      // KO DOWN's slide moves on the landing tick too (PC 641).
       expect(target).toMatchObject({ action: 'koLand', age: 0, y: 0 });
-      expect((target.x - 960) * facing).toBeCloseTo(419.769287, 4);
+      expect((target.x - 960) * facing).toBeCloseTo(
+        419.769287 + 200 * (655 / 65536) * 1.5,
+        4,
+      );
       ticks(match, 10);
       expect((target.x - 960) * facing).toBeCloseTo(449.752808, 4);
       expect(animationFrame('koLand', target.age).image).toBe(63);

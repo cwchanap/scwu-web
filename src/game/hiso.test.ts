@@ -147,17 +147,19 @@ describe('HISO (17 HISO.PLAYER)', () => {
     expect(struck(34)).toMatchObject({ mine: [243, 'hit', 'idle'], damage: 0 });
   });
 
-  it("stops whom GUN SHOT's shot meets (response 64, HISO stop): 36 ticks, then the heavy hit's slide; KAY's 33 (PC 1559)", () => {
+  it("stops whom GUN SHOT's shot meets (response 64, HISO stop): 36 ticks, then the heavy hit's slide; KAY's and ASTROMAN's 33 (PCs 1559, 1499)", () => {
     for (const [opponent, slides] of [
       ['ryuko', 57],
       ['kay', 54],
+      ['astroman', 54],
     ] as const) {
       const shot = byKey({ megaBeam: true }, { gap: 250, opponent });
       expect([shot.yours, shot.damage]).toEqual([
         ['idle', 'hisoStop', 'idle'],
         15,
       ]);
-      // 15 stop ticks, then 36 (KAY's 33) + 3 + 3 still (PCs 1466–1468).
+      // 15 stop ticks, then 36 (KAY's and ASTROMAN's 33) + 3 + 3 still (PCs
+      // 1466–1468).
       const { other, steps } = hisoPlayer(250, opponent);
       steps({}, 2);
       let start = -1;
