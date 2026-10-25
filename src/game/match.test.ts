@@ -1509,6 +1509,56 @@ describe('recovered victim responses', () => {
     },
   );
 
+  it("counts the air kick's strikes in variable 5, which J atttack's run-out clears (PCs 831, 849)", () => {
+    const { match, victim } = hit('airKick', {});
+    const counts = [victim.variables[5]];
+    for (let t = 0; t < 300; t++) {
+      match.step();
+      if (counts.at(-1) !== victim.variables[5])
+        counts.push(victim.variables[5]);
+    }
+    expect(counts).toEqual([1, 2, 3, 0]);
+  });
+
+  it.each([
+    // Above 4 J atttack 2 (78, PC 830) halts at raw −250 (PC 859), which
+    // the slide adds to from age 9 (PC 845); above 7 its + 11, at −500
+    // (PCs 829, 869). KAY's tests both above 4 (PCs 845–846).
+    ['ryuko', [0, 0, 0, 0, 0, -250, -250, -250, -500]],
+    ['kay', [0, 0, 0, 0, 0, -500, -500, -500, -500]],
+  ] as const)(
+    "pushes %s's jump hits in a row harder from the sixth",
+    (who, pushes) => {
+      const match = new Match('practice', false, 3, ['ryuko', who]);
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 300;
+      const raw = () => victim.vx / (victim.facing * S) + 0;
+      const until = (age: number) => {
+        while (victim.age !== age) match.step();
+      };
+      const seen = pushes.map(() => {
+        // Each queued as a jump attack's contact queues it, before the
+        // last runs out.
+        victim.pending = {
+          action: 'jumpHit',
+          stop: 15,
+          attackerStop: 0,
+          power: 0,
+        };
+        match.step();
+        until(3);
+        const halted = raw();
+        until(9);
+        return [halted, raw()];
+      });
+      expect(seen.map(([halted]) => halted)).toEqual(pushes);
+      seen.forEach(([, sliding], k) =>
+        expect(sliding).toBeCloseTo(pushes[k] - 250 + (10 * A) / S, 6),
+      );
+      expect(victim.variables[5]).toBe(9);
+    },
+  );
+
   it.each([
     ['punch', 'airHit', LIFE - 10],
     ['crouchKick', 'sweep', LIFE - 30],

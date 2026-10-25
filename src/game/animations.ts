@@ -109,6 +109,8 @@ export const POSE_EVENTS = [
   'screen',
   'trail',
   'variable',
+  // Each jump hit's count (Ryuko's PC 831).
+  'add',
   // A clip action's op 0x1e window, which Zoma's stand (20) opens.
   'window',
 ] as const;

@@ -558,6 +558,9 @@ const STRIKER_POWER: Partial<Record<number, number>> = { 110: 10, 112: 10 };
 const FB = 110;
 const FIRE = new Set([FB, 111, 112]);
 const AIR_HIT_HEAVY = 76;
+// Each jump hit (J atttack, 77) counts in variable 5 (PC 831), which its
+// last record clears as it runs out (PC 849).
+const JUMP_HIT = 77;
 const copyOf = (who: Who, own: number) => {
   const victim = twinOf(who, own) ?? 0;
   return exported(own, who) && (FIRE.has(victim) || own !== twin(who, victim))
@@ -1104,6 +1107,9 @@ export interface Fighter {
   // The victim's own copy this reaction plays (copyOf): drawn, rolled and
   // entered in place of its clip.
   copy: number | null;
+  // Raw velocity J atttack 2's op 0x01 sets the jump hit sliding at, which
+  // its slide adds to (enterPending).
+  slideBase: number;
   // Where a result branch's check that jumped out of a call returns, as an
   // object's does (Effect's resume).
   resume?: { clip: ObjectKey; t: number; skip: number };
@@ -1463,6 +1469,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   z: FIGHTER_Z,
   branch: null,
   copy: null,
+  slideBase: 0,
   face: -1,
   variables: {},
   locals: {},
@@ -2319,6 +2326,7 @@ export class Match {
     f.branch =
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     f.copy = null;
+    f.slideBase = 0;
     f.resume = undefined;
     if (action === 'getUp' && GET_UP_ROLLS.has(f.who))
       this.rollPass(f, twin(f.who, GET_UP), true);
@@ -2623,12 +2631,13 @@ export class Match {
       else if (f.age >= slide.start) {
         f.vx =
           f.facing *
-          (slide.velocity * SOURCE_VELOCITY_SCALE +
+          ((slide.velocity + f.slideBase) * SOURCE_VELOCITY_SCALE +
             (f.age - slide.start + 1) *
               slide.acceleration *
               SOURCE_ACCELERATION_SCALE);
         f.moving = f.vx;
-      }
+      } else if (f.slideBase)
+        f.moving = f.vx = f.facing * f.slideBase * SOURCE_VELOCITY_SCALE;
     }
     if (f.action === 'bounceDown' && f.age <= 10)
       f.moving = -f.facing * 200 * SOURCE_VELOCITY_SCALE;
@@ -3959,6 +3968,25 @@ export class Match {
     if (f.y < 0 && own !== undefined && twinOf(f.who, own) === FB)
       [action, own] = ['airHitHeavy', twin(f.who, AIR_HIT_HEAVY)];
     const copy = own === undefined ? undefined : copyOf(f.who, own);
+    // Above 4 a jump hit's count enters J atttack 2 (78, PC 830), above 7
+    // its + 11 (PC 829): J atttack's records (PCs 831–838) but for an op
+    // 0x01 that adds raw −250 or −500 to the halted victim's velocity (PCs
+    // 859, 869), then a jump back to its first display (+ 15) and so its
+    // roll (Zoma's PC 784). KAY's tests both above 4 (PCs 845–846). A copy
+    // plays its own records instead: Giant's Air Fire clears the count at
+    // once (PC 1720).
+    const count =
+      action === 'jumpHit' &&
+      !copy &&
+      script(twin(f.who, JUMP_HIT), f.who).events.find(
+        (e) => e.op === 'test' && e.selector === 0x45 && this.passes(f, f, e),
+      );
+    const boost =
+      count &&
+      count.op === 'test' &&
+      script(sourceKey(count.action, count.offset), f.who).events.find(
+        (e) => e.op === 'motion',
+      );
     // Giant's reactions open by testing his counter's variable 4 (PCs 723,
     // 763, ...): at 100, which counter start (278) holds for 72 ticks (PCs
     // 4271–4282), they enter counter hit (279) before their stops and power.
@@ -3987,6 +4015,7 @@ export class Match {
     if (copy) [f.copy, power] = [copy, 0];
     f.vx = f.vy = 0;
     f.moving = 0;
+    if (boost && boost.op === 'motion') f.slideBase = boost.vx;
     this.pause(f, stop);
     this.pauseOthers(f, attackerStop);
     const [victimPower, attackerPower] = f.copy
@@ -4097,6 +4126,13 @@ export class Match {
     // One that ran out did so into the free state (0x412713).
     if (reactions.has(f.action) || f.action === 'land' || f.action === 'getUp')
       f.contact = 0;
+    if (f.action === 'jumpHit')
+      for (const event of script(f.copy ?? twin(f.who, JUMP_HIT), f.who).events)
+        if (
+          event.op === 'variable' &&
+          event.t >= animationDuration(f.action, f.who)
+        )
+          this.runEvent(f, this.fighters.indexOf(f), event);
     const airborne = f.y < 0 || f.vy < 0;
     // An air reaction that ends airborne falls (0x411a80), which frees the
     // fighter.
