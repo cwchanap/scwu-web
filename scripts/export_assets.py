@@ -92,7 +92,9 @@ def decode_event(record):
     # evaluates player variables 0 (EX mode), 1 (a double jump or air dash), 2 (a finisher's
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
-    # Stop, YINAN's dolls and beam, Yo's hit effects), 5 above 4 or 7 (each jump hit's count into its J atttack
+    # Stop, YINAN's dolls and beam, Yo's hit effects), 9 (100 from a jump's takeoff until landing or a double
+    # jump: ZENKA's JUMP 2s take their 179% copies, PCs 58, 207, Zoma's JUMP 2 F and Chung's wall jump pass over
+    # their window's close, PCs 136, 3943), 5 above 4 or 7 (each jump hit's count into its J atttack
     # 2, Ryuko's PCs 829–830) or for 0 (YINAN's EN3 Stones hold until her EN3 hits clear it, PCs 9456, 9106), 11
     # for 10 (ERUS's HP Charge runs off at the next one's Randon1, PCs 6844, 6848, 6873), 12 (EX Fire 2), 13 (ERUS's
     # coins and hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
@@ -122,7 +124,8 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
-                                                                              0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x83, 0x86,
+                                                                              0x47, 0x48, 0x49, 0x4c, 0x4d, 0x4f, 0x83,
+                                                                              0x86,
                                                                               *GLOBALS) \
             or op == 0x1f and record[4] == 0x4e and (record[5] == 8 or record[5] == 4 and s16(record, 9) == 10) \
             or op == 0x1f and record[4] == 0x45 and record[5] in (4, 8) \
@@ -409,6 +412,10 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
             # drops loop until landing enters their handler (0x410d50), which ends the call (+0x7c).
             # A 0-tick hold never runs out either: ERUS's Cerb2 calls 235 + 12 fifteen times (PC
             # 3419), each testing variable 13 into ---EX Rber--- + 2's run (PC 3422).
+            # A test into its own next record falls through there either way: each JUMP 2's of variable 9
+            # (Ryuko's PC 120) but ZENKA's, Zoma's JUMP 2 F and Chung's wall jump.
+            if event and event["op"] == "test" and event["action"] == action and a.start + event["offset"] == pc + 1:
+                event = None
             if stack and op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] >> 6 == 1 and loops(
                     p, u16(record, 1), record[3]) and u16(record, 1) not in {action, *(s[1] for s in stack)}:
                 event = test_event(record)

@@ -341,6 +341,26 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     ).toEqual([16, 8]);
   });
 
+  it('double-jumps on her 179% copy after any jump, whose takeoff sets variable 9 to 100 (PCs 58, 207)', () => {
+    // JUMP 2 tests variable 9 for 100 (PC 207) into JUMP 2 + 15, the copy
+    // her yowai form takes, which clears it (PC 227), as J LEND does.
+    const { match, zenka } = zenkaPlayer();
+    const seen: unknown[] = [];
+    for (let t = 0; t < 120; t++) {
+      match.step(t < 3 || (t >= 20 && t < 23) ? { jump: true } : {}, {});
+      if (seen.at(-1) !== now(zenka)) seen.push(now(zenka));
+    }
+    expect(seen).toEqual(['takeoff', 'jump', '11+15', 'land', 'idle']);
+    expect(zenka.variables[14] ?? 0).toBe(0);
+    expect(zenka.variables[9]).toBe(0);
+    const taken = (key: number | `${number}+${number}`) =>
+      script(key, 'zenka').frames[0].body!.map((box) => box.taken);
+    expect([taken(11), taken('11+15')]).toEqual([
+      [100, 100],
+      [179, 179],
+    ]);
+  });
+
   it('wins after DEMO STAND and her speech, holding image 283 (PC 799), and draws holding it too', () => {
     expect(animationDuration('win', 'zenka')).toBe(640);
     expect(
