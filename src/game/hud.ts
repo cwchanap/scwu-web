@@ -338,7 +338,7 @@ export function createHud(
   // faces at z 0x14 (op 0x04 flags 0x66: Ryuko's 70, PC 707), after the frame.
   const faces = [31, 539].map((x) =>
     scene.add
-      .image(x * scale, 36 * scale, 'ryuko-2001')
+      .image(x * scale, 36 * scale, '__DEFAULT')
       .setScrollFactor(0)
       .setOrigin(0)
       .setScale(scale)
@@ -349,7 +349,7 @@ export function createHud(
   // from actions 72/73.
   const names = [106, 474].map((x) =>
     scene.add
-      .image(x * scale, 38 * scale, 'ryuko-464')
+      .image(x * scale, 38 * scale, '__DEFAULT')
       .setScrollFactor(0)
       .setOrigin(0)
       .setScale(scale * 0.7)

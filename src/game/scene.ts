@@ -101,6 +101,25 @@ const STORY_DEMOS = import.meta.glob<StoryDemoData>(
 // Authored: a story demo's sounds of five seconds or more are its tracks,
 // which play only with Music ticked, as the stages' and the title's do.
 const TRACK_SECONDS = 5;
+// The images and sounds each player's select-screen programs show and play
+// (ops 0x0c and 0x03, select.ts), which load at start and stay; the rest of
+// a player's load with the matches that seat it (whenReady).
+const selectAssets = Object.fromEntries(
+  (Object.keys(CHARACTERS) as Who[]).map((who) => {
+    const records = Object.values(
+      CHARACTERS[who].select.actions as Record<string, number[][]>,
+    ).flat();
+    const used = (op: number, read: (r: number[]) => number) =>
+      new Set(records.filter((r) => r[0] === op).map(read));
+    return [
+      who,
+      {
+        images: used(0x0c, (r) => (r[3] | (r[4] << 8)) & 8191),
+        sounds: used(0x03, (r) => r[2] | (r[3] << 8)),
+      },
+    ];
+  }),
+) as Record<Who, { images: Set<number>; sounds: Set<number> }>;
 // Objects draw by priority, then slot (hud.ts `depthOf`): the slots below
 // `setup`, round setup's stage objects, before the HUD, later ones after it.
 // The depth carries the slot, as a reused sprite keeps a stale place in
@@ -164,7 +183,6 @@ export class TrainingScene extends Phaser.Scene {
   private chosen = false;
   private teams: { who: Who; palette: number }[][] | null = null;
   private stage: Stage = 'court';
-  private wantedStage = this.stage;
   match = new Match(
     'practice',
     false,
@@ -228,6 +246,10 @@ export class TrainingScene extends Phaser.Scene {
   // start share, as the engine keeps one set for the session.
   private globals = Array<number>(64).fill(0);
   private loading = false;
+  // The players whose images and sounds are all in, and the match whenReady
+  // last loaded for.
+  private players = new Set<Who>();
+  private wanted?: Match;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -242,9 +264,8 @@ export class TrainingScene extends Phaser.Scene {
 
   preload() {
     this.loadStage(this.stage);
-    for (const [who, { images }] of Object.entries(CHARACTERS))
-      for (const image of images)
-        this.load.image(`${who}-${image.index}`, BASE + image.filename);
+    for (const who of Object.keys(CHARACTERS) as Who[])
+      this.loadPlayer(who, false);
     for (const image of ui.images)
       this.load.image(`ui-${image.index}`, BASE + image.filename);
     this.load.image('text', BASE + 'text.png');
@@ -254,9 +275,6 @@ export class TrainingScene extends Phaser.Scene {
       for (const sound of sounds)
         this.load.audio(`${demo}-sound-${sound.index}`, BASE + sound.filename);
     }
-    for (const [who, { sounds }] of Object.entries(CHARACTERS))
-      for (const sound of sounds)
-        this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
     for (const sound of ui.sounds)
       this.load.audio(`kgt-sound-${sound.index}`, BASE + sound.filename);
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
@@ -430,8 +448,7 @@ export class TrainingScene extends Phaser.Scene {
     this.chosen = true;
     this.teams = select.team ? select.teams : null;
     this.palettes = battlePalettes(select.palettes);
-    this.leaveScreen();
-    this.reset(this.teams ? 'cpu' : this.match.mode);
+    this.reset(this.teams ? 'cpu' : this.match.mode, true);
   }
 
   private leaveScreen() {
@@ -452,7 +469,7 @@ export class TrainingScene extends Phaser.Scene {
     this.startBattle(next.battle);
   }
 
-  // A story battle on its stage, once the stage's images load.
+  // A story battle on its stage, once its images load.
   private startBattle(battle: Battle) {
     const match = Match.story(
       this.story!.who,
@@ -461,7 +478,7 @@ export class TrainingScene extends Phaser.Scene {
       this.storyHeld,
       this.globals,
     );
-    this.whenLoaded(match.stage, () => {
+    this.whenReady(match, () => {
       this.leaveScreen();
       this.begin(match);
     });
@@ -507,17 +524,78 @@ export class TrainingScene extends Phaser.Scene {
     });
   }
 
-  // Runs once a stage's images are in.
-  private whenLoaded(stage: Stage, then: () => void) {
-    if (this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`))
-      return then();
+  // Runs once a match's stage and every player it can seat (a story's
+  // waiting slots, both VS multi teams) are in, the last screen or match
+  // staying until then; the players it drops then free all but their select
+  // screens' images and sounds. All 45 players' images decode to about 6 GB.
+  // Only the last match asked for starts.
+  private whenReady(match: Match, then: () => void) {
+    this.wanted = match;
+    const players = new Set([
+      ...match.fighters.map((f) => f.who),
+      ...(match.teams?.flat() ?? []),
+    ]);
+    const missing = [...players].filter((who) => !this.players.has(who));
+    const start = () => {
+      for (const who of missing) this.players.add(who);
+      if (this.wanted !== match) return;
+      this.loading = false;
+      this.unloadPlayers(players);
+      then();
+    };
+    const { stage } = match;
+    if (
+      !missing.length &&
+      this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`)
+    )
+      return start();
     this.loading = true;
     this.loadStage(stage);
-    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-      this.loading = false;
-      then();
-    });
+    for (const who of missing) this.loadPlayer(who, true);
+    this.load.once(Phaser.Loader.Events.COMPLETE, start);
     this.load.start();
+  }
+  // A player's images and sounds: all of them, or its select screens'. The
+  // loader skips those already in.
+  private loadPlayer(who: Who, all: boolean) {
+    const { images, sounds } = CHARACTERS[who];
+    const select = selectAssets[who];
+    for (const image of images)
+      if (all || select.images.has(image.index))
+        this.load.image(`${who}-${image.index}`, BASE + image.filename);
+    for (const sound of sounds)
+      if (all || select.sounds.has(sound.index))
+        this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
+  }
+  private unloadPlayers(keep: Set<Who>) {
+    const textures = new Set<string>();
+    const sounds = new Set<string>();
+    for (const who of this.players) {
+      if (keep.has(who)) continue;
+      this.players.delete(who);
+      const select = selectAssets[who];
+      // Its recoloured and tinted copies too (`${key}@palette`, `${key}:rgb`).
+      for (const key of this.textures.getTextureKeys()) {
+        const [, owner, image] = /^([a-z]+)-(\d+)/.exec(key) ?? [];
+        if (owner === who && !select.images.has(Number(image)))
+          textures.add(key);
+      }
+      for (const { index } of CHARACTERS[who].sounds)
+        if (!select.sounds.has(index)) sounds.add(`${who}-sound-${index}`);
+    }
+    for (const object of this.children.list)
+      if (
+        object instanceof Phaser.GameObjects.Image &&
+        textures.has(object.texture.key)
+      )
+        object.setTexture('__DEFAULT');
+    for (const key of textures) this.textures.remove(key);
+    for (const key of sounds) {
+      this.sound.removeByKey(key);
+      this.cache.audio.remove(key);
+    }
+    for (const id of this.voices.keys())
+      if (sounds.has(id.slice(id.indexOf(':') + 1))) this.voices.delete(id);
   }
   // Demo and KGT objects draw their display's top left at their offset; a
   // player's select face and name stand on their ground point (placement).
@@ -576,26 +654,17 @@ export class TrainingScene extends Phaser.Scene {
     this.teams = null;
     this.reset(this.match.mode);
   }
-  // A stage's images load when it is first picked; the current one plays on
-  // until they arrive.
+  // A stage's images load when it is first picked (whenReady).
   setStage(stage: Stage) {
-    this.wantedStage = stage;
-    const start = () => {
-      if (this.wantedStage !== stage) return;
-      this.stage = stage;
-      this.reset(this.match.mode);
-    };
-    if (this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`))
-      return start();
-    this.loadStage(stage);
-    this.load.once(Phaser.Loader.Events.COMPLETE, start);
-    this.load.start();
+    this.stage = stage;
+    this.reset(this.match.mode);
   }
   private loadStage(stage: Stage) {
     for (const image of STAGES[stage].images)
       this.load.image(`${stage}-${image.index}`, BASE + image.filename);
   }
-  reset(mode: Mode) {
+  // `leave` closes the screen that chose the match once it starts.
+  reset(mode: Mode, leave = false) {
     // A story battle starts over.
     if (mode === 'story') {
       if (this.match.battle) this.startBattle(this.match.battle);
@@ -605,7 +674,7 @@ export class TrainingScene extends Phaser.Scene {
     // Authored: free practice and the CPU match no select screen chose keep
     // their own globals.
     const vs = this.chosen && mode === 'cpu';
-    this.begin(
+    const match =
       this.teams && mode === 'cpu'
         ? Match.team(
             this.teams.map((team) => team.map(({ who }) => who)),
@@ -623,8 +692,11 @@ export class TrainingScene extends Phaser.Scene {
             null,
             undefined,
             vs ? this.globals : undefined,
-          ),
-    );
+          );
+    this.whenReady(match, () => {
+      if (leave) this.leaveScreen();
+      this.begin(match);
+    });
   }
   private begin(match: Match) {
     this.match = match;
@@ -711,7 +783,7 @@ export class TrainingScene extends Phaser.Scene {
       // flags 0x46 at PCs 300/325): over the court, behind every object.
       this.blacks.push(
         this.add
-          .image(0, 0, 'ryuko-294')
+          .image(0, 0, '__DEFAULT')
           .setScale(ART_SCALE)
           .setScrollFactor(0)
           .setDepth(screenDepth(15))
@@ -719,7 +791,7 @@ export class TrainingScene extends Phaser.Scene {
       );
       this.shadows.push(this.add.ellipse(0, GROUND - 1, 94, 13, 0x171311, 0.3));
       this.sprites.push(
-        this.add.image(0, GROUND, 'ryuko-3').setOrigin(0).setScale(ART_SCALE),
+        this.add.image(0, GROUND, '__DEFAULT').setOrigin(0).setScale(ART_SCALE),
       );
     }
   }
@@ -728,7 +800,7 @@ export class TrainingScene extends Phaser.Scene {
     while (sprites.length < count)
       sprites.push(
         this.add
-          .image(0, 0, 'ryuko-424')
+          .image(0, 0, '__DEFAULT')
           .setScale(ART_SCALE)
           .setDepth(4)
           .setVisible(false),
