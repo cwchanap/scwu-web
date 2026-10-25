@@ -150,6 +150,27 @@ describe('ERUS (18 ERUS.PLAYER)', () => {
     ]);
   });
 
+  it("stops an HP Charge at the next one's Randon1, which holds variable 11 at 10 for 7 ticks (PCs 6873–6876)", () => {
+    const twice = (second: number) =>
+      play((t) => (t === 0 || t === second ? { getterBeam: true } : {}), {
+        hp: 1,
+        stock: 6,
+        gap: 200,
+        seed: 1,
+      });
+    // Seed 1 heals both times. The first heals 2 in each of HP Charge1's 40
+    // calls, then 1 in each of HP Charge2's, testing variable 11 after each
+    // (PCs 6844, 6848): at 10 it runs off at raw 30000 (423 + 5) and out of
+    // the world, here after 31, and the second heals all 160.
+    expect([twice(392).mine, twice(392).erus.hp]).toEqual([
+      [416, 'idle', 416, 'idle'],
+      1 + 80 + 31 + 160,
+    ]);
+    // HP Charge2 tests every 10 ticks, so 3 in 10 miss the window: both
+    // heal all 160.
+    expect(twice(400).erus.hp).toBe(1 + 160 + 160);
+  });
+
   it('has seven coins: Coin Start adds 100 to variable 13 (PC 5434) and enters no coin at 700 (PC 5424), which takes 100 back', () => {
     const coins = play(
       (t) => (t % 150 === 0 && t < 1500 ? { iori: true } : {}),

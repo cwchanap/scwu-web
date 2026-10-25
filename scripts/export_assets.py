@@ -93,9 +93,9 @@ def decode_event(record):
     # hit effect, ALEX's reflect), 3 (30 while KO'd or holding: Z-MEGA's drain stops at 1
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 5 above 4 or 7 (each jump hit's count into its J atttack
-    # 2, Ryuko's PCs 829–830) or for 0 (YINAN's EN3 Stones hold until her EN3 hits clear it, PCs 9456, 9106), 12 (EX
-    # Fire 2), 13 (ERUS's coins and
-    # hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
+    # 2, Ryuko's PCs 829–830) or for 0 (YINAN's EN3 Stones hold until her EN3 hits clear it, PCs 9456, 9106), 11
+    # for 10 (ERUS's HP Charge runs off at the next one's Randon1, PCs 6844, 6848, 6873), 12 (EX Fire 2), 13 (ERUS's
+    # coins and hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
     # story stance's vanish, PC 28) or for 10 (ZENKA's and ALPHA's yowai forms, PCs 11, ..., which
     # their 開始時 yowai sets at global 1 = 1000, as VS's select screen leaves it; each other test
     # of 14 is for 100, which Black plays natively, PC 428) and 15 (a TEAM VS
@@ -125,7 +125,8 @@ def decode_event(record):
                                                                               0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x83, 0x86,
                                                                               *GLOBALS) \
             or op == 0x1f and record[4] == 0x4e and (record[5] == 8 or record[5] == 4 and s16(record, 9) == 10) \
-            or op == 0x1f and record[4] == 0x45 and record[5] in (4, 8):
+            or op == 0x1f and record[4] == 0x45 and record[5] in (4, 8) \
+            or op == 0x1f and record[4] == 0x4b and record[5] == 4 and s16(record, 9) == 10:
         return test_event(record)
     # Global r[4] & 0x3f = (1) or += (2) r[7:9], clamped to ±30000 (0x4138f0): 0 (at 10 a KO enters make hikari),
     # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai
