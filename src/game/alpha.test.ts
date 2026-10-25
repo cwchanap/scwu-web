@@ -338,25 +338,46 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     expect(match.globals[10]).toBe(10000);
   });
 
-  it('draws his life back only to desperation in VS single (global 3 = 50)', () => {
+  // A VS single (global 3 = 50) from its FIGHT, with global 1 at `global1`.
+  function vsFight(global1: number) {
     const match = new Match('cpu', true, 0, ['ryuko', 'alpha'], 'court', true);
+    match.globals[1] = global1;
     const [ryuko, alpha] = match.fighters;
     while (
       match.roundTicks < FIGHT_TICK ||
       ![ryuko, alpha].every((f) => f.action === 'idle')
     )
       match.step({}, {});
-    // HP 2 takes its 2 back for global 3 ≥ 40 (PC 1221), but at desperation
-    // (150) 0x40e7c0 scales a loss to 60%, 1 (+0x7ca7): he climbs to 151 and
-    // ends on a loss.
-    const { path } = knockOut(match, [3], 700);
+    return match;
+  }
+
+  it('draws his life back only to desperation at global 3 = 50, past 開始時 yowai', () => {
+    // Global 1 below 1000 passes over 開始時 yowai (PC 442). HP 2 takes its 2
+    // back for global 3 ≥ 40 (PC 1221), but at desperation (150) 0x40e7c0
+    // scales a loss to 60%, 1 (+0x7ca7): he climbs to 151 and ends on a loss.
+    const { path } = knockOut(vsFight(0), [3], 700);
     expect(path).toEqual([
       [0, 'idle', 1],
       [11, '84', 1],
       [121, '92', 1],
       [616, 'idle', 149],
     ]);
-    expect(match.winner).toBe(null);
+  });
+
+  it('falls to KO NORMAL in his yowai form, past KO Boss (PC 1025)', () => {
+    // VS single leaves global 1 at 1000, so his 開始時 enters 開始時 yowai,
+    // which sets variable 14 to 10 (PC 479). His lose action's test of it
+    // (PC 1025) skips the KO Boss tests into 83 + 13, whose global 0 isn't
+    // 10, then KO NORMAL (88): the round is lost.
+    const match = vsFight(1000);
+    expect(match.fighters[1].variables[14]).toBe(10);
+    const { path } = knockOut(match, [3], 700);
+    expect(path).toEqual([
+      [0, 'idle', 1],
+      [11, 'down', 0],
+      [121, 'koLand', 0],
+    ]);
+    expect(match.winner).toBe('player');
   });
 
   it('plays his own CPU table in Vs. CPU', () => {

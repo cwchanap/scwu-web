@@ -336,6 +336,43 @@ const scriptClip = (index: ObjectKey, who: Container = 'ryuko') => {
     frames.map((frame) => frame.duration || 1),
   );
 };
+// ZENKA's and ALPHA's yowai forms (variable 14 = 10) take each test of it
+// for 10, into its target's timeline.
+const yowaiTest = (e: ScriptEvent) =>
+  e.op === 'test' && e.selector === 0x4e && e.compare === 1 && e.value === 10
+    ? e
+    : undefined;
+const testKey = ({ action, offset }: { action: number; offset: number }) =>
+  offset ? (`${action}+${offset}` as const) : action;
+// The copy a timeline's test before its first display enters: their jumps'
+// and fall's (PCs 57, 156).
+export function yowaiKey(index: ObjectKey, who: Container): ObjectKey {
+  const test = script(index, who).events.find((e) => e.t === 0 && yowaiTest(e));
+  return test ? testKey(yowaiTest(test)!) : index;
+}
+// A timeline as the yowai forms play it, looping where a test returns to one
+// entered: SHOCK INFINITY's Shock keeps its 179% box (PC 1266).
+function yowaiClip(index: ObjectKey, who: Container) {
+  const frames: Pose[] = [];
+  const entered = new Map<ObjectKey, number>();
+  let loop: number | false = false;
+  for (let key: ObjectKey | undefined = index; key !== undefined;) {
+    entered.set(key, frames.length);
+    const timeline = script(key, who);
+    const test = timeline.events.map(yowaiTest).find(Boolean);
+    const own = timeline.frames.filter((frame) => !test || frame.t < test.t);
+    if (!test && timeline.loop >= 0) loop = frames.length + timeline.loop;
+    frames.push(...own);
+    key = test && testKey(test);
+    if (key !== undefined && entered.has(key))
+      [loop, key] = [entered.get(key)!, undefined];
+  }
+  return clip(
+    frames,
+    loop,
+    frames.map((frame) => frame.duration || 1),
+  );
+}
 const objectClips = new WeakMap<object, Clip | null>();
 function objectClip(index: ObjectKey, who: Container) {
   const found = script(index, who);
@@ -413,20 +450,26 @@ const waits = (frames: Pose[]) =>
 // (PC 56), or looping as its timeline does: TTRO's and Yo's J RP (7, 6)
 // loop two poses until they land (PCs 86, ...). And its fall, word 6
 // (+0x7586), which holds Ryuko's 16 (PC 100) or Zoma's 121 for 1010 ticks.
-function jumpClips(who: Who) {
+function jumpClips(who: Who, z = fighterClips[who], yowai = false) {
+  const { jumps } = CHARACTERS[who];
+  const parts = (index: number): Clip[] => {
+    const timeline = script(yowai ? yowaiKey(index, who) : index, who);
+    const { frames } = timeline;
+    const launch = timeline.events.find((event) => event.op === 'motion')!.t;
+    let n = 0;
+    for (let t = 0; t < launch; n++) t += frames[n].duration;
+    // A yowai copy may fly on the up jump's: ZENKA's forward jump runs into
+    // her up jump + 22 (PC 106), past its launch.
+    if (n === frames.length && timeline.next === jumps[0])
+      return [clip(frames), parts(jumps[0])[1]];
+    const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
+    const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
+    const loop = timeline.end === 'loop' && timeline.loop - n;
+    return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
+  };
   const [takeoff, jump, takeoffForward, jumpForward, takeoffBack, jumpBack] =
-    CHARACTERS[who].jumps.flatMap((index) => {
-      const timeline = script(index, who);
-      const { frames } = timeline;
-      const launch = timeline.events.find((event) => event.op === 'motion')!.t;
-      let n = 0;
-      for (let t = 0; t < launch; n++) t += frames[n].duration;
-      const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
-      const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
-      const loop = timeline.end === 'loop' && timeline.loop - n;
-      return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
-    });
-  const fall = fighterClips[who].fall;
+    jumps.flatMap(parts);
+  const { fall } = z;
   return {
     takeoff,
     jump,
@@ -615,12 +658,17 @@ const guardAnimations = (
 // The other players' neutral, guard, victim and result clips: the engine's
 // own states and the twins of Ryuko's victim actions (export_fighter), shaped
 // like his.
-function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
-  const timeline = (index: number) => scriptClip(twin(who, index), who);
+function twinAnimations(
+  who: Exclude<Who, 'ryuko'>,
+  z = fighterClips[who],
+  yowai = false,
+) {
+  const timeline = (index: number) =>
+    (yowai ? yowaiClip : scriptClip)(twin(who, index), who);
   const table: Partial<Record<AnimatedAction, Clip>> = {
     walk: clip(z.walk, true),
     backwalk: clip(z.backwalk, true),
-    ...jumpClips(who),
+    ...jumpClips(who, z, yowai),
     land: clip(z.land),
     crouchEnter: clip(z.crouchEnter),
     // Action 19 holds a single zero-length display.
@@ -813,6 +861,31 @@ function twinAnimations(who: Exclude<Who, 'ryuko'>, z = fighterClips[who]) {
   };
   return table;
 }
+// ZENKA's and ALPHA's yowai forms, while their variable 14 holds 10 (開始時
+// yowai, PCs 478, 479): their clips' copies keeping the body boxes their
+// tests of it keep (export_fighter), and their jumps' and timeline
+// reactions' test targets: the same displays, but HISA Down's skips its
+// sound (ZENKA's PC 1876).
+const YOWAI_ANIMATIONS: Partial<
+  Record<Who, { idle: Pose; table: Partial<Record<AnimatedAction, Clip>> }>
+> = Object.fromEntries(
+  Object.entries(fighterClips).flatMap(([who, z]) => {
+    const weak = Object.entries(z)
+      .filter(([name]) => name.endsWith('Yowai'))
+      .map(([name, frames]) => [name.slice(0, -'Yowai'.length), frames]);
+    if (!weak.length) return [];
+    const clips = { ...z, ...Object.fromEntries(weak) };
+    return [
+      [
+        who,
+        {
+          idle: clips.idle[0],
+          table: twinAnimations(who as Exclude<Who, 'ryuko'>, clips, true),
+        },
+      ],
+    ];
+  }),
+);
 const TWIN_ANIMATIONS = {
   zoma: twinAnimations('zoma'),
   kiki: twinAnimations('kiki'),
@@ -913,20 +986,24 @@ function clipOf(action: AnimatedAction | ObjectKey, who: Container) {
   if (!found) throw new Error(`${who} has no ${action} clip yet`);
   return found;
 }
-// `ex`: in EX mode, where the player has an EX form of the clip.
+// `ex`: in EX mode, where the player has an EX form of the clip; `yowai`, in
+// ZENKA's and ALPHA's yowai forms.
 const exClipOf = (
   action: AnimatedAction | ObjectKey,
   who: Container,
   ex: boolean,
+  yowai = false,
 ) =>
   (ex && EX_ANIMATIONS[who as Who]?.[action as AnimatedAction]) ||
+  (yowai && YOWAI_ANIMATIONS[who as Who]?.table[action as AnimatedAction]) ||
   clipOf(action, who);
 export function animationDuration(
   action: AnimatedAction | ObjectKey,
   who: Container = 'ryuko',
   ex = false,
+  yowai = false,
 ) {
-  return exClipOf(action, who, ex)?.duration ?? 0;
+  return exClipOf(action, who, ex, yowai)?.duration ?? 0;
 }
 
 // The op 0x19 boxes the hit test reads (0x40f1b8: kind bit 1 or 2) for a
@@ -938,10 +1015,11 @@ export const clipPose = (
   age: number,
   who: Who = 'ryuko',
   ex = false,
+  yowai = false,
 ) =>
   action === 'idle'
-    ? fighterClips[who].idle[0]
-    : animationFrame(action, age, who, ex);
+    ? (yowai && YOWAI_ANIMATIONS[who]?.idle) || fighterClips[who].idle[0]
+    : animationFrame(action, age, who, ex, yowai);
 // The op 0x15 of the idle display that starts at a looping `age`: TRAINING's
 // 通常立ち refills his life, drains his power and fills the opponent's as it
 // reaches its 15th display (PC 24). His idle has no rolls, so its age stands
@@ -957,8 +1035,8 @@ export function idlePower(who: Who, age: number) {
   }
   return [];
 }
-function bodies(action: Shown, age: number, who: Who): BodyBox[] {
-  return clipPose(action, age, who).body ?? [];
+function bodies(action: Shown, age: number, who: Who, yowai = false) {
+  return clipPose(action, age, who, false, yowai).body ?? [];
 }
 // Action 43's black panel (image 294, a 673 × 507 field of palette entry 0,
 // (0, 0, 8), which is not the colour key), opaque (PC 432) and at 50% (436);
@@ -974,12 +1052,14 @@ export const BLACK = Object.fromEntries(
 // neutral, knockdown and win clips reset it there; none changes it later.
 export const entryColor = (action: Shown, who: Who = 'ryuko') =>
   clipPose(action, 0, who).color;
+// `yowai`: in ZENKA's and ALPHA's yowai forms.
 export function hurtboxes(
   action: Shown,
   age: number,
   who: Who = 'ryuko',
+  yowai = false,
 ): BodyBox[] {
-  return bodies(action, age, who).filter((box) => box.kind & 6);
+  return bodies(action, age, who, yowai).filter((box) => box.kind & 6);
 }
 // Kind bit 0 pushes (0x40fce9), walked from the last slot down.
 export function pushboxes(
@@ -997,8 +1077,9 @@ export function animationFrame(
   age: number,
   who: Container = 'ryuko',
   ex = false,
+  yowai = false,
 ): Pose {
-  const found = exClipOf(action, who, ex);
+  const found = exClipOf(action, who, ex, yowai);
   if (!found) throw new Error(`Source object ${action} has no displays`);
   const { frames, ticks, loopStart, duration, intro } = found;
   let time = Math.max(0, age);

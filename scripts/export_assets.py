@@ -95,7 +95,9 @@ def decode_event(record):
     # life), 4 (Kiki's K' follow-up), 6 (an IORI cancel), 7 (DIDO's en300 probe), 8 (KAY's C
     # Stop, YINAN's dolls and beam, Yo's hit effects), 12 (EX Fire 2), 13 (ERUS's coins and
     # hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
-    # story stance's vanish, PC 28; every other test of 14 is for 10 or 100) and 15 (a TEAM VS
+    # story stance's vanish, PC 28) or for 10 (ZENKA's and ALPHA's yowai forms, PCs 11, ..., which
+    # their 開始時 yowai sets at global 1 = 1000, as VS's select screen leaves it; each other test
+    # of 14 is for 100, which Black plays natively, PC 428) and 15 (a TEAM VS
     # winner's mark, which its Team VS Start tests, as SEAN's cc hit does) and globals 0 (10 sends a KO to make hikari), 1, 2 and 4 (below), 3 (0 takes each 開始時
     # BR, above 0 the ZA hits), 5 (MASA's and 3-TIMES's VS openings), 6 (the freeze), 8 and 9 (a TEAM
     # VS winner's life, 1P's and 2P's), 10 (10, as story's select screen leaves it, takes each
@@ -120,7 +122,7 @@ def decode_event(record):
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
                                                                               0x47, 0x48, 0x4c, 0x4d, 0x4f, 0x83, 0x86,
                                                                               *GLOBALS) \
-            or op == 0x1f and record[4] == 0x4e and record[5] == 8:
+            or op == 0x1f and record[4] == 0x4e and (record[5] == 8 or record[5] == 4 and s16(record, 9) == 10):
         return test_event(record)
     # Global r[4] & 0x3f = (1) or += (2) r[7:9], clamped to ±30000 (0x4138f0): 0 (at 10 a KO enters make hikari),
     # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai
@@ -254,8 +256,12 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
     # Tests jumping out of a call, yet to reach where its pass runs out: (event index, depth).
     returns = []
     # A jump keeps the body boxes (only 0x410cf0 clears them), so a branch into
-    # its own action, as Zoma's run loops, starts with those its earlier records set.
-    for pc in range(p.action(index).start, min(p.action(index).start + offset, p.action(index).end)):
+    # its own action, as Zoma's run loops, starts with those its earlier records set,
+    # up to a test jumping forward into it: ZENKA's yowai stand passes over its last box (PC 12).
+    start, end = p.action(index).start, p.action(index).end
+    test = next((pc for pc in range(start, min(start + offset, end)) if (e := decode_event(p.records[pc]))
+                 and e["op"] == "test" and (e["action"], e["offset"]) == (index, offset)), start + offset - 1)
+    for pc in range(start, min(test + 1, end)):
         if p.records[pc][0] == 0x19:
             bodies = body_boxes(bodies, p.records[pc])
         elif p.records[pc][0] in (0x07, 0x14):
@@ -641,12 +647,13 @@ def select_program(p, face, image_ids):
     return dict(face=face, actions={str(i): records for i, records in sorted(actions.items())})
 
 
-def pose_clips(p, c, actions, image_ids):
+def pose_clips(p, c, actions, image_ids, yowai=False):
     """Each named action's displays, with their body boxes, colour and events.
 
     `actions` maps a name to a source action, or to (action, offset) to start
     mid-action. A display after an op 0x23 carries the colour state it sets,
     and the op 0x03, 0x04, 0x0e, 0x1f and 0x25 events of the records just before it.
+    `yowai` takes the tests of variable 14 for 10 forward within the action.
     """
     clips = {}
     for name, index in actions.items():
@@ -659,6 +666,10 @@ def pose_clips(p, c, actions, image_ids):
             # ANMC P's WIN (PC 579) passes the sound its roll plays instead.
             if p.records[pc][0] == 0x0a and u16(p.records[pc], 1) == index and pc < action.start + p.records[pc][3]:
                 pc = action.start + p.records[pc][3] - 1
+            elif yowai and (event := decode_event(p.records[pc])) and event["op"] == "test" and (
+                    event["selector"], event["compare"], event["value"]) == (0x4e, 1, 10) and \
+                    event["action"] == index and pc < action.start + event["offset"]:
+                pc = action.start + event["offset"] - 1
             # One back ends it, unless the action jumps past it: SHIN-Z's 勝ち
             # loops from PC 698 (PC 701) before a display nothing reaches (PC
             # 703), where each Black's test of variable 14 jumps past its loop.
@@ -1120,7 +1131,8 @@ ZMEGA_TWINS = {name: (r, r + next(d for top, d in ((63, 8), (77, 12), (89, 13), 
 # from Clothes off500 (his clothes obj2, 140, follows his clothes obj) and
 # thirty-seven past her Chuck Hiso (139), which he lacks. His lose action is 負け
 # (83), which falls through to KO NORMAL (88, PC 1032); his KO Boss forms
-# (84–87) come before it, and its 2nd (90) and KO down after his ★.
+# (84–87), which his yowai form skips (PC 1025), come before it, and its 2nd
+# (90) and KO down after his ★.
 ALPHA_TWINS = {name: (r, r + next(d for top, d in ((89, 38), (103, 37), (139, 38), (173, 37)) if r < top))
                for name, (r, _) in ZOMA_TWINS.items()} | dict(lose=(59, 83), ko=(60, 88), koAgain=(61, 90), down=(62, 91))
 # SHIN-Z's sit nine after Ryuko's KOs and lose action, fourteen after her light
@@ -3029,10 +3041,10 @@ FIGHTERS = {
         # (PC 602) and his supers set it to 100 (PCs 3669, 3877, 3916, 4050,
         # 4082, 4183), so his reactions clear 13 where Ryuko's clear 14. Most
         # also test variable 14 for 10 (op 0x1f, PCs 959, 980, ...), which
-        # only his 開始時 yowai (33, PC 478) sets, off the Vs. intro's path,
-        # to skip their last body box; the match keeps the fall-through, as
-        # it does for his moves' tests, which enter their yowai forms (P1 y,
-        # 201, PC 2595, ...):
+        # 開始時 yowai (33, PC 478) sets at global 1 = 1000, as VS's select
+        # screen leaves it, to skip their last body box (179%, not 100%):
+        # their yowai clips keep it, as his moves' tests enter their yowai
+        # forms (P1 y, 201, PC 2595, ...):
         differ={
             # Giant's guards (Hit Up within 10 ticks into Counter Hit, 195,
             # which spends 100 power, PC 2565), clearing 13.
@@ -3197,9 +3209,10 @@ FIGHTERS = {
         # (PC 816) and his supers set it to 100 (PCs 4545, 5545, 5609, 5645,
         # 6003, 6152), so his reactions clear 13 (PCs 1352, 1373, ...) where
         # Ryuko's clear 14. Most also test variable 14 for 10 (op 0x1f, PCs
-        # 1359, 1381, ...), which only his 開始時 yowai (34, PC 479) sets, off
-        # the Vs. intro's path; the match keeps the fall-through, as it does
-        # for his moves' tests (PCs 3069, 3092, ...):
+        # 1359, 1381, ...), which 開始時 yowai (34, PC 479) sets at global 1 =
+        # 1000, as VS's select screen leaves it, to keep a 200% body box:
+        # their yowai clips keep it, as his moves' tests enter their yowai
+        # forms (PCs 3069, 3092, ...):
         differ={
             # ZENKA's: Giant's guards (Hit Up within 10 ticks into Counter hit,
             # 211, which spends 100 power, PC 3020) and Ryuko's reactions,
@@ -3237,7 +3250,8 @@ FIGHTERS = {
             # 0 for 10 into Start KO 3 (51, PC 1019), which only his Start KO 2
             # (50, PC 737) sets, and variable 15 for 10, 20 and 30 into KO Boss
             # N (87), KO NORMAL 2nd (90) and make hikari (96) + 8 (PCs 1026–
-            # 1028), which only KO NORMAL sets, to 20.
+            # 1028), which only KO NORMAL sets, to 20. His yowai form's test of
+            # variable 14 (PC 1025) skips those and the KO Boss tests.
             "lose",
         },
         # Results: 勝ち (82) calls demo stand (28) once (PC 1002) and loops his
@@ -3996,6 +4010,14 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     clips = pose_clips(p, c, actions, image_ids)
     # Its fall too, which a move's last jump still enters by its timeline.
     clips.update(pose_clips(p, c, dict(fall=tables["fall"]), image_ids))
+    # ZENKA's and ALPHA's yowai forms: VS's select screen leaves global 1 at
+    # 1000, so their 開始時 enters 開始時 yowai, which sets variable 14 to 10
+    # (PCs 478, 479), and their clips' tests of it keep a body box that takes
+    # more of each hit (their stands 179% and 200%, PCs 10–12) or play a copy
+    # with such boxes (their jumps' takeoffs, fall and landing). The match
+    # reads these while it holds.
+    weak = pose_clips(p, c, {**actions, "fall": tables["fall"]}, image_ids, yowai=True)
+    clips.update({name + "Yowai": frames for name, frames in weak.items() if frames != clips[name] and name not in flat})
     # Clips that play their action's flattened timeline, calls inlined.
     for name in flat:
         index, offset = actions[name] if isinstance(actions[name], tuple) else (actions[name], 0)

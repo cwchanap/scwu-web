@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
-import { animationDuration, animationFrame, BLACK } from './animations';
-import { faceImage } from './hud';
+import {
+  animationDuration,
+  animationFrame,
+  BLACK,
+  hurtboxes,
+  script,
+  yowaiKey,
+} from './animations';
+import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro } from './testing';
@@ -258,6 +265,80 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
         (age) => animationFrame('32+3', age, 'zenka').image,
       ),
     ).toEqual([327, 328, 327, 328, 284, 113, 113]);
+  });
+
+  // A VS single with ZENKA as player `side`, from its FIGHT, global 1 at
+  // `global1`.
+  function vsFight(side: 0 | 1, global1: number) {
+    const match = new Match(
+      'cpu',
+      true,
+      0,
+      side ? ['ryuko', 'zenka'] : ['zenka', 'ryuko'],
+      'court',
+      true,
+    );
+    match.globals[1] = global1;
+    while (
+      match.roundTicks < FIGHT_TICK ||
+      !match.fighters.every((f) => f.action === 'idle')
+    )
+      match.step({}, {});
+    return {
+      match,
+      zenka: match.fighters[side],
+      other: match.fighters[1 - side],
+    };
+  }
+
+  it('takes more of each hit and enters P1 y in her yowai form (global 1 = 1000)', () => {
+    // VS's select screen leaves global 1 at 1000: 開始時 enters 開始時 yowai,
+    // which sets variable 14 to 10 (PC 478). Her stand's test of it keeps
+    // its 179% box (PCs 10–12), so Ryuko's 10-damage P1 takes 17; below
+    // 1000 it takes 10. Her P 1 (199) tests it into P1 y (201).
+    const taken = [1000, 0].map((global1) => {
+      const { match, zenka, other } = vsFight(1, global1);
+      zenka.x = other.x + 100;
+      const hp = zenka.hp;
+      for (let t = 0; t < 60; t++) match.step(t ? {} : J, {});
+      return [zenka.variables[14] ?? 0, hp - zenka.hp];
+    });
+    expect(taken).toEqual([
+      [10, 17],
+      [0, 10],
+    ]);
+    const entered = [1000, 0].map((global1) => {
+      const { match, zenka } = vsFight(0, global1);
+      match.step(J, {});
+      return now(zenka);
+    });
+    expect(entered).toEqual([201, 199]);
+  });
+
+  it('jumps, falls and lands on her yowai copies', () => {
+    // Each jump's test of variable 14 (PC 57) enters a copy whose boxes
+    // take 179%; the side jumps run on into the up jump's (+ 22, PCs 106, 154).
+    expect(
+      ['takeoffForward', 'jumpForward', 'jump'].map((action) =>
+        hurtboxes(action as 'jump', 0, 'zenka', true).map((box) => box.taken),
+      ),
+    ).toEqual([[179], [179], [179]]);
+    expect(hurtboxes('jump', 0, 'zenka').map((box) => box.taken)).toEqual([
+      100,
+    ]);
+    // Her fall's copy (8 + 11) falls at 80, not 60 (PC 172); J LEND's holds
+    // one 8-tick display (PC 203).
+    const gravity = (key: number | `${number}+${number}`) =>
+      script(key, 'zenka').events.find((e) => e.op === 'motion');
+    const { fall } = CHARACTERS.zenka;
+    expect(yowaiKey(fall, 'zenka')).toBe('8+11');
+    expect(gravity(yowaiKey(fall, 'zenka'))).toMatchObject({ ay: 80 });
+    expect(gravity(fall)).toMatchObject({ ay: 60 });
+    expect(
+      [false, true].map((yowai) =>
+        animationDuration('land', 'zenka', false, yowai),
+      ),
+    ).toEqual([16, 8]);
   });
 
   it('wins after DEMO STAND and her speech, holding image 283 (PC 799), and draws holding it too', () => {

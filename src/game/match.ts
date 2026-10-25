@@ -15,6 +15,7 @@ import {
   NORMAL_COLOR,
   POSE_EVENTS,
   script,
+  yowaiKey,
 } from './animations';
 import type {
   Action,
@@ -647,7 +648,12 @@ function struck(
   const y = origin.y + box.y * 1.5;
   const mid = (a: number, r: number, b: number, s: number) =>
     (Math.min(a + r, b + s) + Math.max(a - r, b - s)) / 2;
-  for (const body of hurtboxes(shown(target), target.age, target.who)) {
+  for (const body of hurtboxes(
+    shown(target),
+    target.age,
+    target.who,
+    yowai(target),
+  )) {
     const bx = target.x + target.facing * body.x * 1.5;
     const by = target.y + body.y * 1.5;
     if (
@@ -883,6 +889,11 @@ export const exMode = (f: Fighter) => {
   const ex = EX_MODE[f.who];
   return ex !== undefined && f.variables[0] === ex;
 };
+// ZENKA's and ALPHA's yowai forms (hurtboxes, yowaiKey): each round their
+// 開始時 enters 開始時 yowai at global 1 = 1000, as VS's select screen leaves
+// it, which sets variable 14 to 10 (PCs 478, 479), and nothing of theirs
+// clears it. Only their clips have yowai forms.
+const yowai = (f: Fighter) => f.variables[14] === 10;
 // The clips' EX forms follow the guards' and demo stands' tests of variable
 // 0: EX mode's, and Z-MEGA's Shin form, 100, whose DEMO stand plays DEMO
 // stand sp (31, PC 342) in his draw (PC 716), though no face of his reads it.
@@ -1369,6 +1380,7 @@ export function fighterPose(f: Fighter): Pose {
     f.action === 'jump' ? f.airAge : f.age,
     f.who,
     clipEx(f),
+    yowai(f),
   );
 }
 const newEffect = (
@@ -1515,7 +1527,8 @@ function walkSpeed(who: Who, back: boolean) {
 // ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
 // under 100.
 function launchJump(f: Fighter) {
-  const { events } = script(CHARACTERS[f.who].jumps[f.jump], f.who);
+  const index = CHARACTERS[f.who].jumps[f.jump];
+  const { events } = script(yowai(f) ? yowaiKey(index, f.who) : index, f.who);
   const launch = events.find((event) => event.op === 'motion');
   if (launch?.op === 'motion') motion(f, launch);
   f.airAge = 0;
@@ -3548,13 +3561,16 @@ export class Match {
   // Airborne, return to neutral enters the default-action table's fall, word
   // 6 (+0x7586, 0x411a80), which the port draws as a jump. 0x410cf0 keeps the
   // motion, and its op 0x01 (Ryuko's PC 99, flags 0xe) keeps vx, vy and ax
-  // and sets its own gravity: 80, MASA's 120, ZENKA's 60. Its landing
-  // handler is the jump's, but RARIO's and TRAINING's crouch (12).
+  // and sets its own gravity: 80, MASA's 120, ZENKA's 60, or 80 in her
+  // yowai form (PC 172). Its landing handler is the jump's, but RARIO's and
+  // TRAINING's crouch (12).
   private fall(f: Fighter) {
     const { ax } = f;
+    const { fall } = CHARACTERS[f.who];
     this.action(f, 'jump');
     [f.jump, f.ax, f.airAge, f.moving] = [3, ax, 0, 'velocity'];
-    for (const event of script(CHARACTERS[f.who].fall, f.who).events)
+    for (const event of script(yowai(f) ? yowaiKey(fall, f.who) : fall, f.who)
+      .events)
       if (event.op === 'motion' || event.op === 'handler')
         this.runEvent(f, this.fighters.indexOf(f), event);
   }
@@ -3895,13 +3911,14 @@ export class Match {
     // for variable 0 (SHIN-Z's PC 705); ALPHA's KO Boss for global 10 (PC
     // 1029). Its jump to KO Normal (PC 591) plays as `down`, but for
     // DoraEmon's, whose op 0x10 (PC 775) enters KO RELOAD (72) with three
-    // stocks.
-    if (action === 'down' || action === 'koAgain') {
-      const {
-        events: lose,
-        next,
-        offset = 0,
-      } = script(twin(f.who, LOSE), f.who);
+    // stocks. ALPHA's yowai form skips his KO Boss tests (PC 1025, into 83 +
+    // 13), testing global 0 before his KO Normal.
+    for (
+      let key: ObjectKey | null =
+        action === 'down' || action === 'koAgain' ? twin(f.who, LOSE) : null;
+      key !== null;
+    ) {
+      const { events: lose, next, offset = 0 } = script(key, f.who);
       const reload =
         next === null
           ? undefined
@@ -3914,14 +3931,15 @@ export class Match {
         (reload?.op === 'stock' && reload.atLeast && f.stock >= reload.min
           ? { action: reload.target, offset: reload.offset }
           : undefined);
-      if (jump) {
-        for (const event of lose.slice(
-          0,
-          'op' in jump ? lose.indexOf(jump) : lose.length,
-        ))
-          this.runEvent(f, this.fighters.indexOf(f), event);
+      if (!jump) break;
+      for (const event of lose.slice(
+        0,
+        'op' in jump ? lose.indexOf(jump) : lose.length,
+      ))
+        this.runEvent(f, this.fighters.indexOf(f), event);
+      if (jump.action !== twin(f.who, LOSE))
         return this.enterSource(f, jump.action, jump.offset);
-      }
+      key = sourceKey(jump.action, jump.offset);
     }
     // HIT UP tests variable 8 above 99 (PC 921), which only ICE Punch sets
     // (PCs 1347, 1371) and the idle clears (PC 3), into HISA (80) and its
@@ -4072,7 +4090,8 @@ export class Match {
       f.action !== 'script' &&
       (reactions.has(f.action) ||
         ['land', 'stand', 'getUp'].includes(f.action)) &&
-      f.age < animationDuration(f.action, f.who)
+      // ZENKA's yowai J LEND holds one display, 8 ticks (PC 203).
+      f.age < animationDuration(f.action, f.who, false, yowai(f))
     )
       return;
     // One that ran out did so into the free state (0x412713).
