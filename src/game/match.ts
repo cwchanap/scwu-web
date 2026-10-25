@@ -4538,11 +4538,12 @@ export class Match {
       this.previous = this.inputs.map((input) => ({ ...input }));
       for (const f of this.fighters) if (f.present) this.pause(f, this.koStop);
       // KGT 13, which round setup spawns after the players at priority 0x65
-      // (0x408ce9), steps after the objects below it: it holds global 14 at
-      // 10 for its first 10 ticks (PCs 70, 78, 88, 97), so a 開始時 BR that
-      // tests it after the first tick keeps its display (Ryuko's PC 323).
+      // (0x408ce9), steps after the objects below it: it clears global 15
+      // (PC 69), the round over, and holds global 14 at 10 for its first 10
+      // ticks (PCs 70, 78, 88, 97), so a 開始時 BR that tests it after the
+      // first tick keeps its display (Ryuko's PC 323).
       this.stepObjects(objects.filter((e) => e.z < 0x65));
-      if (this.roundTicks === 1) this.globals[14] = 10;
+      if (this.roundTicks === 1) [this.globals[15], this.globals[14]] = [0, 10];
       if (this.roundTicks === 11) this.globals[14] = 0;
       this.stepObjects(objects.filter((e) => e.z >= 0x65));
       for (const f of this.fighters)
@@ -4587,6 +4588,13 @@ export class Match {
     // other stop it skips a slot still waiting to enter (+0x2238, 0x4136ae).
     for (const f of this.fighters) if (f.present) this.pause(f, this.koStop);
     this.stepObjects(objects);
+    // Each result lettering (KO 26, YOU WIN 28, YOU LOSE 29, DRAW 32, DOUBLE
+    // KO 33), spawned as the round controller sees the result, sets global
+    // 15 to 100 on its first step, at 0x65 (KGT PCs 171, 199, 225, 257,
+    // 260): the round over, for which the KO downs skip their life check
+    // (Ryuko's PC 645), each VS CHARGE stops clearing it (PCs 405, 413) and
+    // some moves end (GIGI's DIVE, PC 3316).
+    if (this.endingTicks === 1) this.globals[15] = 100;
     // The Vs. result states spawn 1P or 2P WIN (KGT 30, 31; 0x4094ad,
     // 0x409582), whose first step, at 0x65, sets global 8 or 9 to 1 (KGT PCs
     // 251, 254), for the TEAM VS winner's objects to carry its life.

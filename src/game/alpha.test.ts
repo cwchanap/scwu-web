@@ -326,11 +326,13 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     // (PC 1084) and adds 6 to variable 3 (PC 1081) each time it runs out
     // back into the lose action, until variable 3 passes 30 (PC 1080) into
     // KO NORMAL (88), whose landing enters KO down (91): global 10 = 10000
-    // (PC 1130).
+    // (PC 1130). Past its 60 ticks it holds there for global 15 at 100,
+    // which KO's first step set (PC 1140).
     expect(path.slice(4)).toEqual([
       [709, '87', 0],
       [715, '88', 0],
       [825, '91', 0],
+      [885, '91+11', 0],
     ]);
     expect([alpha.stock, alpha.variables[3], alpha.variables[15]]).toEqual([
       0, 36, 20,

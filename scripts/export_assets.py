@@ -34,9 +34,8 @@ def u16(record, offset):
     return struct.unpack_from("<H", record, offset)[0]
 
 
-# The op 0x1f globals (0x4456b0) the match keeps beside 3 and 6 (0x80 up): 15, which KGT 13 clears each round
-# (PC 69), isn't one.
-GLOBALS = (0x80, 0x81, 0x82, 0x84, 0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8e)
+# The op 0x1f globals (0x4456b0) the match keeps beside 3 and 6 (0x80 up).
+GLOBALS = (0x80, 0x81, 0x82, 0x84, 0x85, 0x88, 0x89, 0x8a, 0x8b, 0x8e, 0x8f)
 
 
 def decode_event(record):
@@ -102,8 +101,9 @@ def decode_event(record):
     # winner's mark, which its Team VS Start tests, as SEAN's cc hit does) and globals 0 (10 sends a KO to make hikari), 1, 2 and 4 (below), 3 (0 takes each 開始時
     # BR, above 0 the ZA hits), 5 (MASA's and 3-TIMES's VS openings), 6 (the freeze), 8 and 9 (a TEAM
     # VS winner's life, 1P's and 2P's), 10 (10, as story's select screen leaves it, takes each
-    # 開始時's and stage object's story path), 11 (10 or above 99 turns the stage's track off) and 14
-    # (200 stops it, which each 開始時 BR tests for 0); other tests keep their fall-through path.
+    # 開始時's and stage object's story path), 11 (10 or above 99 turns the stage's track off), 14
+    # (200 stops it, which each 開始時 BR tests for 0) and 15 (100 once the round is over: the KO downs pass
+    # over their life check, GIGI's DIVE comes up); other tests keep their fall-through path.
     # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
     # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
     # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
@@ -130,8 +130,9 @@ def decode_event(record):
     # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai
     # at 1 = 1000, PCs 443, 442, and ZAKU's BR its round by 4, PCs 316–319), 5 (in VS, 12, 13, 14 or 15 from the
     # SP BGM actions of Boss Base, ZM Office, ZM Office T2 and BR Boss Base), 8 and 9 (the Team VS objects' life
-    # levels, which Skill4 clears), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's 開始時 set 10, their OPs 100) and
-    # 14 (SIN's, KAY's and DIDO's supers hold 200, then clear it).
+    # levels, which Skill4 clears), 10 (ALPHA's KO Boss), 11 (MASA's and 3-TIMES's 開始時 set 10, their OPs 100),
+    # 14 (SIN's, KAY's and DIDO's supers hold 200, then clear it) and 15 (each VS CHARGE clears it every tick until
+    # the round is over, then holds 100; KATE's EN slash hits add 20).
     if op == 0x1f and record[4] in GLOBALS and record[5] in (1, 2):
         return dict(op="global", index=record[4] & 0x3f, value=s16(record, 7),
                     **({"add": True} if record[5] == 2 else {}))

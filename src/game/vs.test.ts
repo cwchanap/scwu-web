@@ -3124,3 +3124,37 @@ describe("YINAN's ZA finishers (global 3 > 0)", () => {
     expect([br.hp, vs.hp]).toEqual(hp);
   });
 });
+
+describe('the round over (global 15)', () => {
+  it("is set by KO's first step and held by each VS CHARGE, until round 2's KGT 13 clears it", () => {
+    const match = vsMatch();
+    while (match.roundTicks < FIGHT_TICK) match.step();
+    match.fighters[1].hp = 0;
+    // [value, round, ticks into its ending or into the round]
+    const set: number[][] = [];
+    let held = match.globals[15];
+    let charges: ObjectKey[] = [];
+    while (match.round === 1 || match.roundTicks < 2) {
+      match.step();
+      if (match.round === 1 && match.endingTicks === 2)
+        charges = match.effects
+          .filter((e) => base(e.clip) === 38)
+          .map((e) => e.clip);
+      if (match.globals[15] !== held)
+        set.push([
+          (held = match.globals[15]),
+          match.round,
+          match.round === 1 ? match.endingTicks : match.roundTicks,
+        ]);
+    }
+    // KO (26), spawned as the round controller sees the KO, sets it on its
+    // first step (KGT PC 171); each VS CHARGE, which clears it every tick
+    // until then (PC 406), holds it at 100 (PCs 405, 413). Round 2's KGT 13
+    // clears it on its first step (PC 69).
+    expect(set).toEqual([
+      [100, 1, 1],
+      [0, 2, 1],
+    ]);
+    expect(charges).toEqual(['38+9', '38+9']);
+  });
+});

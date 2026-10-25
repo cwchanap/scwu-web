@@ -171,6 +171,20 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
     ).toMatchObject({ mine: [225, 231, 240, 'idle'], damage: 35 });
   });
 
+  it('comes up from DIVE through DIVE Out once the round is over (PC 3316)', () => {
+    const { match, gigi, other, steps } = gigiPlayer();
+    steps({}, 2);
+    steps({ iori: true });
+    steps({}, 59);
+    // The round controller sees the KO after GIGI's step, and KO's first
+    // step sets global 15 to 100 after his next.
+    other.hp = 0;
+    steps({}, 2);
+    expect([now(gigi), match.globals[15]]).toEqual([225, 100]);
+    steps({});
+    expect(now(gigi)).toBe(234);
+  });
+
   it('runs his air specials, Air Bike K landing through 技名11 (285) into Dragon lend', () => {
     expect(
       play(presses({ 0: { jump: true }, 10: { drill: true } })),
