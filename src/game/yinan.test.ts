@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 import { base, brIntro } from './testing';
@@ -413,6 +413,55 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     expect(byKey({ ex: true }, { stock: 0 }).mine).toEqual(['258+3', 'idle']);
   });
 
+  it('crouches in her EX form while variable 0 is 100 (PCs 494, 502, 511), each crouch holding its zero-length display (PCs 504, 506)', () => {
+    const crouch = (ex: boolean) => {
+      const { yinan, steps } = yinanPlayer(300);
+      if (ex) yinan.variables[0] = 100;
+      steps({}, 2);
+      const shown: unknown[] = [];
+      for (let t = 0; t < 60; t++) {
+        steps(t < 40 ? { crouch: true } : {});
+        const image = fighterPose(yinan).image;
+        if (shown.at(-1) !== image) shown.push(t, yinan.action, image);
+      }
+      return shown;
+    };
+    expect(crouch(false)).toEqual([
+      0,
+      'crouchEnter',
+      4034,
+      5,
+      'crouch',
+      4035,
+      13,
+      'crouch',
+      4036,
+      40,
+      'stand',
+      4034,
+      45,
+      'idle',
+      4000,
+    ]);
+    expect(crouch(true)).toEqual([
+      0,
+      'crouchEnter',
+      4648,
+      5,
+      'crouch',
+      4649,
+      13,
+      'crouch',
+      4650,
+      40,
+      'stand',
+      4648,
+      45,
+      'idle',
+      4000,
+    ]);
+  });
+
   it('plays her Normal specials and their follow-ups', () => {
     expect(byKey({ drill: true })).toMatchObject({
       mine: [268, '268+14', 269, 'idle'],
@@ -571,7 +620,16 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
     ]);
     // EN3 takes three stocks (PC 8918).
     expect(play(en3)).toMatchObject({
-      mine: ['crouchEnter', 'crouch', 'stand', 13, 481, '481+19', 483, 'idle'],
+      mine: [
+        'crouchEnter',
+        'stand',
+        'crouchEnter',
+        13,
+        481,
+        '481+19',
+        483,
+        'idle',
+      ],
       damage: 211,
       stock: 0,
     });
@@ -679,7 +737,17 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
         damage: 100,
       });
     expect(play(en3, { ex: true })).toMatchObject({
-      mine: ['crouchEnter', 'crouch', 'stand', 15, 508, 509, 510, 511, 'idle'],
+      mine: [
+        'crouchEnter',
+        'stand',
+        'crouchEnter',
+        15,
+        508,
+        509,
+        510,
+        511,
+        'idle',
+      ],
       damage: 189,
       stock: 0,
     });

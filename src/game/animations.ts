@@ -445,6 +445,12 @@ const waits = (frames: Pose[]) =>
   frames.map(({ duration }) =>
     duration > 0 && duration < 1000 ? duration : 1,
   );
+// Action 19 holds its zero-length display, after the poses before it: GON's,
+// PAC-HELO's and YINAN's second (PCs 318, 251, 504).
+const holds = (frames: Pose[]) => {
+  const wait = frames.findIndex((frame) => !frame.duration);
+  return wait < 0 || wait;
+};
 // A player's up, forward and back jumps, the default-action table's words
 // 3–5 (+0x7580, 0x4110f0): each takeoff, the displays before its op 0x01
 // launches it (AMIRO's up jump three, 11 ticks), then its air poses up to the
@@ -673,8 +679,7 @@ function twinAnimations(
     ...jumpClips(who, z, yowai),
     land: clip(z.land),
     crouchEnter: clip(z.crouchEnter),
-    // Action 19 holds a single zero-length display.
-    crouch: clip(z.crouch, true, waits(z.crouch)),
+    crouch: clip(z.crouch, holds(z.crouch), waits(z.crouch)),
     stand: clip(z.stand),
     turn: clip(z.turn),
     crouchTurn: clip(z.crouchTurn),
@@ -962,14 +967,28 @@ function exStands(who: Exclude<Who, 'ryuko'>) {
   });
   return { win, draw };
 }
+// ZIRO's walks and YINAN's crouches jump past their action end to their EX
+// forms while variable 0 is 100 (PCs 38, 54, 494, 502, 511).
+const neutralEx = (z: Record<string, Pose[]>) => ({
+  ...(z.walkEx && {
+    walk: clip(z.walkEx, true),
+    backwalk: clip(z.backwalkEx, true),
+  }),
+  ...(z.crouchEx && {
+    crouchEnter: clip(z.crouchEnterEx),
+    crouch: clip(z.crouchEx, holds(z.crouchEx), waits(z.crouchEx)),
+    stand: clip(z.standEx),
+  }),
+});
 const EX_ANIMATIONS = Object.fromEntries(
   Object.entries(fighterClips)
-    .filter(([, z]) => z.guardEx || z.winStandEx)
+    .filter(([, z]) => z.guardEx || z.winStandEx || z.walkEx || z.crouchEx)
     .map(([who, z]) => [
       who,
       {
         ...(z.guardEx && guardAnimations(z, 'Ex')),
         ...(z.winStandEx && exStands(who as Exclude<Who, 'ryuko'>)),
+        ...neutralEx(z),
       },
     ]),
 ) as Partial<Record<Who, Partial<Record<AnimatedAction, Clip>>>>;

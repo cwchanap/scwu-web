@@ -326,8 +326,8 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     expect(hurtboxes('jump', 0, 'zenka').map((box) => box.taken)).toEqual([
       100,
     ]);
-    // Her fall's copy (8 + 11) falls at 80, not 60 (PC 172); J LEND's holds
-    // one 8-tick display (PC 203).
+    // Her fall's copy (8 + 11) falls at 80, not 60 (PC 172); J LEND and its
+    // copy each hold one 8-tick display (PCs 192, 203).
     const gravity = (key: number | `${number}+${number}`) =>
       script(key, 'zenka').events.find((e) => e.op === 'motion');
     const { fall } = CHARACTERS.zenka;
@@ -338,7 +338,7 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
       [false, true].map((yowai) =>
         animationDuration('land', 'zenka', false, yowai),
       ),
-    ).toEqual([16, 8]);
+    ).toEqual([8, 8]);
   });
 
   it('double-jumps on her 179% copy after any jump, whose takeoff sets variable 9 to 100 (PCs 58, 207)', () => {

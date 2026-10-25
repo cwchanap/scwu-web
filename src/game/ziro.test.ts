@@ -278,6 +278,30 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
       expect(byKey(key, { ...ex, gap })).toMatchObject({ mine, damage });
   });
 
+  it('walks in his EX form while variable 0 is 100 (PCs 38, 54), past where his walks run out (PCs 44, 60)', () => {
+    const walk = (ex: boolean, input: Input) => {
+      const { ziro, steps } = ziroPlayer(300);
+      if (ex) ziro.variables[0] = 100;
+      steps({}, 2);
+      const shown: number[] = [];
+      for (let t = 0; t < 70; t++) {
+        steps(input);
+        if (shown.at(-1) !== fighterPose(ziro).image)
+          shown.push(t, fighterPose(ziro).image);
+      }
+      return shown;
+    };
+    expect(walk(false, { right: true })).toEqual([
+      0, 122, 12, 123, 24, 124, 36, 121, 48, 122, 60, 123,
+    ]);
+    expect(walk(true, { right: true })).toEqual([
+      0, 484, 15, 485, 30, 486, 45, 487, 60, 484,
+    ]);
+    expect(walk(true, { left: true })).toEqual([
+      0, 487, 17, 486, 34, 485, 51, 484, 68, 487,
+    ]);
+  });
+
   it('cancels nataku p, which sets variable 6 (PC 4055), into MISS ALL or RAMBU for two stocks', () => {
     for (const [key, mine, damage] of [
       ['getterBeam', [270, 352, 'idle'], 119],

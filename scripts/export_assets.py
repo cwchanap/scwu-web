@@ -693,6 +693,13 @@ def pose_clips(p, c, actions, image_ids, yowai=False):
                     target and target[0] == index and action.start + target[1] > pc
                     for target in map(jump_target, p.records[action.start:action.end])):
                 break
+            # An action end runs the action out (0x412617): ZIRO's walks and
+            # YINAN's crouches end there, before the EX forms their tests of
+            # variable 0 jump to (PCs 38, 54, 494, 502, 511), and ZENKA's J
+            # LEND before its yowai copy (PC 193). The idle keeps every
+            # display, whose images its interpreter shows wherever it jumps.
+            elif p.records[pc][0] in (0x05, 0x29) and pc >= action.start + offset and name != "idle":
+                break
             elif p.records[pc][0] == 0x19:
                 bodies = body_boxes(bodies, p.records[pc])
             elif p.records[pc][0] == 0x23 and pc >= action.start + offset:
@@ -712,6 +719,10 @@ def pose_clips(p, c, actions, image_ids, yowai=False):
                 frames.append(dict(frame, events=events) if events else frame)
                 events = []
                 image_ids.add(frame["image"])
+                # A zero-length display waits (0x412800), holding until the
+                # action changes: YINAN's crouch at PC 504.
+                if not frame["duration"] and name != "idle":
+                    break
         clips[name] = frames
     return clips
 
@@ -4015,6 +4026,14 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                      and u16(r, 9) == 100), None)
         if test:
             actions[name + "Ex"] = u16(test, 1)
+    # ZIRO's walks and YINAN's crouches alike jump past their action end to
+    # their EX forms while variable 0 is 100 (PCs 38, 54, 494, 502, 511).
+    for name, index in neutral.items():
+        action = p.action(index)
+        test = next((r for r in p.records[action.start:action.end] if r[0] == 0x1f and r[4] == 0x40 and r[5] == 4
+                     and u16(r, 1) == index), None)
+        if test and name != "idle":
+            actions[name + "Ex"] = (index, test[3])
     # Demo stands jump to their EX stance alike while it holds the EX value:
     # SAKUYA's STAND DEMO to Skill1 (32, PC 296), SIN's and SOU's for 10.
     if "winStand" in actions:
