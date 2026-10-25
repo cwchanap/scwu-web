@@ -4079,6 +4079,24 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     copies = [*(twins[name][1] for name in ("fb", "fbb", "fbh")
                 if any(p.records[pc][0] == 0x0c for pc in range(p.action(twins[name][1]).start,
                                                                  p.action(twins[name][1]).end))), *aliases]
+
+    # DRAGON Fireball (125), which the match plays as the uppercut (96), copies it where a player's
+    # draws or cries otherwise: FENG's cries 12 (PC 1823), G Suneo's, YINAN's and AYA's show other
+    # displays and Yo's last waits. Their op 0x1f records play from their own (counters).
+    def records(index):
+        out = []
+        for pc in range(p.action(index).start + 1, p.action(index).end):
+            record = bytearray(p.records[pc])
+            if record[0] in ACTION_REFERENCES:
+                start, end, at = ACTION_REFERENCES[record[0]]
+                record[start:end] = bytes(end - start)
+                if at is not None:
+                    record[at] = 0
+            if record[0] != 0x1f:
+                out.append(bytes(record))
+        return out
+    if "dragonFireball" in twins and records(twins["dragonFireball"][1]) != records(twins["uppercut"][1]):
+        copies.append(twins["dragonFireball"][1])
     # The neutral actions that roll, which the match takes: ALPHA's jumps past his voice (PCs 51, 83,
     # 108) and SOU's crouch into another blink (PC 290). The idle's interpreter rolls its own.
     rolling = [index for name, index in neutral.items() if name != "idle" and any(

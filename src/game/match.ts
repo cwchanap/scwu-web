@@ -562,9 +562,16 @@ const AIR_HIT_HEAVY = 76;
 // Each jump hit (J atttack, 77) counts in variable 5 (PC 831), which its
 // last record clears as it runs out (PC 849).
 const JUMP_HIT = 77;
+// DRAGON Fireball (125), which plays as the uppercut (96): FENG's, G
+// Suneo's, Yo's, YINAN's and AYA's, which draw or cry otherwise, are copies
+// (export_fighter).
+const DRAGON_FIREBALL = 125;
 const copyOf = (who: Who, own: number) => {
   const victim = twinOf(who, own) ?? 0;
-  return exported(own, who) && (FIRE.has(victim) || own !== twin(who, victim))
+  return exported(own, who) &&
+    (FIRE.has(victim) ||
+      victim === DRAGON_FIREBALL ||
+      own !== twin(who, victim))
     ? own
     : undefined;
 };

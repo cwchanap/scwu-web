@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import type { Who } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
 import { fighterPose, Match } from './match';
@@ -135,6 +136,43 @@ describe('Kiki (03 KIKI.PLAYER)', () => {
   it('sends ranbu’s victim up through DRAGON Fireball (response 63), as the uppercut', () => {
     expect(responsesOf('ryuko')[63]).toBe(125);
     expect(reactions(247)).toContain('uppercut');
+  });
+
+  it('plays a victim’s own DRAGON Fireball where it draws or cries otherwise than the uppercut', () => {
+    // The copy each victim's reaction plays, and its cries as it enters.
+    const struck = (victim: Who) => {
+      const match = new Match('practice', false, 0, ['kiki', victim]);
+      const [kiki, f] = match.fighters;
+      f.x = kiki.x + 120;
+      kiki.stock = 3;
+      enter(match, kiki, 247);
+      for (let t = 0; f.action !== 'uppercut' && t < 1500; t++) match.step();
+      const cries = match.sounds.flatMap((s) =>
+        s.owner === 1 ? [s.index] : [],
+      );
+      return { copy: f.copy, cries, image: fighterPose(f).image };
+    };
+    // FENG's (142) cries 12 (PC 1823), where his DRAGON P (112) cries none.
+    expect(struck('feng')).toMatchObject({ copy: 142, cries: [12] });
+    expect(
+      (['suneo', 'yo', 'yinan', 'aya'] as const).map((w) => struck(w).copy),
+    ).toEqual([137, 128, 160, 156]);
+    // G Suneo's third display shows 145 where his uppercut's shows 144, and
+    // YINAN's first sits where hers sits 10 pixels back.
+    expect(
+      [
+        animationFrame(137, 35, 'suneo'),
+        animationFrame('uppercut', 35, 'suneo'),
+      ].map(({ image }) => image),
+    ).toEqual([145, 144]);
+    expect(
+      [
+        animationFrame(160, 0, 'yinan'),
+        animationFrame('uppercut', 0, 'yinan'),
+      ].map(({ dx }) => dx),
+    ).toEqual([0, -10]);
+    // Chung's matches his uppercut (100), which plays.
+    expect(struck('chung')).toMatchObject({ copy: null, cries: [25] });
   });
 
   it('lifts EN3’s victim straight up (response 82), then hops it in and out with the beam', () => {
