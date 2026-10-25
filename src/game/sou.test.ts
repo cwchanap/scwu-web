@@ -3,7 +3,7 @@ import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
 import { animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
-import { exMode, Match } from './match';
+import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 import { brIntro } from './testing';
@@ -289,6 +289,37 @@ describe('SOU (16 SOU.PLAYER)', () => {
     // 792–806).
     expect([-1, 0, 40, 80, 120].map((face) => faceImage(face, 'sou'))).toEqual([
       2001, 2002, 2001, 2000, 2001,
+    ]);
+  });
+
+  it('stands tired in his win and draw at 144 life or less, as DEMO stand checks it before its EX test (op 0x11, PC 308)', () => {
+    // DEMO stand 3 (31) plays in DEMO stand's place, 72 ticks, then each
+    // runs on from its call: 勝ち into WIN talk (PC 649), the draw into 318.
+    const result = (hp: number, winner: 'player' | 'draw', ex = false) => {
+      const match = new Match('practice', false, 0, ['sou', 'ryuko']);
+      const [sou, ryuko] = match.fighters;
+      sou.hp = hp;
+      if (ex) sou.variables[0] = 10;
+      if (winner === 'player') [ryuko.hp, ryuko.action] = [0, 'koLand'];
+      match.winner = winner;
+      const shown: number[] = [];
+      for (let t = 0; t < 90; t++) {
+        match.step();
+        if (shown.at(-1) !== fighterPose(sou).image)
+          shown.push(t, fighterPose(sou).image);
+      }
+      return shown;
+    };
+    const tired = [0, 359, 30, 360, 40, 361, 62, 360, 72, 307];
+    expect(result(144, 'player')).toEqual([...tired, 80, 308, 88, 309]);
+    expect(result(144, 'player', true)).toEqual([...tired, 80, 308, 88, 309]);
+    expect(result(144, 'draw')).toEqual([...tired, 80, 311]);
+    expect(result(145, 'player')).toEqual([
+      0, 115, 20, 116, 32, 117, 52, 116, 72, 307, 80, 308, 88, 309,
+    ]);
+    expect(result(145, 'player', true)).toEqual([
+      0, 349, 12, 350, 24, 351, 36, 352, 48, 353, 60, 354, 72, 307, 80, 308, 88,
+      309,
     ]);
   });
 

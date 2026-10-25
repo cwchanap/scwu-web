@@ -448,8 +448,9 @@ def flatten(p, c, index, played=(), offset=0, reactions=(), endless=()):
                 event = dict(event, rewind=dict(t=at, skip=skip))
             # Any other keeps the call too: its target's run-out returns into it (0x4125ea), where
             # this pass runs out (`resume`, set there). MASA's #Fly Missile waits out the freeze
-            # in Skill6 (261, PC 3419), which runs out into the call's next pass.
-            elif event and stack and event["op"] == "test":
+            # in Skill6 (261, PC 3419), which runs out into the call's next pass. An op 0x11 alike:
+            # SOU's DEMO stand checks his life into DEMO stand 3 (31, PC 308).
+            elif event and stack and event["op"] in ("test", "life"):
                 returns.append((len(events), len(stack)))
             elif event and stack and event["op"] in ("input", "command") and not (
                     event["op"] == "command" and len(stack) == 1 and stack[0][2] == 1
@@ -4115,12 +4116,14 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # timelines, which the match plays from there, and its op 0x01 and
     # landing handler run from its own: G Suneo's 勝ち into Random win (52,
     # PC 696), ERUS's draw hop (PCs 701–707), KAY's win hop (PC 579), REMU's
-    # flight (PC 651).
+    # flight (PC 651). So does an op 0x11: SOU's DEMO stand, which his win and
+    # draw call, checks his life (PC 308).
     result_scripts = {}
     for result in ("win", "draw"):
         index, offset = actions[result] if isinstance(actions[result], tuple) else (actions[result], 0)
         events = flatten(p, c, index, offset=offset)["events"]
-        if any(e["op"] in ("random", "test", "motion", "handler") and "resume" not in e for e in events):
+        if any(e["op"] in ("random", "test", "motion", "handler") and "resume" not in e or e["op"] == "life"
+               for e in events):
             # Its landing handler too, though the result plays as a clip.
             queue += [(index, offset)] + [(e["action"], e["offset"]) for e in events
                                           if e["op"] == "handler" and e["action"]]

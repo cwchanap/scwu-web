@@ -193,6 +193,8 @@ export type SourceEvent =
       offset: number;
       below: boolean;
       value: number;
+      // In a call, where its target's run-out returns (SOU's PC 308).
+      resume?: { t: number; skip: number };
     }
   | { op: 'apply'; flags: number; response: number; x: number; y: number }
   | {

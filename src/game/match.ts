@@ -2465,6 +2465,15 @@ export class Match {
         (event.op === 'sound' && event.t >= carried)
       )
         this.runEvent(f, owner, event);
+      // SOU's demo stand checks his life (op 0x11, PC 308) into DEMO stand 3
+      // (31) at 144 or less, before its EX test: his win and draw call it.
+      if (event.op === 'life') {
+        if (event.below ? f.hp > event.value : f.hp < event.value) continue;
+        if (event.resume) f.resume = { clip: key, ...event.resume };
+        if (this.enterResult(f, sourceKey(event.target, event.offset)))
+          return true;
+        continue;
+      }
       if (event.op !== 'random' && event.op !== 'test') continue;
       // A drawn branch takes a test out of a call, returning into it; the
       // result's own clip draws its EX stands (exStands).
