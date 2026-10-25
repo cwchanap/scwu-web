@@ -103,6 +103,16 @@ function clip(
 // calls inlined and op 0x0a jumps followed, plus the gameplay opcodes at their
 // action ages. The match plays every move and object from them.
 export type ScriptEvent = { t: number } & SourceEvent;
+// The records a roll at `at` jumps past to the display after it, which that
+// display carries: ALPHA's voice (PC 52).
+export const skippedBy = (events: ScriptEvent[], at: number) =>
+  events
+    .slice(at + 1)
+    .filter(
+      (e) =>
+        e.t === events[at].t &&
+        (POSE_EVENTS as readonly string[]).includes(e.op),
+    );
 export const POSE_EVENTS = [
   'sound',
   'spawn',
@@ -474,6 +484,12 @@ function jumpClips(who: Who, z = fighterClips[who], yowai = false) {
       return [clip(frames), parts(jumps[0])[1]];
     const wait = frames.findIndex((frame, k) => k >= n && !frame.duration);
     const air = frames.slice(n, wait < 0 ? undefined : wait + 1);
+    // ALPHA's voice past his roll, which the match plays (launchJump).
+    const roll = timeline.events.findIndex(
+      (e) => e.op === 'random' && e.t === launch,
+    );
+    const voice = roll < 0 ? 0 : skippedBy(timeline.events, roll).length;
+    if (voice) air[0] = { ...air[0], events: air[0].events!.slice(0, -voice) };
     const loop = timeline.end === 'loop' && timeline.loop - n;
     return [clip(frames.slice(0, n)), clip(air, loop, waits(air))];
   };

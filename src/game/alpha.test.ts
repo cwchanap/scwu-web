@@ -37,6 +37,25 @@ const J = { punch: true };
 const K = { kick: true };
 
 describe('ALPHA (33 ALPHA.PLAYER)', () => {
+  it('rolls rand % 3 > 1 past his voice as each jump launches (PCs 51, 83, 108)', () => {
+    // The launch cues 55 (PC 47), then his voice 49 unless the roll passes.
+    for (const right of [false, true]) {
+      const cues = [0, 1, 2, 3, 4, 5].map((seed) => {
+        const match = new Match('practice', false, seed, ['alpha', 'ryuko']);
+        const [alpha] = match.fighters;
+        match.step({ jump: true, right });
+        while (alpha.action === 'takeoff') match.step({ right });
+        return match.sounds
+          .flatMap((s) => (s.owner === 0 ? [s.index] : []))
+          .sort((a, b) => a - b);
+      });
+      expect(new Set(cues.map(String))).toEqual(new Set(['55', '49,55']));
+    }
+    expect(animationFrame('jump', 0, 'alpha').events).toEqual([
+      { op: 'sound', index: 55 },
+    ]);
+  });
+
   it('takes 500 life from his parameter block, desperate at 150', () => {
     expect([lifeOf('alpha'), desperationOf('alpha')]).toEqual([500, 150]);
     const { alpha } = alphaPlayer();

@@ -2343,6 +2343,47 @@ describe('recovered power gauge', () => {
     expect(fb('yinan').power).toBe(23);
   });
 
+  it("rolls KAY's Pull Back and YO's and SIN's TWIS SIDE FLY past their cries (PCs 1735, 1072, 1116)", () => {
+    // The roll and the cry each reaction plays, seed by seed.
+    const struck = (victim: Who, seed: number) => {
+      const anmc = victim !== 'kay';
+      const match = new Match('practice', false, seed, [
+        anmc ? 'anmc' : 'ryuko',
+        victim,
+      ]);
+      const [f, target] = match.fighters;
+      const reaction = anmc ? 'twistSideHit' : 'hitPull';
+      if (anmc) {
+        // ANMC P's EX CHUCK HIT tosses through Fly twis (92).
+        f.variables[0] = 100;
+        target.x = f.x + 90;
+      } else {
+        enter(match, f, RYUKO.iori2, 22);
+        target.x = f.x + 200;
+      }
+      for (let t = 0; target.action !== reaction && t < 400; t++)
+        match.step(anmc && !(t % 6) ? { throw: true } : {});
+      // The tick it enters cues its first display's sounds.
+      const { branch } = target;
+      const cries = match.sounds.flatMap((s) =>
+        s.owner === 1 ? [s.index] : [],
+      );
+      return [branch, cries] as const;
+    };
+    for (const [victim, rolled, cry] of [
+      ['kay', '126+16', 35],
+      ['yo', '95+15', 27],
+      ['sin', '96+15', 61],
+    ] as const) {
+      const seen = [0, 1, 2, 3, 4, 5, 6, 7].map((seed) => struck(victim, seed));
+      expect(new Set(seen.map(([branch]) => branch))).toEqual(
+        new Set([null, rolled]),
+      );
+      for (const [branch, cries] of seen)
+        expect(cries.includes(cry)).toBe(branch === null);
+    }
+  });
+
   it('plays a victim’s own UNCOUNTER DOWN and Air Fire (responses 69, 70) in place of DOWN and J Att', () => {
     // KATE's 229 strikes with 69, ERUS's 292 with 70.
     const struck = (striker: Who, clip: number, victim: Who) => {

@@ -249,6 +249,30 @@ describe('SOU (16 SOU.PLAYER)', () => {
     expect(stance(10, 144)).toEqual([360, 361, 355, 356, 357, 356, 358, 359]);
   });
 
+  it('blinks as he crouches, rolling rand % 6 > 3 to blink again each time image 126 runs out (PC 290)', () => {
+    // The ticks each blink (127, 128, 127) starts while down is held: the
+    // first as he enters his crouch, then one each time the roll passes,
+    // 100 ticks of image 126 apart.
+    const blinks = [0, 1, 2].map((seed) => {
+      const match = new Match('practice', false, seed, ['sou', 'ryuko']);
+      const [sou] = match.fighters;
+      const starts: number[] = [];
+      let last = 0;
+      for (let t = 0; t < 600; t++) {
+        match.step({ crouch: true });
+        const { image } = fighterPose(sou);
+        if (image === 127 && last !== 127 && last !== 128) starts.push(t);
+        last = image;
+      }
+      return starts;
+    });
+    expect(blinks).toEqual([
+      [5, 136, 267],
+      [5, 236, 467, 598],
+      [5, 336],
+    ]);
+  });
+
   it('drops into his Vs. intro and lands, in EX mode with down held (PC 415)', () => {
     // 開始時 BR + 10 (PC 402), then Round 1 from PC 411.
     expect(

@@ -1249,7 +1249,7 @@ TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", 
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
             "airBlockRapid", "airTimeStopGuard", "lose", "ko", "down", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
-            "airHisoStop", "dstToss"]
+            "airHisoStop", "dstToss", "hitPull", "twistSideHit"]
 
 # The responses whose reactions only some players' moves reach, which the
 # match plays from the victim's own timeline: Clothes off and Clothes off 500
@@ -1622,7 +1622,8 @@ FIGHTERS = {
             "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
             "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
             # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20; TWIS
-            # SIDE FLY rolls it to skip its sound (PC 1072), where Ryuko's has none.
+            # SIDE FLY rolls it to skip its sound (PC 1072), where Ryuko's has none,
+            # which the match plays.
             "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "twistSideHit",
             "chainPull",
             # Zoma's, rolling rand % 3 > 1 (PC 1133); DRAGON Fireball and Yinan
@@ -1667,8 +1668,8 @@ FIGHTERS = {
             "guard", "crouchGuard", "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop",
             "blockRapid", "crouchBlockRapid", "timeStopGuard", "crouchTimeStopGuard",
             # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20; TWIS
-            # SIDE FLY and the sweep roll it to skip their sound (PC 913), where
-            # Ryuko's have none.
+            # SIDE FLY and the sweep roll it to skip their sound (PCs 1116, 913),
+            # where Ryuko's have none, which the match plays.
             "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "chuckToss", "twistSideHit",
             "sweep", "chainPull",
             # Zoma's, rolling rand % 3 > 1.
@@ -1774,7 +1775,7 @@ FIGHTERS = {
             "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySide", "flySideWall", "chainPull",
             # Variable 5 tests (> 4, not > 7, PC 845), which the match plays.
             "jumpHit",
-            # A roll that skips its sound (PC 1735), which the clip doesn't play.
+            # A roll that skips its sound (PC 1735), which the match plays.
             "hitPull",
             # Kiki's raw vx −800.
             "launchDown",
@@ -4078,10 +4079,14 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     copies = [*(twins[name][1] for name in ("fb", "fbb", "fbh")
                 if any(p.records[pc][0] == 0x0c for pc in range(p.action(twins[name][1]).start,
                                                                  p.action(twins[name][1]).end))), *aliases]
+    # The neutral actions that roll, which the match takes: ALPHA's jumps past his voice (PCs 51, 83,
+    # 108) and SOU's crouch into another blink (PC 290). The idle's interpreter rolls its own.
+    rolling = [index for name, index in neutral.items() if name != "idle" and any(
+        r[0] == 0x20 for r in p.records[p.action(index).start:p.action(index).end])]
     queue = [(i, 0) for i in [*(twins[name][1] for name in SCRIPTED + guards), *copies,
                               *filter(None, tables["response_effects"]), *moves, *(t for ops in counters.values() for _, _, t in ops if t),
                               *sorted(own_timelines), *([tables["start"]] if key != "dora" else []), *tables["jumps"],
-                              *tables["walks"], tables["fall"]]]
+                              *tables["walks"], tables["fall"], *rolling]]
     # The object the HUD face spawns, which the match makes for each player in the Vs. modes.
     if tables["faceHelper"]:
         queue.append(tuple(tables["faceHelper"]))
@@ -4238,13 +4243,13 @@ def main():
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
     # match plays (the shock 88, FLY NO HIT 97, the rush air hit 122, the beam
-    # hits 83 and 84, hits 75–77, 79, 80, 91, 96, 99, 100, 105, 126 and 132, the toss 129 and the air reactions), the lose
+    # hits 83 and 84, hits 75–77, 79, 80, 91, 92, 96, 99, 100, 105, 121, 126 and 132, the toss 129 and the air reactions), the lose
     # action (59) whose records open every KO, every response's hit effect and
     # every object the clips spawn; her moves, and the guard reactions whose op
     # 0x24 enters COUNTER HIT (174). Each brings what its events spawn, call
     # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
-    queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 96, 99, 100, 105, 126, 108, 109, 132, 129, 153, 158,
+    queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 92, 96, 99, 100, 105, 121, 126, 108, 109, 132, 129, 153, 158,
                               167, 172, 59, 60, 62, 133, 120, 107, 114,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,

@@ -15,6 +15,7 @@ import {
   NORMAL_COLOR,
   POSE_EVENTS,
   script,
+  skippedBy,
   yowaiKey,
 } from './animations';
 import type {
@@ -771,6 +772,10 @@ const ROLLED: Partial<Record<Action, number>> = {
   jumpHit: 77,
   flySide: 91,
   dstToss: 129,
+  // KAY's Pull Back (126) and YO's and SIN's TWIS SIDE FLY (95, 96) roll
+  // rand % 3 > 1 past their sounds (PCs 1735, 1072, 1116).
+  hitPull: 121,
+  twistSideHit: 92,
 };
 // Each player's twins that roll in its own records: Zoma's chuck toss (133)
 // and Kiki's rises (97, 127) don't.
@@ -936,6 +941,23 @@ const NEUTRAL = Object.fromEntries(
 const LEVELS = Object.fromEntries(
   Object.entries(CHARACTERS).map(([who, { levels }]) => [who, levels]),
 ) as unknown as Record<Who, Record<string, number>>;
+// SOU's crouch (20) rolls rand % 6 > 3 as its last display runs out (PC
+// 290): past it, it blinks again from its start; otherwise it holds image
+// 126 another 100 ticks (20 + 5, PC 291), the loop its timeline keeps.
+const CROUCH_ROLLS = Object.fromEntries(
+  (Object.keys(CHARACTERS) as Who[]).flatMap((who) => {
+    const index = Number(
+      Object.keys(NEUTRAL[who]).find((k) => NEUTRAL[who][k] === 'crouch'),
+    );
+    if (!exported(index, who)) return [];
+    const { events, frames, loop } = script(index, who);
+    const roll = events.find((e) => e.op === 'random');
+    const hold = frames
+      .slice(0, Number(loop))
+      .reduce((t, frame) => t + frame.duration, 0);
+    return roll?.op === 'random' ? [[who, { ...roll, hold }]] : [];
+  }),
+) as Partial<Record<Who, { divisor: number; above: number; hold: number }>>;
 // Each victim action's source number (Ryuko's), for the guard reactions.
 const REACTION_INDEX = new Map(
   Object.entries(RESPONSE_REACTIONS).map(([index, { action }]) => [
@@ -1541,17 +1563,6 @@ function walkSpeed(who: Who, back: boolean) {
   const { events } = script(CHARACTERS[who].walks[Number(back)], who);
   const launch = events.find((event) => event.op === 'motion');
   return launch?.op === 'motion' ? launch.vx * SOURCE_VELOCITY_SCALE : 0;
-}
-
-// Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
-// ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
-// under 100.
-function launchJump(f: Fighter) {
-  const index = CHARACTERS[f.who].jumps[f.jump];
-  const { events } = script(yowai(f) ? yowaiKey(index, f.who) : index, f.who);
-  const launch = events.find((event) => event.op === 'motion');
-  if (launch?.op === 'motion') motion(f, launch);
-  f.airAge = 0;
 }
 
 // Routine 0x40e6f0 carries full gauges into stock, up to the fighter's cap,
@@ -2587,6 +2598,23 @@ export class Match {
     }
     if (!frames.length && end === 'jump' && next !== null)
       this.rollPass(f, sourceKey(next, offset), sounds);
+  }
+
+  // Each jump's own op 0x01: Ryuko's up at raw −1450, forward and back at
+  // ±400 and −1400, under gravity 80 (PCs 54, 69, 84); 3-TIMES's at −1650
+  // under 100. ALPHA's then rolls rand % 3 > 1 past his voice (PCs 51, 83,
+  // 108; 66 yowai), which jumpClips leaves to it.
+  private launchJump(f: Fighter) {
+    const index = CHARACTERS[f.who].jumps[f.jump];
+    const { events } = script(yowai(f) ? yowaiKey(index, f.who) : index, f.who);
+    const launch = events.find((event) => event.op === 'motion');
+    if (launch?.op === 'motion') motion(f, launch);
+    f.airAge = 0;
+    const at = events.findIndex((e) => e.op === 'random' && e.t === launch?.t);
+    const roll = events[at];
+    if (roll?.op === 'random' && this.cpu.random() % roll.divisor <= roll.above)
+      for (const event of skippedBy(events, at))
+        this.runEvent(f, this.fighters.indexOf(f), event);
   }
 
   // Chuck 消える (143) holds its blank display for 100 ticks, then jumps into
@@ -4145,7 +4173,7 @@ export class Match {
       if (f.age < animationDuration(JUMP_CLIPS[f.jump][0], f.who)) return;
       // A jump's op 0x01 follows its takeoff displays (Ryuko's PC 54), so
       // the jump moves on this tick.
-      launchJump(f);
+      this.launchJump(f);
       this.action(f, 'jump');
       f.moving = 'velocity';
       return;
@@ -4253,6 +4281,14 @@ export class Match {
       return;
     }
     if (!airborne && input.crouch) {
+      const blink = CROUCH_ROLLS[f.who];
+      if (
+        blink &&
+        f.action === 'crouch' &&
+        f.age >= animationDuration('crouch', f.who)
+      )
+        f.age =
+          this.cpu.random() % blink.divisor > blink.above ? 0 : blink.hold;
       this.action(f, crouched ? 'crouch' : 'crouchEnter');
       return;
     }
