@@ -1760,7 +1760,7 @@ FIGHTERS = {
             "airGuard", "airBlockHeavy", "airBlockRapid", "airTimeStopGuard",
             # Chung's rand % 3 > 1 to Ryuko's rand % 6 > 2, or no op 0x20.
             "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySide", "flySideWall", "chainPull",
-            # Variable 5 tests (> 4, not > 7), which the match doesn't read.
+            # Variable 5 tests (> 4, not > 7, PC 845), which the match plays.
             "jumpHit",
             # A roll that skips its sound (PC 1735), which the clip doesn't play.
             "hitPull",
@@ -1939,7 +1939,7 @@ FIGHTERS = {
             # 0x20; the heavy air hit also clears variable 5 (PC 851).
             "hitHeavy", "airHitHeavy", "tatumakiIn", "tatumakiOut", "launchAway", "flySideWall", "chainPull",
             # Clears variable 14 and 8 before 6, not after, with Chung's
-            # variable 5 tests (> 7, then > 4), which the match doesn't read.
+            # variable 5 tests (> 7, then > 4), which the match plays.
             "jumpHit",
             # Kiki's raw vx −800 (PC 1848).
             "launchDown",
@@ -2285,7 +2285,7 @@ FIGHTERS = {
             # Yo's: clears variable 14 before 8 and 5, not after.
             "vanish",
             # Sets variable 5, which J Att counts (PCs 874–876), to 10 where
-            # Ryuko's clears it (PC 1964); the match doesn't read it.
+            # Ryuko's clears it (PC 1964), which the match plays.
             "musicAttack",
             # Clears variables 6, 8, 5 and 14 first (PCs 1616–1619), as his
             # ground form does (PCs 1589–1592) and Ryuko's air form doesn't.
@@ -2432,8 +2432,7 @@ FIGHTERS = {
             # Yo's: clears variable 14 before 8 and 5, not after.
             "vanish",
             # Sets variable 5, which J Att counts (PCs 863–865), to 10 (PC
-            # 2001) where Ryuko's clears it, as SEAN's; the match doesn't read
-            # it.
+            # 2001) where Ryuko's clears it, as SEAN's, which the match plays.
             "musicAttack",
             # ERUS's: Ryuko's, also clearing variable 7 (PC 627).
             "lose",
@@ -2509,7 +2508,7 @@ FIGHTERS = {
             "vanish",
             # Sets variable 5, which J Att counts (PCs 895–897), to 10 (PC
             # 1980) where Ryuko's clears it, as SEAN's, without clearing
-            # variable 14; the match doesn't read it.
+            # variable 14, which the match plays.
             "musicAttack",
             # HISO's and ALEX's: copies of hit heavy, BEAM Stand and HISA; FB
             # also rolls rand % 4 > 1 (PC 1655), as his hit heavy does.
