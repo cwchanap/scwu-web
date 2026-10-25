@@ -5,7 +5,7 @@ import { firstStrike, LIFE, Match } from './match';
 import type { Fighter } from './match';
 import type { Who } from './characters';
 import { scenarioOf, Story } from './story';
-import { enter, RYUKO } from './testing';
+import { enter, playing, RYUKO } from './testing';
 import type { Battle, Slot } from './story';
 
 // A third player borrowed from another match: a story battle seats up to
@@ -380,6 +380,62 @@ describe('story battles', () => {
         return heard;
       }),
     ).toEqual([[32], ['32+2'], ['30+9', 150]]);
+  });
+
+  it('revives ZAKU and PAC-HELO in their story rounds, whose KO downs test variable 11 (PCs 535, 545)', () => {
+    // Global 4 at 70 (--NEXT Zaku Halo--) takes Round BR 2 + 4 (PC 317),
+    // setting variable 11 to 2 (PC 344): KO down enters KO Down BR (62) at
+    // once, which lies 10 + 500 ticks, spawns KO BR HP and stands, 10 + 4 ×
+    // 41 (DEMO STAND): 684. At 1, as +BR-OP's Round BR leaves it (PC 338),
+    // Round BR 2 sets 1 (PC 342), and KO down waits out its 2000-tick pose
+    // into KO Down BR + 10: PAC-HELO's stands 5 + 5 + 4 × 35 (Demo stand).
+    // At 0 it lies on.
+    const revive = (player: number, global4: number) => {
+      const match = Match.story(
+        'ryuko',
+        battle({
+          slots: [slot({ player }), null, null, null, null, null, null],
+        }),
+        0,
+        undefined,
+        left({ 4: global4 }),
+      );
+      const [ryuko, f] = match.fighters;
+      fight(match);
+      f.hp = 1;
+      f.x = ryuko.x + 90 * ryuko.facing;
+      const path: unknown[] = [];
+      for (let t = 0; t < 3000; t++) {
+        match.step(t ? {} : { punch: true });
+        if (path.at(-1) !== playing(f)) path.push(t, playing(f));
+      }
+      return [...path, f.hp];
+    };
+    expect(revive(34, 70)).toEqual([
+      0,
+      'turn',
+      8,
+      'down',
+      118,
+      62,
+      802,
+      'idle',
+      200,
+    ]);
+    expect(revive(35, 1)).toEqual([
+      0,
+      'turn',
+      8,
+      'down',
+      118,
+      61,
+      2128,
+      '62+10',
+      2278,
+      'idle',
+      200,
+    ]);
+    expect(revive(34, 0)).toEqual([0, 'turn', 8, 'down', 118, 61, 0]);
   });
 
   it("hides Sport Court's dancers at global 10 = 10 (PCs 36–351)", () => {

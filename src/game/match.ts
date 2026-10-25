@@ -802,6 +802,19 @@ const KO_TIMELINES = new Set(
     script(twin(who, KO_DOWN), who).events.some((e) => e.op === 'random'),
   ),
 );
+// ZAKU's and PAC-HELO's KO downs (61) play from their timelines too, as
+// their tests of variable 11 (PCs 535, 545), which their story rounds set
+// (Round BR 2, PCs 342, 344), take KO Down BR (62): at 2 at once, at 1 once
+// the 2000-tick pose has run (62 + 10). It lies 500 ticks, then, unless the
+// round is over (PC 559), spawns KO BR HP (63, PC 560), which gains 2 life
+// 101 times (PCs 565–566), and stands into neutral (PC 563).
+const KO_SCRIPTS = new Set(
+  (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+    script(twin(who, KO_DOWN), who).events.some(
+      (e) => e.op === 'test' && e.selector >> 6 === 1,
+    ),
+  ),
+);
 const markHeld = (f: Fighter) => (f.reaction = (f.reaction & ~5) | 0xa);
 // A looping script never runs out, so its object lives until deleted.
 const loops = (e: Effect) => script(e.clip, e.who).end === 'loop';
@@ -3527,6 +3540,10 @@ export class Match {
     }
     f.gravity = 0.24;
     if (f.action === 'down' || f.action === 'koAgain') {
+      if (KO_SCRIPTS.has(f.who)) {
+        this.enterSource(f, twin(f.who, KO_DOWN));
+        return true;
+      }
       const timeline = KO_TIMELINES.has(f.who) && twin(f.who, KO_DOWN);
       this.action(f, 'koLand', false, timeline || undefined);
       if (f.branch) this.rollResult(f);

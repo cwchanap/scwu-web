@@ -96,7 +96,8 @@ def decode_event(record):
     # jump: ZENKA's JUMP 2s take their 179% copies, PCs 58, 207, Zoma's JUMP 2 F and Chung's wall jump pass over
     # their window's close, PCs 136, 3943), 5 above 4 or 7 (each jump hit's count into its J atttack
     # 2, Ryuko's PCs 829–830) or for 0 (YINAN's EN3 Stones hold until her EN3 hits clear it, PCs 9456, 9106), 11
-    # for 10 (ERUS's HP Charge runs off at the next one's Randon1, PCs 6844, 6848, 6873), 12 (EX Fire 2), 13 (ERUS's
+    # (10 runs ERUS's HP Charge off at the next one's Randon1, PCs 6844, 6848, 6873; 2 or 1 takes ZAKU's and
+    # PAC-HELO's KO down and make hikari into their BR forms, PCs 535, 545, 569, 580), 12 (EX Fire 2), 13 (ERUS's
     # coins and hounds), 14 above 9 (ZAKU's and PAC-HELO's lose action into INAI, PCs 492, 499, past their
     # story stance's vanish, PC 28) or for 10 (ZENKA's and ALPHA's yowai forms, PCs 11, ..., which
     # their 開始時 yowai sets at global 1 = 1000, as VS's select screen leaves it; each other test
@@ -128,12 +129,11 @@ def decode_event(record):
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
         return test_event(record)
     if op == 0x1f and record[5] & 0xc and not record[5] & 3 and record[4] in (0x40, 0x41, 0x42, 0x43, 0x44, 0x46,
-                                                                              0x47, 0x48, 0x49, 0x4c, 0x4d, 0x4f, 0x83,
-                                                                              0x86,
+                                                                              0x47, 0x48, 0x49, 0x4b, 0x4c, 0x4d, 0x4f,
+                                                                              0x83, 0x86,
                                                                               *GLOBALS) \
             or op == 0x1f and record[4] == 0x4e and (record[5] == 8 or record[5] == 4 and s16(record, 9) == 10) \
-            or op == 0x1f and record[4] == 0x45 and record[5] in (4, 8) \
-            or op == 0x1f and record[4] == 0x4b and record[5] == 4 and s16(record, 9) == 10:
+            or op == 0x1f and record[4] == 0x45 and record[5] in (4, 8):
         return test_event(record)
     # Global r[4] & 0x3f = (1) or += (2) r[7:9], clamped to ±30000 (0x4138f0): 0 (at 10 a KO enters make hikari),
     # 1, 2 and 4 (the screens and story demos set them for the battle after: ZENKA's and ALPHA's 開始時 take yowai
@@ -3389,8 +3389,8 @@ FIGHTERS = {
             # Ryuko's, its last display 5 ticks (PC 1805), not 10.
             "getUp",
             # Ryuko's KO DOWN, holding his last display 2000 ticks (PC 544),
-            # without her test of global 15 and life check (PCs 645–646); his
-            # tests of variable 11 (PCs 535, 545) keep their fall-through.
+            # without her test of global 15 and life check (PCs 645–646), but
+            # testing variable 11 into KO Down BR (62, PCs 535, 545).
             "down",
         },
         # Results: 勝ち (56) calls DEMO STAND (34) four times (PC 476) and
@@ -3455,8 +3455,8 @@ FIGHTERS = {
             "blockHeavy", "crouchBlockHeavy", "blockStop", "crouchBlockStop", "blockRapid", "crouchBlockRapid",
             "timeStopGuard", "crouchTimeStopGuard",
             # Ryuko's KO DOWN, holding his last display 2000 ticks (PC 552),
-            # without her test of global 15 and life check (PCs 645–646); his
-            # tests of variable 11 (PCs 543, 553) keep their fall-through.
+            # without her test of global 15 and life check (PCs 645–646), but
+            # testing variable 11 into KO Down BR (62, PCs 543, 553).
             "down",
         },
         # Results as ZAKU's: 勝ち (56) calls Demo stand (34) four times (PC
