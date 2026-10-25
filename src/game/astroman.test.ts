@@ -326,15 +326,15 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
   });
 
   it('guards a box meeting P’s, K’s, Punch start’s or super P start’s in their GARDs (slot 5, 0x40eb60)', () => {
-    // His key at 0, Ryuko's punch at `at`. SP GARD (224) sets variable 0 to
-    // 10 (PC 3074), which super P start's tests take into SUPER P LV1
+    // His key at 0, Ryuko's punches at `at`. SP GARD (224) sets variable 0
+    // to 10 (PC 3074), which super P start's tests take into SUPER P LV1
     // (228), 130.
-    const guard = (key: Input, at: number) => {
+    const guard = (key: Input, ...at: number[]) => {
       const { match, astroman, other } = astromanPlayer();
       astroman.stock = 3;
       const mine: unknown[] = [];
       for (let t = -5; t < 500; t++) {
-        match.step(t ? {} : key, t === at ? { punch: true } : {});
+        match.step(t ? {} : key, at.includes(t) ? { punch: true } : {});
         if (t >= 0 && mine.at(-1) !== now(astroman)) mine.push(now(astroman));
       }
       return [
@@ -350,6 +350,14 @@ describe('ASTROMAN (40 ASTROMAN.PLAYER)', () => {
       [223, 224, 228, 'idle'],
       0,
       130,
+    ]);
+    // A second guard, in SP GARD 4's window (227, PC 3048), adds 10 before
+    // testing it for 20 (PC 3135), into its deeper tint (227 + 18), and
+    // super P start takes LV2 (229), 140, into her P 1's 120% body.
+    expect(guard({ musashi: true }, -3, 85)).toEqual([
+      [223, 224, '227+18', 229, 'idle'],
+      0,
+      168,
     ]);
   });
 

@@ -2799,8 +2799,9 @@ export class Match {
   }
 
   // Op 0x1f's checks (0x4137a4) of the actor's own variables (below selector
-  // 0x40), which `pre` sets or adds to first, player variables (0x40 up) and
-  // global 6 (the freeze): == (1), > (2) or < (3).
+  // 0x40), player variables (0x40 up), globals (0x80 up) and global 6 (the
+  // freeze), which `pre` sets or adds to first (0x4138df): == (1), > (2) or
+  // < (3).
   private passes(
     self: Fighter,
     actor: Fighter | Effect,
@@ -2815,8 +2816,17 @@ export class Match {
         : pre.x
           ? { value: Math.floor(actor.x / 1.5), add: false }
           : pre;
-      if (selector < 0x80) this.setLocal(actor, selector, set);
-      else this.globals[selector & 0x3f] = set.value;
+      const write = (old = 0) =>
+        set.add
+          ? Math.max(-30000, Math.min(30000, old + set.value))
+          : set.value;
+      if (selector < 0x40) this.setLocal(actor, selector, set);
+      else if (selector === 0x86) this.freeze = write(this.freeze);
+      else if (selector < 0x80)
+        self.variables[selector & 0x3f] = write(
+          self.variables[selector & 0x3f],
+        );
+      else this.globals[selector & 0x3f] = write(this.globals[selector & 0x3f]);
     }
     const variable =
       selector < 0x40

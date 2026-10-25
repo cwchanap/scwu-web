@@ -921,7 +921,7 @@ And ASTROMAN's, a hulking, muscle-bound boy robot with 780 life, whose steps sha
 | F, or ↓→ K           | ASS GUN: five bullets from a gun in his backside                                                                                   |
 | G, or →↓← J          | C Chuck: close in, a grab into kisses that heal him 60, then 40                                                                    |
 | 1, or →↓←→↓← J       | S CC: close in, a grab into knees, blasts and kisses that heal him 50, then 300, 3 stocks                                          |
-| 2, or ↓→↓→ J         | SUPER P: a huge black rocket fist, 120, 1 stock                                                                                    |
+| 2, or ↓→↓→ J         | SUPER P: a huge black rocket fist, 120, 1 stock; each blow it guards powers it up, 130 to 170                                      |
 | 3, or ↓→↓→ K         | ASS GUN SUPER: a beam from his backside that strikes twenty times from a little ahead of him, 1 stock                              |
 
 And YINAN's, a white-haired wolf girl with 450 life who borrows armour, mecha and costumes for her moves. TO EX switches her between a Normal and an EX type, and each special and super has a form for each:

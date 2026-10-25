@@ -107,9 +107,12 @@ def decode_event(record):
     # 開始時's and stage object's story path), 11 (10 or above 99 turns the stage's track off), 14
     # (200 stops it, which each 開始時 BR tests for 0) and 15 (100 once the round is over: the KO downs pass
     # over their life check, GIGI's DIVE comes up); other tests keep their fall-through path.
-    # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9), which r[5] & 3 sets (1) or adds
-    # to (2) before any check (`pre`): YINAN's Fist S counts its passes in its variable 0 (PCs 6304, 6315–6317,
-    # 6327), as p90 does (PCs 5294–5328). With r[5] bit 0x80 the operand comes from r[6] instead
+    # Below 0x40 its variable is the object's own ([esi + 0x131], 0x4137d9). r[5] & 3 sets (1) or adds to (2)
+    # any variable before its check (`pre`, 0x4138df–0x413962): YINAN's Fist S counts its passes in its variable
+    # 0 (PCs 6304, 6315–6317, 6327), as p90 does (PCs 5294–5328); ASTROMAN's SP GARDs add 10 to player variable 0
+    # for each guard (PCs 3092, 3112, 3135), which super P start's tests take into SUPER P LV1–4 (PCs 3052–3055);
+    # ALPHA's NEW EN3 Fire clears the freeze (PC 6095) and SWW's rambu AIR and DRAGON hits variable 4 (PC 1722,
+    # ...), checks that never pass. With r[5] bit 0x80 the operand comes from r[6] instead
     # (0x413813–0x4138cf): 0xc7 is the round (0x470044), which each 開始時 sets its variable 1 to and tests for 1
     # (Ryuko's PCs 290, 305), and 0xc0 the object's own x ([esi + 8] >> 16), which YINAN's Flash Att tests
     # against the stage's ends (PCs 5785–5786) and each HUD face's object against 320 (Ryuko's PC 733;
@@ -118,7 +121,8 @@ def decode_event(record):
             and record[5] & 3 == 1 and record[5] & 0xc:
         source = dict(round=True) if record[6] == 0xc7 else dict(x=True)
         return dict(test_event(record), pre=dict(value=0, add=False, **source))
-    if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and (record[5] & 3) in (1, 2):
+    if op == 0x1f and (record[4] >> 6 == 0 or record[4] >> 6 < 3 and record[5] & 0xc) and not record[5] & 0x80 \
+            and (record[5] & 3) in (1, 2):
         pre = dict(value=s16(record, 7), add=record[5] & 3 == 2)
         return dict(test_event(record), pre=pre) if record[5] & 0xc else dict(op="local", index=record[4], **pre)
     if op == 0x1f and record[4] >> 6 == 0 and not record[5] & 0x80 and record[5] & 0xc and not record[5] & 3:
