@@ -5,7 +5,7 @@ import { faceImage } from './hud';
 import { exMode, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
-import { brIntro } from './testing';
+import { base, brIntro } from './testing';
 
 // YINAN as player 1, `gap` from Ryuko as player 2, who plays `theirs`.
 function yinanPlayer(gap = 90) {
@@ -576,6 +576,28 @@ describe('YINAN (41 YINAN.PLAYER)', () => {
       stock: 0,
     });
     expect(play(en3, { stock: 2 }).mine).toContain(406);
+  });
+
+  it("holds EN3's Stones until EN3 Hit clears variable 5, then flashes them out (PCs 9106, 9456)", () => {
+    const { match, yinan, steps } = yinanPlayer();
+    yinan.stock = 3;
+    steps({}, 2);
+    const stones = () =>
+      match.effects.filter((e) => [499, 500, 501].includes(base(e.clip)));
+    // EN3 Hit sets variable 5 to 1 (PC 9081) and spawns EN3 Stone (498, PC
+    // 9082), which lays a Stone every 3 ticks (PCs 9417–9450).
+    let t = 0;
+    while (!yinan.variables[5]) steps(en3(t++));
+    while (yinan.variables[5]) steps(en3(t++));
+    // Each loops on a one-tick display while it is 1 (PC 9456): cleared (PC
+    // 9106), they take + 7, adding their colour (PC 9459) for 5 ticks.
+    expect(new Set(stones().map((e) => e.clip))).toEqual(
+      new Set(['499+7', '500+7', '501+7']),
+    );
+    steps({}, 4);
+    expect(stones().length).toBeGreaterThan(0);
+    steps({});
+    expect(stones()).toEqual([]);
   });
 
   it('keeps Eat and R300 for under 150 life', () => {
