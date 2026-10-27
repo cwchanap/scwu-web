@@ -5260,6 +5260,21 @@ describe('prototype training rules', () => {
     expect([...match.effects, d].some((e) => e.index === a.index)).toBe(true);
   });
 
+  it("holds SHOW TIME's slot until its displays run out, then the next object takes it (0x4068e0, 0x408e03)", () => {
+    const match = new Match('cpu', true);
+    ticks(match, match.fightTick);
+    const at = { x: 600, y: -300 };
+    // The round controller spawned SHOW TIME (25) into the first free slot,
+    // so this axe takes a later one.
+    const axe = spawn(match, 0, RYUKO.axe, at);
+    // Its 60 ticks of displays run out at its 61st step, which deletes it,
+    // and its turn in the step after frees the slot, below the axe's.
+    ticks(match, 61);
+    expect(spawn(match, 0, RYUKO.axe, at).index).toBeGreaterThan(axe.index);
+    match.step();
+    expect(spawn(match, 0, RYUKO.axe, at).index).toBe(axe.index - 1);
+  });
+
   it('stops the objects following a stopped fighter, not the others', () => {
     const match = new Match();
     const [f, target] = match.fighters;

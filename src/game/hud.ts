@@ -29,6 +29,7 @@ const { ko, calls } = ui as unknown as {
   ko: Lettering;
   calls: {
     start: number;
+    opening: Record<Opening, number>;
     rounds: Lettering[];
     results: Record<'win' | 'perfect' | 'draw', number>;
     story: Record<'win' | 'lose', Lettering>;
@@ -60,8 +61,9 @@ export function roundEndTick(winner: Match['winner'], perfect: boolean) {
   return ko.wait + win + (perfect ? bonus + 1 : 0) + 1;
 }
 export const NEXT_ROUND_TICKS = calls.transition.wait + 1;
-// A win's 1P or 2P WIN spawns as KO's wait runs out.
+// A win's 1P or 2P WIN spawns as KO's wait runs out, and PERFECT as WIN's.
 export const WIN_TICK = ko.wait;
+export const PERFECT_TICK = WIN_TICK + calls.results.win;
 
 // A story's result states (410, 420, 430; 0x4091fc–0x40933d) wait out YOU
 // WIN, YOU LOSE or DRAW (28, 29, 32) alone.
@@ -98,19 +100,29 @@ export const koFrame = (age: number) => letteringFrame(ko, age);
 // and after it 14's logo wipe back in (116), or VS multi's VS L and VS R
 // sliding in (120, 121), the last round's too. A match lasts at most five
 // rounds.
+type Opening = 'brief' | 'logo' | 'first' | 'later';
+const openingPath = ({ globals, round }: Match): Opening =>
+  globals[10] === 10
+    ? 'brief'
+    : !globals[3]
+      ? 'logo'
+      : round === 1 || globals[3] > 99
+        ? 'first'
+        : 'later';
+const opening = (match: Match) => {
+  const path = openingPath(match);
+  return path === 'logo' ? [calls.logo] : calls.vs[path];
+};
+const result = ({ battle, winner }: Match) =>
+  battle && winner !== 'draw'
+    ? calls.story[winner === 'player' ? 'win' : 'lose']
+    : ko;
 function letterings(match: Match): [Lettering, number][] {
   const shown: [Lettering, number][] = [];
-  const { globals } = match;
-  const opening =
-    globals[10] === 10
-      ? calls.vs.brief
-      : !globals[3]
-        ? [calls.logo]
-        : calls.vs[match.round === 1 || globals[3] > 99 ? 'first' : 'later'];
   const bits = match.battle?.letterings ?? 3;
   if (match.calls) {
     shown.push(
-      ...opening.map((lettering): [Lettering, number] => [
+      ...opening(match).map((lettering): [Lettering, number] => [
         lettering,
         match.roundTicks,
       ]),
@@ -122,19 +134,31 @@ function letterings(match: Match): [Lettering, number][] {
       ]);
     if (bits & 2) shown.push([calls.fight, match.roundTicks - match.fightTick]);
   }
-  const { battle, winner } = match;
-  if (winner)
-    shown.push([
-      battle && winner !== 'draw'
-        ? calls.story[winner === 'player' ? 'win' : 'lose']
-        : ko,
-      match.endingTicks,
-    ]);
+  if (match.winner) shown.push([result(match), match.endingTicks]);
   if (match.winner && match.calls)
     for (const lettering of match.teams ? calls.vs.team : [calls.transition])
       shown.push([lettering, match.endingTicks - match.roundEnd]);
   return shown;
 }
+
+// The ticks a KGT object shows its displays before op 0x05, or the next
+// action's op 0x00, deletes it; one that loops runs on.
+const life = ({ frames, loop }: Lettering) =>
+  loop === undefined
+    ? frames.reduce((total, frame) => total + frame.duration, 0)
+    : Infinity;
+// Each lettering's life and priority: KGT 13's own on its path, with what
+// its first step spawns (match.ts holds their slots), the round's DRESS n
+// and SHOW TIME, and the result's.
+export const openingLife = (match: Match) => calls.opening[openingPath(match)];
+export const openingObjects = (match: Match) =>
+  opening(match).map((lettering) => ({
+    z: lettering.z!,
+    life: life(lettering),
+  }));
+export const dressLife = (round: number) => life(calls.rounds[round - 1]);
+export const FIGHT_LIFE = life(calls.fight);
+export const resultLife = (match: Match) => life(result(match));
 
 // The KGT sounds of the lettering displays starting at this tick.
 export function letteringSounds(match: Match) {

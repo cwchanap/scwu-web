@@ -61,8 +61,15 @@ import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
 import {
+  DRESS_TICK,
+  dressLife,
+  FIGHT_LIFE,
   FIGHT_TICK,
   NEXT_ROUND_TICKS,
+  openingLife,
+  openingObjects,
+  PERFECT_TICK,
+  resultLife,
   roundEndTick,
   ROUND_END_TICKS,
   storyEndTick,
@@ -1670,6 +1677,15 @@ export class Match {
   // Deleted objects, whose slots (state 1, 0x40e505) stay taken until their
   // own turn in a step pass frees them (0x4069a0).
   private freeing: Effect[] = [];
+  // The round's KGT objects (0x4068e0), which hud.ts draws: KGT 13 and what
+  // its first step spawns, DRESS n, SHOW TIME, the result's lettering, 1P or
+  // 2P WIN, PERFECT, and KGT 14 with what it spawns. Each holds a slot until
+  // the tick its displays run out, or for the round while it loops or holds
+  // a display of 0 (WIN, PERFECT, 14). The camera, the round controller and
+  // the HUD manager with its faces (0x408c4a–0x408c69) hold theirs for the
+  // round from before any player's object, which leaves the others' order
+  // as it is, so they hold none here.
+  private kgt: { e: Effect; until: number }[] = [];
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
@@ -1770,6 +1786,8 @@ export class Match {
         ? this.entrants()
         : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
     this.clearInput();
+    // Round setup makes KGT 13 after the stage's objects (0x408ce9).
+    if (intro) this.hold(0x65, openingLife(this));
   }
 
   // A story battle (0x406aa3) on its stage (+1: stage file n − 1, in the
@@ -2100,7 +2118,9 @@ export class Match {
     this.roundTicks = 0;
     this.effects = [];
     this.freeing = [];
+    this.kgt = [];
     this.layers = stageObjects(this.stage);
+    this.hold(0x65, openingLife(this));
     this.freeze = 0;
     this.koStop = 0;
     this.quake.x = this.quake.y = null;
@@ -3484,7 +3504,7 @@ export class Match {
       ][event.flags & 3],
       owner,
       slot: registers ? event.slot : -1,
-      index: firstFree([...this.layers, ...this.effects, ...this.freeing]),
+      index: firstFree(this.taken()),
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
       ...(stage && { stage: stageScroll(who as Stage, event.action) }),
@@ -4459,6 +4479,23 @@ export class Match {
       this.nextRound();
   }
 
+  private taken() {
+    return [
+      ...this.layers,
+      ...this.effects,
+      ...this.freeing,
+      ...this.kgt.map(({ e }) => e),
+    ];
+  }
+
+  // A KGT object spawning, which holds a slot for `life` more steps (a
+  // stand-in, whose clip nothing reads).
+  private hold(z: number, life = Infinity) {
+    const e = newEffect({ clip: 0, who: this.stage, z });
+    e.index = firstFree(this.taken());
+    this.kgt.push({ e, until: this.roundTicks + 1 + life });
+  }
+
   private delete(e: Effect) {
     if (e.stage) this.layers = this.layers.filter((layer) => layer !== e);
     else this.effects = this.effects.filter((other) => other !== e);
@@ -4601,9 +4638,11 @@ export class Match {
     // the tick's start by priority (0x404d0b), the players' slots before any
     // object's within one, so an object a step or a contact spawns first
     // steps in the next tick's pass, and one a player's step moves keeps its
-    // place; within a priority they go in slot order. ponytail: the HUD's
-    // KGT letterings and the camera hold no slot here, so a slot a lettering
-    // frees goes to no later object first.
+    // place; within a priority they go in slot order. A KGT object deleted
+    // last tick (kgt) frees its slot at its turn.
+    for (const { e, until } of this.kgt)
+      if (until <= this.roundTicks) this.freeing.push(e);
+    this.kgt = this.kgt.filter(({ until }) => until > this.roundTicks);
     const order = this.fighters
       .map((_, i) => i)
       .sort((a, b) => this.fighters[a].z - this.fighters[b].z || a - b);
@@ -4625,7 +4664,6 @@ export class Match {
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
     // fighters finish their intro and stand.
     this.roundTicks++;
-    if (this.roundTicks === 2) this.spawnFaces();
     this.cpuDriven =
       !opponent &&
       (this.mode !== 'practice' || this.practice.partner === 'cpu');
@@ -4682,10 +4720,18 @@ export class Match {
       // (PC 69), the round over, and holds global 14 at 10 for its first 10
       // ticks (PCs 70, 78, 88, 97), so a 開始時 BR that tests it after the
       // first tick keeps its display (Ryuko's PC 323).
+      // KGT 13 also spawns its opening's objects on its first step.
       this.stepObjects(objects.filter((e) => e.z < 0x65));
-      if (this.roundTicks === 1) [this.globals[15], this.globals[14]] = [0, 10];
+      if (this.roundTicks === 1) {
+        [this.globals[15], this.globals[14]] = [0, 10];
+        for (const { z, life } of openingObjects(this)) this.hold(z, life);
+      }
       if (this.roundTicks === 11) this.globals[14] = 0;
+      if (this.roundTicks === 2) this.spawnFaces();
       this.stepObjects(objects.filter((e) => e.z >= 0x65));
+      // The round controller, last, spawns DRESS n (0x408d7c).
+      if (this.roundTicks === DRESS_TICK && (this.battle?.letterings ?? 3) & 1)
+        this.hold(0x65, dressLife(this.round));
       for (const f of this.fighters)
         if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
       this.moveObjects();
@@ -4727,7 +4773,16 @@ export class Match {
     // Applied after both steps, so a double KO holds once; like op 0x1a's
     // other stop it skips a slot still waiting to enter (+0x2238, 0x4136ae).
     for (const f of this.fighters) if (f.present) this.pause(f, this.koStop);
-    this.stepObjects(objects);
+    // The HUD faces, at 0x65 after KGT 13, spawn their objects on their
+    // first step (spawnFaces), and KGT 14 the transition's.
+    this.stepObjects(objects.filter((e) => e.z < 0x65));
+    if (this.roundTicks === 2) this.spawnFaces();
+    // 116, or VS multi's 120 and 121 (KGT PCs 103, 110–111).
+    if (this.calls && this.winner && this.endingTicks === this.roundEnd + 1) {
+      this.hold(0x7f);
+      if (this.teams) this.hold(0x7f);
+    }
+    this.stepObjects(objects.filter((e) => e.z >= 0x65));
     // Each result lettering (KO 26, YOU WIN 28, YOU LOSE 29, DRAW 32, DOUBLE
     // KO 33), spawned as the round controller sees the result, sets global
     // 15 to 100 on its first step, at 0x65 (KGT PCs 171, 199, 225, 257,
@@ -4765,6 +4820,22 @@ export class Match {
       // draw or double KO both (0x409394, 0x40966b).
       if (this.winner !== 'opponent') this.wins[0]++;
       if (this.winner !== 'player') this.wins[1]++;
+      this.hold(0x65, resultLife(this));
+    }
+    // It spawns SHOW TIME (0x408e03), then the result states' letterings
+    // that hold a display: 1P or 2P WIN, PERFECT, and KGT 14.
+    if (
+      this.calls &&
+      this.roundTicks === this.fightTick &&
+      (this.battle?.letterings ?? 3) & 2
+    )
+      this.hold(0x65, FIGHT_LIFE);
+    if (this.calls && this.winner) {
+      const won = !this.battle && this.winner !== 'draw';
+      const perfect = this.roundEnd === roundEndTick(this.winner, true);
+      if (won && this.endingTicks === WIN_TICK) this.hold(0x65);
+      if (won && perfect && this.endingTicks === PERFECT_TICK) this.hold(0x65);
+      if (this.endingTicks === this.roundEnd) this.hold(0x65);
     }
     this.previous = inputs.map((input) => ({ ...input }));
     this.clashBoxes();

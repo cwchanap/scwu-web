@@ -4483,8 +4483,13 @@ def export_ui():
     # or jump to 26; a story's (0x4091fc, 0x40929f) YOU WIN or YOU LOSE (28,
     # 29), which play 26's displays with waits of their own.
     wait = lambda action: u16(p.records[p.action(action).start], 1)
+    life = lambda timeline: sum(frame["duration"] for frame in timeline["frames"])
     ko = kgt_timeline(p, 26)
-    calls = dict(start=wait(13), logo=kgt_timeline(p, 115), rounds=[kgt_timeline(p, 15 + i) for i in range(5)],
+    # KGT 13's own displays up to its op 0x05, which deletes it, on each path (PCs 75, 82, 93): 320
+    # ticks, 360 past the VS splash's spawns.
+    opening = dict(brief=life(kgt_timeline(p, 13, 7)), later=life(kgt_timeline(p, 13, 7)),
+                   first=life(kgt_timeline(p, 13, 14)), logo=life(kgt_timeline(p, 13, 25)))
+    calls = dict(start=wait(13), opening=opening, rounds=[kgt_timeline(p, 15 + i) for i in range(5)],
                  fight=kgt_timeline(p, 25), transition=dict(kgt_timeline(p, 116), wait=wait(14)),
                  results=dict(win=wait(30), perfect=wait(27), draw=wait(32)),
                  story=dict(win=kgt_timeline(p, 28), lose=kgt_timeline(p, 29)))
@@ -4505,6 +4510,7 @@ def export_ui():
     # takes the VS splash every round (PC 74), and between rounds 14 (PC 102) slides VS L and VS R
     # in from the screen's edges (120, 121, PCs 110-111) to join where they stand; 14's own displays
     # only repeat them.
+    calls["logo"] = spawned(94)
     calls["vs"] = dict(first=[spawned(pc) for pc in range(82, 86)], later=[spawned(76)], brief=[spawned(76, 7)],
                        team=[spawned(pc) for pc in (110, 111)])
     timelines = [ko, calls["logo"], *calls["rounds"], calls["fight"], calls["transition"],
