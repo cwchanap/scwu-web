@@ -26,7 +26,8 @@ it('plays the recovered KO displays through the squash-out before showing rematc
   expect(koFrame(166)).toBeUndefined();
   const match = new Match();
   match.fighters[1].hp = 0;
-  match.step();
+  // The KO, state 300, then the result state, which spawns KO.
+  for (let i = 0; i < 3; i++) match.step();
   for (let i = 0; i < KO_TICKS; i++) match.step();
   expect(match.resultReady).toBe(false);
   for (let i = KO_TICKS; i < ROUND_END_TICKS; i++) match.step();
@@ -101,7 +102,8 @@ it("voices the KO lettering's 'KO' (KGT sound 1, PC 180) for every result", () =
       match.step();
       if (letteringSounds(match).length) heard.push(match.endingTicks);
     }
-    expect(heard).toEqual([31]);
+    // At its age 31, its first step being the tick after its spawn.
+    expect(heard).toEqual([32]);
   }
 });
 
@@ -109,15 +111,16 @@ it('calls the Vs. CPU round: DRESS 1, then SHOW TIME and control', () => {
   expect([DRESS_TICK, FIGHT_TICK]).toEqual([351, 631]);
   const match = new Match('cpu', true);
   const heard: [number, number[]][] = [];
-  while (match.roundTicks < FIGHT_TICK) {
+  while (match.roundTicks <= FIGHT_TICK) {
     match.step({ punch: true });
     const sounds = letteringSounds(match);
     if (sounds.length) heard.push([match.roundTicks, sounds]);
   }
-  // 15 plays 7 and 3 ('ROUND1'); 25 plays 2 ('FIGHT') and 8.
+  // 15 plays 7 and 3 ('ROUND1'); 25 plays 2 ('FIGHT') and 8, each on its
+  // first step, the tick after it spawns.
   expect(heard).toEqual([
-    [351, [7, 3]],
-    [631, [2, 8]],
+    [352, [7, 3]],
+    [632, [2, 8]],
   ]);
   // And the select screen's decided cursors' 9 (KGT PCs 555, 591), the
   // title cursor's 10 (KGT PC 498) and VS L's 12 (KGT PC 863).
@@ -138,7 +141,7 @@ it("waits out the results, then calls round 2 with 'DRESS 2' (KGT 16, sound 4)",
   match.fighters[1].hp = 0;
   match.step();
   const heard: [number, number[]][] = [];
-  while (match.round === 1 || match.roundTicks < DRESS_TICK) {
+  while (match.round === 1 || match.roundTicks <= DRESS_TICK) {
     match.step();
     const sounds = letteringSounds(match);
     if (sounds.length) heard.push([match.round, sounds]);
@@ -197,9 +200,10 @@ it("opens a VS round with KGT 13's VS splash, then demo black (117)", () => {
     const sounds = letteringSounds(match);
     if (sounds.length) heard.push([match.round, match.roundTicks, sounds]);
   }
-  // VS L's slide plays 12 in round 1 only; demo black is silent.
+  // VS L's slide plays 12 in round 1 only, at its age 150 from its first
+  // step at tick 2; demo black is silent.
   expect(heard.filter(([, , sounds]) => sounds.includes(12))).toEqual([
-    [1, 150, [12]],
+    [1, 152, [12]],
   ]);
 });
 
@@ -240,11 +244,12 @@ it('opens every VS multi round with the VS splash, and between rounds slides VS 
         sounds,
       ]);
   }
-  // VS L's slide plays 12 each round, and 120 as it meets VS R.
+  // VS L's slide plays 12 each round, and 120 as it meets VS R, its first
+  // step two ticks after state 900 spawns KGT 14.
   expect(heard.filter(([, , sounds]) => sounds.includes(12))).toEqual([
-    [1, 150, [12]],
-    [1, 23, [12]],
-    [2, 150, [12]],
+    [1, 152, [12]],
+    [1, 25, [12]],
+    [2, 152, [12]],
   ]);
 });
 
@@ -264,9 +269,9 @@ it('slides VS L and VS R in after the last round too, then ends the match (state
       heard.push([match.round, match.endingTicks - match.roundEnd]);
   }
   expect(heard).toEqual([
-    [1, 23],
-    [2, 23],
-    [3, 23],
+    [1, 25],
+    [2, 25],
+    [3, 25],
   ]);
   expect(match.endingTicks - match.roundEnd).toBe(NEXT_ROUND_TICKS);
 });

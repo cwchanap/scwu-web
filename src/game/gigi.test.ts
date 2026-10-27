@@ -176,10 +176,11 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
     steps({}, 2);
     steps({ iori: true });
     steps({}, 59);
-    // The round controller sees the KO after GIGI's step, and KO's first
-    // step sets global 15 to 100 after his next.
+    // The round controller sees the KO after GIGI's step, picks the result
+    // the tick after and spawns KO the tick after that, whose first step
+    // sets global 15 to 100 after GIGI's next.
     other.hp = 0;
-    steps({}, 2);
+    steps({}, 4);
     expect([now(gigi), match.globals[15]]).toEqual([225, 100]);
     steps({});
     expect(now(gigi)).toBe(234);

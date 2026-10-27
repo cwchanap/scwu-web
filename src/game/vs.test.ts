@@ -1507,7 +1507,7 @@ describe("SHIN-Z's VS 開始時 (31)", () => {
       208,
     ]);
     expect(match.winner).toBe(null);
-    match.step();
+    steps(match, 3);
     expect(match.winner).toBe('opponent');
   });
 

@@ -99,7 +99,9 @@ export const koFrame = (age: number) => letteringFrame(ko, age);
 // which jump to it), a story's YOU WIN or YOU LOSE (28, 29) in its place,
 // and after it 14's logo wipe back in (116), or VS multi's VS L and VS R
 // sliding in (120, 121), the last round's too. A match lasts at most five
-// rounds.
+// rounds. Each shows its first display on its first step, the tick after
+// its spawn (0x4068e0 only sets it up): KGT 13's and 14's objects the tick
+// after 13's or 14's own first step spawns them.
 type Opening = 'brief' | 'logo' | 'first' | 'later';
 const openingPath = ({ globals, round }: Match): Opening =>
   globals[10] === 10
@@ -124,20 +126,21 @@ function letterings(match: Match): [Lettering, number][] {
     shown.push(
       ...opening(match).map((lettering): [Lettering, number] => [
         lettering,
-        match.roundTicks,
+        match.roundTicks - 2,
       ]),
     );
     if (bits & 1)
       shown.push([
         calls.rounds[match.round - 1],
-        match.roundTicks - DRESS_TICK,
+        match.roundTicks - DRESS_TICK - 1,
       ]);
-    if (bits & 2) shown.push([calls.fight, match.roundTicks - match.fightTick]);
+    if (bits & 2)
+      shown.push([calls.fight, match.roundTicks - match.fightTick - 1]);
   }
-  if (match.winner) shown.push([result(match), match.endingTicks]);
+  if (match.winner) shown.push([result(match), match.endingTicks - 1]);
   if (match.winner && match.calls)
     for (const lettering of match.teams ? calls.vs.team : [calls.transition])
-      shown.push([lettering, match.endingTicks - match.roundEnd]);
+      shown.push([lettering, match.endingTicks - match.roundEnd - 2]);
   return shown;
 }
 

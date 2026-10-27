@@ -1664,6 +1664,9 @@ export class Match {
   ticks = 0;
   winner: 'player' | 'opponent' | 'draw' | null = null;
   endingTicks = 0;
+  // State 300 (0x408ec7), and the result it picks the tick after, which its
+  // result state acts on the tick after that (step).
+  private picking: { winner: Match['winner'] } | null = null;
   // Ticks since round setup, and whether the match plays the Vs. CPU intro,
   // round calls and rounds.
   roundTicks = 0;
@@ -1932,14 +1935,14 @@ export class Match {
       if (ally(i)) ours = Math.max(ours, f.points);
       else theirs = Math.max(theirs, f.points);
     });
-    this.winner =
+    const winner =
       ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
-    if (this.winner !== 'player') this.lost++;
+    if (winner !== 'player') this.lost++;
     const lose = timeUp ? 3 : 2;
     this.results = this.fighters.map((_, i) =>
-      this.winner === 'draw'
+      winner === 'draw'
         ? 3
-        : this.winner === 'player'
+        : winner === 'player'
           ? ally(i)
             ? 1
             : lose
@@ -1949,6 +1952,7 @@ export class Match {
               ? 3
               : 1,
     );
+    return winner;
   }
 
   // A waiting slot's step retries its set-up (0x411e7e): it enters once its
@@ -2114,6 +2118,7 @@ export class Match {
     this.round++;
     this.ticks = 0;
     this.winner = null;
+    this.picking = null;
     this.endingTicks = 0;
     this.roundTicks = 0;
     this.effects = [];
@@ -4658,7 +4663,8 @@ export class Match {
     // After a KO or time-out the round phase stays 1 (only a debug key sets
     // 2, 0x406231 and 0x408f38): fighters keep reading commands and
     // striking, and each takes its result's action once back in neutral
-    // (0x410ff1). Only the timer stops (0x408e50).
+    // (0x410ff1). Only the timer stops, as only the fight state counts it
+    // (0x408e50).
     if (this.winner) this.endingTicks++;
     // Round phase 0 (0x47004c) lasts until the fight lettering sets 1:
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
@@ -4737,7 +4743,7 @@ export class Match {
       this.moveObjects();
       return;
     }
-    if (!this.winner) this.ticks++;
+    if (!this.winner && !this.picking) this.ticks++;
     if (this.mode === 'practice') {
       for (const f of this.fighters)
         if (this.practice.maxStock && f.action === 'idle') {
@@ -4804,24 +4810,31 @@ export class Match {
     // 0x7f: its fight state reads the lives after every step (0x408e90), so
     // a lose action that restores life on its first step (ALPHA's KO Boss,
     // PC 1037) is never seen at 0. A story's ends as the 1P is KO'd or any
-    // player reaches 100 points (0x408eda). State 300 compares life per
-    // mille (+0xdf09, 0x408f68), as lives differ.
+    // player reaches 100 points (0x408eda). Seeing the end it sets state 300
+    // (0x408ec7), which picks the result the tick after from the lives then,
+    // by per mille (+0xdf09, 0x408f68) as lives differ, or a story's
+    // (0x409062). The tick after that the result state credits the winner,
+    // or both for a draw or double KO (0x40948a, 0x40955f, 0x409394,
+    // 0x40966b), gives the players their results (+0xe007) and spawns its
+    // lettering.
     const [one, two] = this.fighters;
     const over = this.battle
       ? !one.hp || this.fighters.some((f) => f.points >= 100)
       : !one.hp || !two.hp;
-    if (!this.winner && (over || this.seconds === 0)) {
-      if (this.battle) this.storyResult();
-      else {
-        const [a, b] = [perMille(one), perMille(two)];
-        this.winner = a === b ? 'draw' : a > b ? 'player' : 'opponent';
-      }
-      // The result states credit the winner (0x40948a, 0x40955f), and a
-      // draw or double KO both (0x409394, 0x40966b).
+    if (this.picking?.winner) {
+      this.winner = this.picking.winner;
+      this.picking = null;
       if (this.winner !== 'opponent') this.wins[0]++;
       if (this.winner !== 'player') this.wins[1]++;
       this.hold(0x65, resultLife(this));
-    }
+    } else if (this.picking) {
+      if (this.battle) this.picking.winner = this.storyResult();
+      else {
+        const [a, b] = [perMille(one), perMille(two)];
+        this.picking.winner = a === b ? 'draw' : a > b ? 'player' : 'opponent';
+      }
+    } else if (!this.winner && (over || this.seconds === 0))
+      this.picking = { winner: null };
     // It spawns SHOW TIME (0x408e03), then the result states' letterings
     // that hold a display: 1P or 2P WIN, PERFECT, and KGT 14.
     if (

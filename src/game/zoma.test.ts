@@ -116,6 +116,8 @@ describe('Zoma (02 ZOMA.PLAYER)', () => {
     match.step();
     match.step();
     expect(zoma).toMatchObject({ action: 'down', hp: 0 });
+    match.step();
+    match.step();
     expect(match.winner).toBe('player');
     for (let t = 0; t < 400 && zoma.action !== 'koLand'; t++) match.step();
     expect([zoma.action, ryuko.action]).toEqual(['koLand', 'win']);

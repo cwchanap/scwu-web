@@ -193,7 +193,8 @@ describe('story battles', () => {
     expect(match.winner).toBeNull();
     knockOut(match, three, ryuko);
     expect(ryuko.points).toBe(100);
-    match.step();
+    // State 300 picks the result, and its state credits it (0x409062).
+    for (let t = 0; t < 3; t++) match.step();
     expect(match).toMatchObject({ winner: 'player', wins: [1, 0], lost: 0 });
     expect(match.matchOver).toBe(true);
     // Back in neutral each takes its result: ZAKU, standing, the lose action.
@@ -206,7 +207,7 @@ describe('story battles', () => {
     fight(match);
     const [ryuko, zaku] = match.fighters;
     knockOut(match, ryuko, zaku);
-    match.step();
+    for (let t = 0; t < 3; t++) match.step();
     expect(match).toMatchObject({ winner: 'draw', wins: [1, 1], lost: 1 });
   });
 
@@ -379,7 +380,7 @@ describe('story battles', () => {
         }
         return heard;
       }),
-    ).toEqual([[32], ['32+2'], ['30+9', 150]]);
+    ).toEqual([[32], ['32+2'], ['30+9', 152]]);
   });
 
   it('revives ZAKU and PAC-HELO in their story rounds, whose KO downs test variable 11 (PCs 535, 545)', () => {
@@ -532,8 +533,26 @@ describe('Vs. results', () => {
     ryuko.hp = 255;
     zaku.hp = 101;
     match.ticks = 5999;
-    match.step();
+    for (let t = 0; t < 3; t++) match.step();
     expect(match.winner).toBe('opponent');
+  });
+
+  it('picks the result from the lives the tick after the round ends, and credits it the tick after that (0x408ec7, 0x408f68, 0x409444)', () => {
+    const match = new Match('cpu', false, 0, ['ryuko', 'zaku']);
+    const zaku = match.fighters[1];
+    match.ticks = 5999;
+    match.step();
+    const seconds = match.seconds;
+    zaku.hp = 1;
+    match.step();
+    expect(match.winner).toBe(null);
+    match.step();
+    expect(match).toMatchObject({
+      winner: 'player',
+      wins: [1, 0],
+      endingTicks: 0,
+      seconds,
+    });
   });
 });
 
