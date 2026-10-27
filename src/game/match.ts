@@ -4452,6 +4452,20 @@ export class Match {
   private stepObjects(objects: Effect[]) {
     for (const e of objects) {
       if (!e.stage && !this.effects.includes(e)) continue;
+      // 0x4124fb: past its handler and stop, one following an object whose
+      // slot is deleted (state 1, 0x40e505) is deleted too, its step still
+      // running: ERUS's 335 + 43 goes with its 338. The slot frees at its
+      // own next step (0x4069a0), before which every later follower meets
+      // it. ponytail: a parent another's spawn deletes mid-pass frees before
+      // a follower stepping between the two, which the engine keeps.
+      const parent = e.follow?.parent;
+      const orphan =
+        !e.stage &&
+        e.pending === undefined &&
+        !e.hitStop &&
+        parent !== undefined &&
+        'clip' in parent &&
+        !this.effects.some((other) => other === parent);
       this.stepObject(e);
       // A script that runs out reaches the next action's op 0x00, which
       // deletes an object (0x41273c, 0x413bc6) and frees its slot for the
@@ -4465,11 +4479,12 @@ export class Match {
         this.layers = this.layers.filter((layer) => layer !== e);
       else if (
         !e.stage &&
-        !(
-          running &&
-          (e.follow !== null ||
-            inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))
-        )
+        (orphan ||
+          !(
+            running &&
+            (e.follow !== null ||
+              inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))
+          ))
       )
         this.effects = this.effects.filter((other) => other !== e);
     }

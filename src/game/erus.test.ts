@@ -51,6 +51,36 @@ const byKey = (key: Input, options: Parameters<typeof play>[1] = {}) =>
   play((t) => (t ? {} : key), options);
 
 describe('ERUS (18 ERUS.PLAYER)', () => {
+  it("deletes Coin's 335 + 43 with the 338 it follows (0x4124fb)", () => {
+    const { match, erus } = erusPlayer(200);
+    erus.stock = 3;
+    match.step();
+    enter(match, erus, 333);
+    let t = 0;
+    const tick = () => {
+      t++;
+      match.step();
+    };
+    const find = () =>
+      match.effects.find(
+        (e) =>
+          e.clip === '335+43' &&
+          e.follow?.parent &&
+          'clip' in e.follow.parent &&
+          e.follow.parent.clip === 338,
+      );
+    while (!find()) tick();
+    const follower = find()!;
+    const coin = follower.follow!.parent;
+    const gone = (o: unknown) => !match.effects.some((e) => e === o);
+    while (!gone(coin)) tick();
+    const coinGone = t;
+    while (!gone(follower) && t < 1000) tick();
+    // It steps before the coin (priority 0x50 against 0x51), so it meets the
+    // deleted slot the next tick.
+    expect([follower.z, coin.z, coinGone, t]).toEqual([0x50, 0x51, 103, 104]);
+  });
+
   it('takes 450 life from her parameter block, desperate at 135', () => {
     expect([lifeOf('erus'), desperationOf('erus')]).toEqual([450, 135]);
     const { erus } = erusPlayer();
