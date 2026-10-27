@@ -3539,24 +3539,28 @@ export class Match {
     this.settle(f, walled);
   }
 
-  // The pass then moves each unstopped object, the stage's too, and one
-  // following its parent takes the parent's position plus its offset,
-  // mirrored by the parent's facing, stopped or not (0x40f992–0x40f9d9).
+  // The pass then moves each unstopped object, the stage's too, in table
+  // order, and one following its parent takes the parent's position plus its
+  // offset, mirrored by the parent's facing, stopped or not
+  // (0x40f992–0x40f9d9). A parent later in the table hasn't moved yet, so
+  // its follower keeps to where it was: Giant's 435 trails his 369 by a tick.
   private moveObjects() {
-    const objects = [...this.layers, ...this.effects];
-    for (const e of objects)
+    const objects = [...this.layers, ...this.effects].sort(
+      (a, b) => a.index - b.index,
+    );
+    for (const e of objects) {
       if (e.hitStop === 0) {
         e.vx += e.ax;
         e.vy += e.gravity;
         e.x += e.vx;
         e.y += e.vy;
       }
-    for (const e of objects)
       if (e.follow) {
         const { parent, x, y } = e.follow;
         e.x = parent.x + parent.facing * x * 1.5;
         e.y = parent.y + y * 1.5;
       }
+    }
   }
 
   // 0x411810: before its commands and script, a player at or past the floor

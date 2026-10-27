@@ -154,6 +154,28 @@ describe('Giant (07 GIANT.PLAYER)', () => {
     until(match, () => giant.action === 'knockdown');
   });
 
+  it("keeps en300's 435 to where its 369 was a tick before when 369 sits later in the object table (0x40f992)", () => {
+    const { match, giant } = giantPlayer(200);
+    giant.stock = 3;
+    match.step();
+    enter(match, giant, 362);
+    const later: number[] = [];
+    for (let t = 0; t < 400; t++) {
+      const was = new Map<unknown, number[]>(
+        match.effects.map((e) => [e, [e.x, e.y]]),
+      );
+      match.step();
+      for (const e of match.effects) {
+        const parent = match.effects.find((p) => p === e.follow?.parent);
+        if (e.clip !== 435 || !parent || parent.index < e.index) continue;
+        if (!was.has(parent)) continue;
+        expect([e.x, e.y]).toEqual(was.get(parent));
+        if (parent.x !== was.get(parent)![0]) later.push(t);
+      }
+    }
+    expect(later.length).toBeGreaterThan(100);
+  });
+
   it('spawns love heart (440) each pass of his own MUSIC ATTACK (PC 1944)', () => {
     const { match, other, steps } = giantPlayer(90, 'giant');
     steps({}, 2);
