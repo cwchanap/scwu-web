@@ -4668,12 +4668,14 @@ export class Match {
     if (this.winner) this.endingTicks++;
     // Round phase 0 (0x47004c) lasts until the fight lettering sets 1:
     // commands (0x410069), the CPU (0x41130c) and the timer wait, and the
-    // fighters finish their intro and stand.
+    // fighters finish their intro and stand. The round controller, stepping
+    // last, sets it at the fight tick's end, so the players' steps read it
+    // from the tick after.
     this.roundTicks++;
     this.cpuDriven =
       !opponent &&
       (this.mode !== 'practice' || this.practice.partner === 'cpu');
-    if (this.calls && this.roundTicks < this.fightTick) {
+    if (this.calls && this.roundTicks <= this.fightTick) {
       this.inputs = this.fighters.map((_, i) =>
         i === 0 ? player : i === 1 ? (opponent ?? {}) : {},
       );
@@ -4735,9 +4737,14 @@ export class Match {
       if (this.roundTicks === 11) this.globals[14] = 0;
       if (this.roundTicks === 2) this.spawnFaces();
       this.stepObjects(objects.filter((e) => e.z >= 0x65));
-      // The round controller, last, spawns DRESS n (0x408d7c).
-      if (this.roundTicks === DRESS_TICK && (this.battle?.letterings ?? 3) & 1)
+      // The round controller, last, spawns DRESS n (0x408d7c), then SHOW
+      // TIME (0x408e03), whose wait of 0 runs out at once into the fight
+      // state and round phase 1 (0x408e37, 0x408e41).
+      const bits = this.battle?.letterings ?? 3;
+      if (this.roundTicks === DRESS_TICK && bits & 1)
         this.hold(0x65, dressLife(this.round));
+      if (this.roundTicks === this.fightTick && bits & 2)
+        this.hold(0x65, FIGHT_LIFE);
       for (const f of this.fighters)
         if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
       this.moveObjects();
@@ -4835,14 +4842,8 @@ export class Match {
       }
     } else if (!this.winner && (over || this.seconds === 0))
       this.picking = { winner: null };
-    // It spawns SHOW TIME (0x408e03), then the result states' letterings
-    // that hold a display: 1P or 2P WIN, PERFECT, and KGT 14.
-    if (
-      this.calls &&
-      this.roundTicks === this.fightTick &&
-      (this.battle?.letterings ?? 3) & 2
-    )
-      this.hold(0x65, FIGHT_LIFE);
+    // It spawns the result states' letterings that hold a display: 1P or 2P
+    // WIN, PERFECT, and KGT 14.
     if (this.calls && this.winner) {
       const won = !this.battle && this.winner !== 'draw';
       const perfect = this.roundEnd === roundEndTick(this.winner, true);

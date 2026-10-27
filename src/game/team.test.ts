@@ -86,8 +86,10 @@ const knockOut = (match: Match, f: Fighter, by: Fighter) => {
     match as unknown as { knockOut(f: Fighter, wasOut: boolean): void }
   ).knockOut(f, false);
 };
+// Play to the fight, whose phase 1 the players read from the tick after
+// SHOW TIME's.
 const fight = (match: Match) => {
-  while (match.roundTicks < match.fightTick) match.step();
+  while (match.roundTicks <= match.fightTick) match.step();
 };
 
 describe('story battles', () => {

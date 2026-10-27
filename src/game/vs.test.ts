@@ -1476,8 +1476,8 @@ describe("SHIN-Z's VS 開始時 (31)", () => {
   // of his own life (PC 505) before Start KO 3 (45) holds. His lose action
   // runs at once (0x412327) and, for variable 0, jumps back to Start KO 3
   // (PC 705), whose sounds play again before it holds image 208; the round
-  // goes to his opponent at FIGHT, the fight state's first KO check
-  // (0x408eda).
+  // goes to his opponent the tick after FIGHT, the fight state's first KO
+  // check (0x408eda).
   it('knocks himself out with Start KO before FIGHT', () => {
     const match = new Match('cpu', true, 0, ['shinz', 'ryuko'], 'court', true);
     const [p1, p2] = match.fighters;
@@ -1507,7 +1507,7 @@ describe("SHIN-Z's VS 開始時 (31)", () => {
       208,
     ]);
     expect(match.winner).toBe(null);
-    steps(match, 3);
+    steps(match, 4);
     expect(match.winner).toBe('opponent');
   });
 

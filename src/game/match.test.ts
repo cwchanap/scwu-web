@@ -521,6 +521,10 @@ describe('recovered neutral and round animations', () => {
     ticks(match, FIGHT_TICK - 251, { punch: true });
     expect(player.action).toBe('idle');
     expect(match).toMatchObject({ roundTicks: FIGHT_TICK - 1, ticks: 0 });
+    // The round controller sets phase 1 after the players' steps.
+    match.step({ punch: true });
+    expect(player.action).toBe('idle');
+    expect(match).toMatchObject({ roundTicks: FIGHT_TICK, ticks: 0 });
     match.step({ punch: true });
     expect(player.action).toBe('idle');
     expect(match.ticks).toBe(1);

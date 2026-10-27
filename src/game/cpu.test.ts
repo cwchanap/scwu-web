@@ -198,7 +198,7 @@ describe('CPU decision and playback', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court');
     const counts: number[] = [];
     for (const round of [1, 2]) {
-      while (match.round < round || match.roundTicks < match.fightTick - 1)
+      while (match.round < round || match.roundTicks < match.fightTick)
         match.step();
       counts.push(rolls(match));
       // Mid-entry when the round ends: Zoma's CPU runs on through the KO.
