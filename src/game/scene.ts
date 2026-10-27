@@ -858,10 +858,9 @@ export class TrainingScene extends Phaser.Scene {
   // brightness, the life left on its inner row in green, then what the bar
   // shows lost in red. SCWU.KGT's system flag 0x20 (0x4438a4) adds the
   // life's digits 18 left of it and the lost life's, 32 redder (0x40b5cf),
-  // 40 into it, each counted leftward from its units (0x40bed0).
-  // ponytail: at the player's position after its step, a tick's motion
-  // ahead of the copy the bar reads (+0xdf41, 0x412552); keep that copy if
-  // the lag shows.
+  // 40 into it, each counted leftward from its units (0x40bed0). It draws
+  // from where the player stood as its last unstopped step began (+0xdf41,
+  // 0x412552), a tick's motion behind it.
   private drawLifeBars() {
     const bars = (this.bars ??= this.add
       .graphics()
@@ -885,8 +884,8 @@ export class TrainingScene extends Phaser.Scene {
     };
     for (const f of this.match.lifeBars) {
       const life = lifeOf(f.who);
-      const x = Math.trunc(f.x / ART_SCALE) - 25;
-      const y = Math.trunc((GROUND + f.y) / ART_SCALE);
+      const x = Math.trunc(f.bar.x / ART_SCALE) - 25;
+      const y = Math.trunc((GROUND + f.bar.y) / ART_SCALE);
       const green = Math.trunc((f.hp * 50) / life);
       bars.fillStyle(0, 0.5);
       rect(x, y, 50, 10);

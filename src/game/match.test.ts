@@ -1447,6 +1447,19 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     );
   });
 
+  it('draws a life bar from where its player stood as its last unstopped step began (+0xdf41, 0x412552)', () => {
+    const { match, victim } = struck('punch');
+    let lags = 0;
+    for (let t = 0; t < 40; t++) {
+      const [x, y, held] = [victim.x, victim.y, victim.bar];
+      const stopped = victim.hitStop > 0;
+      match.step();
+      expect(victim.bar).toEqual(stopped ? held : { x, y });
+      if (victim.x !== victim.bar.x) lags++;
+    }
+    expect(lags).toBeGreaterThan(0);
+  });
+
   it('adds a loss to what is still shown lost, and a KO clears it (0x40e855)', () => {
     const match = new Match();
     const [f, victim] = match.fighters;

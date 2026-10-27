@@ -619,8 +619,11 @@ function gainLife(f: Fighter, life: number) {
   [f.lost, f.lostDelay] = [Math.max(0, f.lost - life), 20];
 }
 // 0x412522: each step a stop or a queued action doesn't skip counts the
-// hold down, then drains what the bar shows lost by 1.
-function drainLost(f: Fighter) {
+// hold down, then drains what the bar shows lost by 1, and keeps where the
+// player stands for the bar to draw from (+0xdf41, 0x412552), before the
+// motion pass moves it.
+function stepBar(f: Fighter) {
+  f.bar = { x: f.x, y: f.y };
   if (!f.lost) return;
   if (f.lostDelay) f.lostDelay--;
   else f.lost--;
@@ -1089,6 +1092,9 @@ export interface Fighter {
   // and +0xdf29, the steps before it drains (lifeBars).
   lost: number;
   lostDelay: number;
+  // +0xdf41: where the player stood as its last unstopped step began, which
+  // its life bar draws from (stepBar).
+  bar: { x: number; y: number };
   facing: -1 | 1;
   action: Action;
   age: number;
@@ -1473,6 +1479,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   hp: lifeOf(who),
   lost: 0,
   lostDelay: 0,
+  bar: { x, y: 0 },
   facing,
   action: 'idle',
   age: 0,
@@ -4138,7 +4145,7 @@ export class Match {
       if (f.hitStop === 0) {
         // 0x4123c5: an unstopped step drops the word a stop saved.
         f.stopInput = null;
-        drainLost(f);
+        stepBar(f);
         f.shown = true;
         this.retarget(f);
         if (this.driven(f)) input = this.think(f);
@@ -4648,7 +4655,7 @@ export class Match {
           f.hitStop--;
           continue;
         }
-        drainLost(f);
+        stepBar(f);
         f.shown = true;
         this.retarget(f);
         // A VS 開始時 steps as any script does, and runs out into idle.
