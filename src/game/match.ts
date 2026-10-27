@@ -1660,6 +1660,9 @@ export class Match {
   effects: Effect[] = [];
   // The stage's objects, which step with the others by priority.
   layers: Effect[];
+  // Deleted objects, whose slots (state 1, 0x40e505) stay taken until their
+  // own turn in a step pass frees them (0x4069a0).
+  private freeing: Effect[] = [];
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
@@ -2089,6 +2092,7 @@ export class Match {
     this.endingTicks = 0;
     this.roundTicks = 0;
     this.effects = [];
+    this.freeing = [];
     this.layers = stageObjects(this.stage);
     this.freeze = 0;
     this.koStop = 0;
@@ -3442,9 +3446,8 @@ export class Match {
     // jumps the spawner while the slot's object lives (runEvent).
     const registers = !stage && !(event.flags & 4);
     if (registers)
-      this.effects = this.effects.filter(
-        (e) => e.owner !== owner || e.slot !== event.slot,
-      );
+      for (const e of this.effects)
+        if (e.owner === owner && e.slot === event.slot) this.delete(e);
     if (!event.action) return;
     const clip = sourceKey(event.action, event.offset);
     const screen = !stage && (event.flags & 0x40) !== 0;
@@ -3474,7 +3477,7 @@ export class Match {
       ][event.flags & 3],
       owner,
       slot: registers ? event.slot : -1,
-      index: firstFree([...this.layers, ...this.effects]),
+      index: firstFree([...this.layers, ...this.effects, ...this.freeing]),
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
       ...(stage && { stage: stageScroll(who as Stage, event.action) }),
@@ -4449,34 +4452,40 @@ export class Match {
       this.nextRound();
   }
 
+  private delete(e: Effect) {
+    if (e.stage) this.layers = this.layers.filter((layer) => layer !== e);
+    else this.effects = this.effects.filter((other) => other !== e);
+    this.freeing.push(e);
+  }
+
   private stepObjects(objects: Effect[]) {
     for (const e of objects) {
+      if (this.freeing.includes(e)) {
+        this.freeing = this.freeing.filter((other) => other !== e);
+        continue;
+      }
       if (!e.stage && !this.effects.includes(e)) continue;
       // 0x4124fb: past its handler and stop, one following an object whose
-      // slot is deleted (state 1, 0x40e505) is deleted too, its step still
-      // running: ERUS's 335 + 43 goes with its 338. The slot frees at its
-      // own next step (0x4069a0), before which every later follower meets
-      // it. ponytail: a parent another's spawn deletes mid-pass frees before
-      // a follower stepping between the two, which the engine keeps.
-      const parent = e.follow?.parent;
+      // slot is deleted (state 1) is deleted too, its step still running:
+      // ERUS's 335 + 43 goes with its 338. One meeting the slot freed (its
+      // parent deleted by another's spawn, and stepping between the two)
+      // keeps to it. ponytail: the engine's then follows whatever takes the
+      // slot; the port's keeps to the parent's last place.
       const orphan =
         !e.stage &&
         e.pending === undefined &&
         !e.hitStop &&
-        parent !== undefined &&
-        'clip' in parent &&
-        !this.effects.some((other) => other === parent);
+        this.freeing.some((other) => other === e.follow?.parent);
       this.stepObject(e);
       // A script that runs out reaches the next action's op 0x00, which
-      // deletes an object (0x41273c, 0x413bc6) and frees its slot for the
-      // next spawn; 0x4124c9 also culls one that leaves the world unless it
+      // deletes an object (0x41273c, 0x413bc6), its slot free for a spawn
+      // from its next turn; 0x4124c9 also culls one that leaves the world unless it
       // follows a parent. Op 0x05 deletes a stage object too (0x412617), as
       // Sakura Night's petals (2–5) end; one holding a display stays.
       const running =
         e.age < animationDuration(e.clip, e.who) ||
         (e.stage ? script(e.clip, e.who).end !== 'delete' : loops(e));
-      if (e.stage && !running)
-        this.layers = this.layers.filter((layer) => layer !== e);
+      if (e.stage && !running) this.delete(e);
       else if (
         !e.stage &&
         (orphan ||
@@ -4486,7 +4495,7 @@ export class Match {
               inWorld(e.screen ? { x: e.x, y: e.y - 920 * 1.5 } : e))
           ))
       )
-        this.effects = this.effects.filter((other) => other !== e);
+        this.delete(e);
     }
   }
 
@@ -4594,7 +4603,7 @@ export class Match {
     // The objects below a player's priority step before it.
     const below = order.map(() => [] as Effect[]);
     const objects: Effect[] = [];
-    for (const e of [...this.layers, ...this.effects].sort(
+    for (const e of [...this.layers, ...this.effects, ...this.freeing].sort(
       (a, b) => a.z - b.z || a.index - b.index,
     )) {
       const k = order.findIndex((i) => e.z < this.fighters[i].z);

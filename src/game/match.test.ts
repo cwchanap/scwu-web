@@ -5222,12 +5222,29 @@ describe('prototype training rules', () => {
       spawn(match, 0, RYUKO.axe, at),
     ];
     expect(b.index).toBe(a.index + 1);
-    // Deleting the first frees its slot, which the next object takes, ahead
-    // of the second.
+    // Once the first's slot is free, the next object takes it, ahead of the
+    // second.
     match.effects = [b];
     const c = spawn(match, 0, RYUKO.axe, at);
     expect(c.index).toBe(a.index);
     expect(match.effects).toEqual([c, b]);
+  });
+
+  it("keeps a deleted object's slot until its next turn in a step pass frees it (0x40e505, 0x4069a0)", () => {
+    const match = new Match();
+    const at = { x: 600, y: -300 };
+    const a = spawn(match, 0, RYUKO.axe, at, 0);
+    // Spawning into its owner slot deletes the first (state 1), so the
+    // second takes the slot after it.
+    const b = spawn(match, 0, RYUKO.axe, at, 0);
+    const c = spawn(match, 0, RYUKO.axe, at);
+    expect([b.index, c.index]).toEqual([a.index + 1, a.index + 2]);
+    expect(match.effects).toEqual([b, c]);
+    // The step pass meets the first and frees its slot for the next spawn,
+    // this step's (Ryuko's 340) or the one after it.
+    match.step();
+    const d = spawn(match, 0, RYUKO.axe, at);
+    expect([...match.effects, d].some((e) => e.index === a.index)).toBe(true);
   });
 
   it('stops the objects following a stopped fighter, not the others', () => {
