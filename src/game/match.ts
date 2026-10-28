@@ -77,6 +77,7 @@ import {
   WIN_TICK,
 } from './hud';
 import { ROSTER, takePalette } from './select';
+import ui from './generated/ui.json';
 import type { Battle, Slot } from './story';
 export const SUPER_CONTROLS = [
   'getterBeam',
@@ -624,15 +625,8 @@ function boxDamage(
 }
 // Op 0x17 lists six responses: standing, crouching and airborne, then the
 // same three guarding. This picks the victim's.
-const responseFor = (
-  ids: readonly number[],
-  target: Fighter,
-  guarding: boolean,
-  crouching: boolean,
-) =>
-  ids[
-    (guarding ? 3 : 0) + (target.y < 0 || target.vy < 0 ? 2 : crouching ? 1 : 0)
-  ];
+const responseSlot = (target: Fighter, guarding: boolean, crouching: boolean) =>
+  (guarding ? 3 : 0) + (target.y < 0 || target.vy < 0 ? 2 : crouching ? 1 : 0);
 // 0x4124c9 deletes an object that doesn't follow its parent once it leaves
 // x −50..1330 or y −50..1010 source pixels; the floor is y 920 (0x412247).
 const inWorld = ({ x, y }: { x: number; y: number }) =>
@@ -1025,6 +1019,8 @@ const blocks = new Set<Action>([
   'airTimeStopGuard',
 ]);
 const guards = new Set<Action>(['guard', 'crouchGuard', 'airGuard', ...blocks]);
+// The KGT's responses flagged as hits (0x438694 bit 0).
+const HIT_RESPONSES = new Set(ui.hits);
 // What the free state enters through the neutral handler (0x410dc0, actions
 // 1–7 and 18–27) once a script ends in op 0x00, plus the authored guard poses.
 // The fall is left out: air attacks, air dashes and supers reach it through
@@ -3842,12 +3838,18 @@ export class Match {
     if (!box) return [];
     const body = struck(this.origin(source), source.facing, box, target)!;
     const guarding = this.guarding(target, source, box);
-    const response = responseFor(
-      source.responses,
-      target,
-      guarding,
-      this.crouching(target),
-    );
+    let slot = responseSlot(target, guarding, this.crouching(target));
+    // 0x40f4c9, 0x40f4fa: a CPU guarding on its feet whose guard response
+    // is a hit takes the other height's, so it guards Ryuko's punch 3 (25,
+    // 77) crouching too.
+    if (
+      slot < 5 &&
+      guarding &&
+      this.driven(target) &&
+      HIT_RESPONSES.has(source.responses[slot])
+    )
+      slot = 7 - slot;
+    const response = source.responses[slot];
     // 0x40f539: a response id selects the victim action from the victim's
     // own table. Another player's follows its Ryuko twin's rules
     // (export_fighter), so `victim` is Ryuko's number for it; the reactions
@@ -3867,12 +3869,11 @@ export class Match {
     // spends ANMC P's 234, whose guard half is 0. No box names a response
     // whose victim action is 0 (0x40f640).
     const error = !reaction && !timeline && box.damage > 0;
-    // A guarded contact (the guard half, 0x40f4be) stays one unless the
-    // response is unguardable (0x40f544), as a guard half naming a hit is;
-    // a hit half naming a guard, YINAN's R300 Hit's time stop (response 80,
-    // PC 10429), is a hit.
-    const blocked =
-      guarding && !timeline && (!reaction || blocks.has(reaction.action));
+    // A guarded contact (the guard half, 0x40f4be) stays one unless its
+    // response is a hit (0x40f544), as a guard half naming a hit is; a hit
+    // half naming a guard, YINAN's R300 Hit's time stop (response 80, PC
+    // 10429), is a hit.
+    const blocked = guarding && !HIT_RESPONSES.has(response);
     return [
       {
         f: attacker,

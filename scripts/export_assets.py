@@ -4535,6 +4535,11 @@ def export_ui():
     if at(0x4451c2, "<3H") != (13, 14, 15):
         sys.exit("The KGT system block no longer maps to 0x435474; refusing to export.")
     cursors = at(0x445250, "<4H")
+    # After the names, 200 response definitions of 36 bytes (0x438674): a
+    # name, then a flag byte whose bit 0 marks a hit (ヒット, Chuck), which a
+    # guard can't take (0x40f544) and a CPU's guard trades for the other
+    # height's (0x40f4dc, 0x40f50d).
+    hits = [i for i in range(200) if tail[0x438694 - base + 36 * i] & 1]
     x0, y0, dx, dy, cols, rows, x1, y1, mx1, my1, x2, y2, mx2, my2 = at(0x4452b0, "<14h")
     select_images = set()
     select = dict(cursors=cursors, origin=[x0, y0], step=[dx, dy], cols=cols, rows=rows, sides=[[x1, y1], [x2, y2]],
@@ -4587,7 +4592,7 @@ def export_ui():
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
-                                           select=select, title=title, **{"continue": resume}))
+                                           select=select, title=title, hits=hits, **{"continue": resume}))
     return demo_name
 
 

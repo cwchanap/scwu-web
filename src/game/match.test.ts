@@ -1231,6 +1231,27 @@ describe('practice partner', () => {
     expect(walker.target.action).toBe('walk');
   });
 
+  it("guards punch 3 crouching as a CPU through its standing guard's response (0x40f4c9)", () => {
+    // Punch 3's guard responses (PC 97) are 25 standing and 77 crouching,
+    // which the KGT flags a hit (0x438694 bit 0), so a crouching player
+    // takes it, but a CPU trades it for 25's heavy guard.
+    const crouch: CpuEntry = {
+      flags: 0,
+      probability: 100,
+      min: 0,
+      max: 2000,
+      steps: [{ direction: 4, command: 0, duration: 500 }],
+    };
+    const { match, ryuko, target } = partner('cpu');
+    match.cpu = new CpuVM([crouch], 100);
+    for (let t = 0; t < 10; t++) match.step();
+    expect(target.action).toBe('crouch');
+    strike(match, ryuko, RYUKO.punch3);
+    match.step();
+    match.step();
+    expect(target).toMatchObject({ action: 'blockHeavy', hp: LIFE });
+  });
+
   it('stands still by default', () => {
     const { match, target } = partner('stand');
     for (let tick = 0; tick < 200; tick++) match.step();
