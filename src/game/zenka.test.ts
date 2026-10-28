@@ -10,7 +10,7 @@ import {
 } from './animations';
 import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
-import type { Fighter, Input } from './match';
+import type { Effect, Fighter, Input } from './match';
 import { brIntro } from './testing';
 
 // ZENKA as player 1, `gap` from a standing Ryuko as player 2.
@@ -232,6 +232,28 @@ describe('ZENKA (31 ZENKA.PLAYER)', () => {
     expect(
       play(presses({ 0: { axe: true }, 20: { changeAttack: true } })),
     ).toEqual({ mine: [238, 'idle'], damage: 45, stock: 3 });
+  });
+
+  it("moves SC SUPER's flashes onto the object taking their freed parent's slot (+0x17a)", () => {
+    const { match, zenka, steps } = zenkaPlayer();
+    zenka.stock = 3;
+    steps({}, 2);
+    steps({ axe: true });
+    steps({}, 19);
+    steps({ musashi: true });
+    // The SC SUPER's stop holds the flashes (328, 329) past their 255's end
+    // (age 144), so they meet its slot freed, which a 303 that her 285
+    // spawns takes; it runs on as 306.
+    let parent: Effect | undefined;
+    while (match.roundTicks < 275) {
+      steps({});
+      parent ??= match.effects.find((e) => e.clip === 255);
+    }
+    const taker = match.effects.find((e) => e.index === parent!.index)!;
+    const flashes = match.effects.filter((e) => [328, 329].includes(+e.clip));
+    expect([taker.clip, flashes.length]).toEqual([306, 2]);
+    for (const f of flashes)
+      expect([f.x, f.y]).toEqual([taker.x + 200 * 1.5, taker.y]);
   });
 
   it('darkens the court through variable 13, which her Black (54) tests', () => {

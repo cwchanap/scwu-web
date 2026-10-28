@@ -3518,7 +3518,14 @@ export class Match {
     });
     // 0x406570 takes the first free slot and runs no script: the object
     // first steps in the next tick's pass (stepObjects), which lists only the
-    // objects alive at its start.
+    // objects alive at its start. A follower keeps to its spawner's slot
+    // (+0x17a, 0x40f99b), so one that met its parent's slot freed follows
+    // the object taking it: ZENKA's 328 and 329, stopped past their 255's
+    // end, follow the 303 taking its slot. ponytail: a KGT object taking one
+    // (hold) has no place in the port, so its follower keeps to the parent's.
+    for (const e of [...this.layers, ...this.effects])
+      if (e.follow && 'index' in e.follow.parent)
+        if (e.follow.parent.index === child.index) e.follow.parent = child;
     const list = stage ? this.layers : this.effects;
     const at = list.findIndex((e) => e.index > child.index);
     list.splice(at < 0 ? list.length : at, 0, child);
@@ -4520,8 +4527,7 @@ export class Match {
       // slot is deleted (state 1) is deleted too, its step still running:
       // ERUS's 335 + 43 goes with its 338. One meeting the slot freed (its
       // parent deleted by another's spawn, and stepping between the two)
-      // keeps to it. ponytail: the engine's then follows whatever takes the
-      // slot; the port's keeps to the parent's last place.
+      // keeps to it, and follows whatever takes the slot (spawnObject).
       const orphan =
         !e.stage &&
         e.pending === undefined &&
