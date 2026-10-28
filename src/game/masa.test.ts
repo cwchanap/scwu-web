@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
-import { animationDuration, animationFrame, BLACK } from './animations';
+import {
+  animationDuration,
+  animationFrame,
+  BLACK,
+  hurtboxes,
+} from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro, enter, spawn } from './testing';
+import { StoryDemo } from './select';
+import type { Demo } from './select';
+import { scenarioOf } from './story';
+import type { Battle } from './story';
+import demo23 from './generated/demos/23.json';
 
 // MASA as player 1, `gap` from a standing opponent as player 2.
 function masaPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -257,6 +267,69 @@ describe('MASA (29 MASA.PLAYER)', () => {
     expect(frozen.xs.size).toBe(1);
     expect(frozen.vxs[2]).toBe(0);
     expect(frozen.vxs[8]).toBeCloseTo((730 * 655 * 1.5) / 65536, 6);
+  });
+
+  it("falls through KO 2 (99) after story demo 23, past KO NORMAL's boxes to strike", () => {
+    // Ryuko's story step 30, with the globals story's select screen leaves,
+    // then demo 23 if `demo`, his KO by a punch from FIGHT: MASA's variable
+    // 14, his actions as [tick, action], and the ticks after it that he
+    // could be struck.
+    const knockOut = (demo: boolean) => {
+      const globals = Object.assign(Array<number>(64).fill(0), {
+        2: 50,
+        3: 10,
+        10: 10,
+      });
+      if (demo) {
+        const scene = new StoryDemo(23, demo23 as Demo);
+        scene.globals = globals;
+        while (!scene.done) scene.step();
+      }
+      const battle = scenarioOf('ryuko')[30] as Battle;
+      const match = Match.story('ryuko', battle, 0, undefined, globals);
+      const [ryuko] = match.fighters;
+      const masa = match.fighters.find((f) => f.who === 'masa')!;
+      while (match.roundTicks < match.fightTick || masa.action !== 'idle')
+        match.step({});
+      const variable = masa.variables[14] ?? 0;
+      masa.x = ryuko.x + 90 * ryuko.facing;
+      [masa.hp, masa.stock] = [1, 0];
+      const path: [number, unknown][] = [];
+      let [ko, struck] = [-1, 0];
+      for (let t = 0; !match.resultReady; t++) {
+        match.step(t ? {} : J);
+        if (ko < 0 && masa.hp === 0) ko = t;
+        else if (ko >= 0 && hurtboxes(now(masa)!, masa.age, 'masa').length)
+          struck++;
+        if (path.at(-1)?.[1] !== now(masa)) path.push([t, now(masa)]);
+      }
+      return { variable, path: path.slice(1), struck };
+    };
+    expect(knockOut(false)).toEqual({
+      variable: 0,
+      path: [
+        [8, 'down'],
+        [118, 'koLand'],
+      ],
+      struck: 60,
+    });
+    // Demo 23 sets global 10 to 10000 (its action 4, record 3). 開始時
+    // spawns its + 7 (PC 349), which enters 開始時 D10 (48) for global 3 at
+    // 10 (PC 353); that skips variable 14 for global 10 below 9999 (PC 408),
+    // else sets it to 10 (PC 409). KO NORMAL tests it first (PC 899) into KO
+    // 2 (99): KO NORMAL but for its type-3 boxes (PCs 916, 922), so nothing
+    // strikes him as he falls, and a third of its shake (PC 945). It lands
+    // into KO down (101) alike. 3-TIMES's are the same records (PCs 325,
+    // 800), which his own story's step 54 meets after demo 91.
+    expect(knockOut(true)).toEqual({
+      variable: 10,
+      path: [
+        [8, 99],
+        [118, 101],
+        [178, '101+9'],
+      ],
+      struck: 0,
+    });
   });
 
   it('wins after DEMO STAND twice, looping images 450–451 (PC 891), and draws holding 122', () => {
