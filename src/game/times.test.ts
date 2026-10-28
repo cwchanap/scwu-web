@@ -35,6 +35,16 @@ const byKey = (key: Input, options: Parameters<typeof play>[1] = {}) =>
 const presses = (keys: Record<number, Input>) => (t: number) => keys[t] ?? {};
 
 describe('3-TIMES (30 3-TIMES.PLAYER)', () => {
+  it("gains his own guard's 2 power from a guarded punch (PC 2176), not Ryuko's 1", () => {
+    const { match, times } = timesPlayer();
+    match.step();
+    match.step();
+    for (let t = 0; t < 30 && times.action !== 'block'; t++)
+      match.step({ guard: true }, t ? {} : { punch: true });
+    match.step({ guard: true });
+    expect([times.action, times.power]).toEqual(['block', 2]);
+  });
+
   it('takes 400 life from his parameter block, desperate at 120', () => {
     expect([lifeOf('times'), desperationOf('times')]).toEqual([400, 120]);
     const { times } = timesPlayer();

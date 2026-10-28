@@ -320,77 +320,41 @@ const selected = (global3: number) => {
   if (global3) Object.assign(globals, { 1: 1000, 2: 50, 3: global3 });
   return globals;
 };
-// Victim reaction scripts add opcode 0x15 power to themselves and the attacker.
+// Victim reaction scripts add opcode 0x15 power to themselves and the
+// attacker. Most play from the victim's own exported timeline (ownPower),
+// where 3-TIMES's, Z-MEGA's, SHIN-Z's, ZAKU's, PAC-HELO's, GOLF's, ASURA's,
+// TTRO's, ASTROMAN's, RARIO's and TRAINING's guards add 2, 5 and 3 (3-TIMES's
+// PCs 2176, 2209, 2275) for Ryuko's 1, 3 and 2; the rest take these.
 const REACTION_POWER: Partial<Record<Action, [number, number]>> = {
   hit: [3, 2],
-  airHit: [3, 2],
   hitRapid: [1, 0],
-  airHitRapid: [1, 0],
-  block: [1, 0],
-  crouchBlock: [1, 0],
-  airBlock: [1, 0],
-  blockHeavy: [3, 0],
-  crouchBlockHeavy: [3, 0],
-  airBlockHeavy: [3, 0],
-  blockStop: [5, 0],
-  crouchBlockStop: [5, 0],
-  blockRapid: [2, 0],
-  crouchBlockRapid: [2, 0],
-  airBlockRapid: [2, 0],
-  timeStopGuard: [2, 0],
-  crouchTimeStopGuard: [2, 0],
-  airTimeStopGuard: [2, 0],
   rushAirHit: [1, 0],
-  // PCs 1212, 1235.
-  tatumakiIn: [3, 0],
-  tatumakiOut: [3, 0],
-  chainPull: [3, 0], // PC 1332
 };
 for (const action of [
   'hitHeavy',
-  'airHitHeavy',
-  'jumpHit',
   'launchUp',
   'launchAway',
-  'sweep',
-  'hitPull',
   'launchDown',
   'twist',
-  'fly',
   'uppercut',
-  'liftUp',
   'fireLaunch',
-  'flySide',
   'twistSide',
-  'twistSideHit',
   'inatuma',
   'airInatuma',
   'icePunch',
-  'airIcePunch',
   'hisoStop',
   'airHisoStop',
 ] as const)
   REACTION_POWER[action] = [5, 3];
-// Action 135 credits only the victim, as do 132 (PC 1783), 134 (PC 1818) and
-// 108–109 (PCs 1400, 1421).
+// Action 135 credits only the victim, as does 134 (PC 1818).
 REACTION_POWER.drillDown = [5, 0];
-REACTION_POWER.chuckToss = [8, 0];
 REACTION_POWER.chuckUp = [5, 0];
-REACTION_POWER.stun = REACTION_POWER.airStun = [1, 0];
-// Zoma's crouching guard (151) adds 2 more to him (PC 1929); ANMC P's
-// Tatumaki >> (102) gives him 5 and the attacker 3 (PC 1229), and KAY's
-// Fire HISA (107) the attacker 13 (PC 1324). ALEX's air time guards (176,
-// 181) and ERUS's stop guards (167, 169) have no op 0x15, so add them none.
-// YINAN's, AYA's and DoraEmon's HISA Down (158, 154, 146) give the attacker
-// none (PCs 2389, 1775, 2037).
+// KAY's Fire HISA (107) gives the attacker 13 (PC 1324); YINAN's, AYA's and
+// DoraEmon's HISA Down (158, 154, 146) give it none (PCs 2389, 1775, 2037).
 const OWN_REACTION_POWER: Partial<
   Record<Who, Partial<Record<Action, [number, number]>>>
 > = {
-  zoma: { crouchBlock: [3, 0] },
-  anmc: { tatumakiOut: [5, 3] },
   kay: { fireLaunch: [5, 13] },
-  alex: { airBlockRapid: [0, 0], airTimeStopGuard: [0, 0] },
-  erus: { blockStop: [0, 0], crouchBlockStop: [0, 0] },
   yinan: { launchDown: [5, 0] },
   aya: { launchDown: [5, 0] },
   dora: { launchDown: [5, 0] },
@@ -587,10 +551,10 @@ const copyOf = (who: Who, own: number) => {
     ? own
     : undefined;
 };
-// A copy's op 0x15s: YINAN's FB credits HISA's 13 after its 10 (PC 2068),
-// KAY's FBH only HISA's 3 (PC 1408).
-const copyPower = (f: Fighter) =>
-  script(f.copy!, f.who).events.reduce<[number, number]>(
+// An exported reaction's or copy's op 0x15s: YINAN's FB credits HISA's 13
+// after its 10 (PC 2068), KAY's FBH only HISA's 3 (PC 1408).
+const ownPower = (key: ObjectKey, who: Who) =>
+  script(key, who).events.reduce<[number, number]>(
     ([self, other], e) =>
       e.op === 'power'
         ? [self + e.selfPower, other + e.otherPower]
@@ -4262,8 +4226,10 @@ export class Match {
     this.pause(f, stop);
     this.pauseOthers(f, attackerStop);
     const [victimPower, attackerPower] = f.copy
-      ? copyPower(f)
-      : reactionPower(f);
+      ? ownPower(f.copy, f.who)
+      : own !== undefined && exported(own, f.who)
+        ? ownPower(own, f.who)
+        : reactionPower(f);
     addPower(f, victimPower);
     const striker = this.met(f);
     if (striker) addPower(striker, attackerPower + power);

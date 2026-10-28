@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import {
+  CHARACTERS,
+  desperationOf,
+  lifeOf,
+  responsesOf,
+  twin,
+} from './characters';
 import type { Who } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import type { Action } from './animations';
@@ -203,12 +209,17 @@ describe('ALEX (15 ALEX.PLAYER)', () => {
   it('gains no power from his air time guards (176, 181), which lack op 0x15', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'alex']);
     const alex = match.fighters[1];
-    for (const action of ['airBlockRapid', 'blockRapid'] as const) {
+    // As a contact queues them, with his own action, whose records give it.
+    for (const [action, own] of [
+      ['airBlockRapid', twin('alex', 167)],
+      ['blockRapid', twin('alex', 163)],
+    ] as const) {
       alex.power = 0;
-      (match as unknown as { queue(f: Fighter, a: Action): void }).queue(
-        alex,
-        action,
-      );
+      (
+        match as unknown as {
+          queue(f: Fighter, a: Action, s: 0, a2: 0, p: 0, o: number): void;
+        }
+      ).queue(alex, action, 0, 0, 0, own);
       match.step();
       expect([action, alex.power]).toEqual([
         action,

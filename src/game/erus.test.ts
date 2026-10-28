@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import {
+  CHARACTERS,
+  desperationOf,
+  lifeOf,
+  responsesOf,
+  twin,
+} from './characters';
 import type { Who } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
@@ -299,9 +305,9 @@ describe('ERUS (18 ERUS.PLAYER)', () => {
     const erus = match.fighters[1];
     (
       match as unknown as {
-        queue(f: Fighter, a: Action, s: number, a2: number): void;
+        queue(f: Fighter, a: Action, s: 0, a2: 0, p: 0, o: number): void;
       }
-    ).queue(erus, 'blockStop', 0, 0);
+    ).queue(erus, 'blockStop', 0, 0, 0, twin('erus', 159));
     const power = erus.power;
     match.step();
     expect([erus.action, erus.power - power]).toEqual(['blockStop', 0]);

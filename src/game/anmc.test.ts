@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import {
+  CHARACTERS,
+  desperationOf,
+  lifeOf,
+  responsesOf,
+  twin,
+} from './characters';
 import {
   animationDuration,
   animationFrame,
@@ -32,9 +38,14 @@ const until = (match: Match, done: () => boolean, limit = 3000) => {
   }
   throw new Error('never happened');
 };
-// Queues a victim action as a contact does, entered at the next step.
-function react(match: Match, f: Fighter, action: Action) {
-  (match as unknown as { queue(f: Fighter, a: Action): void }).queue(f, action);
+// Queues a victim action as a contact does, entered at the next step, with
+// the player's `own` action when it plays its records.
+function react(match: Match, f: Fighter, action: Action, own?: number) {
+  (
+    match as unknown as {
+      queue(f: Fighter, a: Action, s: 0, a2: 0, p: 0, o?: number): void;
+    }
+  ).queue(f, action, 0, 0, 0, own);
   match.step();
 }
 // The source actions a fighter plays while pressing `input` every sixth tick.
@@ -217,7 +228,7 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
     const [ryuko, anmc] = match.fighters;
     // Its op 0x15 gives to its target, which its first free step finds.
     match.step();
-    react(match, anmc, 'tatumakiOut');
+    react(match, anmc, 'tatumakiOut', twin('anmc', 100));
     expect([anmc.power, ryuko.power]).toEqual([5, 3]);
     react(match, anmc, 'launchDown');
     until(match, () => anmc.age === 9);
