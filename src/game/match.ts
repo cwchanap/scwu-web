@@ -624,9 +624,10 @@ function boxDamage(
   return Math.max(1, Math.trunc((decayed * taken) / 100));
 }
 // Op 0x17 lists six responses: standing, crouching and airborne, then the
-// same three guarding. This picks the victim's.
+// same three guarding. This picks the victim's: airborne above the floor
+// (+0x58, 0x40f4a5), where the hit test, before the motion pass, finds it.
 const responseSlot = (target: Fighter, guarding: boolean, crouching: boolean) =>
-  (guarding ? 3 : 0) + (target.y < 0 || target.vy < 0 ? 2 : crouching ? 1 : 0);
+  (guarding ? 3 : 0) + (target.y < 0 ? 2 : crouching ? 1 : 0);
 // 0x4124c9 deletes an object that doesn't follow its parent once it leaves
 // x −50..1330 or y −50..1010 source pixels; the floor is y 920 (0x412247).
 const inWorld = ({ x, y }: { x: number; y: number }) =>

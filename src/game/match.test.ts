@@ -1472,6 +1472,19 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     expect(f.damage).toBe(10);
   });
 
+  it('takes the standing response on the floor even rising (y against the floor, +0x58, 0x40f4a5)', () => {
+    // The hit test comes before the motion pass, so a victim whose op 0x01
+    // just set vy, rambu AIR's at age 9 (122) under Zoma's 220+18, still
+    // stands: punch 1's response 1 (hit 弱 立ち), not 2.
+    const match = new Match();
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 200;
+    strike(match, f, RYUKO.punch);
+    victim.vy = -5;
+    ticks(match, 2);
+    expect(victim.action).toBe('hit');
+  });
+
   it("scales by the struck body box's byte 11: 120% on an attacking pose", () => {
     expect(struck('punch', 'kick').victim.hp).toBe(LIFE - 12);
   });
