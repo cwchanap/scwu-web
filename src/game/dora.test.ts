@@ -421,9 +421,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
 
   it('reloads from a KO with three stocks: KO NORMAL’s op 0x10 (PC 775) enters KO RELOAD (72)', () => {
     // Ryuko punches him at 1 life: his actions, life and the winner.
-    const knockOut = (stock: number) => {
+    const knockOut = (stock: number, global3 = 0) => {
       const match = new Match('practice', false, 3, ['ryuko', 'dora']);
       const [ryuko, dora] = match.fighters;
+      match.globals[3] = global3;
       match.step({}, {});
       dora.x = ryuko.x + 90;
       [dora.stock, dora.hp] = [stock, 1];
@@ -456,6 +457,21 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       ],
       winner: 'player',
     });
+    // With fewer at global 3 = 10, as a story leaves it, KO NORMAL's next
+    // test (PC 776) enters KO NORMAL CPU (70), which spawns ten 技名16 (80,
+    // PCs 804–813). Each tick each adds 1 to his variable 4 and takes 1000
+    // life (PCs 1022–1023), a KO that scores the story slot's points, and
+    // each KO enters 70 again, past its spawns (PC 803). Past 100 (PC 802)
+    // he falls on into KO NORMAL + 3: SHIN-Z's story battle with him (step
+    // 24), 1 point a KO, ends on those 100 KOs.
+    expect(knockOut(2, 10).path).toEqual([
+      [0, 'idle', 1],
+      [8, 70, 0],
+      [9, '70+13', 0],
+      [19, '69+3', 0],
+      [129, 76, 0],
+      [190, '76+11', 0],
+    ]);
   });
 
   it('plays his own CPU table in Vs. CPU', () => {

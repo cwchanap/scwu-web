@@ -4120,28 +4120,40 @@ export class Match {
     // before it: make hikari (63) while global 0 is 10 (PC 590), after
     // deleting objects 7–9 and clearing variables 6, 8 and 14; Start KO 3
     // for variable 0 (SHIN-Z's PC 705); ALPHA's KO Boss for global 10 (PC
-    // 1029). Its jump to KO Normal (PC 591) plays as `down`, but for
-    // DoraEmon's, whose op 0x10 (PC 775) enters KO RELOAD (72) with three
-    // stocks. ALPHA's yowai form skips his KO Boss tests (PC 1025, into 83 +
-    // 13), testing global 0 before his KO Normal.
+    // 1029). Its jump to KO Normal (PC 591) plays as `down`, past KO
+    // Normal's first checks, which take the first that passes: DoraEmon's
+    // op 0x10 (PC 775) enters KO RELOAD (72) with three stocks, and his test
+    // of global 3 for 10 (PC 776) KO NORMAL CPU (70) in a story. Each one's
+    // test of variable 3 into KO NORMAL 2nd is `koAgain`. ALPHA's yowai form
+    // skips his KO Boss tests (PC 1025, into 83 + 13), testing global 0
+    // before his KO Normal.
     for (
       let key: ObjectKey | null =
         action === 'down' || action === 'koAgain' ? twin(f.who, LOSE) : null;
       key !== null;
     ) {
       const { events: lose, next, offset = 0 } = script(key, f.who);
-      const reload =
-        next === null
-          ? undefined
-          : script(sourceKey(next, offset), f.who).events[0];
+      const ko =
+        next === null ? [] : script(sourceKey(next, offset), f.who).events;
+      const checks = ko.slice(
+        0,
+        ko.findIndex((e) => e.t || (e.op !== 'stock' && e.op !== 'test')),
+      );
+      const check = checks.find((e) =>
+        e.op === 'stock'
+          ? e.atLeast && f.stock >= e.min
+          : e.op === 'test' && e.selector !== 0x43 && this.passes(f, f, e),
+      );
       const jump =
         lose.find(
           (e): e is Extract<ScriptEvent, { op: 'test' }> =>
             e.op === 'test' && this.passes(f, f, e),
         ) ??
-        (reload?.op === 'stock' && reload.atLeast && f.stock >= reload.min
-          ? { action: reload.target, offset: reload.offset }
-          : undefined);
+        (check?.op === 'stock'
+          ? { action: check.target, offset: check.offset }
+          : check?.op === 'test'
+            ? { action: check.action, offset: check.offset }
+            : undefined);
       if (!jump) break;
       for (const event of lose.slice(
         0,
