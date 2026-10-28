@@ -6669,6 +6669,18 @@ describe('recovered CPU', () => {
     }
   });
 
+  it('keeps a player guarding through a guard reaction, even on a cross-up', () => {
+    for (const facing of [-1, 1] as const) {
+      const match = new Match();
+      const [ryuko, victim] = match.fighters;
+      victim.x = ryuko.x + 120;
+      Object.assign(victim, { action: 'block', age: 0, facing, reaction: 0xc });
+      strike(match, ryuko, RYUKO.punch);
+      ticks(match, 2);
+      expect(victim.action).toBe('block');
+    }
+  });
+
   it('rolls in the air only while free (0x40f3c2)', () => {
     // Ryuko's air punch meets the CPU after its inputs and the wait.
     const struck = (inputs: Input[], until: (cpu: Fighter) => boolean) => {

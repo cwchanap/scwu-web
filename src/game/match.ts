@@ -4044,13 +4044,14 @@ export class Match {
     source: { facing: number },
     box: ScriptBox,
   ) {
-    let guard = guards.has(target.action) && target.facing !== source.facing;
-    if (this.driven(target)) {
-      const bits = target.reaction & 0xc;
-      guard =
-        bits === 0xc ||
-        (bits === 0 && this.cpus[this.fighters.indexOf(target)]!.guards());
-    }
+    // In a guard reaction (+0x15e & 0xc is 0xc) any player keeps guarding,
+    // whichever way it faces (0x40f449).
+    const bits = target.reaction & 0xc;
+    const guard =
+      bits === 0xc ||
+      (this.driven(target)
+        ? bits === 0 && this.cpus[this.fighters.indexOf(target)]!.guards()
+        : guards.has(target.action) && target.facing !== source.facing);
     return guard && !(box.kind & 0x40);
   }
 
@@ -5117,9 +5118,13 @@ export class Match {
     });
     this.moveObjects();
     // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at
-    // the contact (0x40f6f1), its hit handler after the motion pass
-    // (0x40fffd), each only for a striker with nothing queued, so a reaction
-    // takes an interrupted aerial drill whatever the fighters' order.
+    // the contact (0x40f6f1), its hit handler after the motion pass only for
+    // a striker with nothing queued (0x40fffd), so a reaction takes an
+    // interrupted aerial drill whatever the fighters' order.
+    // ponytail: both wait for a striker with nothing queued. The engine's
+    // guard handler overwrites a reaction an earlier striker queued, but a
+    // striker guarded while struck would need a box in a guard reaction or
+    // the free state, which no fighter's records hold.
     for (const { f, blocked, source, error } of contacts) {
       if (error) continue;
       if ('clip' in source) this.handle(source, blocked);
