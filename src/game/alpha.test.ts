@@ -389,7 +389,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
   it('draws his life back only to desperation at global 3 = 50, past 開始時 yowai', () => {
     // Global 1 below 1000 passes over 開始時 yowai (PC 442). HP 2 takes its 2
     // back for global 3 ≥ 40 (PC 1221), but at desperation (150) 0x40e7c0
-    // scales a loss to 60%, 1 (+0x7ca7): he climbs to 151 and ends on a loss.
+    // scales a loss to his 45%, 1 (+0x7ca7): he climbs to 151 and ends on a loss.
     const { path } = knockOut(vsFight(0), [3], 700);
     expect(path).toEqual([
       [0, 'idle', 1],

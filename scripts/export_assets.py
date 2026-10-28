@@ -540,12 +540,16 @@ def player_tables(data, c, p, image_ids):
         cpu.pop()
     # The loader reads the CPU block, then 0x74b bytes into player +0x757a
     # (0x403c0b). Its s16 at +0x7ca3 splits a command's near and far actions
-    # (0x41080e), in source pixels, and the u16 at +0x7caa is the life. Round 1
+    # (0x41080e), in source pixels, and the u16 at +0x7caa is the life. A
+    # guard takes the striker's +0x7ca5 percent (0x40f6be), a loss at
+    # desperation the loser's +0x7ca7 (0x40e7fe), and a hit loses the
+    # striker's +0x7ca8 percent per hit the victim has taken (0x40f795). Round 1
     # sets the power per stock from its u32 at +0x7cae and the stock cap from
     # +0x7cb2 (0x411f50–0x411f64), which 0x40e6f0 fills to.
     block = cpu_offset - 10 + 0x2b66 - 0x757a
     near = struct.unpack_from("<h", data, block + 0x7ca3)[0]
     life = u16(data, block + 0x7caa)
+    chip, scale, decay = data[block + 0x7ca5], data[block + 0x7ca7], data[block + 0x7ca8]
     per_stock, stocks = struct.unpack_from("<II", data, block + 0x7cae)
     # The select screen runs the default-action table's word 21 (+0x75a4,
     # 0x407a2a) while the player's cell is hovered: キャラセレフェイス. A
@@ -555,7 +559,7 @@ def player_tables(data, c, p, image_ids):
     # (0x4111b3–0x411209). Airborne, return to neutral enters word 6
     # (+0x7586, 0x411a80): the fall.
     return dict(held=held, responses=responses, response_effects=response_effects, cpu=cpu,
-                commands=dict(near=near, entries=commands), life=life, perStock=per_stock, stocks=stocks,
+                commands=dict(near=near, entries=commands), life=life, chip=chip, scale=scale, decay=decay, perStock=per_stock, stocks=stocks,
                 scenario=scenario(data, block + 0x7cc9),
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
                 faceHelper=face_helper(p, u16(data, block + 0x75a6)),

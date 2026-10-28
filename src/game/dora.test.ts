@@ -280,6 +280,9 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('spends his stocks on his supers', () => {
+    // His block's decay (+0x7ca8) takes 2% of each hit's damage per hit the
+    // victim has taken since its last run-out (0x40f795), so 秘神具騒嵐's
+    // 5s and 6s fall to 1.
     expect(byKey({ getterBeam: true })).toMatchObject({
       mine: [296, 'idle'],
       damage: 130,
@@ -287,17 +290,17 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     });
     expect(byKey({ musashi: true })).toMatchObject({
       mine: [305, '305+46', 'idle'],
-      damage: 457,
+      damage: 191,
       stock: 4,
     });
     expect(byKey({ changeAttack: true })).toMatchObject({
       mine: [327, 332, 'idle'],
-      damage: 258,
+      damage: 175,
       stock: 4,
     });
     expect(byKey({ blackRush: true })).toMatchObject({
       mine: [338, 340, '340+3', 341, 342, 270, 'idle'],
-      damage: 215,
+      damage: 173,
       stock: 4,
     });
     // 激神超抱擁 takes three stocks (PC 5943), or enters No super, which adds
@@ -326,7 +329,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     });
     expect(cancel({ changeAttack: true })).toMatchObject({
       mine: [267, 328, 332, 'idle'],
-      damage: 308,
+      damage: 219,
       stock: 3,
     });
     expect(cancel({ blackRush: true }).mine).toEqual([

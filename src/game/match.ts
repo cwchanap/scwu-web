@@ -563,7 +563,8 @@ const ownPower = (key: ObjectKey, who: Who) =>
         : [self, other],
     [0, 0],
   );
-// 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1). One
+// 0x40e7c0: at 30% life or less, a loss shrinks to the loser's percentage
+// (+0x7ca7): 60, CHUNG's 65, ALPHA's 45 (at least 1). One
 // that leaves life adds to what the life bar shows lost and holds it 20
 // steps (0x40ea79); one that empties it clears both (0x40e855).
 // +0xdf09, life per mille (0x408f68); a story's waiting slot keeps its full
@@ -573,7 +574,7 @@ const perMille = (f: Fighter) =>
 
 function loseLife(f: Fighter, loss: number) {
   if (loss && f.hp <= desperationOf(f.who))
-    loss = Math.max(1, Math.trunc((loss * 60) / 100));
+    loss = Math.max(1, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
   f.hp = Math.max(0, f.hp - loss);
   if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
   // A loss that leaves no life drops the player to priority 0x3c (0x40e8cd),
@@ -597,16 +598,29 @@ function stepBar(f: Fighter) {
   if (f.lostDelay) f.lostDelay--;
   else f.lost--;
 }
-// 0x40f010: a hit takes the box's damage scaled by the struck body box's
-// percentage `taken`; a guard takes 20% (+0x7ca5) only from a box of kind bit 2.
-// Ryuko's combo decay (+0x7ca8) is 0, so the victim's hit count never reduces
-// damage and isn't tracked.
-function boxDamage(box: ScriptBox, taken: number, blocked: boolean) {
-  if (!blocked)
-    return box.damage && Math.max(1, Math.trunc((box.damage * taken) / 100));
-  return box.damage && box.kind & 4
-    ? Math.max(1, Math.trunc((box.damage * 20) / 100))
-    : 0;
+// 0x40f010: a guard takes the striker's chip percentage (+0x7ca5, 0x40f6be)
+// only from a box of kind bit 2. A hit loses the striker's decay (+0x7ca8)
+// percent per hit the victim has taken (+0xdf01, 0x40f795), then scales by
+// the struck body box's percentage `taken`.
+function boxDamage(
+  box: ScriptBox,
+  taken: number,
+  blocked: boolean,
+  striker: Who,
+  struck: number,
+) {
+  const { damage } = box;
+  const { chip, decay } = CHARACTERS[striker];
+  if (blocked)
+    return damage && box.kind & 4
+      ? Math.max(1, Math.trunc((damage * chip) / 100))
+      : 0;
+  if (!damage) return 0;
+  const decayed = Math.max(
+    1,
+    damage - Math.trunc((damage * decay * struck) / 100),
+  );
+  return Math.max(1, Math.trunc((decayed * taken) / 100));
 }
 // Op 0x17 lists six responses: standing, crouching and airborne, then the
 // same three guarding. This picks the victim's.
@@ -1077,6 +1091,9 @@ export interface Fighter {
   // (+0x4dfd7f) holds.
   stopInput: Input | null;
   connected: boolean;
+  // Damaging hits taken (+0xdf01, 0x40f807), which a run-out (0x412719) and
+  // round set-up (0x411f35) clear.
+  struck: number;
   hits: number;
   damage: number;
   power: number;
@@ -1482,6 +1499,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   hitStop: 0,
   stopInput: null,
   connected: false,
+  struck: 0,
   hits: 0,
   damage: 0,
   power: 0,
@@ -3765,7 +3783,7 @@ export class Match {
 
   // Running out airborne, the free state falls; false on foot.
   private runOut(f: Fighter) {
-    f.contact = 0;
+    f.contact = f.struck = 0;
     if (f.y < 0) {
       this.fall(f);
       return true;
@@ -3859,7 +3877,8 @@ export class Match {
       {
         f: attacker,
         target,
-        damage: boxDamage(box, body.taken, blocked),
+        box,
+        taken: body.taken,
         damaging: box.damage > 0,
         effect: box.damage ? responseEffectsOf(attacker.who)[response] : 0,
         hitStop: reaction?.stop ?? 0,
@@ -4352,7 +4371,7 @@ export class Match {
       return;
     // One that ran out did so into the free state (0x412713).
     if (reactions.has(f.action) || f.action === 'land' || f.action === 'getUp')
-      f.contact = 0;
+      f.contact = f.struck = 0;
     if (f.action === 'jumpHit')
       for (const event of script(f.copy ?? twin(f.who, JUMP_HIT), f.who).events)
         if (
@@ -4999,7 +5018,8 @@ export class Match {
     for (const {
       f,
       target,
-      damage: strength,
+      box,
+      taken,
       damaging,
       effect,
       hitStop,
@@ -5026,7 +5046,9 @@ export class Match {
       }
       const body = source === f;
       if (damaging) target.hitStop = source.hitStop = 0;
+      const strength = boxDamage(box, taken, blocked, f.who, target.struck);
       const loss = loseLife(target, strength);
+      if (!blocked && strength) target.struck++;
       f.damage += loss;
       if (!blocked) f.hits++;
       // A loss that empties life, a chip's too (0x40e7c0), queues the lose

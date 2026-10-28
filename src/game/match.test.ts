@@ -1431,8 +1431,9 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     victimPose = 'idle',
     defense: Input = {},
     life = LIFE,
+    who: Who = 'ryuko',
   ) {
-    const match = new Match();
+    const match = new Match('practice', false, 0, ['ryuko', who]);
     const [f, victim] = match.fighters;
     victim.x = f.x + 200;
     pose(match, victim, victimPose, 12);
@@ -1460,12 +1461,32 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     expect(struck('punch', 'idle', { guard: true }).victim.hp).toBe(LIFE);
   });
 
+  it("chips the striker's own percentage: ALPHA's 40, ZENKA's 50 (0x40f6be)", () => {
+    // ALPHA's 276 opens with a kind 7 box of 15, ZENKA's 243 one of kind 6
+    // and 5.
+    const chip = (who: Who, index: number) => {
+      const match = new Match('practice', false, 0, [who, 'ryuko']);
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 200;
+      strike(match, f, index);
+      ticks(match, 2, {}, { guard: true });
+      return LIFE - victim.hp;
+    };
+    expect(chip('alpha', 276)).toBe(6);
+    expect(chip('zenka', 243)).toBe(2);
+  });
+
   it('shrinks losses to 60% at 30% life (153 of 510) or less', () => {
     expect(struck('punch', 'idle', {}, 154).victim.hp).toBe(154 - 10);
     expect(struck('punch', 'idle', {}, 153).victim.hp).toBe(153 - 6);
     // trunc(3 × 60%) is 0, raised to 1.
     const chip = struck('iori', 'idle', { guard: true }, 153);
     expect(chip.victim.hp).toBe(153 - 1);
+  });
+
+  it("shrinks them to the loser's own percentage (+0x7ca7): ALPHA's 45, KIKI's 55", () => {
+    expect(struck('punch', 'idle', {}, 150, 'alpha').victim.hp).toBe(150 - 4);
+    expect(struck('punch', 'idle', {}, 147, 'kiki').victim.hp).toBe(147 - 5);
   });
 
   it('KOs through a guard when a chip empties life (0x40e7c0)', () => {
