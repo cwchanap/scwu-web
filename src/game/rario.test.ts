@@ -8,7 +8,7 @@ import {
   stocksOf,
 } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
-import { faceImage } from './hud';
+import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
@@ -335,6 +335,30 @@ describe('RARIO (47 RARIO.PLAYER)', () => {
         images.push(vm.frame.image);
     }
     expect(images).toEqual([115, 116, 117, 118, 119, 118, 117, 116]);
+  });
+
+  it('comes back at full life after a TEAM VS win below 180: his Team VS 1P 270 jumps to itself (PC 350)', () => {
+    const next = (life: number) => {
+      const match = Match.team(
+        [
+          ['rario', 'ryuko'],
+          ['ryuko', 'ryuko'],
+        ],
+        'court',
+      );
+      while (match.roundTicks <= FIGHT_TICK) match.step();
+      match.fighters[0].hp = life;
+      match.fighters[1].hp = 0;
+      while (match.round === 1) match.step();
+      while (match.roundTicks <= FIGHT_TICK) match.step();
+      return match.fighters[0].hp;
+    };
+    // 1P WIN's global 8 (KGT PC 251) runs his checker down Team VS 1P 360
+    // and 270 (39, 40) by his life. 270 sets global 8 to 3 at 180 or more
+    // (PC 351), for 270 the next round, but below it jumps to itself (PC
+    // 350), spinning out the step's 300 records, and the engine deletes it
+    // (0x413b7b): global 8 stays 1, for full life.
+    expect([next(200), next(150)]).toEqual([270, 450]);
   });
 
   it('plays his own CPU table in Vs. CPU', () => {

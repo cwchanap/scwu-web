@@ -1710,6 +1710,8 @@ export class Match {
   // round from before any player's object, which leaves the others' order
   // as it is, so they hold none here.
   private kgt: { e: Effect; until: number }[] = [];
+  // The jumps chained in this step (branchTo).
+  private jumps = 0;
   // Global 6 (0x4456bc): supers and COUNTER HIT add their freeze to it (op
   // 0x1f var 0x86), and KGT action 58 counts it down each tick unless paused
   // (PCs 366–371).
@@ -2907,8 +2909,27 @@ export class Match {
   }
 
   // A jump to another timeline (ops 0x16, 0x1f, 0x20 and 0x24) runs its
-  // first records at once, in place of the rest of this step's.
-  private branchTo(actor: Fighter | Effect, key: ObjectKey) {
+  // first records at once, in place of the rest of this step's. The step's
+  // record loop gives up past 300 records (0x4125c0), deleting the object
+  // (0x413b7b, 0x40e4a0) with a ScriptMainLoopError: RARIO's Team VS 1P 270
+  // (40) jumps to itself while his life is below 180 (PC 350), where his
+  // other checkers jump on to the next. ponytail: it counts chained jumps,
+  // each two records at the least, not records; a fighter, whose own
+  // deletion the port can't play, stays where it is.
+  private branchTo(actor: Fighter | Effect, key: ObjectKey): boolean {
+    if (this.jumps === 150) {
+      if ('clip' in actor) this.delete(actor);
+      return true;
+    }
+    this.jumps++;
+    try {
+      return this.jump(actor, key);
+    } finally {
+      this.jumps--;
+    }
+  }
+
+  private jump(actor: Fighter | Effect, key: ObjectKey) {
     actor.age = 0;
     if ('clip' in actor) {
       actor.clip = key;
@@ -3430,12 +3451,12 @@ export class Match {
     owner: number,
     { t, skip }: { t: number; skip: number },
   ) {
-    // One back into its own tick spins through the step's 300 records
-    // (0x4125c0), going on from there the next step: KATE's *ATT HANDEN RP
-    // holds while frozen (PC 4287). The exporter checks no events precede it.
+    // One back into its own tick spins out the step's 300 records, which
+    // deletes an object (branchTo): KATE's *ATT HANDEN RP while frozen (PC
+    // 4287). The exporter checks no events precede it.
     if (t === actor.age) {
-      actor.age = t - 1;
-      if (!('clip' in actor)) actor.fired = t - 1;
+      if ('clip' in actor) this.delete(actor);
+      else actor.age = actor.fired = t - 1;
       return true;
     }
     const key = 'clip' in actor ? actor.clip : timeline(actor);
@@ -4547,6 +4568,7 @@ export class Match {
   }
 
   private delete(e: Effect) {
+    if (this.freeing.includes(e)) return;
     if (e.stage) this.layers = this.layers.filter((layer) => layer !== e);
     else this.effects = this.effects.filter((other) => other !== e);
     this.freeing.push(e);

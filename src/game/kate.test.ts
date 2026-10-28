@@ -276,7 +276,7 @@ describe('KATE (22 KATE.PLAYER)', () => {
     ]);
   });
 
-  it('holds *ATT HANDEN RP at its last display while frozen, its test jumping back a record (PC 4287)', () => {
+  it('deletes *ATT HANDEN RP if frozen, its test jumping back a record into a spin (PC 4287)', () => {
     // *ATT HANDEN (288) calls RP (289), each pass striking at its start. Each
     // tick's freeze and the object's age, starred while it holds a box.
     const ages = (freeze: number) => {
@@ -285,16 +285,17 @@ describe('KATE (22 KATE.PLAYER)', () => {
       return Array.from({ length: 14 }, (_, t) => {
         if (t === 5) match.freeze = freeze;
         match.step();
+        if (!match.effects.includes(handen)) return 'gone';
         return `${match.freeze}:${handen.age}${handen.box ? '*' : ''}`;
       });
     };
     expect(ages(0).join(' ')).toBe(
       '0:0* 0:1* 0:2* 0:3 0:4 0:5 0:6 0:7* 0:8* 0:9* 0:10 0:11 0:12 0:13',
     );
-    // With no display between, the step spins out its 300 records (0x4125c0)
-    // and goes on at the test the next.
+    // With no display between, the step spins out its 300 records
+    // (0x4125c0), and the engine deletes the object (0x413b7b).
     expect(ages(6).join(' ')).toBe(
-      '0:0* 0:1* 0:2* 0:3 0:4 5:5 4:6 3:6 2:6 1:6 0:6 0:7* 0:8* 0:9*',
+      '0:0* 0:1* 0:2* 0:3 0:4 5:5 4:6 gone gone gone gone gone gone gone',
     );
   });
 
