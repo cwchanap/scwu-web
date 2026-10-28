@@ -6,8 +6,8 @@ import {
   BLACK,
   pushboxes,
 } from './animations';
-import type { Action } from './animations';
-import { exMode, fighterPose, Match } from './match';
+import type { Action, Color } from './animations';
+import { drawnColor, exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 import { enter } from './testing';
@@ -121,6 +121,29 @@ describe('ANMC P (06 ANMC P.PLAYER)', () => {
       steps({}, 2);
       expect(chain(anmc, steps, { kick: true }).slice(0, 4)).toEqual(moves);
     }
+  });
+
+  it("keeps K 2's last type-3 roll after its fader runs out, until its op 0x23 (0x40d596)", () => {
+    const { match, anmc } = anmcPlayer();
+    anmc.variables[0] = 100;
+    enter(match, anmc, 210);
+    // A draw a tick, rolling the tick number: at age 19 it fades from no
+    // tint toward (20, 20, 10) for 20 ticks.
+    let drawn: [Color, Color] | undefined;
+    const draw = (t: number) =>
+      (drawn = drawnColor(anmc.color, anmc.fader, t, t, drawn))[1];
+    const tint = (p: number) => {
+      const r = Math.trunc((100 - p) / 5);
+      return { r, g: r, b: Math.trunc((100 - p) / 10) };
+    };
+    let t = 0;
+    for (; !anmc.fader?.left; t++) match.step();
+    for (; anmc.fader!.left; t++, match.step())
+      expect(draw(t)).toMatchObject(tint(t));
+    const [color, last] = [anmc.color, tint(t - 1)];
+    for (; anmc.color === color; t++, match.step())
+      expect(draw(t)).toMatchObject(last);
+    expect([anmc.age, draw(t)]).toEqual([55, anmc.color]);
   });
 
   it('toggles EX mode with --TYPE CHANGE--: to ex (242) sets variable 0 to 100 for half a stock, TO NOR clears it', () => {

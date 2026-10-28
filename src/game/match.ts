@@ -1425,6 +1425,27 @@ export function faderColor(
     fade: mix(target.fade, start.fade),
   };
 }
+// What an object draws with, from the colour the match holds and the
+// `kept` pair of that colour and what it drew last (0x40d596). A running
+// type-1 or type-2 fader draws the match's blend, a type-2 one its start on
+// odd drawn frames (0x40cb72; 0x4456fc counts them), and a type-3 one a
+// blend at `roll`, rand() % 100, each draw (0x40cacf): ANMC P's K 2 (210, PC
+// 2774). Each draw writes it over the object's colour (+0x44–0x50), so once
+// the fader runs out the last stays until the match sets another: K 2's op
+// 0x23 at age 55.
+export function drawnColor(
+  color: Color,
+  fader: Fader | null,
+  frame: number,
+  roll: number,
+  kept?: [Color, Color],
+): [Color, Color] {
+  const type = fader?.left ? fader.type : 0;
+  if (type === 2 && frame & 1) return [color, { ...color, ...fader!.start }];
+  if (type === 3) return [color, { ...color, ...faderColor(fader!, roll) }];
+  if (type || kept?.[0] !== color) return [color, color];
+  return kept;
+}
 // The display a fighter shows.
 export function fighterPose(f: Fighter): Pose {
   // Op 0x07 replaces a held player's display, whatever its action: Giant's

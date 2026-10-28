@@ -29,7 +29,7 @@ import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
 import {
   afterimageColor,
-  faderColor,
+  drawnColor,
   fighterPose,
   FixedClock,
   GROUND,
@@ -948,22 +948,20 @@ export class TrainingScene extends Phaser.Scene {
     return this.match.fighters[owner]?.who === who ? this.palettes[owner] : 0;
   }
 
-  // A running type-2 fader shows its start colour on odd drawn frames
-  // (0x40cb72; 0x4456fc counts them), and a type-3 one blends at rand() %
-  // 100 each draw (0x40cacf): ANMC P's K 2 (210, PC 2774). ponytail: that
-  // rand is the shared one, as the type-4 shake's, and its last blend stays
-  // until an op 0x23 (K 2's at age 55); this one keeps its own and leaves
-  // the start colour.
-  private faded(color: Color, owner: number): Color {
-    const { fader } = this.match.fighters[owner];
-    if (!fader?.left) return color;
-    if (fader.type === 2 && this.frame & 1) return { ...color, ...fader.start };
-    if (fader.type === 3)
-      return {
-        ...color,
-        ...faderColor(fader, Math.floor(Math.random() * 100)),
-      };
-    return color;
+  // Each object's colour as the match held it at its last draw, and what it
+  // drew (drawnColor). Authored: a type-3 fader rolls its own rand, not the
+  // shared one, as the type-4 shake does.
+  private drawn = new WeakMap<Fighter | Effect, [Color, Color]>();
+  private faded(actor: Fighter | Effect, owner: number): Color {
+    const drawn = drawnColor(
+      actor.color,
+      this.match.fighters[owner].fader,
+      this.frame,
+      Math.floor(Math.random() * 100),
+      this.drawn.get(actor),
+    );
+    this.drawn.set(actor, drawn);
+    return drawn[1];
   }
 
   // Blitters 0x40c840 by op 0x23 mode: 1 averages with the screen, 2 adds,
@@ -1163,13 +1161,7 @@ export class TrainingScene extends Phaser.Scene {
           (GROUND + f.y) / ART_SCALE,
           (pose.held ? holder : f).facing === -1,
         );
-        this.paint(
-          sprite,
-          pose,
-          this.faded(f.color, i),
-          f.who,
-          this.palettes[i],
-        )
+        this.paint(sprite, pose, this.faded(f, i), f.who, this.palettes[i])
           .setDepth(depthOf(f.z, i))
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
@@ -1209,7 +1201,7 @@ export class TrainingScene extends Phaser.Scene {
           effect.x,
           effect.screen ? effect.y : GROUND + effect.y,
           effect.facing,
-          this.faded(effect.color, effect.owner),
+          this.faded(effect, effect.owner),
           this.paletteOf(effect.who, effect.owner),
         );
       });
@@ -1234,7 +1226,7 @@ export class TrainingScene extends Phaser.Scene {
             color: afterimageColor(
               trail,
               skipped + i,
-              this.faded(actor.color, owner),
+              this.faded(actor, owner),
             ),
           }));
         },
