@@ -2927,6 +2927,21 @@ export class Match {
       actor.branch = key;
       actor.fired = -1;
       this.fireEvents(actor);
+      // The record loop runs on through one with no display in the same step
+      // (0x4125e8), as an entered one does (enterSource): in a TEAM VS round
+      // after his win SEAN's Team VS Start (37) finds his variable 15 set
+      // (PC 406), and Skill7 (39) clears it and globals 8 and 9 (PCs
+      // 453–455), then jumps past 開始時's end (PC 456): he stands at once.
+      const { end, next, offset = 0 } = script(key, actor.who);
+      if (
+        actor.action !== 'script' ||
+        actor.branch !== key ||
+        animationDuration(key, actor.who)
+      )
+        return true;
+      if (end === 'end' && !this.runOut(actor)) this.action(actor, 'idle');
+      if (end === 'jump' && next !== null)
+        this.enterSource(actor, next, offset);
     }
     return true;
   }

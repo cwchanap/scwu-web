@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import type { Who } from './characters';
 import { animationFrame, BLACK } from './animations';
-import { faceImage } from './hud';
+import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro, RYUKO, strike } from './testing';
@@ -223,6 +223,37 @@ describe('SEAN (20 SEAN.PLAYER)', () => {
     expect(animationFrame('draw', 1000, 'sean').image).toBe(8191);
     expect(BLACK.sean.opaque.image).toBe(1009);
     expect(faceImage(-1, 'sean')).toBe(2001);
+  });
+
+  it('skips his TEAM VS entrance in the round after his win: Team VS Start (37) runs Skill7 (39) out at once', () => {
+    const match = Match.team(
+      [
+        ['sean', 'ryuko'],
+        ['ryuko', 'zoma'],
+      ],
+      'court',
+    );
+    while (match.round === 1) {
+      if (match.roundTicks === FIGHT_TICK) match.fighters[1].hp = 0;
+      match.step();
+    }
+    // 1P WIN's global 8 (KGT PC 251) sends his checker (46 + 4) into Team
+    // VS 1P 500 (47), which sets his variable 15 (PC 501). Team VS Start
+    // jumps on it to Skill7 (PC 406), which clears it and globals 8 and 9
+    // and runs out past 開始時's end (PCs 453–456), all in one step.
+    const sean = match.fighters[0];
+    const branches = new Set<unknown>();
+    while (sean.action === 'script') {
+      branches.add(sean.branch);
+      match.step();
+    }
+    expect([
+      [...branches],
+      sean.action,
+      match.roundTicks,
+      sean.variables[15],
+      match.globals[8],
+    ]).toEqual([[33, '33+9'], 'idle', 101, 0, 0]);
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
