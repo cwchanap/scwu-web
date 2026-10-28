@@ -269,6 +269,31 @@ describe('MASA (29 MASA.PLAYER)', () => {
     expect(frozen.vxs[8]).toBeCloseTo((730 * 655 * 1.5) / 65536, 6);
   });
 
+  it("holds #Fly Missile through his KO NORMAL's freeze (PCs 909, 913)", () => {
+    // Ryuko's punch KOs him at tick 8 as his missile flies off: KO NORMAL
+    // adds 10 to the freeze (PC 909) and at age 5 another 40 (PC 913),
+    // which the missile waits out in Skill6 (261), then flies on. Each
+    // tick's freeze and the missile's timeline and age.
+    const { match, masa, steps } = masaPlayer();
+    const missile = spawn(match, 0, 260, { x: masa.x, y: -200, facing: -1 });
+    steps({}, 36);
+    [masa.hp, masa.stock] = [1, 0];
+    const xs = new Set<number>();
+    const ticks = Array.from({ length: 60 }, (_, t) => {
+      steps({}, 1, t ? {} : J);
+      if (missile.clip === 261) xs.add(missile.x);
+      return `${match.freeze}:${missile.clip}/${missile.age}`;
+    });
+    expect([7, 8, 12, 13, 57, 58].map((t) => ticks[t])).toEqual([
+      '0:260/43',
+      '9:261/0',
+      '5:261/0',
+      '44:261/0',
+      '0:261/0',
+      '0:260/44',
+    ]);
+    expect([masa.action, xs.size]).toEqual(['down', 1]);
+  });
   it("falls through KO 2 (99) after story demo 23, past KO NORMAL's boxes to strike", () => {
     // Ryuko's story step 30, with the globals story's select screen leaves,
     // then demo 23 if `demo`, his KO by a punch from FIGHT: MASA's variable

@@ -2412,8 +2412,12 @@ export class Match {
     );
     if (test) return this.enterSource(f, test.action, test.offset);
     if (action !== 'jump') f.jump = 0;
-    // KO Normal's PC 607 adds ten stop ticks to the other fighter.
-    if (action === 'down') this.pauseOthers(f, 10);
+    // KO Normal's PC 606 adds 10 to the freeze (global 6), and PC 607 ten
+    // stop ticks to the other fighter.
+    if (action === 'down') {
+      this.freeze += 10;
+      this.pauseOthers(f, 10);
+    }
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -2595,8 +2599,8 @@ export class Match {
     );
   }
 
-  // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
-  // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
+  // KO Normal (60) adds 40 to the freeze at age 5 (PC 610), holds both
+  // fighters 40 ticks (PC 611) and launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
   // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
   // is over (PC 645). RARIO's launch straight up at −1820 (PCs 487, 500),
@@ -2613,7 +2617,10 @@ export class Match {
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
     if (!launch) return false;
-    if (f.action === 'down' && f.age === 5) this.koStop += 40;
+    if (f.action === 'down' && f.age === 5) {
+      this.freeze += 40;
+      this.koStop += 40;
+    }
     if (f.age === launch) {
       const straight = STRAIGHT_KO.includes(f.who);
       f.vx = straight ? 0 : -f.facing * 500 * SOURCE_VELOCITY_SCALE;
