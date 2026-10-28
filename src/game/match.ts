@@ -3838,7 +3838,7 @@ export class Match {
     );
     if (!box) return [];
     const body = struck(this.origin(source), source.facing, box, target)!;
-    const guarding = this.guarding(target, source, box);
+    const guarding = this.guarding(target, box);
     let slot = responseSlot(target, guarding, this.crouching(target));
     // 0x40f4c9, 0x40f4fa: a CPU guarding on its feet whose guard response
     // is a hit takes the other height's, so it guards Ryuko's punch 3 (25,
@@ -4035,23 +4035,20 @@ export class Match {
   }
 
   // 0x40f3a2: a CPU victim ignores its input. Free (+0x15e & 0xc is 0) it
-  // guards on rand % 100 < level (0x40f3c2); in a guard reaction (0xc) it
-  // keeps guarding, whichever way it faces (0x40f449). Ryuko's +0x7cb6 bit 2
-  // lets it guard in the air (0x40f475). A box of kind 0x40 can't be guarded
-  // (0x40f469): Musashi's finish (257) and COUNTER HIT (174).
-  private guarding(
-    target: Fighter,
-    source: { facing: number },
-    box: ScriptBox,
-  ) {
-    // In a guard reaction (+0x15e & 0xc is 0xc) any player keeps guarding,
-    // whichever way it faces (0x40f449).
+  // guards on rand % 100 < level (0x40f3c2); another guards holding back in
+  // its side's terms (bit 1, 0x40f3bd, as no block sets +0x7cb6 bit 8), which
+  // the guard key stands for, wherever the striker is or faces. In a guard
+  // reaction (0xc) any player keeps guarding, whichever way it faces
+  // (0x40f449). Ryuko's +0x7cb6 bit 2 lets it guard in the air (0x40f475).
+  // A box of kind 0x40 can't be guarded (0x40f469): Musashi's finish (257)
+  // and COUNTER HIT (174).
+  private guarding(target: Fighter, box: ScriptBox) {
     const bits = target.reaction & 0xc;
     const guard =
       bits === 0xc ||
       (this.driven(target)
         ? bits === 0 && this.cpus[this.fighters.indexOf(target)]!.guards()
-        : guards.has(target.action) && target.facing !== source.facing);
+        : guards.has(target.action));
     return guard && !(box.kind & 0x40);
   }
 

@@ -6681,6 +6681,19 @@ describe('recovered CPU', () => {
     }
   });
 
+  it('guards holding back whatever the striker faces (0x40f3bd)', () => {
+    // YO's 205 passes her guarding victim and strikes from beyond it, still
+    // facing away.
+    const match = new Match('practice', false, 0, ['yo', 'ryuko']);
+    const [yo, victim] = match.fighters;
+    victim.x = yo.x + 150;
+    ticks(match, 3, {}, { guard: true });
+    enter(match, yo, 205);
+    ticks(match, 47, {}, { guard: true });
+    expect([yo.x > victim.x, yo.facing]).toEqual([true, 1]);
+    expect(victim.action).toBe('blockHeavy');
+  });
+
   it('rolls in the air only while free (0x40f3c2)', () => {
     // Ryuko's air punch meets the CPU after its inputs and the wait.
     const struck = (inputs: Input[], until: (cpu: Fighter) => boolean) => {
