@@ -301,7 +301,7 @@ describe('story battles', () => {
         damage ? { hp: 150, power: 10 } : { hp: 100, power: 0 },
       );
       expect(zaku.pending).toMatchObject({
-        action: damage ? 'koAgain' : 'hit',
+        action: damage ? 'down' : 'hit',
       });
     }
   });

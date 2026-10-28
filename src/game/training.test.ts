@@ -199,16 +199,11 @@ describe('TRAINING (48 TRAINING.PLAYER)', () => {
   it('flies off from make hikari, gets up at 0 life and takes his lose action again', () => {
     // His make hikari (39) sets variable 3 to 30, spawns his lose action's
     // last display (35 + 4) and cues sound 4, then its op 0x11 jumps to FLY
-    // NO HIT (70) at any life (PC 441). Back in neutral the KO'd loser takes
-    // result 2, his lose action, into KO NORMAL 2nd (37) for variable 3 = 30.
+    // NO HIT (70) at any life (PC 441). Down normal and Down Get up clear
+    // variable 3 (PCs 1399, 1389), so back in neutral the KO'd loser takes
+    // result 2, his lose action, into KO NORMAL (36).
     const { match, path, entry } = chuckKO(0, 'training');
-    expect(path.slice(6)).toEqual([
-      70,
-      'knockdown',
-      'getUp',
-      'koAgain',
-      'koLand',
-    ]);
+    expect(path.slice(6)).toEqual([70, 'knockdown', 'getUp', 'down', 'koLand']);
     expect(entry).toEqual({
       sounds: [{ owner: 1, index: 4 }],
       screen: ['35+4'],

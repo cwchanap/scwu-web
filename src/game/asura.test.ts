@@ -322,12 +322,14 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       match.step();
       match.step();
       const cued: [number, number, string][] = [];
+      const freeze: number[] = [];
       for (let t = 0; t < 200; t++) {
         match.step(t === 0 ? { punch: true } : {});
         for (const { owner, index } of match.sounds)
           if (owner === 1) cued.push([t, index, asura.action]);
+        if (t === 8 || t === 13) freeze.push(match.freeze);
       }
-      return cued;
+      return { cued, freeze };
     });
     // Both rejoin at 46 + 15, so he lands alike.
     const ko = (voice: number) => [
@@ -335,7 +337,28 @@ describe('ASURA (38 ASURA.PLAYER)', () => {
       [8, voice, 'down'],
       [118, 17, 'koLand'],
     ];
-    expect(voices).toEqual([ko(7), ko(8), ko(8), ko(8), ko(7), ko(8)]);
+    expect(voices.map(({ cued }) => cued)).toEqual([
+      ko(7),
+      ko(8),
+      ko(8),
+      ko(8),
+      ko(7),
+      ko(8),
+    ]);
+    // Global 6 freezes: the rolled voice's + 13 adds 10 (PC 420), which the
+    // fall-through's jump to + 15 (PC 418) skips; each adds 40 at age 5.
+    const [rolled, past] = [
+      [9, 44],
+      [0, 39],
+    ];
+    expect(voices.map(({ freeze }) => freeze)).toEqual([
+      rolled,
+      past,
+      past,
+      past,
+      rolled,
+      past,
+    ]);
   });
 
   it('stands through his idle program until it ends (PC 15)', () => {

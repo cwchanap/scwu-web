@@ -178,8 +178,9 @@ describe('GIGI (25 GIGI.PLAYER)', () => {
     steps({}, 59);
     // The round controller sees the KO after GIGI's step, picks the result
     // the tick after and spawns KO the tick after that, whose first step
-    // sets global 15 to 100 after GIGI's next.
-    other.hp = 0;
+    // sets global 15 to 100 after GIGI's next. Ryuko's KO left variable 3
+    // at 50 (PC 596), so KO Normal takes its 2nd.
+    [other.hp, other.variables[3]] = [0, 50];
     steps({}, 4);
     expect([now(gigi), match.globals[15]]).toEqual([225, 100]);
     steps({});

@@ -597,10 +597,6 @@ const copyPower = (f: Fighter) =>
         : [self, other],
     [0, 0],
   );
-// A loss that empties life sets the lose action 59 (0x40e83e), which enters
-// KO Normal (60), or KO NORMAL 2nd (61) while player variable 3 is above 40
-// (PC 595): only a KO sets it (50, PC 596), so for a fighter already KO'd.
-const knockedOut = (wasOut: boolean): Action => (wasOut ? 'koAgain' : 'down');
 // 0x40e7c0: at 30% life or less, a loss shrinks to 60% (at least 1). One
 // that leaves life adds to what the life bar shows lost and holds it 20
 // steps (0x40ea79); one that empties it clears both (0x40e855).
@@ -2343,8 +2339,8 @@ export class Match {
   // to +0x12's player (0 the striker, +0xdef9's, n seat n − 1), another's its
   // slot's +0xf to that slot's +0x12; and that slot's KO bonus (bits 7–8)
   // gives its life and power (+0x10, +0x11) to the 1P (1) or the striker (2).
-  private knockOut(f: Fighter, wasOut: boolean) {
-    this.queue(f, knockedOut(wasOut));
+  private knockOut(f: Fighter) {
+    this.queue(f, 'down');
     const { battle } = this;
     if (!battle) return;
     const slot = this.slots[this.fighters.indexOf(f)];
@@ -2412,12 +2408,8 @@ export class Match {
     );
     if (test) return this.enterSource(f, test.action, test.offset);
     if (action !== 'jump') f.jump = 0;
-    // KO Normal's PC 606 adds 10 to the freeze (global 6), and PC 607 ten
-    // stop ticks to the other fighter.
-    if (action === 'down') {
-      this.freeze += 10;
-      this.pauseOthers(f, 10);
-    }
+    // KO Normal's PC 607 adds ten stop ticks to the other fighter.
+    if (action === 'down') this.pauseOthers(f, 10);
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -2426,6 +2418,10 @@ export class Match {
     if (neutralActions.has(action)) toNeutral(f);
     f.branch =
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
+    if (action === 'down') {
+      f.branch ??= this.koTest(f);
+      this.koFreeze(f);
+    }
     f.copy = null;
     f.slideBase = 0;
     f.resume = undefined;
@@ -2599,8 +2595,31 @@ export class Match {
     );
   }
 
-  // KO Normal (60) adds 40 to the freeze at age 5 (PC 610), holds both
-  // fighters 40 ticks (PC 611) and launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
+  // Ryuko's KO Normal tests global 3 for 0 (PC 597), jumping to + 5 past
+  // setting variable 3 to 100 (PC 598) outside a story; enter runs the
+  // records before the test, as before a roll.
+  private koTest(f: Fighter) {
+    const ko = twin(f.who, LOSE + 1);
+    const test = script(ko, f.who).events.find(
+      (e) => !e.t && e.op === 'test' && e.action === ko && this.passes(f, f, e),
+    );
+    return test?.op === 'test' ? sourceKey(test.action, test.offset) : null;
+  }
+
+  // KO Normal's freeze (global 6) at the fighter's age, from the timeline
+  // it draws: Ryuko's adds 10 (PC 606), then 40 at age 5 (PC 610). ASURA's
+  // voice roll (PC 416) jumps past its 10 to + 15 (PC 418) when it fails.
+  private koFreeze(f: Fighter) {
+    let key: ObjectKey = f.branch ?? twin(f.who, LOSE + 1);
+    const { end, next, offset = 0 } = script(key, f.who);
+    if (!animationDuration(key, f.who) && end === 'jump' && next !== null)
+      key = sourceKey(next, offset);
+    for (const event of eventsAt(key, f.age, f.who))
+      if (event.op === 'freeze') this.freeze += event.add;
+  }
+
+  // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
+  // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
   // (PCs 641–644; Amiro's 63 for 12, PCs 710–714), then lies while the round
   // is over (PC 645). RARIO's launch straight up at −1820 (PCs 487, 500),
@@ -2618,7 +2637,7 @@ export class Match {
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
     if (!launch) return false;
     if (f.action === 'down' && f.age === 5) {
-      this.freeze += 40;
+      this.koFreeze(f);
       this.koStop += 40;
     }
     if (f.age === launch) {
@@ -2712,7 +2731,6 @@ export class Match {
   private gonMiss(f: Fighter) {
     if (f.action !== 'gonMiss' || f.age < animationDuration(f.action, f.who))
       return false;
-    const wasOut = f.hp === 0;
     const striker = this.met(f);
     const damage = loseLife(f, 40);
     if (striker) striker.damage += damage;
@@ -2720,7 +2738,7 @@ export class Match {
     if (striker) addPower(striker, 3);
     this.queue(f, 'launchAway', 13, 13);
     this.enterPending(f);
-    if (f.hp === 0) this.knockOut(f, wasOut);
+    if (f.hp === 0) this.knockOut(f);
     return true;
   }
 
@@ -3289,9 +3307,8 @@ export class Match {
         // (PC 1662).
         if (event.selfLife > 0) gainLife(self, event.selfLife);
         if (event.selfLife < 0) {
-          const wasOut = self.hp === 0;
           loseLife(self, -event.selfLife);
-          if (self.hp === 0) this.knockOut(self, wasOut);
+          if (self.hp === 0) this.knockOut(self);
         }
         if (!other) {
           addPower(self, event.selfPower);
@@ -3299,11 +3316,10 @@ export class Match {
         }
         if (event.otherLife > 0) gainLife(other, event.otherLife);
         if (event.otherLife < 0) {
-          const wasOut = other.hp === 0;
           const damage = loseLife(other, -event.otherLife);
           self.hits++;
           self.damage += damage;
-          if (other.hp === 0) this.knockOut(other, wasOut);
+          if (other.hp === 0) this.knockOut(other);
         }
         addPower(self, event.selfPower);
         addPower(other, event.otherPower);
@@ -4130,10 +4146,12 @@ export class Match {
     // 1029). Its jump to KO Normal (PC 591) plays as `down`, past KO
     // Normal's first checks, which take the first that passes: DoraEmon's
     // op 0x10 (PC 775) enters KO RELOAD (72) with three stocks, and his test
-    // of global 3 for 10 (PC 776) KO NORMAL CPU (70) in a story. Each one's
-    // test of variable 3 into KO NORMAL 2nd is `koAgain`. ALPHA's yowai form
-    // skips his KO Boss tests (PC 1025, into 83 + 13), testing global 0
-    // before his KO Normal.
+    // of global 3 for 10 (PC 776) KO NORMAL CPU (70) in a story. Its test of
+    // variable 3, which a KO sets (Ryuko's 50, PC 596) and getting up clears
+    // (PC 1968), plays KO NORMAL 2nd as `koAgain` (PC 595), whatever the
+    // life: Zoma's chuck and Musashi grab hold it at 30 (201, 253). ALPHA's
+    // yowai form skips his KO Boss tests (PC 1025, into 83 + 13), testing
+    // global 0 before his KO Normal.
     for (
       let key: ObjectKey | null =
         action === 'down' || action === 'koAgain' ? twin(f.who, LOSE) : null;
@@ -4149,8 +4167,9 @@ export class Match {
       const check = checks.find((e) =>
         e.op === 'stock'
           ? e.atLeast && f.stock >= e.min
-          : e.op === 'test' && e.selector !== 0x43 && this.passes(f, f, e),
+          : e.op === 'test' && this.passes(f, f, e),
       );
+      const again = check?.op === 'test' && check.selector === 0x43;
       const jump =
         lose.find(
           (e): e is Extract<ScriptEvent, { op: 'test' }> =>
@@ -4158,10 +4177,13 @@ export class Match {
         ) ??
         (check?.op === 'stock'
           ? { action: check.target, offset: check.offset }
-          : check?.op === 'test'
+          : check?.op === 'test' && !again
             ? { action: check.action, offset: check.offset }
             : undefined);
-      if (!jump) break;
+      if (!jump) {
+        action = again ? 'koAgain' : 'down';
+        break;
+      }
       for (const event of lose.slice(
         0,
         'op' in jump ? lose.indexOf(jump) : lose.length,
@@ -4365,13 +4387,9 @@ export class Match {
     // action instead of reading commands; airborne, the fall reads them. A
     // loser KO'd takes 2, the lose action (0x40948b): TRAINING's make hikari
     // flies him off (PC 441) and he gets up at 0 life.
-    if (this.winner && !airborne && f.hp === 0) {
-      this.queue(f, knockedOut(true));
-      return this.enterPending(f);
-    }
-    const result = this.winner && !airborne && this.result(f);
+    const result = this.winner && !airborne && (f.hp ? this.result(f) : 'lose');
     if (result === 'lose') {
-      this.queue(f, knockedOut(false));
+      this.queue(f, 'down');
       return this.enterPending(f);
     }
     if (result) {
@@ -4479,7 +4497,11 @@ export class Match {
     // and 14, then jumps to KO Normal (PC 591), or with global 0 at 10 to
     // make hikari (63, PC 590; enterPending).
     const roll =
-      f.branch !== f.copy && f.branch && (f.copy ?? rolls(f.who)[f.action]);
+      f.branch !== f.copy &&
+      f.branch &&
+      (f.copy ??
+        rolls(f.who)[f.action] ??
+        (f.action === 'down' ? twin(f.who, LOSE + 1) : null));
     const rolled = roll ? script(roll, f.who).events : [];
     const entry = f.entered
       ? []
@@ -4490,7 +4512,12 @@ export class Match {
           ...rolled
             .slice(
               0,
-              rolled.findIndex((e) => e.op === 'random'),
+              rolled.findIndex(
+                (e) =>
+                  e.op === 'random' ||
+                  (e.op === 'test' &&
+                    sourceKey(e.action, e.offset) === f.branch),
+              ),
             )
             .filter((e) => (POSE_EVENTS as readonly string[]).includes(e.op)),
         ];
@@ -5015,7 +5042,6 @@ export class Match {
       }
       const body = source === f;
       if (damaging) target.hitStop = source.hitStop = 0;
-      const wasOut = target.hp === 0;
       const loss = loseLife(target, strength);
       f.damage += loss;
       if (!blocked) f.hits++;
@@ -5025,7 +5051,7 @@ export class Match {
       // sets its reaction, so DST's two missiles stop it once. A KO'd
       // victim KOs again, scoring again, but a box without damage takes
       // nothing and so doesn't (0x40f689, 0x40f747).
-      if (loss && target.hp === 0) this.knockOut(target, wasOut);
+      if (loss && target.hp === 0) this.knockOut(target);
       else if (timeline) target.pending = { key: timeline };
       else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
       target.reaction = blocked

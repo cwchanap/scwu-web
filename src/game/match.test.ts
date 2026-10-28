@@ -323,6 +323,21 @@ describe('Hit Up launcher', () => {
     expect(target.variables[14]).toBe(0);
   });
 
+  it('sets variable 3 to 50 entering KO Normal, then 100 in a story (PCs 596–598)', () => {
+    const set = [0, 10].map((story) => {
+      const match = new Match();
+      const [f, target] = match.fighters;
+      target.x = f.x + 120;
+      target.hp = 1;
+      match.globals[3] = story;
+      match.step({ punch: true });
+      while (target.action !== 'down') match.step();
+      return target.variables[3];
+    });
+    // Outside a story the test of global 3 for 0 (PC 597) jumps past 100.
+    expect(set).toEqual([50, 100]);
+  });
+
   it("relaunches a KO'd fighter struck again through KO NORMAL 2nd (61)", () => {
     const match = new Match();
     const [player, target] = match.fighters;
