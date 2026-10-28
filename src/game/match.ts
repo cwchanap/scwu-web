@@ -4745,9 +4745,7 @@ export class Match {
         this.hold(0x65, dressLife(this.round));
       if (this.roundTicks === this.fightTick && bits & 2)
         this.hold(0x65, FIGHT_LIFE);
-      for (const f of this.fighters)
-        if (f.action !== 'intro' && f.action !== 'idle') this.travel(f);
-      this.moveObjects();
+      this.hitTest();
       return;
     }
     if (!this.winner && !this.picking) this.ticks++;
@@ -4852,6 +4850,16 @@ export class Match {
       if (this.endingTicks === this.roundEnd) this.hold(0x65);
     }
     this.previous = inputs.map((input) => ({ ...input }));
+    this.hitTest();
+  }
+
+  // The main loop calls the hit test (0x40ffc0) after each tick's script
+  // pass, whatever the round phase (0x404d8b): only the players' commands
+  // and CPU read it. Before FIGHT, RARIO's 開始時 object (34) finds the
+  // marker (39, 41) of ZENKA's or ALPHA's 開始時 yowai, its hit handler (35)
+  // setting his variable 15 to 100, and in a Br. intro Ryuko and REAR, among
+  // others, push apart from tick 250.
+  private hitTest() {
     this.clashBoxes();
     // The hit test meets the fighters and objects where last tick's motion
     // left them. Contacts are collected before any applies, so same-tick

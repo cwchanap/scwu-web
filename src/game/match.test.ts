@@ -533,6 +533,29 @@ describe('recovered neutral and round animations', () => {
     expect(playing(player)).toBe(RYUKO.punch);
   });
 
+  it('runs the hit test and the push before FIGHT (0x404d8b)', () => {
+    // Ryuko's Br. intro runs out into idle beside REAR's at tick 250, their
+    // push boxes overlapping, and they push apart in the following ticks.
+    const match = new Match('cpu', true, 0, ['ryuko', 'rear']);
+    const [ryuko, rear] = match.fighters;
+    while (match.roundTicks < 249) match.step();
+    expect([ryuko.x, rear.x].map((x) => x.toFixed(2))).toEqual([
+      '734.92',
+      '795.15',
+    ]);
+    while (match.roundTicks < 260) match.step();
+    expect([ryuko.x, rear.x].map((x) => x.toFixed(2))).toEqual([
+      '710.92',
+      '819.15',
+    ]);
+    // RARIO's 開始時 object (34) meets the marker (39) of ZENKA's 開始時
+    // yowai, which the select screen's global 1 takes, and its hit handler
+    // (35) sets his variable 15 to 100.
+    const vs = new Match('cpu', true, 0, ['rario', 'zenka'], 'court', true);
+    while (vs.roundTicks < FIGHT_TICK) vs.step();
+    expect(vs.fighters[0].variables[15]).toBe(100);
+  });
+
   it("rolls each win's op 0x20 at its record, playing the branch taken from there", () => {
     // Player 1 wins at once; per seed, the branch it shows after each tick.
     const win = (who: Who, seed: number, ticks: number) => {
