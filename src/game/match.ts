@@ -2335,7 +2335,9 @@ export class Match {
     const bonus =
       slot && [null, this.fighters[0], striker][(slot.flags >> 7) & 3];
     if (!bonus) return;
-    // ponytail: every story's bonus life is a gain.
+    // The life, a signed byte (0x40e984), goes through the life routine
+    // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
+    // 0, but every story's is 30 to 100: a gain.
     gainLife(bonus, slot.life);
     addPower(bonus, slot.power);
   }
