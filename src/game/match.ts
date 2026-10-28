@@ -636,6 +636,7 @@ function struck(
   const y = origin.y + box.y * 1.5;
   const mid = (a: number, r: number, b: number, s: number) =>
     (Math.min(a + r, b + s) + Math.max(a - r, b - s)) / 2;
+  if (target.bare) return;
   for (const body of hurtboxes(
     shown(target),
     target.age,
@@ -1114,6 +1115,9 @@ export interface Fighter {
   black: { shown: 'none' | 'opaque' | 'half'; left: number };
   // Set on a fighter held by a super: op 0x07's pose, flags and holder offset.
   held: { pose: number; flags: number; x: number; y: number } | null;
+  // Op 0x07 cleared its body boxes (0x40e550), which only its own op 0x19s
+  // set again, as the next action it enters runs them.
+  bare: boolean;
   // The cancel counter (+0xdf85): op 0x18 arms it with r[10] bit 0 or
   // disarms it (0x412d2b, 0x412d37), and a contact by any of the player's
   // boxes, its objects' too, raises an armed one to 2 (0x40f384), which an
@@ -1499,6 +1503,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   fader: null,
   black: { shown: 'none', left: 1 },
   held: null,
+  bare: false,
   contact: 0,
   reaction: 0,
   striker: null,
@@ -2401,6 +2406,7 @@ export class Match {
     f.box = null;
     f.boxes = [];
     f.responses = [];
+    f.bare = false;
     // 0x40e510 clears the handlers.
     f.onHit = f.onGuard = f.onLand = f.onWall = f.onClash = 0;
     // A source action's own op 0x23 sets its colour, and a clip action's op
@@ -3230,9 +3236,13 @@ export class Match {
           y: event.y,
         };
         // The hold replaces the victim's stop (+0x40 at -1, 0x41303a) and
-        // zeroes its motion (0x412f66).
+        // zeroes its motion (0x412f66). It clears the victim's boxes and
+        // bodies (0x40e550) and op 0x17 responses (+0x129, 0x40e540): no box
+        // strikes it, nor does it push, until it enters another action.
         other.hitStop = -1;
         Object.assign(other, { vx: 0, vy: 0, ax: 0, gravity: 0, moving: 0 });
+        Object.assign(other, { box: null, boxes: [], responses: [] });
+        other.bare = true;
         this.placeHeld(self, other);
         break;
       case 'apply': {
@@ -5063,11 +5073,13 @@ export class Match {
     this.fighters.forEach((a, i) => {
       if (!a.present) return;
       this.travel(a);
-      if (!a.shown) return;
+      if (!a.shown || a.bare) return;
       for (const boxA of pushboxes(shown(a), a.age, a.who)) {
         const ax = pixel(a.x) + a.facing * boxA.x;
         const ay = pixel(a.y) + boxA.y;
-        for (const b of this.fighters.slice(i + 1).filter((b) => b.shown))
+        for (const b of this.fighters
+          .slice(i + 1)
+          .filter((b) => b.shown && !b.bare))
           for (const boxB of pushboxes(shown(b), b.age, b.who)) {
             const bx = pixel(b.x) + b.facing * boxB.x;
             const by = pixel(b.y) + boxB.y;

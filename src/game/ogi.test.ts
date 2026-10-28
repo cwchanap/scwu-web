@@ -5,7 +5,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro } from './testing';
+import { brIntro, enter } from './testing';
 
 // OGI as player 1, `gap` from a standing opponent as player 2.
 function ogiPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -66,6 +66,28 @@ describe('OGI (27 OGI.PLAYER)', () => {
     expect(
       [59, 60, 73, 81, 85, 88, 90, 99, 104, 137, 140, 172].map((r) => twins[r]),
     ).toEqual([63, 64, 80, 88, 93, 96, 97, 106, 112, 145, 147, 179]);
+  });
+
+  it("has no body while held: SAKUYA's CC hit shocks him before its box strikes (PCs 5325–5333)", () => {
+    // Op 0x07 (PC 5325) clears his bodies (0x40e550), his Chuck Hit's from
+    // its first display (PC 1753) too, where Ryuko's sets none (PC 1732).
+    // So the box armed beside the shock's op 0x14 (PCs 5327, 5333) meets
+    // only the shock's own bodies, a step later, as it does Ryuko's.
+    const match = new Match('practice', false, 3, ['sakuya', 'ogi']);
+    const [sakuya, ogi] = match.fighters;
+    match.step({}, {});
+    ogi.x = sakuya.x + 40;
+    enter(match, sakuya, 347);
+    const path: [string, number][] = [];
+    while (ogi.action !== 'hitRapid') {
+      match.step({}, {});
+      if (path.at(-1)?.[0] !== ogi.action) path.push([ogi.action, ogi.hp]);
+    }
+    expect(path.slice(-3)).toEqual([
+      ['superHeld', 500],
+      ['shock', 495],
+      ['hitRapid', 495],
+    ]);
   });
 
   it("reads his command table, entering each move's source action", () => {
