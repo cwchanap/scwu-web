@@ -268,7 +268,7 @@ const launchMotion: Partial<
   },
   twistWall: { tick: 8, vx: 700, vy: -800, gravity: 60, land: 'knockdown' },
   // Response 61 (Chung's lee) → action 137, floating from its first tick
-  // (PC 1871) until GON_MISS_TICKS.
+  // (PC 1871) until its display ends (gonMiss).
   gonMiss: { tick: 0, vx: -330, vy: -430, gravity: 0, land: 'knockdown' },
   // Response 60 (Zoma's DST) → action 109: nine ticks of shaking, then PC
   // 1434 drops it into 146 (PC 1433).
@@ -403,6 +403,7 @@ const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 const KNOCKDOWN = 146;
 const GET_UP = 145;
 const HISA = 80;
+const GON_MISS = 137;
 // MASA's and 3-TIMES's Down Get up (190, 187) picks its voice by a chain of
 // rolls (PCs 2205–2226, 2114–2135); Z-MEGA's and SHIN-Z's (157, 159) roll
 // rand % 6 > 2 and > 4 (PCs 1937, 2013) past a one-tick display whose hit
@@ -551,12 +552,13 @@ const copyOf = (who: Who, own: number) => {
     ? own
     : undefined;
 };
-// An exported reaction's or copy's op 0x15s: YINAN's FB credits HISA's 13
-// after its 10 (PC 2068), KAY's FBH only HISA's 3 (PC 1408).
+// An exported reaction's or copy's op 0x15s before its first display, which
+// run as it is entered: YINAN's FB credits HISA's 13 after its 10 (PC
+// 2068), KAY's FBH only HISA's 3 (PC 1408). GON MISS's come after (gonMiss).
 const ownPower = (key: ObjectKey, who: Who) =>
   script(key, who).events.reduce<[number, number]>(
     ([self, other], e) =>
-      e.op === 'power'
+      e.op === 'power' && !e.t
         ? [self + e.selfPower, other + e.otherPower]
         : [self, other],
     [0, 0],
@@ -2689,17 +2691,23 @@ export class Match {
 
   // GON MISS (137) floats until its display ends (PC 1873). Then its op
   // 0x15 (PC 1874) takes 40 life from the victim and adds 5 power to it and
-  // 3 to the striker, and PC 1875 jumps into HISA (80), running its first
-  // records at once: 13 stop ticks for both and its own power. Life that
-  // runs out queues the lose action.
+  // 3 to the striker; ALPHA's and ZENKA's take 40 more unless their yowai
+  // form holds variable 14 at 10 (PCs 2570–2571, 2110–2111). PC 1875 jumps
+  // into HISA (80), running its first records at once: 13 stop ticks for
+  // both and its own power. Life that runs out queues the lose action.
   private gonMiss(f: Fighter) {
-    if (f.action !== 'gonMiss' || f.age < animationDuration(f.action, f.who))
-      return false;
+    const end = animationDuration('gonMiss', f.who);
+    if (f.action !== 'gonMiss' || f.age < end) return false;
     const striker = this.met(f);
-    const damage = loseLife(f, 40);
-    if (striker) striker.damage += damage;
-    addPower(f, 5);
-    if (striker) addPower(striker, 3);
+    for (const event of script(twin(f.who, GON_MISS), f.who).events) {
+      if (event.t !== end) continue;
+      if (event.op === 'test' && this.passes(f, f, event)) break;
+      if (event.op !== 'power') continue;
+      const damage = loseLife(f, -event.selfLife);
+      if (striker) striker.damage += damage;
+      addPower(f, event.selfPower);
+      if (striker) addPower(striker, event.otherPower);
+    }
     this.queue(f, 'launchAway', 13, 13);
     this.enterPending(f);
     if (f.hp === 0) this.knockOut(f);

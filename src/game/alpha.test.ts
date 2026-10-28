@@ -62,6 +62,20 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     expect(alpha).toMatchObject({ who: 'alpha', hp: 500, action: 'idle' });
   });
 
+  it('takes 40 more life after GON MISS outside his yowai form (PCs 2569–2571)', () => {
+    const lost = (variable14: number) => {
+      const { match, alpha } = alphaPlayer();
+      alpha.variables[14] = variable14;
+      (match as unknown as { queue(f: Fighter, a: 'gonMiss'): void }).queue(
+        alpha,
+        'gonMiss',
+      );
+      while (alpha.action !== 'launchAway') match.step({}, {});
+      return lifeOf('alpha') - alpha.hp;
+    };
+    expect([lost(0), lost(10)]).toEqual([80, 40]);
+  });
+
   it("pairs every victim action with Ryuko's", () => {
     const twins = CHARACTERS.alpha.twins as Record<string, number>;
     const paired = responsesOf('ryuko').flatMap((ryuko, id) =>

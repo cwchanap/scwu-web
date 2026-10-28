@@ -1245,11 +1245,12 @@ TRAINING_TWINS = {name: (r, r + next(d for top, d in ((63, -24), (89, -26), (119
 TIMELINES = {"lose", "hitRapid", "airHitRapid", "rushAirHit", "fly", "flySpin", "shock", "shockLoop",
              "fb", "fbb", "fbh", "stun", "airStun"}
 # The reactions whose op 0x01 commands, op 0x20 rolls and branches the match
-# plays, the lose action that opens every KO and the air guards.
+# plays, the lose action that opens every KO, the air guards and GON MISS,
+# whose op 0x15s after its float the match runs.
 SCRIPTED = ["airHit", "sweep", "hitHeavy", "airHitHeavy", "jumpHit", "launchAway", "hitRapid", "airHitRapid", "shock",
             "uppercut", "liftUp", "tatumakiIn", "tatumakiOut", "flySide", "fly", "stun", "airStun", "rushAirHit", "chuckToss", "airGuard", "airBlockHeavy",
             "airBlockRapid", "airTimeStopGuard", "lose", "ko", "down", "musicAttack", "airInatuma", "airIcePunch", "chainPull",
-            "airHisoStop", "dstToss", "hitPull", "twistSideHit"]
+            "airHisoStop", "dstToss", "hitPull", "twistSideHit", "gonMiss"]
 
 # The responses whose reactions only some players' moves reach, which the
 # match plays from the victim's own timeline: Clothes off and Clothes off 500
@@ -4261,14 +4262,15 @@ def main():
     levels = {i: p.records[p.action(i).start][2] for i in moves}
     # The reactions whose op 0x01 commands, op 0x20 rolls and branches the
     # match plays (the shock 88, FLY NO HIT 97, the rush air hit 122, the beam
-    # hits 83 and 84, hits 75–77, 79, 80, 91, 92, 96, 99, 100, 105, 121, 126 and 132, the toss 129 and the air reactions), the lose
+    # hits 83 and 84, hits 75–77, 79, 80, 91, 92, 96, 99, 100, 105, 121, 126 and 132, the toss 129, GON MISS 137
+    # and the air reactions), the lose
     # action (59) whose records open every KO, every response's hit effect and
     # every object the clips spawn; her moves, and the guard reactions whose op
     # 0x24 enters COUNTER HIT (174). Each brings what its events spawn, call
     # and branch into, keyed "action+offset" when a branch enters mid-action.
     # Image 0 (a solid marker block) and 8191 are the source's blank displays.
     queue = [(i, 0) for i in [88, 97, 122, 83, 84, 74, 75, 76, 77, 79, 80, 91, 92, 96, 99, 100, 105, 121, 126, 108, 109, 132, 129, 153, 158,
-                              167, 172, 59, 60, 62, 133, 120, 107, 114,
+                              167, 172, 59, 60, 62, 133, 120, 107, 114, 137,
                               *filter(None, tables["response_effects"]), *moves,
                               149, 151, 154, 156, 159, 161, 163, 165, 168, 170,
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
