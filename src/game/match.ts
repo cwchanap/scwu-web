@@ -5211,10 +5211,10 @@ export class Match {
     // player it met to be struck and to have landed none (0x410023): FENG's
     // Evil IORI P3 (252) finds Ryuko without damage as her punch 1 lands,
     // so it stays out of its hit branch (179).
-    // ponytail: both wait for a striker with nothing queued. The engine's
-    // guard handler overwrites a reaction an earlier striker queued, but a
-    // striker guarded while struck would need a box in a guard reaction or
-    // the free state, which no fighter's records hold.
+    // ponytail: the guard handler waits for nothing queued too. The engine's
+    // overwrites a reaction an earlier striker queued, but a striker guarded
+    // while struck would need a box in a guard reaction or the free state,
+    // which no fighter's records hold.
     const landed = contacts.filter(
       (c) => c.source === c.f && !c.blocked && !c.error,
     );
