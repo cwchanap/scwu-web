@@ -5186,16 +5186,33 @@ export class Match {
     // Op 0x02 slots 2 and 3: a script's own box queues its guard handler at
     // the contact (0x40f6f1), its hit handler after the motion pass only for
     // a striker with nothing queued (0x40fffd), so a reaction takes an
-    // interrupted aerial drill whatever the fighters' order.
+    // interrupted aerial drill whatever the fighters' order. An own box
+    // landing unguarded marks its player (+0xdf2d) and the one it struck
+    // (+0xdf31, 0x40f863–0x40f87d), and the hit handler also waits for the
+    // player it met to be struck and to have landed none (0x410023): FENG's
+    // Evil IORI P3 (252) finds Ryuko without damage as her punch 1 lands,
+    // so it stays out of its hit branch (179).
     // ponytail: both wait for a striker with nothing queued. The engine's
     // guard handler overwrites a reaction an earlier striker queued, but a
     // striker guarded while struck would need a box in a guard reaction or
     // the free state, which no fighter's records hold.
+    const landed = contacts.filter(
+      (c) => c.source === c.f && !c.blocked && !c.error,
+    );
     for (const { f, blocked, source, error } of contacts) {
       if (error) continue;
       if ('clip' in source) this.handle(source, blocked);
       const handler = blocked ? f.onGuard : f.onHit;
-      if (source === f && f.action === 'script' && !f.pending && handler)
+      const met = this.met(f);
+      if (
+        source === f &&
+        f.action === 'script' &&
+        !f.pending &&
+        handler &&
+        (blocked ||
+          (landed.some((c) => c.target === met) &&
+            !landed.some((c) => c.f === met)))
+      )
         f.pending = { key: handler };
     }
     for (const [striker] of objectHits) {

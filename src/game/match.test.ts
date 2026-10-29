@@ -308,6 +308,22 @@ describe('Hit Up launcher', () => {
     }
   });
 
+  it("trades away punch 1's hit branch to a box without damage (0x410023)", () => {
+    for (const trade of [false, true]) {
+      const match = new Match('practice', false, 0, ['ryuko', 'feng']);
+      const [f, target] = match.fighters;
+      target.x = f.x + 120;
+      // FENG's Evil IORI P3 box (164, −48) ±(78, 47), responses 0 and no
+      // damage, finds Ryuko from age 19, the tick punch 1 lands at 11.
+      enter(match, target, 252);
+      const lead = trade ? 11 : 10;
+      for (let tick = 0; tick <= lead + 8; tick++)
+        match.step({ punch: tick === lead });
+      expect(playing(f)).toBe(trade ? RYUKO.punch : RYUKO.punchHit);
+      expect([f.hp, target.hp]).toEqual([LIFE, 458]);
+    }
+  });
+
   it("runs the lose action 59's records as a KO enters (PCs 584–589)", () => {
     const match = new Match();
     const [f, target] = match.fighters;
