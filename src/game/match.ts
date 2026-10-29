@@ -407,10 +407,16 @@ const HISA = 80;
 const GON_MISS = 137;
 // MASA's and 3-TIMES's Down Get up (190, 187) picks its voice by a chain of
 // rolls (PCs 2205–2226, 2114–2135); Z-MEGA's and SHIN-Z's (157, 159) roll
-// rand % 6 > 2 and > 4 (PCs 1937, 2013) past a one-tick display whose hit
-// and guard handlers and box (PCs 1938–1940), 9869 source pixels down, meet
-// nothing, 30 ticks either way. Each rolls as it is entered (Match.action)
-// and draws its clip, as every path does.
+// rand % 6 > 2 and > 4 (PCs 1937, 2013) past their hit and guard handlers,
+// into RAMDOM GET UP (156, 158), and a box 9869 and 9890 source pixels down
+// for their first display (PCs 1938–1940, 2014–2016), 30 ticks either way.
+// The box meets the opponent's VS CHARGE body, 9900 down (Ryuko's PC 410),
+// which the intro's OP super Charge follows its player with: an opponent in
+// front counters the get-up (objectHits). Each runs its first records as it
+// is entered (Match.action) and draws its clip, as every path does.
+// ponytail: free practice skips the intros, so no VS CHARGE follows the
+// opponent there and the get-up never counters; spawning each intro's OP
+// super Charge would give it one.
 const GET_UP_ROLLS = new Set(
   (Object.keys(CHARACTERS) as Who[]).filter(
     (who) =>
@@ -2423,8 +2429,6 @@ export class Match {
     f.copy = null;
     f.slideBase = 0;
     f.resume = undefined;
-    if (action === 'getUp' && GET_UP_ROLLS.has(f.who))
-      this.rollPass(f, twin(f.who, GET_UP), true);
     // 0x410d50 stops a player entering an action on the ground, and keeps an
     // airborne one's motion: Zoma's moves take this.
     const flying = action === 'script' && (f.y < 0 || f.vy !== 0);
@@ -2467,6 +2471,8 @@ export class Match {
       f.gravity = 0.24;
       f.moving = 0;
     }
+    if (action === 'getUp' && GET_UP_ROLLS.has(f.who))
+      this.rollPass(f, twin(f.who, GET_UP));
   }
 
   // The action of a standing fighter's round result (+0xe007): 1 win (57),
@@ -4312,6 +4318,8 @@ export class Match {
         }
         f.age++;
         f.moving = 0;
+        // The get-up's box lives through its first display (PCs 1940, 2018).
+        if (f.action === 'getUp') f.box = null;
         if (this.land(f)) return;
         if (this.cancel(f, history)) return;
         if (f.action === 'idle')

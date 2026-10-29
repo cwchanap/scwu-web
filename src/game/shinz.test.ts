@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
 import { animationDuration, animationFrame, BLACK } from './animations';
-import { faceImage } from './hud';
+import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro } from './testing';
@@ -213,6 +213,48 @@ describe('SHIN-Z (34 SHIN-Z.PLAYER)', () => {
       800,
       490 - 55,
     ]);
+  });
+
+  it("counters from Down Get up as its box meets the opponent's VS CHARGE (PCs 2014–2016), as Z-MEGA does (PCs 1938–1940)", () => {
+    // `who` lies `gap` before a Vs. CPU Ryuko, whose OP super Charge (39)
+    // follows her, 3 ticks before his knockdown runs out: his path until he
+    // stands, and her loss.
+    const getUp = (who: 'shinz' | 'zmega', seed: number, gap: number) => {
+      const match = new Match('cpu', true, seed, [who, 'ryuko']);
+      while (match.roundTicks < FIGHT_TICK) match.step();
+      const [f, ryuko] = match.fighters;
+      const age = animationDuration('knockdown', who) - 3;
+      Object.assign(f, { x: 600, facing: 1, action: 'knockdown', age });
+      Object.assign(ryuko, { x: 600 + gap, facing: -1 });
+      const mine: unknown[] = [];
+      for (let t = 0; t < 300 && mine.at(-1) !== 'idle'; t++) {
+        match.step();
+        if (mine.at(-1) !== now(f)) mine.push(now(f));
+      }
+      return { mine, damage: lifeOf('ryuko') - ryuko.hp };
+    };
+    // His box for the get-up's first tick, 126 ± 164 ahead and 9890 down,
+    // meets her object's VS CHARGE body, 9900 down (Ryuko's PC 410): its hit
+    // handler enters RAMDOM GET UP (158), which strikes for 50 (PC 2004).
+    expect(getUp('shinz', 3, 150)).toEqual({
+      mine: ['knockdown', 'getUp', 158, 'idle'],
+      damage: 50,
+    });
+    // rand % 6 > 4 jumps past the box (PC 2013); far off, it meets nothing.
+    for (const [seed, gap] of [
+      [1, 150],
+      [3, 700],
+    ])
+      expect(getUp('shinz', seed, gap)).toEqual({
+        mine: ['knockdown', 'getUp', 'idle'],
+        damage: 0,
+      });
+    // Z-MEGA's RAMDOM GET UP (156) strikes for 40, here 48: her cpu iori's
+    // bodies (410) take 120% (PC 5839).
+    expect(getUp('zmega', 1, 150)).toEqual({
+      mine: ['knockdown', 'getUp', 156, 'idle'],
+      damage: 48,
+    });
   });
 
   it('spends a stock on KAISA SUPER and SGIGA, three on AKUMA SP, or enters No super', () => {
