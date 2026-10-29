@@ -393,6 +393,7 @@ export class TrainingScene extends Phaser.Scene {
     screen.globals = this.globals;
     this.select = screen;
     this.sound.stopAll();
+    this.selectTrack = undefined;
     this.paused = false;
     this.clearInput();
     this.report();
@@ -404,25 +405,21 @@ export class TrainingScene extends Phaser.Scene {
     const select = this.select!;
     select.step(input);
     for (const { container, index } of select.sounds) {
-      // Authored: the title's 126-second track (T2's sound 1) and the select
-      // screen's 57-second one (CHAR SELECT's) play only with Music ticked,
-      // as the stages' do.
-      if ((container === 't2' || container === 'select') && index === 1) {
-        if (this.music) {
-          const key = `${container}-sound-1`;
-          this.selectTrack = this.sound.get(key) ?? this.sound.add(key);
-          this.selectTrack.play();
-        }
-        continue;
-      }
-      // CHAR SELECT's sound 0, which its closing panels cue, is empty.
       const key = `${container}-sound-${index}`;
-      if (this.demoTracks.has(key)) {
-        if (!this.music) continue;
+      // Authored: the title's 126-second track (T2's sound 1), the select
+      // screen's 57-second one (CHAR SELECT's) and a story demo's play only
+      // with Music ticked, as the stages' do; ticking it later starts the
+      // last one cued.
+      if (
+        ((container === 't2' || container === 'select') && index === 1) ||
+        this.demoTracks.has(key)
+      ) {
         this.selectTrack?.stop();
         this.selectTrack = this.sound.get(key) ?? this.sound.add(key);
-        this.selectTrack.play();
-      } else if (this.cache.audio.exists(key)) this.play(key);
+        if (this.music) this.selectTrack.play();
+      }
+      // CHAR SELECT's sound 0, which its closing panels cue, is empty.
+      else if (this.cache.audio.exists(key)) this.play(key);
     }
     if (!select.done) return;
     if (select instanceof Title)
@@ -702,7 +699,8 @@ export class TrainingScene extends Phaser.Scene {
     this.match = match;
     this.roundPalettes();
     this.match.practice = { ...this.practice };
-    this.sound.stopAll();
+    // A match the toolbar restarts behind a screen leaves its sounds playing.
+    if (!this.select) this.sound.stopAll();
     this.cue = undefined;
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
@@ -735,7 +733,8 @@ export class TrainingScene extends Phaser.Scene {
   setMusic(on: boolean) {
     this.music = on;
     if (this.select) {
-      if (!on) this.selectTrack?.stop();
+      if (on) this.selectTrack?.play();
+      else this.selectTrack?.stop();
       return;
     }
     this.playMusic();
