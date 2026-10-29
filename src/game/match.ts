@@ -2302,7 +2302,9 @@ export class Match {
   }
 
   // Whom a player's boxes and objects may strike (0x40f0ed–0x40f118): another
-  // player it fights.
+  // player it fights. The test of +0x60 is the owner's: a player's first step
+  // (in every mode, 0–2) and its object's copy +0x156 there (0x411cb7,
+  // 0x411f0c, 0x412218); the KGT's and stage's objects, at 0, hold no box.
   private hostile(owner: number, other: number) {
     return (
       owner !== other && Boolean((this.fighters[owner]?.enemies >> other) & 1)
