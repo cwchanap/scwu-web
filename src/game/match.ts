@@ -3641,11 +3641,12 @@ export class Match {
       this.placeHeld(f, other);
     walled = placeX(f, f.x) || walled;
     // 0x40fcab: stopped by a wall, a player with a wall handler (op 0x02 slot
-    // 4, +0x70) queues its action (+0x38): a flight's, or a move's, as Yo's
-    // Press Hit carrying its victim (PC 3291).
+    // 4, +0x70) queues its action (+0x38), over a reaction this tick's
+    // contacts queued: a flight's, or a move's, as Yo's Press Hit carrying
+    // its victim (PC 3291).
     const wall = launchMotion[f.action]?.wall;
     if (walled && wall) this.queue(f, wall);
-    else if (walled && f.action === 'script' && f.onWall && !f.pending)
+    else if (walled && f.action === 'script' && f.onWall)
       f.pending = { key: f.onWall };
     const by = f.striker ? f.struckBy : null;
     const reeling = f.striker === 'body' && ((by?.reaction ?? 0) & 12) === 8;
@@ -5151,6 +5152,22 @@ export class Match {
           }),
         );
     }
+    // 0x40f36a: a player's box meeting an object's body queues its hit
+    // handler at the contact, over whatever is queued, a reaction or KO an
+    // earlier player's box queued among them; only a later striker's (a
+    // later player's or any object's) replaces it.
+    for (const [striker] of objectHits) {
+      if ('clip' in striker || !striker.onHit) continue;
+      const i = this.fighters.indexOf(striker);
+      const later = contacts.some(
+        (c) =>
+          c.target === striker &&
+          !c.error &&
+          (c.reaction || c.timeline) &&
+          ('clip' in c.source || this.fighters.indexOf(c.f) > i),
+      );
+      if (!later) striker.pending = { key: striker.onHit };
+    }
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
     // slot 19 down, in whole source pixels (x >> 16). Only the airborne one
@@ -5218,8 +5235,6 @@ export class Match {
     for (const [striker] of objectHits) {
       striker.connected = true;
       if ('clip' in striker) this.handle(striker, false);
-      else if (striker.onHit && !striker.pending)
-        striker.pending = { key: striker.onHit };
     }
     this.holdVictims();
   }

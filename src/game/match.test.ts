@@ -5679,6 +5679,46 @@ describe('prototype training rules', () => {
       expect(flying.clip).toBe(227);
     });
 
+    it("lets a punch meeting an object replace an earlier player's reaction (0x40f36a)", () => {
+      for (const puncher of [1, 0]) {
+        const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+        const f = match.fighters[puncher];
+        const behind = match.fighters[1 - puncher];
+        Object.assign(f, { x: 600, facing: 1 });
+        Object.assign(behind, { x: 420, facing: 1 });
+        // Punch 1 meets the body (0, −112) ±(37, 82) of YINAN's 21, which
+        // stands in the fighter layer, as the other punch 1 lands from behind.
+        match.effects = [
+          object(21, 1 - puncher, { who: 'yinan', x: 700, facing: -1 }),
+        ];
+        strike(match, f, RYUKO.punch);
+        strike(match, behind, RYUKO.punch);
+        ticks(match, 2);
+        // Its hit handler (179) replaces 1P's reaction, queued earlier in
+        // slot order, but 2P's, queued later, replaces it.
+        expect([named(f), f.hp, behind.hp]).toEqual([
+          puncher ? 'punchHit' : 'hit',
+          498,
+          LIFE,
+        ]);
+      }
+    });
+
+    it('lets a wall handler replace a reaction queued that tick (0x40fcab)', () => {
+      const match = new Match();
+      const [ryuko, zoma] = match.fighters;
+      Object.assign(ryuko, { x: FIGHTER_MARGIN });
+      zoma.x = ryuko.x + 120;
+      strike(match, zoma, 178);
+      enter(match, ryuko, RYUKO.punch);
+      // A drift into the wall with 91's wall handler (95), as Zoma's punch 1
+      // lands on the punching body (120%): the motion pass queues the
+      // handler over the reaction.
+      Object.assign(ryuko, { vx: -3, onWall: 95 });
+      match.step();
+      expect([ryuko.pending, ryuko.hp]).toEqual([{ key: 95 }, LIFE - 12]);
+    });
+
     it('cannot be guarded with a box of kind 0x40 (0x40f469)', () => {
       const struck = (kind: number) => {
         const match = new Match('cpu');
