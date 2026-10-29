@@ -563,6 +563,7 @@ def player_tables(data, c, p, image_ids):
                 scenario=scenario(data, block + 0x7cc9),
                 selectFace=u16(data, block + 0x75a4), start=u16(data, block + 0x759c),
                 faceHelper=face_helper(p, u16(data, block + 0x75a6)),
+                charge=vs_charge(p, u16(data, block + 0x759c)),
                 jumps=[u16(data, block + 0x7580 + 2 * k) for k in range(3)],
                 walks=[u16(data, block + 0x757c + 2 * k) for k in range(2)], fall=u16(data, block + 0x7586))
 
@@ -642,6 +643,19 @@ def face_helper(p, face):
     [action, offset], or none: TRAINING's spawns only its display."""
     action = p.action(face)
     return next(([u16(r, 2), r[4]] for r in p.records[action.start:action.end] if r[0] == 0x04 and r[1] & 3 == 1), [])
+
+
+def vs_charge(p, start):
+    """VS CHARGE, which a player's OP super Charge, spawned by its 開始時 to follow it (op 0x04 flags
+    0x24, Ryuko's PCs 320–321), enters at once in VS single: its first record tests global 3 above
+    40 into it (PC 417). TRAINING has none, and his 開始時 spawns VS CHANGE that way (PC 234)."""
+    charge = next((a for a in map(p.action, range(len(p.actions) - 1)) if a.name.lower() == "op super charge"), None)
+    if not charge:
+        start = p.action(start)
+        return next(u16(r, 2) for r in p.records[start.start:start.end] if r[0] == 0x04 and r[1] == 0x24)
+    test = decode_event(p.records[charge.start + 1])
+    assert test["op"] == "test" and test["selector"] == 131 and test["value"] == 40, test
+    return test["action"]
 
 
 def select_program(p, face, image_ids):
@@ -4113,6 +4127,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     # The object the HUD face spawns, which the match makes for each player in the Vs. modes.
     if tables["faceHelper"]:
         queue.append(tuple(tables["faceHelper"]))
+    # VS CHARGE, which the match makes for each player in free practice.
+    queue.append((tables["charge"], 0))
     # The neutral actions' tests of a global before their first display, which the match takes as it
     # enters them: ZAKU's and PAC-HELO's of global 10 for 10, as story's select screen leaves it, from
     # 通常立ち into their mode select's stance (PC 3: 1 + 16, 1 + 15) and from their turns into
@@ -4282,6 +4298,7 @@ def main():
                               tables["start"], *tables["jumps"], *tables["walks"], tables["fall"]]]
     # The object her HUD face spawns (70 + 26, PC 708), which the match makes in the Vs. modes.
     queue.append(tuple(tables["faceHelper"]))
+    queue.append((tables["charge"], 0))
     scripts = flatten_queue(p, c, queue + spawned(clips), set(actions.values()), image_ids,
                             {r for r, _ in ZOMA_TWINS.values()})
     # Ryuko's sounds the exported cues play, as stored: RIFF/WAVE, 8-bit mono.

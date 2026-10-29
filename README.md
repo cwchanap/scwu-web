@@ -324,7 +324,7 @@ And DIDO's, dressed as a different armored figure or mecha for most moves:
 | U, or ↓→ K                     | slid: a low dive on a white jet sled                                                                                                        |
 | I, or ↓→ J                     | fire: a gold-winged figure's blue flames; in the air a purple winged figure's (harder below 30% health)                                     |
 | F, or ↓← K                     | RAiden: a grey mecha's claw strike; press K again to keep striking                                                                          |
-| G, or ↓← J                     | doge: a pink heart-armored figure's dash, low enough to pass under most strikes                                                             |
+| G, or ↓← J                     | doge: a pink heart-armored figure's dash, low enough to pass under most strikes, which strikes once beside the opponent, 30                 |
 | 1, or ↓←↓→ K                   | Hidden En300, below 30% health: a white-robed girl's magic circle; a catch plays a long scene of wings and water, 3 stocks (slid otherwise) |
 | 2, or ↓→↓→ K                   | Temjin fly: a white-suited girl surfing a giant blade, 1 stock, also in the air                                                             |
 | 3, or ↓←↓← K                   | dragon super: a hooded figure's staff calls a blue lightning dragon that coils around her, 1 stock                                          |
@@ -691,7 +691,7 @@ And ZIRO's, a teal-haired young man who calls up a different robot suit, winged,
 | E, or ↓ ↓ H                       | --TYPE--: EX mode on or off, half a stock; it swaps his specials and supers                                                                         |
 | U, or →↓↘ K                       | Fire Ball: a shell that speeds up as it flies, two at 30% life or less (EX: a winged robot's rising slash)                                          |
 | I, or ←↓↙ J / K                   | nataku: a dragon arm thrust up and out / straight out (EX: a cloaked robot's charge); MISS ALL or RAMBU cancels it for two stocks                   |
-| F, or ↓← K / J                    | telepot: vanishing under a dark cloak to come out past the opponent / into the air                                                                  |
+| F, or ↓← K / J                    | telepot: vanishing under a dark cloak to come out at the opponent / into the air                                                                    |
 | G, or ↓→ J                        | IORI3HIT: a winged robot's dashing slash, which ↓→ J follows twice more; in the air, a shot down at the floor (EX: a fire ball; in the air, a spin) |
 | 5, or ←↓→ K                       | CC: a grab into blows and a leaping slam (EX: a trident flurry)                                                                                     |
 | 1, or ↓→↓→ K                      | MISS ALL: a gunner robot's barrage of bullets and missiles, 1 stock (EX: a winged robot's beam)                                                     |
@@ -966,7 +966,7 @@ And AYA's, a white-haired, bunny-eared girl with 500 life who dresses as other f
 | U, or ↓→ J             | FB: a black mage's fireball, 30; in the air Air Crush, a dive                                                   |
 | I, or ↓→ K             | DH: a caped rush, 30; in the air Air Kick, a diving kick, 20                                                    |
 | F, or →↓↘ J            | SHO: a sword stroke that raises purple pillars, 35                                                              |
-| G, or ↓← J; E, or ↓← K | TE P / TE K: a long unseen dash into a leaping slash, 30                                                        |
+| G, or ↓← J; E, or ↓← K | TE P / TE K: a long unseen dash that stops beside the opponent, into a leaping slash, 30                        |
 | 1, or ↓→↓→ J           | Slash: a crescent hurled from a shield, 84, 1 stock                                                             |
 | 2, or ↓→↓→ K           | Rocket: a diving kick that pins the opponent and pummels them from every side, 107, 1 stock, also in the air    |
 | 3, or ↓←↓→ J           | EN3: a sword sweep into a holy blast, 211, 3 stocks                                                             |

@@ -81,7 +81,7 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
     expect(dido).toMatchObject({ action: 'script', branch: 184, age: 0 });
   });
 
-  it('plays her specials: slid for 35, fire for 30, and doge, whose probe meets nothing', () => {
+  it("plays her specials: slid for 35, fire for 30, and doge, whose probe meets the opponent's VS CHARGE", () => {
     expect(byKey({ drill: true })).toMatchObject({
       mine: [231, 'turn', 'idle'],
       damage: 35,
@@ -91,10 +91,11 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
       damage: 30,
     });
     // Its box sits at (0, 9905) (PC 3302), where only VS CHARGE's body
-    // (36, PC 407) is, so Doge near Hit (236) never plays.
+    // (36, PC 407) is: the opponent's, which follows her, enters Doge near
+    // Hit (236), which strikes for 30 (PC 3341).
     expect(byKey({ dst: true })).toMatchObject({
-      mine: [235, 'turn', 'idle'],
-      damage: 0,
+      mine: [235, 236, 'idle'],
+      damage: 30,
     });
   });
 
@@ -257,7 +258,7 @@ describe('DIDO (13 DIDO.PLAYER)', () => {
   });
 
   it('plays her own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 0, ['ryuko', 'dido']);
+    const match = new Match('cpu', false, 3, ['ryuko', 'dido']);
     const dido = match.fighters[1];
     const entered = new Set<unknown>();
     // slid, fire and RAiden.

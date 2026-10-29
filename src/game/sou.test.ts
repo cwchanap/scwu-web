@@ -165,6 +165,28 @@ describe('SOU (16 SOU.PLAYER)', () => {
       mine: ['takeoff', 'jump', 314, 336, 338, 'idle'],
       damage: 35,
     });
+    // Its far box spans all behind him, 9900 down (PC 4472): once the
+    // opponent is there, it meets her VS CHARGE body (Ryuko's PC 410), whose
+    // hit handler enters the 2P form (325, PC 4471).
+    const { sou, other, steps } = souPlayer();
+    sou.variables[0] = 10;
+    steps({}, 2);
+    const mine: unknown[] = [];
+    for (let t = 0; t < 700; t++) {
+      if (t === 60) other.x = sou.x - 300;
+      steps(t ? (t === 10 ? { dst: true } : {}) : { jump: true, right: true });
+      if (mine.at(-1) !== now(sou)) mine.push(now(sou));
+    }
+    expect(mine).toEqual([
+      'takeoff',
+      'jump',
+      314,
+      325,
+      '335+16',
+      '347+3',
+      'turn',
+      'idle',
+    ]);
   });
 
   it('spends his stocks on Command 1, SPARK and DANKU SHOT (one each) and Beast att (3), and their EX forms', () => {

@@ -2,6 +2,7 @@
 // source action; these name the ones the tests drive, and the objects they
 // spawn (the axe, DST's missiles).
 import type { ObjectKey } from './animations';
+import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import { fighterPose, firstStrike, HUD_FACES, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
@@ -141,10 +142,13 @@ export function named(f: Fighter): string {
 }
 
 // The match's objects but those keeping to the HUD faces (spawnFaces), which
-// every round outside a story has.
+// every round outside a story has, and the VS CHARGE each player starts with
+// in a match with no intro.
 export const fightObjects = (match: Match) =>
   match.effects.filter(
-    (e) => !HUD_FACES.some((face) => face === e.follow?.parent),
+    (e) =>
+      !HUD_FACES.some((face) => face === e.follow?.parent) &&
+      base(e.clip) !== CHARACTERS[e.who as Who]?.charge,
   );
 
 // A fighter's objects of one source action, its branches included.

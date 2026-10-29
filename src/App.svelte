@@ -1355,9 +1355,11 @@
           harder below 30% health), <kbd>F</kbd> or ↓←
           <kbd>K</kbd> RAiden, a grey mecha's claw strike that <kbd>K</kbd>
           keeps striking, and <kbd>G</kbd> or ↓← <kbd>J</kbd> doge, a pink
-          heart-armored figure's dash, low enough to pass under most strikes.
-          Her supers, for a stock each: <kbd>2</kbd> or ↓→↓→ <kbd>K</kbd> Temjin
-          fly, a white-suited girl surfing a giant blade (also in the air),
+          heart-armored figure's dash, low enough to pass under most strikes,
+          which strikes once beside the opponent. Her supers, for a stock each:
+          <kbd>2</kbd>
+          or ↓→↓→ <kbd>K</kbd> Temjin fly, a white-suited girl surfing a giant
+          blade (also in the air),
           <kbd>3</kbd> or ↓←↓← <kbd>K</kbd> dragon super, a hooded figure's blue
           lightning dragon coiling around her, and <kbd>4</kbd> or ↓→↓→
           <kbd>J</kbd> Raiden, a red mecha's barrage fired diagonally up the
@@ -1810,7 +1812,7 @@
           out, or ←↓↙ <kbd>K</kbd> straight out (EX: a cloaked robot's charge),
           <kbd>F</kbd>
           or ↓← <kbd>K</kbd> telepot, vanishing under a dark cloak to come out
-          past the opponent, or with ↓← <kbd>J</kbd> into the air,
+          at the opponent, or with ↓← <kbd>J</kbd> into the air,
           <kbd>G</kbd> or ↓→ <kbd>J</kbd> IORI3HIT, a winged robot's dashing
           slash that ↓→ <kbd>J</kbd> follows twice more, in the air a shot down
           at the floor (EX: a fire ball; in the air a spin), and <kbd>5</kbd> or
@@ -2139,9 +2141,11 @@
           caped rush (in the air Air Kick, a diving kick), <kbd>F</kbd> or →↓↘
           <kbd>J</kbd> SHO, a sword stroke that raises purple pillars, and
           <kbd>G</kbd> or ↓← <kbd>J</kbd> TE P (<kbd>E</kbd> or ↓←
-          <kbd>K</kbd> TE K), a long unseen dash into a leaping slash. Her
-          supers, for a stock each: <kbd>1</kbd> or ↓→↓→ <kbd>J</kbd> Slash, a
-          crescent hurled from a shield, and <kbd>2</kbd> or ↓→↓→
+          <kbd>K</kbd> TE K), a long unseen dash that stops beside the opponent,
+          into a leaping slash. Her supers, for a stock each: <kbd>1</kbd> or
+          ↓→↓→ <kbd>J</kbd> Slash, a crescent hurled from a shield, and
+          <kbd>2</kbd>
+          or ↓→↓→
           <kbd>K</kbd> Rocket, a diving kick that pins the opponent and pummels
           them from every side, also in the air; for three, <kbd>3</kbd> or ↓←↓→
           <kbd>J</kbd> EN3, a sword sweep into a holy blast. On a hit her normals

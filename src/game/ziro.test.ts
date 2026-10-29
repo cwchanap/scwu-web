@@ -170,15 +170,19 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     ).toMatchObject({ mine: [336, 338, 340, 341, 'idle'], damage: 45 });
   });
 
-  it('teleports past the opponent with telepot (raw 10000, PC 3853)', () => {
-    for (const [gap, mine] of [
-      [90, 257],
-      [300, 258],
+  it("teleports with telepot (raw 10000, PC 3853) until its box meets the opponent's VS CHARGE", () => {
+    // Its hit handlers enter tele out (259, PCs 3851–3852, 3876–3877) as the
+    // box, 9040 down, meets the body 9900 down (Ryuko's PC 410): TALE K N's
+    // trails 80 behind him (PC 3854), so he stands past her; tele K's leads
+    // 60 ahead (PC 3879), so he stops before her.
+    for (const [gap, mine, behind] of [
+      [90, [257, 259, 'turn', 'idle'], 1],
+      [300, [258, 259, 'idle'], -1],
     ] as const) {
       expect(byKey({ iori: true }, { gap })).toMatchObject({
-        mine: [mine, 'turn', 'idle'],
+        mine,
         damage: 0,
-        behind: 1,
+        behind,
       });
     }
   });
@@ -443,7 +447,7 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    const match = new Match('cpu', false, 23, ['ryuko', 'ziro']);
+    const match = new Match('cpu', true, 0, ['ryuko', 'ziro']);
     const ziro = match.fighters[1];
     const entered = new Set<unknown>();
     // TALE K N, NATAKU FIST K, Shoot start, CC START and his CPU's own cpu

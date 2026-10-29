@@ -1549,7 +1549,7 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     match.step();
     // The 12th hit spawns the count after the hit effect, at idle's struck
     // body box's centre: ⌊500 / 1.5⌋ + 1 mirrored, −92 (source pixels).
-    const [spark, counter] = match.effects;
+    const [spark, counter] = fightObjects(match);
     expect(counter).toMatchObject({
       who: 'kgt',
       x: 334 * 1.5,
@@ -2679,8 +2679,8 @@ describe('recovered supers', () => {
         stock: 1,
       });
       // Action 264 spawns SUPER STAR (371) and stops the opponent 10 + 65 ticks.
-      expect(match.effects.map((e) => e.clip)).toEqual([371]);
-      expect(match.effects[0].x - ryuko.x).toBeCloseTo(facing * 21 * 1.5);
+      expect(fightObjects(match).map((e) => e.clip)).toEqual([371]);
+      expect(fightObjects(match)[0].x - ryuko.x).toBeCloseTo(facing * 21 * 1.5);
       until(match, () => ryuko.age === 73);
       expect(target.hitStop).toBe(1);
       match.step();
@@ -2748,7 +2748,7 @@ describe('recovered supers', () => {
       stock: 0,
       power: 0,
     });
-    expect(match.effects.map((e) => e.clip)).toEqual([392]);
+    expect(fightObjects(match).map((e) => e.clip)).toEqual([392]);
     until(match, () => ryuko.age === 30);
     expect(ryuko.power).toBe(10);
     until(match, () => named(ryuko) !== 'noSuper');
@@ -3821,7 +3821,7 @@ describe('prototype training rules', () => {
     expect(hitEffects(match)).toHaveLength(2);
     match.step();
     expect(hitEffects(match)).toHaveLength(0);
-    expect(new Match().effects).toHaveLength(0);
+    expect(fightObjects(new Match())).toHaveLength(0);
   });
 
   it('spawns the axe response effects for hits and blocks', () => {
@@ -5424,10 +5424,10 @@ describe('prototype training rules', () => {
     expect(b.index).toBe(a.index + 1);
     // Once the first's slot is free, the next object takes it, ahead of the
     // second.
-    match.effects = [b];
+    match.effects = match.effects.filter((e) => e !== a);
     const c = spawn(match, 0, RYUKO.axe, at);
     expect(c.index).toBe(a.index);
-    expect(match.effects).toEqual([c, b]);
+    expect(fightObjects(match)).toEqual([c, b]);
   });
 
   it("keeps a deleted object's slot until its next turn in a step pass frees it (0x40e505, 0x4069a0)", () => {
@@ -5439,7 +5439,7 @@ describe('prototype training rules', () => {
     const b = spawn(match, 0, RYUKO.axe, at, 0);
     const c = spawn(match, 0, RYUKO.axe, at);
     expect([b.index, c.index]).toEqual([a.index + 1, a.index + 2]);
-    expect(match.effects).toEqual([b, c]);
+    expect(fightObjects(match)).toEqual([b, c]);
     // The step pass meets the first and frees its slot for the next spawn,
     // this step's (Ryuko's 340) or the one after it.
     match.step();
@@ -7187,7 +7187,7 @@ describe('EX mode', () => {
       power: 10,
       ex: true,
     });
-    expect(match.effects.map((e) => e.clip)).toEqual([375]);
+    expect(fightObjects(match).map((e) => e.clip)).toEqual([375]);
     expect(f.face).toBe(-1);
     match.step();
     // The HUD face (action 70) counts its cycle from the next tick.
@@ -7618,7 +7618,7 @@ describe('stage objects', () => {
       owner: -1,
       stage: { home: 2, x: 100, y: 100 },
     });
-    expect(match.effects).toEqual([]);
+    expect(fightObjects(match)).toEqual([]);
     // Its first step sets ax -7, vx 300 and vy 150 (PC 4), and the motion
     // pass moves it.
     match.step();

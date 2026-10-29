@@ -224,14 +224,20 @@ describe('AYA (42 AYA.PLAYER)', () => {
       mine: [273, 'idle'],
       damage: 35,
     });
-    // ECS P and K dash ten passes (PCs 3495, 3526) with a box 9000 below
-    // (PCs 3498, 3529), which never meets a body (0x40f23d–0x40f25d), into
-    // AS Att (259), which leaps and strikes ahead.
-    for (const key of [{ dst: true }, { ex: true }])
-      expect(byKey(key)).toMatchObject({
-        mine: [key.dst ? 257 : 258, 259, 'land', 'turn', 'idle'],
-        damage: 0,
-      });
+    // ECS P and K dash up to ten passes (PCs 3495, 3526) into AS Att (259)
+    // and AS Att K (260), which leap and strike for 30, with a box 9000
+    // below (PCs 3498, 3529), which misses fighters' bodies (0x40f23d–
+    // 0x40f25d) but meets the opponent's VS CHARGE, 9900 down (Ryuko's PC
+    // 410), once beside her: its hit handler stops the dash there (257 + 27,
+    // 258 + 27, PCs 3502, 3533).
+    expect(byKey({ dst: true })).toMatchObject({
+      mine: [257, '257+27', 259, 'land', 'idle'],
+      damage: 30,
+    });
+    expect(byKey({ ex: true })).toMatchObject({
+      mine: [258, '258+27', 260, 261, 'turn', 'idle'],
+      damage: 30,
+    });
     expect(byKey({ dst: true }, { gap: 900 }).damage).toBe(30);
     // In the air: Air Crush (246), Air Kick (254) and Rocket (289).
     const air = (key: Input) => play(presses({ 0: { jump: true }, 20: key }));

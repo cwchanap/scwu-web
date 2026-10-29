@@ -414,9 +414,6 @@ const GON_MISS = 137;
 // which the intro's OP super Charge follows its player with: an opponent in
 // front counters the get-up (objectHits). Each runs its first records as it
 // is entered (Match.action) and draws its clip, as every path does.
-// ponytail: free practice skips the intros, so no VS CHARGE follows the
-// opponent there and the get-up never counters; spawning each intro's OP
-// super Charge would give it one.
 const GET_UP_ROLLS = new Set(
   (Object.keys(CHARACTERS) as Who[]).filter(
     (who) =>
@@ -1807,6 +1804,23 @@ export class Match {
       : intro
         ? this.entrants()
         : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+    // Authored: with no 開始時, whose OP super Charge follows its player into
+    // VS CHARGE at once in VS single (Ryuko's 39 into 38, PCs 320–321, 417),
+    // each player starts with its VS CHARGE (TRAINING's VS CHANGE, which his
+    // spawns itself, PC 234), whose body 9900 down (PC 410) the sensors
+    // reach for (SHIN-Z's Down Get up, PC 2016).
+    if (!intro)
+      this.fighters.forEach((f, owner) =>
+        this.spawnObject(f, owner, {
+          flags: 0x24,
+          action: CHARACTERS[f.who].charge,
+          offset: 0,
+          x: 0,
+          y: 0,
+          slot: 0,
+          z: 0,
+        }),
+      );
     this.clearInput();
     // Round setup makes KGT 13 after the stage's objects (0x408ce9).
     if (intro) this.hold(0x65, openingLife(this));
