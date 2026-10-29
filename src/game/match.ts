@@ -2200,9 +2200,11 @@ export class Match {
     };
   }
 
-  // Authored start: the camera begins on the fighters, as round start's 320,
-  // 480 (0x407094) does for fighters centred on the stage. A story's set-up
-  // centres it on every seat (0x408c1f).
+  // The camera begins on its aim: round start sets the scroll to 0, 480
+  // (0x407094), and the VS set-up its x to 320 (0x408a68), the aim of its
+  // seats at 390 and 890 (0x408a2e, 0x408ac3); a story's set-up centres it on
+  // every seat (0x408c1f). Authored: without the intro the fighters stand at
+  // 300 and 660, and it starts on their aim too.
   private view() {
     if (this.camera) return this.camera;
     if (!this.battle) return clampCamera(this.aim());
