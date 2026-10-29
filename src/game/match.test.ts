@@ -1523,6 +1523,71 @@ describe('recovered damage (0x40f010, 0x40e7c0)', () => {
     expect(struck('punch', 'idle', {}, 147, 'kiki').victim.hp).toBe(147 - 5);
   });
 
+  it("shows a hit past the victim's first as its count and HIT over the struck box (0x40f837, 0x40ab10)", () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 200;
+    pose(match, victim, 'idle', 12);
+    victim.struck = 11;
+    strike(match, f, RYUKO.punch);
+    match.step();
+    // The 12th hit spawns the count after the hit effect, at idle's struck
+    // body box's centre: ⌊500 / 1.5⌋ + 1 mirrored, −92 (source pixels).
+    const [spark, counter] = match.effects;
+    expect(counter).toMatchObject({
+      who: 'kgt',
+      x: 334 * 1.5,
+      y: -92 * 1.5,
+      z: 0x5e,
+      index: spark.index + 1,
+      counter: { count: 12 },
+    });
+    // Its first step shows HIT, then 2 and 1 leftward 10 apart (KGT 1, 4, 3).
+    match.step();
+    const shown = () =>
+      match.effects.filter((e) => e.who === 'kgt' && !e.counter);
+    expect(shown().map(({ clip, x, y, z }) => [clip, x, y, z])).toEqual([
+      [1, 501, -138, 0x65],
+      [4, 501, -138, 0x65],
+      [3, 486, -138, 0x65],
+    ]);
+    // Each holds 10 ticks, then rises adding (raw ay −20) until it runs out
+    // at 35.
+    ticks(match, 11);
+    expect(
+      shown().map(({ age, y, color }) => [age, +y.toFixed(2), color.mode]),
+    ).toEqual(Array(3).fill([10, -138.18, 2]));
+    ticks(match, 24);
+    expect(shown().map(({ age }) => age)).toEqual([34, 34, 34]);
+    match.step();
+    expect(shown()).toEqual([]);
+  });
+
+  it('drops a hit count once a later hit passes it, or after 200 steps (0x40ac1c)', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 140;
+    enter(match, f, RYUKO.kick3);
+    const counters = () => match.effects.filter((e) => e.counter);
+    // Kick 3's first hit shows nothing; its second spawns a count of 2.
+    while (victim.struck < 2) match.step();
+    const [two] = counters();
+    expect(two.counter!.count).toBe(2);
+    // The third spawns 3's; 2's next step sees it passed and deletes it.
+    while (victim.struck < 3) match.step();
+    expect(counters()).toEqual([two, expect.anything()]);
+    const [, three] = counters();
+    match.step();
+    expect(counters()).toEqual([three]);
+    // Left alone, the last lives 200 steps.
+    while (f.action === 'script' || victim.reaction) match.step();
+    const last = counters()[0];
+    while (last.counter!.steps < 200) match.step();
+    expect(counters()).toEqual([last]);
+    match.step();
+    expect(counters()).toEqual([]);
+  });
+
   it('KOs through a guard when a chip empties life (0x40e7c0)', () => {
     const { f, victim } = struck('iori', 'idle', { guard: true }, 1);
     expect(victim).toMatchObject({ action: 'down', hp: 0 });
@@ -2909,7 +2974,9 @@ describe('recovered supers', () => {
     const drawable = () => {
       const stepped = match.effects.filter((e) => e.age >= 0);
       stepped.forEach((e) => seen.add(e.clip));
-      expect(stepped.filter((e) => !animationDuration(e.clip))).toEqual([]);
+      expect(stepped.filter((e) => !animationDuration(e.clip, e.who))).toEqual(
+        [],
+      );
       return false;
     };
     until(match, () => drawable() || target.action === 'fly');

@@ -4540,6 +4540,19 @@ def export_ui():
     # guard can't take (0x40f544) and a CPU's guard trades for the other
     # height's (0x40f4dc, 0x40f50d).
     hits = [i for i in range(200) if tail[0x438694 - base + 36 * i] & 1]
+    # A damaging hit past the victim's first spawns its hit count (object type 7, 0x40f837), whose
+    # first step spawns ヒット文字"HIT" (the word at 0x4451aa) and each digit's ヒット数字
+    # (0x4451ac + digit x 2), ones first, leftward by KGT action 1's first record's r[2]; its r[1]
+    # bit 0 would shift them right by that per digit (0x40ab3b-0x40abc5). They run as KGT objects
+    # (+0x15a 2, 0x406890), and their actions' flag bit 0x20 deletes them as they run out (0x41279b).
+    label, = at(0x4451aa, "<H")
+    digits = at(0x4451ac, "<10H")
+    header = p.records[p.action(1).start]
+    counted = flatten_queue(p, c, [(a, 0) for a in (label, *digits)], set(), set())
+    if (header[1] & 1 or any(not c.data[c.table39_offset + 39 * a + 35] & 0x20 for a in (label, *digits))
+            or any(e["op"] not in ("color", "motion") for s in counted.values() for e in s["events"])):
+        sys.exit("The hit count shifts its digits, loops or runs records the match does not; refusing to export.")
+    combo = dict(label=label, digits=digits, width=header[2], scripts=counted)
     x0, y0, dx, dy, cols, rows, x1, y1, mx1, my1, x2, y2, mx2, my2 = at(0x4452b0, "<14h")
     select_images = set()
     select = dict(cursors=cursors, origin=[x0, y0], step=[dx, dy], cols=cols, rows=rows, sides=[[x1, y1], [x2, y2]],
@@ -4583,6 +4596,7 @@ def export_ui():
     ids.update(range(47, 93, 5))
     ids.update(f["image"] for t in timelines for f in t["frames"] if c.images[f["image"]].width > 1)
     ids.update(i for i in select_images if c.images[i].width and c.images[i].height)
+    ids.update(f["image"] for s in counted.values() for f in s["frames"])
     (PUBLIC / "ui").mkdir(exist_ok=True)
     images = []
     for index in sorted(ids):
@@ -4592,7 +4606,7 @@ def export_ui():
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
-                                           select=select, title=title, hits=hits, **{"continue": resume}))
+                                           select=select, title=title, hits=hits, combo=combo, **{"continue": resume}))
     return demo_name
 
 

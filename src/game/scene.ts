@@ -811,7 +811,7 @@ export class TrainingScene extends Phaser.Scene {
   // A player's objects draw with its palette (0x40ccf2), but for images with
   // their own; each recoloured image is drawn once and cached.
   private recolored(image: number, who: Container, palette: number) {
-    const key = `${who}-${image}`;
+    const key = `${who === 'kgt' ? 'ui' : who}-${image}`;
     if (!palette || !(who in CHARACTERS)) return key;
     const recolored = `${key}@${palette}`;
     if (this.textures.exists(recolored)) return recolored;
@@ -1192,6 +1192,20 @@ export class TrainingScene extends Phaser.Scene {
         if (!effect || effect.age < 0) return;
         // Viewport objects (op 0x04 flag 0x40) ignore the camera.
         const pose = animationFrame(effect.clip, effect.age, effect.who);
+        // A KGT object draws its display's top left at its offset (0x40d39b),
+        // with no player's fader or palette.
+        if (effect.who === 'kgt') {
+          this.paint(sprite, pose, effect.color, effect.who)
+            .setDepth(objectDepth(effect, setup))
+            .setScrollFactor(1)
+            .setOrigin(0)
+            .setFlip(false, false)
+            .setPosition(
+              effect.x + pose.dx * ART_SCALE,
+              GROUND + effect.y + pose.dy * ART_SCALE,
+            );
+          return;
+        }
         this.place(
           sprite
             .setDepth(objectDepth(effect, setup))

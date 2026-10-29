@@ -181,8 +181,9 @@ export type GlobalTest = {
 };
 export type Stage = keyof typeof stages;
 export const STAGES = stages;
-// The container an object's scripts and images come from.
-export type Container = Who | Stage;
+// The container an object's scripts and images come from: a player's, the
+// stage's, or SCWU.KGT's (the hit count's objects, export_ui).
+export type Container = Who | Stage | 'kgt';
 
 // The life in the player's parameter block (+0x7caa): Ryuko's and Chung's
 // 510, Zoma's and Kiki's 490, Amiro's 470, ANMC P's 450, Giant's 550, G

@@ -662,6 +662,11 @@ function struck(
         taken: body.taken,
         x: mid(x, box.w * 1.5, bx, body.w * 1.5),
         y: mid(y, box.h * 1.5, by, body.h * 1.5),
+        // Its centre in whole source pixels (0x40f1c8–0x40f21b).
+        centre: {
+          x: (Math.floor(target.x / 1.5) + target.facing * body.x) * 1.5,
+          y: (Math.floor(target.y / 1.5) + body.y) * 1.5,
+        },
       };
   }
 }
@@ -1302,6 +1307,9 @@ export interface Effect {
   resume?: { clip: ObjectKey; t: number; skip: number };
   // A stage object: the action it restarts and its scroll percentages.
   stage?: { home: number; x: number; y: number };
+  // Object type 7 (0x40ab10), a victim's hit count: the count it shows
+  // (+0x156), whose count it watches (+0x15e) and its steps (+0x15a).
+  counter?: { count: number; victim: Fighter; steps: number };
 }
 // Op 0x25's slot (+0x151; 100 samples at 0x447f80 + 0x650 each): the
 // countdown and the samples to draw, oldest first.
@@ -3588,11 +3596,15 @@ export class Match {
       ][event.flags & 3],
       owner,
       slot: registers ? event.slot : -1,
-      index: firstFree(this.taken()),
       screen,
       follow: event.flags & 0x20 ? { parent, x: event.x, y: event.y } : null,
       ...(stage && { stage: stageScroll(who as Stage, event.action) }),
     });
+    this.take(child);
+  }
+
+  private take(child: Effect) {
+    child.index = firstFree(this.taken());
     // 0x406570 takes the first free slot and runs no script: the object
     // first steps in the next tick's pass (stepObjects), which lists only the
     // objects alive at its start. A follower keeps to its spawner's slot
@@ -3603,7 +3615,7 @@ export class Match {
     for (const e of [...this.layers, ...this.effects])
       if (e.follow && 'index' in e.follow.parent)
         if (e.follow.parent.index === child.index) e.follow.parent = child;
-    const list = stage ? this.layers : this.effects;
+    const list = child.stage ? this.layers : this.effects;
     const at = list.findIndex((e) => e.index > child.index);
     list.splice(at < 0 ? list.length : at, 0, child);
   }
@@ -3892,6 +3904,7 @@ export class Match {
         facing: source.facing,
         x: body.x,
         y: body.y,
+        centre: body.centre,
         blocked,
         source,
         bonus: STRIKER_POWER[victim] ?? 0,
@@ -4577,13 +4590,17 @@ export class Match {
     this.run(player, opponent);
     this.fighters.forEach((f, index) => this.enter(f, index));
     // The tick ends counting the faders down (0x404d97); each draw then
-    // writes a running one over the colour of its player's objects.
+    // writes a running one over the colour of its player's objects (kinds 0,
+    // 1 and 5, 0x40e42c), not the hit count's KGT ones.
     this.fighters.forEach((f, owner) => {
       const { fader } = f;
       // Type 3 blends at draw time (scene.ts).
       if (!fader?.left || !--fader.left || fader.type > 2) return;
       const blend = faderColor(fader);
-      for (const actor of [f, ...this.effects.filter((e) => e.owner === owner)])
+      for (const actor of [
+        f,
+        ...this.effects.filter((e) => e.owner === owner && e.who !== 'kgt'),
+      ])
         actor.color = { ...actor.color, ...blend };
     });
     // Objects run by priority each tick (0x404d4c). KGT action 58, the stage
@@ -4630,6 +4647,10 @@ export class Match {
         continue;
       }
       if (!e.stage && !this.effects.includes(e)) continue;
+      if (e.counter) {
+        this.stepCount(e);
+        continue;
+      }
       // 0x4124fb: past its handler and stop, one following an object whose
       // slot is deleted (state 1) is deleted too, its step still running:
       // ERUS's 335 + 43 goes with its 338. One meeting the slot freed (its
@@ -4646,12 +4667,15 @@ export class Match {
       // from its next turn; 0x4124c9 also culls one that leaves the world unless it
       // follows a parent. Op 0x05 deletes a stage object too (0x412617), as
       // Sakura Night's petals (2–5) end; one holding a display stays.
+      // A KGT object (+0x15a 2) skips the bounds too, and the hit count's run
+      // out into deletion (flag 0x20, 0x41279b; export_ui).
       const running =
         e.age < animationDuration(e.clip, e.who) ||
         (e.stage ? script(e.clip, e.who).end !== 'delete' : loops(e));
-      if (e.stage && !running) this.delete(e);
+      if ((e.stage || e.who === 'kgt') && !running) this.delete(e);
       else if (
         !e.stage &&
+        e.who !== 'kgt' &&
         (orphan ||
           !(
             running &&
@@ -4661,6 +4685,29 @@ export class Match {
       )
         this.delete(e);
     }
+  }
+
+  // 0x40ab10: the hit count's first step spawns HIT and the count's digits,
+  // ones first, `width` apart leftward, as KGT objects at 0x65 (0x406890) in
+  // the world (+0x28 bit 0x40000000). It lives 200 steps, or one past the
+  // victim's count passing its own, then frees its slot at its next (type 1,
+  // 0x4069a0).
+  private stepCount(e: Effect) {
+    const counter = e.counter!;
+    if (!counter.steps) {
+      const { label, digits, width } = ui.combo;
+      const show = (action: number, x: number) =>
+        this.take(
+          newEffect({ clip: action, who: 'kgt', age: -1, x, y: e.y, z: 0x65 }),
+        );
+      show(label, e.x);
+      for (let n = counter.count, x = e.x; n; n = Math.trunc(n / 10)) {
+        show(digits[n % 10], x);
+        x -= width * 1.5;
+      }
+    }
+    if (counter.count < counter.victim.struck) counter.steps = 1000;
+    if (++counter.steps > 200) this.delete(e);
   }
 
   private stepObject(e: Effect) {
@@ -4691,8 +4738,15 @@ export class Match {
     }
     // 0x41241c: an object falling to the floor (y 920) stops there, and
     // its landing handler (slot 1) enters its action, dropping its boxes.
-    // A stage object skips this and the world bounds (0x4123cb).
-    if (!e.stage && !e.screen && !e.follow && e.y >= 0 && e.vy > 0) {
+    // A stage or KGT object skips this and the world bounds (0x4123cb).
+    if (
+      !e.stage &&
+      e.who !== 'kgt' &&
+      !e.screen &&
+      !e.follow &&
+      e.y >= 0 &&
+      e.vy > 0
+    ) {
       Object.assign(e, { y: 0, vx: 0, vy: 0, ax: 0, gravity: 0 });
       const land = e.onLand;
       if (land !== undefined) {
@@ -5029,6 +5083,7 @@ export class Match {
       facing,
       x,
       y,
+      centre,
       blocked,
       source,
       bonus,
@@ -5081,6 +5136,20 @@ export class Match {
           slot: 0,
           z: 0x5d,
         });
+      // 0x40f81e: past the victim's first, a hit that takes life spawns its
+      // hit count (object type 7) at the struck body box's centre, at 0x5e.
+      // It has no display, so the draw and the hit test pass it (age −1).
+      if (!blocked && strength && target.struck > 1)
+        this.take(
+          newEffect({
+            clip: 0,
+            who: 'kgt',
+            age: -1,
+            ...centre,
+            z: 0x5e,
+            counter: { count: target.struck, victim: target, steps: 0 },
+          }),
+        );
     }
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from

@@ -1,6 +1,7 @@
 import { CHARACTERS, STAGES, twin } from './characters';
 import type { Container, Who } from './characters';
 import data from './generated/assets.json';
+import ui from './generated/ui.json';
 import type { Frame } from './standing';
 
 // Op 0x19 box in source pixels: centre and half size from the fighter's origin.
@@ -279,9 +280,11 @@ export interface Script {
   offset?: number;
 }
 const scripts = Object.fromEntries(
-  [...Object.entries(CHARACTERS), ...Object.entries(STAGES)].map(
-    ([who, { scripts }]) => [who, scripts],
-  ),
+  [
+    ...Object.entries(CHARACTERS),
+    ...Object.entries(STAGES),
+    ['kgt', ui.combo] as const,
+  ].map(([who, { scripts }]) => [who, scripts]),
 ) as unknown as Record<Container, Record<string, Script>>;
 // A source action, or "action+offset" for an op 0x20 branch entering mid-action.
 export type ObjectKey = number | `${number}+${number}`;
