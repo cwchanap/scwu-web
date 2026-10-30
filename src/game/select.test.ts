@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import {
   battlePalettes,
@@ -119,6 +121,34 @@ describe('character select (object type 10, VS single)', () => {
       [61, -1],
       [62, 4],
     ]);
+  });
+
+  it("paints DoraEmon's face over his GATE LOCK cell (authored)", () => {
+    // A pixel of the export's RGBA, filter-0 PNG.
+    const pixel = (file: string, x: number, y: number) => {
+      const png = readFileSync(
+        new URL(`../../public/assets/${file}`, import.meta.url),
+      );
+      expect(png[25]).toBe(6);
+      const width = png.readUInt32BE(16);
+      const idat: Buffer[] = [];
+      for (let at = 8; at < png.length;) {
+        const size = png.readUInt32BE(at);
+        if (png.toString('latin1', at + 4, at + 8) === 'IDAT')
+          idat.push(png.subarray(at + 8, at + 8 + size));
+        at += size + 12;
+      }
+      const rows = inflateSync(Buffer.concat(idat));
+      const row = y * (1 + 4 * width);
+      expect(rows[row]).toBe(0);
+      return [...rows.subarray(row + 1 + 4 * x, row + 5 + 4 * x)];
+    };
+    for (const file of ['select/13.png', 'select/30.png', 'demo11/13.png']) {
+      // His yellow eye and red nose, and cell 44's GATE LOCK untouched.
+      expect(pixel(file, 130, 366)).toEqual([240, 192, 0, 255]);
+      expect(pixel(file, 146, 370)).toEqual([224, 0, 0, 255]);
+      expect(pixel(file, 110, 380)).toEqual([254, 254, 254, 255]);
+    }
   });
 
   it('leaves locked cells empty and unchoosable', () => {

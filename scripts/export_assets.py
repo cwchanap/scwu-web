@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 import struct
 import sys
+import zlib
 
 ROOT = Path(__file__).resolve().parents[1]
 RESEARCH = ROOT / "scwu-web-handoff/research"
@@ -820,6 +821,49 @@ def export_images(c, folder, image_ids):
         if path.stem not in {str(index) for index in image_ids}:
             path.unlink()
     return images
+
+
+def rgba_png(width, height, rgba):
+    def chunk(kind, value):
+        return struct.pack(">I", len(value)) + kind + value + struct.pack(">I", zlib.crc32(kind + value))
+    rows = b"".join(b"\0" + rgba[y * width * 4:(y + 1) * width * 4] for y in range(height))
+    return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(rows)) + chunk(b"IEND", b""))
+
+
+def image_rgba(c, index):
+    """An image as RGBA, black transparent as indexed_png's tRNS draws it."""
+    pixels, palette, _ = c.pixels_and_palette(index)
+    out = bytearray()
+    for i in pixels:
+        r, g, b = palette[i * 4 + 2], palette[i * 4 + 1], palette[i * 4]
+        out += bytes((r, g, b, 255 if r or g or b else 0))
+    return out
+
+
+# Authored: the grids paint cell 45 GATE LOCK and his flag byte (0x4452cc +
+# 45) is 0, so the original has no face for DoraEmon there. These grids (CHAR
+# SELECT's and TEAM VS's) get his image 266 at 1.5×, his eyes at the cell's
+# centre, inside the cell's own shape and border.
+DORA_GRIDS = {"select": (13, 30), "demo11": (13,)}
+
+
+def paint_dora_cell(grid, width, face):
+    x0, y0, cell_width, cell_height = 128, 345, 25, 72
+    face_width, face_height = 98, 133
+    for y in range(cell_height):
+        for x in range(cell_width):
+            at = ((y0 + y) * width + x0 + x) * 4
+            r, g, b, a = grid[at:at + 4]
+            if not a or r + g + b < 120:
+                continue
+            sx, sy = x + 92, y + 29
+            colour = (30, 60, 140, 255)
+            if sx < 147 and sy < 199:
+                f = (int((sy + 0.5) / 1.5) * face_width + int((sx + 0.5) / 1.5)) * 4
+                if face[f + 3]:
+                    colour = face[f:f + 4]
+            grid[at:at + 4] = bytes(colour)
 
 
 def export_palettes(c, image_ids):
@@ -4769,8 +4813,16 @@ def export_demo(key, name, sha256, out):
         wav = (PUBLIC / sound["filename"]).read_bytes()
         rate, size = struct.unpack_from("<I", wav, 28)[0], struct.unpack_from("<I", wav, wav.index(b"data", 12) + 4)[0]
         sound["seconds"] = round(size / rate, 2)
-    write_json(out, dict(source_sha256=sha256, objects=objects, actions=actions,
-                                               images=export_images(c, key, image_ids - {8191}),
+    images = export_images(c, key, image_ids - {8191})
+    if key in DORA_GRIDS:
+        _, dora, _ = player(*FIGHTERS["dora"]["source"])
+        face = image_rgba(dora, 266)
+        for index in DORA_GRIDS[key]:
+            record = c.images[index]
+            grid = image_rgba(c, index)
+            paint_dora_cell(grid, record.width, face)
+            write_if_changed(PUBLIC / f"{key}/{index}.png", rgba_png(record.width, record.height, bytes(grid)))
+    write_json(out, dict(source_sha256=sha256, objects=objects, actions=actions, images=images,
                                                sounds=sounds, flags=flags, duration=duration))
 
 
