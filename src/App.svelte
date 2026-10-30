@@ -2175,7 +2175,9 @@
           <kbd>5</kbd> Hug, which carries the opponent through the Anywhere Door.
           His Twin Hammer, his Anywhere Door teleport and his FK之意思 super take
           their commands only. His Vs. intro jumps into a scene where SEAN beats him
-          down; the port plays his normal entrance.
+          down; the port plays his normal entrance. His story, which the original
+          lacks, runs SHIN-Z's route with GOLF and ASURA at his side, through ZENKA
+          and ALPHA to SHIN-Z.
         </p>
         <p>
           Choose RARIO for a muscle-bound, barefoot plumber in a red cap with

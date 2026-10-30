@@ -11,7 +11,11 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, Match } from './match';
 import type { Fighter, Input } from './match';
+import { CharacterSelect, StoryDemo } from './select';
+import type { Demo } from './select';
 import { StandingVM } from './standing';
+import { scenarioOf } from './story';
+import type { Battle } from './story';
 
 // DoraEmon as player 1, `gap` from Ryuko as player 2.
 function doraPlayer(gap = 90) {
@@ -495,5 +499,105 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       }
       expect([...entered]).toEqual(expect.arrayContaining([...wanted]));
     }
+  });
+});
+
+describe("DoraEmon's story (authored)", () => {
+  const demos = import.meta.glob<{ default: Demo }>(
+    './generated/demos/*.json',
+    {
+      eager: true,
+    },
+  );
+  // The globals his story leaves at `step`: chosen on the story select
+  // screen, then every demo before it (the battles between are skipped).
+  // Demo 25 waits for a press.
+  const reach = (step: number) => {
+    const select = new CharacterSelect([[5, 5]], true);
+    select.step();
+    select.step({ punch: true });
+    while (!select.done) select.step();
+    const { globals } = select;
+    for (const s of scenarioOf('dora').slice(0, step)) {
+      if (s.type !== 2) continue;
+      const demo = new StoryDemo(
+        s.demo,
+        demos[`./generated/demos/${s.demo}.json`].default,
+        0,
+      );
+      demo.globals = globals;
+      for (let t = 0; !demo.done; t++)
+        demo.step(t > 3000 && t % 2 ? { punch: true } : {});
+    }
+    return globals;
+  };
+  // Step `step`'s battle from FIGHT with him at 1 life and `stock` stocks,
+  // until `until`: the globals, his action at FIGHT, the result, his
+  // actions, stock and life.
+  const lose = (
+    step: number,
+    stock: number,
+    until = (m: Match) => !!m.winner,
+  ) => {
+    const globals = reach(step);
+    const battle = scenarioOf('dora')[step] as Battle;
+    const match = Match.story('dora', battle, 0, undefined, globals);
+    const [dora] = match.fighters;
+    while (match.roundTicks <= match.fightTick) match.step();
+    const atFight = dora.action;
+    [dora.stock, dora.hp] = [stock, 1];
+    const path: string[] = [];
+    for (let t = 0; t < 20000 && !until(match); t++) {
+      match.step();
+      const action = String(now(dora));
+      if (path.at(-1) !== action) path.push(action);
+    }
+    return {
+      g3: globals[3],
+      atFight,
+      winner: match.winner,
+      points: match.fighters.map((f) => f.points),
+      path,
+      stock: dora.stock,
+      hp: dora.hp,
+    };
+  };
+
+  it('loses step 1 to GIANT on a KO, which offers Continue', () => {
+    const result = lose(1, 0);
+    expect(result).toMatchObject({
+      g3: 10,
+      atFight: 'idle',
+      winner: 'opponent',
+    });
+    expect(result.points[1]).toBeGreaterThanOrEqual(100);
+    expect((scenarioOf('dora')[1] as Battle).flags & 1).toBe(1);
+  });
+
+  it('enters KO RELOAD in a duel with three stocks but still loses, unrecovered', () => {
+    const result = lose(1, 4);
+    expect(result.path).toContain('72');
+    expect(result).toMatchObject({ winner: 'opponent', stock: 4 });
+    expect(result.hp).toBeLessThanOrEqual(1);
+  });
+
+  it('revives through KO RELOAD in a brawl, spending three stocks for 600 life', () => {
+    const result = lose(5, 4, (m) => m.fighters[0].hp === 600);
+    expect(result).toMatchObject({ g3: 0, atFight: 'idle', stock: 1, hp: 600 });
+    const reload = result.path.indexOf('72');
+    expect(reload).toBeGreaterThanOrEqual(0);
+    expect(result.path.indexOf('74')).toBeGreaterThan(reload);
+  });
+
+  it("draws a brawl when KO'd with fewer than three stocks", () => {
+    expect(lose(5, 0).winner).toBe('draw');
+  });
+
+  it('loses the final SHIN-Z battle (step 24) on a KO', () => {
+    expect(lose(24, 0)).toMatchObject({
+      g3: 10,
+      atFight: 'idle',
+      winner: 'opponent',
+    });
   });
 });

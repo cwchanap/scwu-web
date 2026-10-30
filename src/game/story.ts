@@ -44,8 +44,48 @@ export type Next =
   | { kind: 'demo'; demo: number }
   | { kind: 'title' };
 
+// Authored: DoraEmon's file has no story and the original never offers him
+// in story mode (select flag 0). His runs SHIN-Z's route (steps 0–22) with
+// these players, slot by slot, every other field SHIN-Z's: one seeded
+// shuffle of the regulars, GOLF and ASURA as the brawls' allies and Z-MEGA
+// as step 15's. Step 1's flag bit 0 offers Continue on a loss, as ALPHA's and
+// ZENKA's step 1 do. SHIN-Z takes his own secret place (24), on stage 3 but
+// from ALPHA's SHIN-Z battle (21), whose KO scorer makes a KO a loss, after
+// demo 8 in DoraOP's place; his ending is SHIN-Z's (89, Zmega End).
+const DORA_PLAYERS: Record<number, number[]> = {
+  1: [6],
+  3: [14],
+  5: [13, 3, 9, 8, 20, 21, 36],
+  7: [26, 11, 15, 10, 5, 24, 37],
+  9: [19, 0, 23, 17, 4, 16, 36],
+  11: [7, 22, 18, 1, 12, 2, 37],
+  15: [28, 27, 29, 25, 39, 38, 31],
+};
+const doraStory = (): Step[] => {
+  const route = CHARACTERS.shinz.scenario as readonly Step[];
+  const steps = route.slice(0, 23).map((step, i) => {
+    const players = DORA_PLAYERS[i];
+    if (!players || step.type !== 1) return step;
+    let slot = 0;
+    return {
+      ...step,
+      flags: i === 1 ? 1 : step.flags,
+      slots: step.slots.map((s) => s && { ...s, player: players[slot++] }),
+    };
+  });
+  const shinz = (CHARACTERS.alpha.scenario as readonly Step[])[21] as Battle;
+  return [
+    ...steps,
+    { type: 2, demo: 8 },
+    { ...shinz, stage: 3 },
+    { type: 2, demo: 89 },
+    { type: 4 },
+  ];
+};
+const DORA_STORY = doraStory();
+
 export const scenarioOf = (who: Who) =>
-  CHARACTERS[who].scenario as readonly Step[];
+  who === 'dora' ? DORA_STORY : (CHARACTERS[who].scenario as readonly Step[]);
 
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).

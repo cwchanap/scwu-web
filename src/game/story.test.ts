@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Story, scenarioOf } from './story';
+import type { Battle } from './story';
 
 const at = (story: Story) => story.step;
 
@@ -63,5 +64,40 @@ describe('story runner', () => {
     expect(scenarioOf('rario').length).toBeGreaterThan(0);
     expect(scenarioOf('training')).toEqual([]);
     expect(new Story('training').next()).toEqual({ kind: 'title' });
+  });
+
+  it("runs DoraEmon's authored story on SHIN-Z's route", () => {
+    const dora = scenarioOf('dora');
+    const shinz = scenarioOf('shinz');
+    expect(dora).toHaveLength(27);
+    const players = (step: number) =>
+      (dora[step] as Battle).slots.flatMap((s) => (s ? [s.player] : []));
+    expect(
+      [1, 3, 5, 7, 9, 11, 15].map((step) => [step, players(step)]),
+    ).toEqual([
+      [1, [6]],
+      [3, [14]],
+      [5, [13, 3, 9, 8, 20, 21, 36]],
+      [7, [26, 11, 15, 10, 5, 24, 37]],
+      [9, [19, 0, 23, 17, 4, 16, 36]],
+      [11, [7, 22, 18, 1, 12, 2, 37]],
+      [15, [28, 27, 29, 25, 39, 38, 31]],
+    ]);
+    expect(dora[1]).toMatchObject({ stage: 8, flags: 1 });
+    for (const step of [
+      0, 2, 4, 6, 8, 10, 12, 13, 14, 16, 17, 18, 19, 20, 21, 22,
+    ])
+      expect(dora[step]).toEqual(shinz[step]);
+    expect(dora.slice(23)).toEqual([
+      { type: 2, demo: 8 },
+      { ...scenarioOf('alpha')[21], stage: 3 },
+      { type: 2, demo: 89 },
+      { type: 4 },
+    ]);
+    const story = new Story('dora');
+    expect(story.next()).toEqual({ kind: 'demo', demo: 3 });
+    const giant = story.next();
+    expect(giant.kind === 'battle' && giant.battle.slots[0]?.player).toBe(6);
+    expect(story.retry()).toEqual(giant);
   });
 });
