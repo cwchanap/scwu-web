@@ -53,6 +53,12 @@ type Options = Parameters<typeof play>[1];
 const byKey = (key: Input, options: Options = {}) =>
   play((t) => (t ? {} : key), options);
 const presses = (keys: Record<number, Input>) => (t: number) => keys[t] ?? {};
+// Each input held from its tick until the next one's.
+const holding = (keys: Record<number, Input>) => (t: number) => {
+  let input: Input = {};
+  for (const [at, key] of Object.entries(keys)) if (+at <= t) input = key;
+  return input;
+};
 
 describe('DoraEmon (46 B6.PLAYER)', () => {
   it('takes 600 life and five stocks of 90 power from his parameter block', () => {
@@ -226,7 +232,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(byKey({ dash: true, left: true }).mine).toEqual([15, 'idle']);
   });
 
-  it('strikes in the air, its dash form after an air dash, with no double jump', () => {
+  it('strikes in the air, its dash form after an air dash, its 2 form after a double jump', () => {
     expect(
       play(presses({ 0: { jump: true }, 30: { punch: true } })).mine,
     ).toEqual(['takeoff', 'jump', 209, 'land', 'idle']);
@@ -246,8 +252,9 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         },
       ).mine,
     ).toEqual(['takeoff', 'jump', 16, 210, 'land', 'idle']);
-    // Jump 2's two steps take a 1-tick window (0x410171–0x41087c run it
-    // once), so they never match, and ↑ again strikes J HK straight off.
+    // His file gives Jump 2's two steps a 1-tick window (0x410171–0x41087c
+    // run it once), which never matches; authored, it takes the others' 10,
+    // so ↑ again double jumps (11) and J HK takes its 2 form (220).
     expect(
       play(
         presses({
@@ -257,7 +264,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
           40: { dst: true },
         }),
       ).mine,
-    ).toEqual(['takeoff', 'jump', 218, 'land', 'idle']);
+    ).toEqual(['takeoff', 'jump', 11, 220, 'land', 'idle']);
   });
 
   it('plays his keyed specials', () => {
@@ -281,6 +288,42 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(
       play(presses({ 0: { jump: true }, 20: { axe: true } })).mine,
     ).toEqual(['takeoff', 'jump', 280, 270, 'turn', 'idle']);
+  });
+
+  it('takes his motions by hand, in the windows the other files give them (authored)', () => {
+    // Each direction held 60 ms, past his file's 10-tick windows.
+    const [d, df, f] = [
+      { crouch: true },
+      { crouch: true, right: true },
+      { right: true },
+    ];
+    const first = (keys: Record<number, Input>) =>
+      play(holding(keys)).mine.find((action) => typeof action === 'number');
+    // ↓↘→ HP: 機猫神空砲 HP.
+    expect(first({ 0: d, 6: df, 12: f, 18: { hitUp: true }, 19: {} })).toBe(
+      260,
+    );
+    // →↓↘ LP: 機猫神天翔 LP.
+    expect(first({ 0: f, 6: d, 12: df, 18: { punch: true }, 19: {} })).toBe(
+      277,
+    );
+    // ↓ ↓ HK: 機猫神瞬移 HK.
+    expect(first({ 0: d, 6: {}, 12: d, 18: { dst: true }, 19: {} })).toBe(286);
+    // ↓↘→↓↘→ HP: 魔神空大砲.
+    expect(
+      first({
+        0: d,
+        6: df,
+        12: f,
+        18: d,
+        24: df,
+        30: f,
+        36: { hitUp: true },
+        37: {},
+      }),
+    ).toBe(296);
+    // → → 60 ms apart: Dash F.
+    expect(first({ 0: f, 6: {}, 12: f, 13: {} })).toBe(14);
   });
 
   it('spends his stocks on his supers', () => {

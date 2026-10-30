@@ -80,6 +80,24 @@ export interface CommandEntry {
 // and ASURA's 0 nothing, TTRO's 180 his SCC's and CC's, ASTROMAN's 200
 // his C Chuck's, YINAN's 110 her Venom Doll's and CPU Driver's, and AYA's
 // 110 nothing.
+// Authored: DoraEmon's file gives his motions 10 ticks, his dashes 3 and
+// Jump 2 1, which never matches its two steps: too short to enter by hand.
+// Entries 1–29 take the windows the other files give the same steps; his
+// one-step and CPU entries keep his.
+const DORA_WINDOWS = [
+  85, // 激神超抱擁
+  ...Array<number>(10).fill(50), // FK之意思 to 魔神空大砲
+  10, // ---
+  40, // 機猫神天翔
+  40,
+  ...Array<number>(6).fill(35), // 機猫神双槌, 機猫神空砲 and 機猫神突進
+  ...Array<number>(4).fill(30), // 機猫神瞬移
+  10, // Jump 2
+  10,
+  10,
+  13, // Dash F
+  13,
+];
 const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
   {
     ryuko: data.commands,
@@ -124,7 +142,13 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     astroman: astroman.commands,
     yinan: yinan.commands,
     aya: aya.commands,
-    dora: dora.commands,
+    dora: {
+      ...dora.commands,
+      entries: dora.commands.entries.map((entry, i) => ({
+        ...entry,
+        window: DORA_WINDOWS[i] ?? entry.window,
+      })),
+    },
     rario: rario.commands,
     training: training.commands,
   };

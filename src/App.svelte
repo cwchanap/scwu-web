@@ -2156,14 +2156,14 @@
           on SEAN's file, whose name plate he still wears. His attacks each take
           two of the original six buttons, which his keys press together:
           <kbd>G</kbd> LP, <kbd>H</kbd> LK, <kbd>K</kbd> HP and <kbd>J</kbd> HK,
-          low with ↓ and in the air, where an air dash changes their form; he
-          has no double jump. → with <kbd>G</kbd> or <kbd>H</kbd> dashes in with
-          a punch or kick, ↘ <kbd>K</kbd> is Hit Up, a launcher that ↑ follows
-          with a jump, and <kbd>O</kbd> his chuck, a grab and beating. Shift
-          dashes forward, and Shift with ← hops back. Hold <kbd>E</kbd>
+          low with ↓ and in the air, where an air dash or a double jump changes
+          their form. → with <kbd>G</kbd> or <kbd>H</kbd> dashes in with a punch
+          or kick, ↘ <kbd>K</kbd> is Hit Up, a launcher that ↑ follows with a
+          jump, and <kbd>O</kbd> his chuck, a grab and beating. Shift dashes
+          forward, and Shift with ← hops back. Hold <kbd>E</kbd>
           for EN, which charges his gauge; his stocks hold 90 power each, up to five,
-          and once full he taunts, giving the opponent 20. His commands allow a tenth
-          of a second, so his keys carry his moves: <kbd>U</kbd>
+          and once full he taunts, giving the opponent 20. His motions take the time
+          the other fighters' do, and his keys enter them too: <kbd>U</kbd>
           Air Cannon, a blast from a cannon on his arm that starts too far ahead to
           hit an opponent close in, <kbd>I</kbd> Sky Rise, a rising flying
           punch, also in the air, and <kbd>F</kbd> Charge, a flying rush. His

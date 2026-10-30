@@ -972,29 +972,30 @@ And AYA's, a white-haired, bunny-eared girl with 500 life who dresses as other f
 | 3, or ↓←↓→ G           | EN3: a sword sweep into a holy blast, 211, 3 stocks                                                             |
 | After SHO's hit: 1–2   | The super's SC form, 2 stocks                                                                                   |
 
-And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's file, whose name plate he still wears. Each of his attacks takes two of the original six buttons, which his keys press together; his stocks hold 90 power each, up to five. His commands allow only a tenth of a second, so his keys carry his moves:
+And DoraEmon's, a muscle-bound blue robot cat with 600 life, built on SEAN's file, whose name plate he still wears. Each of his attacks takes two of the original six buttons, which his keys press together; his stocks hold 90 power each, up to five. His file allows his commands only a tenth of a second; here they take the time the other fighters' do:
 
-| Input                     | DoraEmon's move                                                                             |
-| ------------------------- | ------------------------------------------------------------------------------------------- |
-| G / H / K / J             | LP, 5 / LK, 8 / HP, 12 / HK, 12; on a hit, LP cancels into the others, a special or a super |
-| Down + G / H / K / J      | Low LP, 7 / LK, 10 / HP, 15 / HK, 12                                                        |
-| In the air: G / H / K / J | An air strike, in another form after an air dash; he has no double jump                     |
-| → + G / → + H             | SP1 / SP2: a dashing punch, 25 / kick, 30                                                   |
-| ↘ + K                     | Hit Up: a launcher, 15; ↑ after its hit jumps after them                                    |
-| O                         | Chuck: a grab and beating, 30                                                               |
-| Shift / Shift + ←         | A dash forward / a hop back; in the air, an air dash                                        |
-| E (hold)                  | EN: charges 4 power a tick; at five stocks, a taunt that gives the opponent 20              |
-| U, or ↓→ K                | Air Cannon: a blast from his arm cannon, 40, starting too far ahead to hit up close         |
-| I, or →↓↘ K               | Sky Rise: a rising flying punch, 60, also in the air                                        |
-| F, or ↓→ J                | Charge: a flying rush, 50                                                                   |
-| ↓← G or K                 | Twin Hammer: a dashing punch into an uppercut                                               |
-| ↓↓ G or K / H or J        | The Anywhere Door: a teleport forward / back                                                |
-| 1, or ↓→↓→ K              | Cannon (魔神空大砲): a shockwave across the screen, 130, 1 stock                            |
-| 2, or ↓←↓→ K              | Gadgets (秘神具騒嵐): green shells and gadgets that pummel the opponent, up to 457, 1 stock |
-| 3, or ↓←↓← K              | Fists (鬼神双乱槌): a punch flurry into a dash and uppercut, 258, 1 stock                   |
-| 4, or ↓→↓← J              | Pierce (覇神極突貫): a flying multi-hit rush, 215, 1 stock                                  |
-| 5, or G G → H K           | Hug (激神超抱擁): carries the opponent through the Anywhere Door, 270, 3 stocks             |
-| →←↓→ J                    | FK之意思: a leap into a flashing barrage, 3 stocks                                          |
+| Input                           | DoraEmon's move                                                                             |
+| ------------------------------- | ------------------------------------------------------------------------------------------- |
+| G / H / K / J                   | LP, 5 / LK, 8 / HP, 12 / HK, 12; on a hit, LP cancels into the others, a special or a super |
+| Down + G / H / K / J            | Low LP, 7 / LK, 10 / HP, 15 / HK, 12                                                        |
+| In the air: G / H / K / J       | An air strike, in another form after an air dash or a double jump                           |
+| → + G / → + H                   | SP1 / SP2: a dashing punch, 25 / kick, 30                                                   |
+| ↘ + K                           | Hit Up: a launcher, 15; ↑ after its hit jumps after them                                    |
+| O                               | Chuck: a grab and beating, 30                                                               |
+| Shift or → → / Shift + ← or ← ← | A dash forward / a hop back; in the air, an air dash                                        |
+| ↑ in the air                    | Double jump                                                                                 |
+| E (hold)                        | EN: charges 4 power a tick; at five stocks, a taunt that gives the opponent 20              |
+| U, or ↓→ K                      | Air Cannon: a blast from his arm cannon, 40, starting too far ahead to hit up close         |
+| I, or →↓↘ K                     | Sky Rise: a rising flying punch, 60, also in the air                                        |
+| F, or ↓→ J                      | Charge: a flying rush, 50                                                                   |
+| ↓← G or K                       | Twin Hammer: a dashing punch into an uppercut                                               |
+| ↓↓ G or K / H or J              | The Anywhere Door: a teleport forward / back                                                |
+| 1, or ↓→↓→ K                    | Cannon (魔神空大砲): a shockwave across the screen, 130, 1 stock                            |
+| 2, or ↓←↓→ K                    | Gadgets (秘神具騒嵐): green shells and gadgets that pummel the opponent, up to 457, 1 stock |
+| 3, or ↓←↓← K                    | Fists (鬼神双乱槌): a punch flurry into a dash and uppercut, 258, 1 stock                   |
+| 4, or ↓→↓← J                    | Pierce (覇神極突貫): a flying multi-hit rush, 215, 1 stock                                  |
+| 5, or G G → H K                 | Hug (激神超抱擁): carries the opponent through the Anywhere Door, 270, 3 stocks             |
+| →←↓→ J                          | FK之意思: a leap into a flashing barrage, 3 stocks                                          |
 
 Knocked out with three stocks, DoraEmon reloads: flung away at 1 life, he lies down, spends the three stocks to darken the court and stands back up at full life.
 
