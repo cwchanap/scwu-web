@@ -159,7 +159,10 @@ describe('character select (object type 10, VS single)', () => {
     ]);
     select.step();
     expect(select.hover[0]).toBe(45);
-    expect(shown(select, 'dora', 84)).toBeDefined();
+    // His face (84) holds a blank display at PC 1, his file's lock; the
+    // port runs past it, so his image 140 shows (authored).
+    for (let t = 0; t < 30; t++) select.step();
+    expect(shown(select, 'dora', 84)?.frame?.image).toBe(140);
     run(select, [{ punch: true }, {}]);
     run(select, tap({ kick: true }));
     while (!select.done) select.step();
@@ -177,9 +180,19 @@ describe('character select (object type 10, VS single)', () => {
     );
     select.step();
     expect(select.hover[0]).toBe(45);
-    expect(
-      select.objects.some((o) => o.container === 'dora' && o.owner === 3),
-    ).toBe(true);
+    // TEAM VS sets global 3 to 100, so his face jumps to 85, which past its
+    // own blank hold flickers image 140 every 5 ticks, as the others' team
+    // faces flicker theirs.
+    const images = new Set<number | undefined>();
+    for (let t = 0; t < 40; t++) {
+      select.step();
+      const face = select.objects.find(
+        (o) => o.container === 'dora' && o.owner === 3,
+      );
+      expect(face?.action).toBe(85);
+      if (t >= 20) images.add(face?.frame?.image);
+    }
+    expect([...images].sort()).toEqual([0, 140]);
   });
 
   it('leaves locked cells empty and unchoosable', () => {

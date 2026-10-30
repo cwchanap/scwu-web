@@ -272,6 +272,10 @@ abstract class Screen {
           break;
         case 0x0c: {
           const packed = u16(r, 3);
+          // Authored: DoraEmon's faces (84 in VS, 85 in TEAM VS) open on a
+          // blank display held for good (image 0, duration 0, PC 1), his
+          // file's lock; the port runs past it, so his image 140 shows.
+          if (o.container === 'dora' && !packed && !u16(r, 1)) break;
           o.frame = {
             pc: o.pc - 1,
             image: packed & 8191,
