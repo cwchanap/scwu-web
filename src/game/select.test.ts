@@ -49,9 +49,10 @@ describe('character select (object type 10, VS single)', () => {
       ],
     });
     // Bit 1 lets VS single rest on a player: not SHIN-Z (story only), nor
-    // DoraEmon and the blank templates.
+    // the blank templates. DoraEmon (45) has none, but the port lets him
+    // (authored).
     const locked = ROSTER.flatMap((who, i) => (selectable(i) ? [] : [i]));
-    expect(locked).toEqual([33, 42, 43, 44, 45, 48, 49]);
+    expect(locked).toEqual([33, 42, 43, 44, 48, 49]);
     expect(ROSTER[47]).toBe('training');
   });
 
@@ -149,6 +150,36 @@ describe('character select (object type 10, VS single)', () => {
       expect(pixel(file, 146, 370)).toEqual([224, 0, 0, 255]);
       expect(pixel(file, 110, 380)).toEqual([254, 254, 254, 255]);
     }
+  });
+
+  it('lets VS pick DoraEmon (45), authored', () => {
+    const select = new CharacterSelect([
+      [5, 5],
+      [0, 0],
+    ]);
+    select.step();
+    expect(select.hover[0]).toBe(45);
+    expect(shown(select, 'dora', 84)).toBeDefined();
+    run(select, [{ punch: true }, {}]);
+    run(select, tap({ kick: true }));
+    while (!select.done) select.step();
+    expect(select.done).toEqual(['dora', 'ryuko']);
+  });
+
+  it('lets TEAM VS seat DoraEmon', () => {
+    const select = new CharacterSelect(
+      [
+        [5, 5],
+        [0, 0],
+      ],
+      false,
+      teamDemo as Demo,
+    );
+    select.step();
+    expect(select.hover[0]).toBe(45);
+    expect(
+      select.objects.some((o) => o.container === 'dora' && o.owner === 3),
+    ).toBe(true);
   });
 
   it('leaves locked cells empty and unchoosable', () => {
@@ -395,9 +426,19 @@ describe('story select (object type 10, story mode)', () => {
       ['shinz', 'shinz'],
       0,
     ]);
-    // Bit 0 locks out DoraEmon (45) and the blank templates.
+    // Bit 0 locks out the blank templates; DoraEmon (45) is let in
+    // (authored).
     const locked = ROSTER.flatMap((_, i) => (selectable(i, 1) ? [] : [i]));
-    expect(locked).toEqual([42, 43, 44, 45, 47, 48, 49]);
+    expect(locked).toEqual([42, 43, 44, 47, 48, 49]);
+  });
+
+  it('lets story mode choose DoraEmon (authored)', () => {
+    const select = new CharacterSelect([[5, 5]], true);
+    select.step();
+    expect(select.hover).toEqual([45, -1]);
+    run(select, tap({ punch: true }));
+    while (!select.done) select.step();
+    expect(select.done).toEqual(['dora', 'dora']);
   });
 });
 

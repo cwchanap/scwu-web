@@ -2213,10 +2213,11 @@
           arrow with <kbd>A</kbd> <kbd>D</kbd> <kbd>W</kbd> <kbd>S</kbd>
           (held, it repeats after half a second) and choose with any attack key; then
           the same keys move the 2P arrow to the opponent. A cell marked GATE LOCK
-          can't be chosen, as in the original's VS mode: SHIN-Z, DoraEmon and the
-          empty slots. Once both are chosen the panels close and the match starts;
-          a won Vs. CPU match returns here, and Character select above the arena opens
-          it again.
+          can't be chosen, as in the original's VS mode: SHIN-Z and the empty slots.
+          DoraEmon's cell, locked in the original, shows his face here and can be
+          chosen. Once both are chosen the panels close and the match starts; a won
+          Vs. CPU match returns here, and Character select above the arena opens it
+          again.
         </p>
         <p>
           Below the arena, you can also choose your fighter and the opponent,

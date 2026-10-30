@@ -167,7 +167,7 @@ describe("Ryuko's VS 開始時 (30)", () => {
     expect([p1.action, p2.action]).toEqual(['idle', 'idle']);
   });
 
-  it("plays each fighter's own, or DoraEmon's Br. intro, whom it never offers", () => {
+  it("plays each fighter's own, or DoraEmon's Br. intro, whom the original never offers", () => {
     const mixed = new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true);
     expect(mixed.fighters.map((f) => f.branch)).toEqual([30, 28]);
     const other = new Match('cpu', true, 0, ['zoma', 'dora'], 'court', true);

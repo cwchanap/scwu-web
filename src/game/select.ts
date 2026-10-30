@@ -90,12 +90,14 @@ export const ROSTER: readonly (Who | null)[] = [
 ];
 // A cell VS single lets a cursor rest on: a named player whose flag has bit 1
 // (0x4079a0); SHIN-Z's has only bit 0 (story), DoraEmon's and the blanks'
-// none. Story mode asks for bit 0 (0x407c5c).
+// none. Story mode asks for bit 0 (0x407c5c). Authored: nothing writes
+// those flags (0x4452cc), so the original never offers DoraEmon; the port
+// lets his cell (45) through for both.
 export const selectable = (index: number, bit = 2) =>
   index >= 0 &&
   index < 50 &&
   LAYOUT.named[index] &&
-  (LAYOUT.flags[index] & bit) !== 0 &&
+  (index === 45 || (LAYOUT.flags[index] & bit) !== 0) &&
   ROSTER[index] !== null;
 
 export interface SelectObject {
