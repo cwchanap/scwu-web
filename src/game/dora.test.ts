@@ -531,13 +531,15 @@ describe("DoraEmon's story (authored)", () => {
     }
     return globals;
   };
-  // Step `step`'s battle from FIGHT with him at 1 life and `stock` stocks,
-  // until `until`: the globals, his action at FIGHT, the result, his
+  // Step `step`'s battle from FIGHT, or once a fighter's box has met his
+  // (`caught`, the striker 0x40e863 scores), with him at 1 life and `stock`
+  // stocks, until `until`: the globals, his action at FIGHT, the result, his
   // actions, stock and life.
   const lose = (
     step: number,
     stock: number,
     until = (m: Match) => !!m.winner,
+    caught = false,
   ) => {
     const globals = reach(step);
     const battle = scenarioOf('dora')[step] as Battle;
@@ -545,6 +547,7 @@ describe("DoraEmon's story (authored)", () => {
     const [dora] = match.fighters;
     while (match.roundTicks <= match.fightTick) match.step();
     const atFight = dora.action;
+    for (let t = 0; caught && !dora.caught && t < 20000; t++) match.step();
     [dora.stock, dora.hp] = [stock, 1];
     const path: string[] = [];
     for (let t = 0; t < 20000 && !until(match); t++) {
@@ -581,7 +584,9 @@ describe("DoraEmon's story (authored)", () => {
     expect(result.hp).toBeLessThanOrEqual(1);
   });
 
-  it('revives through KO RELOAD in a brawl, spending three stocks for 600 life', () => {
+  // Steps 5, 11, 13, 15, 19 and 21 give his KO to the last fighter whose box
+  // met his (KO scorer 0); KO'd from FIGHT, before any has, nobody scores it.
+  it('revives through KO RELOAD in a brawl when nobody has caught him, spending three stocks for 600 life', () => {
     const result = lose(5, 4, (m) => m.fighters[0].hp === 600);
     expect(result).toMatchObject({ g3: 0, atFight: 'idle', stock: 1, hp: 600 });
     const reload = result.path.indexOf('72');
@@ -589,8 +594,16 @@ describe("DoraEmon's story (authored)", () => {
     expect(result.path.indexOf('74')).toBeGreaterThan(reload);
   });
 
-  it("draws a brawl when KO'd with fewer than three stocks", () => {
+  it("draws a brawl when KO'd with fewer than three stocks before anyone has caught him", () => {
     expect(lose(5, 0).winner).toBe('draw');
+  });
+
+  it('loses a brawl once a fighter has caught him, who scores his KO', () => {
+    const result = lose(5, 4, undefined, true);
+    expect(result).toMatchObject({ winner: 'opponent', stock: 4 });
+    expect(result.path).toContain('72');
+    expect(result.path).not.toContain('74');
+    expect(Math.max(...result.points.slice(1))).toBeGreaterThanOrEqual(100);
   });
 
   it('loses the final SHIN-Z battle (step 24) on a KO', () => {

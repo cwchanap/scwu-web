@@ -137,20 +137,21 @@ route:
 The KO outcomes differ by battle. Each is the engine's own result; add no
 rule for any of them.
 
-- **Duels (steps 1 and 3) and boss fights (19, 21, 24):**
-  - `knockOut` (`0x40e863`) gives the battle's `koPoints` (100) to its
-    `koScorer` on the KO's tick, and 100 points ends a story battle.
-  - So a KO loses at once.
-  - With three or more stocks he enters KO RELOAD (72), but the loss comes
-    first, so he never revives. The user accepted that: ALPHA's KO Boss also
-    revives only as the CPU.
-- **Brawls (steps 5–17):** nobody scores a 1P's KO.
+- **Every battle:** `knockOut` (`0x40e863`) gives the battle's `koPoints`
+  (100) on the KO's tick, and 100 points ends a story battle. Its `koScorer`
+  picks who gets them: seat 1 (2) in steps 1, 3, 7, 9, 17 and 24, or the last
+  fighter whose box met his (0, `caught`) in 5, 11, 13, 15, 19 and 21.
+  - So a KO loses at once. With three or more stocks he enters KO RELOAD
+    (72), but the loss comes first. The user accepted that: ALPHA's KO Boss
+    also revives only as the CPU.
+- **A scorer-0 battle before any fighter has met him:** nobody scores the KO.
   - With three or more stocks, KO RELOAD (72) → KR Down (74) spends three
     stocks, he regains 600 life, and he fights on.
-  - With fewer stocks, the brawl ends as a draw, which still opens Continue.
+  - With fewer stocks, the battle ends as a draw, which still opens Continue.
     SHIN-Z as the 1P draws there too.
-  - _Correction found during execution:_ this revive contradicts the earlier
-    "he can't revive"; it's the engine's behaviour.
+  - _Corrections found during execution and final review:_ this revive
+    contradicts the earlier "he can't revive"; it's the engine's behaviour,
+    and in play it needs a KO before anyone has touched him.
 
 Tests reach each battle with the globals the real story leaves. They pick
 him on the story select screen, then play every earlier demo through
