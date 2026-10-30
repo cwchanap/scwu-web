@@ -141,7 +141,7 @@ const BUTTONS: Partial<Record<Control, number>> = {
 };
 // Authored: DoraEmon's attacks each take two of the source's six buttons
 // (A–F, bits 4–9, 0x414340), which no two keys press on one tick, so his
-// keys press both: J LP (C, D), K LK (A, B), H HP (D, E), G HK (B, C), O
+// keys press both: G LP (C, D), H LK (A, B), K HP (D, E), J HK (B, C), O
 // his chuck (C, D, E) and E, held, EN (E, F).
 const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
   dora: {

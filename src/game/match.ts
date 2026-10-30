@@ -4074,29 +4074,43 @@ export class Match {
 
   // 0x40f3a2: a CPU victim ignores its input. Free (+0x15e & 0xc is 0) it
   // guards on rand % 100 < level (0x40f3c2); another guards holding back in
-  // its side's terms (bit 1, 0x40f3bd, as no block sets +0x7cb6 bit 8), which
-  // the guard key stands for, wherever the striker is or faces. In a guard
-  // reaction (0xc) any player keeps guarding, whichever way it faces
-  // (0x40f449). Ryuko's +0x7cb6 bit 2 lets it guard in the air (0x40f475).
-  // A box of kind 0x40 can't be guarded (0x40f469): Musashi's finish (257)
-  // and COUNTER HIT (174).
+  // its side's terms (bit 1, 0x40f42c, as no block sets +0x7cb6 bit 8),
+  // wherever the striker is or faces, and none guards in neutral (bit 0,
+  // 0x40f434). In a guard reaction (0xc) any player keeps guarding,
+  // whichever way it faces (0x40f449). Every +0x7cb6 has bit 2, which lets
+  // it guard in the air (0x40f475). A box of kind 0x40 can't be guarded
+  // (0x40f469): Musashi's finish (257) and COUNTER HIT (174). Authored: the
+  // practice partners' guard control holds a guard pose that guards too.
   private guarding(target: Fighter, box: ScriptBox) {
     const bits = target.reaction & 0xc;
     const guard =
       bits === 0xc ||
       (this.driven(target)
         ? bits === 0 && this.cpus[this.fighters.indexOf(target)]!.guards()
-        : guards.has(target.action));
+        : (bits === 0 && this.holdsBack(target)) || guards.has(target.action));
     return guard && !(box.kind & 0x40);
   }
 
+  // The victim's input word is this tick's, or the one a stop saved until
+  // its next free step (0x40f2ff).
+  private victimInput(target: Fighter) {
+    return target.stopInput ?? this.inputs[this.fighters.indexOf(target)];
+  }
+
+  // Back (bit 1) in the victim's word, mirrored by its side (0x414368).
+  private holdsBack(target: Fighter) {
+    const other = this.nearest(target);
+    const right = other ? target.x < other.x : target.toward === 1;
+    return (inputWord(this.victimInput(target), right) & 1) !== 0;
+  }
+
   // 0x40f4be: down in the victim's input word picks the crouching responses,
-  // as do the port's crouching actions. The word is this tick's, or the one
-  // a stop saved until the victim's next free step (0x40f2ff).
+  // as do the port's crouching actions.
   private crouching(target: Fighter) {
-    const input =
-      target.stopInput ?? this.inputs[this.fighters.indexOf(target)];
-    return target.action.startsWith('crouch') || Boolean(input.crouch);
+    return (
+      target.action.startsWith('crouch') ||
+      Boolean(this.victimInput(target).crouch)
+    );
   }
 
   // Command entry (0x411a01, and 0x41195a in a cancel window): the scan picks

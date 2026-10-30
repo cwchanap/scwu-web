@@ -3999,7 +3999,7 @@ describe('prototype training rules', () => {
         expect(f.y - height).toBeCloseTo(39.578247, 5);
         expect(playing(f)).toBe(action);
         match.step();
-        // Then the fall (7) it jumps to, still acting: the guard key, which
+        // Then the fall (7) it jumps to, still acting: the guard control, which
         // only a free fighter reads, waits for the landing (0x40f3c2).
         const driftStart = f.x;
         match.step({ guard: true });
@@ -6815,6 +6815,39 @@ describe('recovered CPU', () => {
     ticks(match, 47, {}, { guard: true });
     expect([yo.x > victim.x, yo.facing]).toEqual([true, 1]);
     expect(victim.action).toBe('blockHeavy');
+  });
+
+  it('guards a free player holding back, standing, crouching or in the air (0x40f42c)', () => {
+    // Ryuko's punch meets the victim to her right, whose back is right.
+    const struck = (input: Input, first?: Input) => {
+      const match = new Match();
+      const [ryuko, victim] = match.fighters;
+      victim.x = ryuko.x + 120;
+      if (first) match.step({}, first);
+      strike(match, ryuko, RYUKO.punch);
+      ticks(match, 2, {}, input);
+      return [victim.action, victim.hp];
+    };
+    expect(struck({ right: true })).toEqual(['block', LIFE]);
+    expect(struck({ right: true, crouch: true })).toEqual([
+      'crouchBlock',
+      LIFE,
+    ]);
+    expect(struck({ left: true })[0]).toBe('hit');
+    expect(struck({})[0]).toBe('hit');
+    // Kicking, it is acting (+0x15e bit 4, 0x411a41) and can't (0x40f3c9).
+    expect(struck({ right: true }, { kick: true })[0]).toBe('hit');
+    // Every fighter's +0x7cb6 is 2, so it guards in the air too (0x40f475).
+    const match = new Match();
+    const [ryuko, victim] = match.fighters;
+    victim.x = ryuko.x + 400;
+    match.step({}, { jump: true });
+    while (!(victim.action === 'jump' && victim.age === 6)) match.step({}, {});
+    const { x, y, vy, gravity } = victim;
+    Object.assign(ryuko, { x: x - 120, y, vy, gravity });
+    strike(match, ryuko, RYUKO.airPunch);
+    ticks(match, 2, {}, { right: true });
+    expect(victim.action).toMatch(/^airBlock/);
   });
 
   it('rolls in the air only while free (0x40f3c2)', () => {

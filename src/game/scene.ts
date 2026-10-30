@@ -136,6 +136,8 @@ const still = (): ShakeAxis => ({
 // Authored: each match seeds its CPU afresh.
 const randomSeed = () => Math.floor(Math.random() * 2 ** 32);
 const BASE = `${import.meta.env.BASE_URL}assets/`;
+// Authored keys. The source guards holding back (0x40f42c), so no key
+// does; the practice partners' guard control holds a guard pose.
 const keyMap: Record<string, Control> = {
   ArrowLeft: 'left',
   KeyA: 'left',
@@ -145,17 +147,16 @@ const keyMap: Record<string, Control> = {
   KeyW: 'jump',
   ArrowDown: 'crouch',
   KeyS: 'crouch',
-  KeyJ: 'punch',
-  KeyK: 'kick',
-  KeyH: 'hitUp',
+  KeyG: 'punch',
+  KeyH: 'kick',
+  KeyK: 'hitUp',
   KeyF: 'iori',
-  KeyL: 'guard',
   ShiftLeft: 'dash',
   ShiftRight: 'dash',
   KeyU: 'drill',
   KeyI: 'axe',
   KeyO: 'throw',
-  KeyG: 'dst',
+  KeyJ: 'dst',
   KeyE: 'ex',
   Digit1: 'getterBeam',
   Digit2: 'musashi',
