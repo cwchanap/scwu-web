@@ -10,15 +10,17 @@ page's controls into a settings page.
 
 ## Goals
 
-- `index.html`: the game canvas occupies the full window (width and height);
-  Phaser's existing `Scale.FIT` letterboxes the 4:3 canvas inside it.
+- `index.html`: on desktop the game canvas occupies the full window (width and
+  height); Phaser's existing `Scale.FIT` letterboxes the 4:3 canvas inside it.
+  On touch layouts `.touch-controls` sits below `.cabinet` in normal flow, so
+  the stage gets the remaining height rather than the full viewport.
 - Game page keeps only floating chrome: a gear button opening the settings
   page, pause/reset (existing `P`/`R` shortcuts still work), the touch pad on
   coarse pointers, and the compact per-fighter keyboard hint line.
 - Settings page: a full-screen overlay over the paused match, holding
-  everything the old toolbar and footer had — mode switch, music, character
-  select, fighter/opponent/stage pickers, practice options, reset — plus a
-  "Controls guide" link opening `instructions.html` in a new tab.
+  the relocated mode, music, character-select, picker, and practice controls,
+  plus a "Controls guide" link opening `instructions.html` in a new tab.
+  Pause and Reset remain in the floating controls.
 - `instructions.html`: a second Vite entry. Shared how-to-play rules first,
   then one section per fighter with a hash anchor (`#ryuko`, `#zoma`, …) and a
   fighter index at the top for navigation.
@@ -68,7 +70,9 @@ page's controls into a settings page.
   handler stops propagation so the game's window-level `P`/`R`/`Escape`
   shortcuts never fire from inside it. Opening Settings pauses the match,
   the pause is held across match resets (which unpause), and closing restores
-  the pause state from before it opened.
+  the pause state from before it opened. Character select is the exception:
+  it clears the saved state and opens an unpaused select screen, so closing
+  does not re-pause it.
 - Floating pause/reset buttons stay beside the gear (touch users have no `P`/`R`).
 - Both fighter pickers on the game page render from the shared roster list in
   `src/instructions/fighters.ts` (names only; the game page never imports the
