@@ -442,11 +442,15 @@
     gap: 18px;
     flex-wrap: wrap;
   }
+  /* The heading is a flex item; without min-width: 0 its automatic
+     minimum keeps the banner's full scaled width and defeats the img clamp. */
+  .name-row h1 {
+    min-width: 0;
+    max-width: 100%;
+  }
   .name-row img {
     height: 78px;
     width: auto;
-    /* Some VS banners are far wider than Ryuko's (ogi 9.8:1); clamp instead
-       of overflowing the hero column on narrow windows. */
     max-width: 100%;
     object-fit: contain;
     filter: drop-shadow(0 4px 0 #02020a88);
