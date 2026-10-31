@@ -8,3 +8,5 @@ src/game/generated/
 src/game/__fixtures__/
 __pycache__/
 *.pyc
+.worktrees/
+.superpowers/
