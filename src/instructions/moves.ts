@@ -177,7 +177,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — up to three stocks. Without enough stock, Ryuko shouts NO SUPER and gains a little power instead. Any connected punch or kick can be cancelled into a special or super.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — up to three stocks for most fighters. Without enough stock, Ryuko shouts NO SUPER and gains a little power instead. Any connected punch or kick can be cancelled into a special or super.',
         cost: true,
         rows: [
           {
@@ -239,7 +239,7 @@ export const GUIDES_DATA = {
   zoma: {
     art: '/assets/zoma/174.png',
     nameplate: '/assets/zoma/340.png',
-    role: 'All-rounder',
+    role: 'Vanishing dragon strikes and falling bombs',
     tag: 'Chains three from any standing punch or kick; runs while forward is held, and below 30% health his fourth super becomes Shin Spark.',
     ex: false,
     sections: [
@@ -316,7 +316,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -344,7 +344,7 @@ export const GUIDES_DATA = {
             name: 'BOMB / Shin Spark',
             input:
               '<kbd>4</kbd> or <span class="motion">↓←↓→</span><kbd>H</kbd>',
-            desc: 'BOMB above 30% health (no stock); below 30% health, <b>Shin Spark</b> for three stocks.',
+            desc: 'Below 30% health, <b>Shin Spark</b> for three stocks; BOMB otherwise (no stock).',
             cost: 3,
           },
           {
@@ -360,7 +360,7 @@ export const GUIDES_DATA = {
   kiki: {
     art: '/assets/kiki/312.png',
     nameplate: '/assets/kiki/217.png',
-    role: 'Rush fighter',
+    role: "A branching K' and eleven fireballs",
     tag: "Chains as Zoma's; her K' branches into a dashing strike, a shot or BLACK OUT, and MAGIC FIRE throws eleven fireballs.",
     ex: false,
     sections: [
@@ -430,7 +430,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -467,7 +467,7 @@ export const GUIDES_DATA = {
   chung: {
     art: '/assets/chung/116.png',
     nameplate: '/assets/chung/375.png',
-    role: 'Wall fighter',
+    role: 'Wall kicks and thrown stars',
     tag: "Chains as Zoma's; his jump wall move clings to the wall, and gesar and lee turn Evil below 30% health.",
     ex: true,
     sections: [
@@ -557,7 +557,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -600,7 +600,7 @@ export const GUIDES_DATA = {
   amiro: {
     art: '/assets/amiro/384.png',
     nameplate: '/assets/amiro/336.png',
-    role: 'Grappler',
+    role: 'Meteor drops and beam drones',
     tag: "Chains as Chung's; her Coment chuck throws straight up, and NT, funnal and medeo take Evil forms below 30% health.",
     ex: true,
     sections: [
@@ -673,7 +673,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -723,8 +723,8 @@ export const GUIDES_DATA = {
   anmc: {
     art: '/assets/anmc/291.png',
     nameplate: '/assets/anmc/183.png',
-    role: 'Mecha suit',
-    tag: "Chains as Chung's; both of his shots also work in the air, and EX mode swaps the mecha suit for a winged bird costume.",
+    role: 'Rocket leaps and beam-firing balls',
+    tag: "Chains as Chung's; both of his shots also work in the air, and in EX mode he guards in a winged bird costume instead of his mecha suit.",
     ex: true,
     sections: [
       {
@@ -793,7 +793,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -836,7 +836,7 @@ export const GUIDES_DATA = {
   giant: {
     art: '/assets/giant/165.png',
     nameplate: '/assets/giant/349.png',
-    role: 'Heavy hitter',
+    role: 'Rocket punches and baseball pitches',
     tag: "Chains as Chung's; his counter eats double damage before striking back, and his chuck ends with a song that explodes.",
     ex: true,
     sections: [
@@ -915,7 +915,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1036,7 +1036,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1171,7 +1171,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1216,7 +1216,7 @@ export const GUIDES_DATA = {
     art: '/assets/sin/241.png',
     nameplate: '',
     role: 'Shapeshifter',
-    tag: 'Another guise for most moves; his grabs hit harder below 30% health, where he stands in a red blaze.',
+    tag: 'Another guise for most moves; RUN CHUCK and Clack chuck hit harder below 30% health, where he stands in a red blaze.',
     ex: true,
     sections: [
       {
@@ -1301,7 +1301,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1423,7 +1423,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1559,7 +1559,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1685,7 +1685,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1834,7 +1834,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -1963,7 +1963,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
@@ -2096,7 +2096,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three.',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
         cost: true,
         rows: [
           {
