@@ -22,6 +22,28 @@ bun run format   # apply Prettier
 
 `bun run test` and `bun run check` expect assets to have been exported once (`bun run assets`). `bun run assets` skips the export while neither its script nor the handoff has changed. Run `bun run test` for Vitest; `bun test` selects Bun's own runner. `bun install` installs Husky's pre-commit hook, which runs `bun run validate`.
 
+## Deploy to Cloudflare
+
+The site is a static Worker (`wrangler.jsonc` serves `dist/`). The 28,000 art and audio files are over a Worker's 20,000-file limit, so they sit in a public R2 bucket and the page loads them from `VITE_ASSET_BASE` (`src/game/assetBase.ts`; unset, they come from this site's own `/assets/`). `vite.config.ts` cuts the data bundle into chunks under 15 MiB, since a Worker serves no file over 25 MiB.
+
+Cloudflare's build cannot run `bun run assets`: `scwu-web-handoff/` is not in git. `scripts/upload_r2.sh` therefore also puts `src/game/generated/` in the bucket as `generated.tar.gz`, and `scripts/cloudflare_build.sh` downloads it before `vite build`.
+
+One-time setup:
+
+1. Create an R2 bucket and give it a public URL (a custom domain; the `r2.dev` one is rate-limited).
+2. Allow cross-origin reads, which WebGL needs for the art: `wrangler r2 bucket cors set <bucket> --file scripts/r2_cors.json`.
+3. Create an R2 API token with Object Read & Write, then upload (needs the AWS CLI):
+
+   ```sh
+   bun run assets
+   export R2_ACCOUNT_ID=... R2_BUCKET=... AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
+   bun run upload:r2
+   ```
+
+4. In the Cloudflare dashboard, create a Worker named `scwu-web` from this repo (Workers Builds fails if the names differ). Build command `bun run build:cloudflare`, deploy command `npx wrangler deploy`, and a build variable `VITE_ASSET_BASE` set to the bucket's public URL.
+
+Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. It uploads only what changed.
+
 ## Play
 
 | Input                        | Action                                              |
@@ -1060,6 +1082,6 @@ The port keeps behavior recovered from the source apart from rules authored for 
 - `scripts/export_assets.py`: selected asset conversion and independent oracle fixtures.
 - `docs/gameplay.md` / `evidence.md`: how the rules play, and the source evidence behind them.
 
-The original handoff stays unchanged outside `public/`. Vite explicitly denies serving it, including through `/@fs/`. Only selected PNGs enter `public/assets/`; generated assets and fixtures are ignored by Git and regenerated locally. `dist/` contains those selected original assets and is for private development. This MVP does not publish them or establish redistribution rights.
+The original handoff stays unchanged outside `public/`. Vite explicitly denies serving it, including through `/@fs/`. Only selected PNGs enter `public/assets/`; generated assets and fixtures are ignored by Git and regenerated locally. A local `dist/` contains those selected original assets. The deployed game serves them from a public R2 bucket (see Deploy to Cloudflare), which is the owner's choice and does not establish redistribution rights.
 
 Phaser uses its [scene lifecycle](https://docs.phaser.io/phaser/concepts/scenes); Git hooks follow [Husky's current setup](https://typicode.github.io/husky/get-started.html).

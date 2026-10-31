@@ -1,0 +1,7 @@
+{
+  // Static site only: the built app in dist/. The art and audio (28,000
+  // files) are too many for Worker assets and live in R2; see README.
+  "name": "scwu-web",
+  "compatibility_date": "2026-10-31",
+  "assets": { "directory": "./dist" },
+}

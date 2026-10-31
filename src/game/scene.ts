@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ASSET_BASE as BASE } from './assetBase';
 import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
@@ -135,7 +136,6 @@ const still = (): ShakeAxis => ({
 });
 // Authored: each match seeds its CPU afresh.
 const randomSeed = () => Math.floor(Math.random() * 2 ** 32);
-const BASE = `${import.meta.env.BASE_URL}assets/`;
 // Authored keys. The source guards holding back (0x40f42c), so no key
 // does; the practice partners' guard control holds a guard pose.
 const keyMap: Record<string, Control> = {
@@ -1341,6 +1341,9 @@ export function createGame(
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
     banner: false,
+    // The art may come from another origin (the R2 bucket); WebGL refuses
+    // those textures unless the request is CORS.
+    loader: { crossOrigin: 'anonymous' },
   });
   return { game, scene };
 }

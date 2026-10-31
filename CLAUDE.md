@@ -20,6 +20,8 @@ bun run lint                # ESLint
 bun run format              # Prettier write (format:check to verify)
 bun run validate            # assets + format:check + lint + check + test (the pre-commit hook runs this)
 bun run build               # assets + check + vite build
+bun run build:cloudflare    # Cloudflare's build: fetch generated/ from R2, then vite build
+bun run upload:r2           # sync public/assets and generated/ to the R2 bucket (needs R2_* and AWS_* env)
 ```
 
 ## Source data pipeline
@@ -31,7 +33,7 @@ bun run build               # assets + check + vite build
   - `src/game/generated/assets.json` (Ryuko): name → source-action clips, whose frames carry op `0x19` body boxes and op `0x23` colour; flattened source timelines (`scripts`, keyed `"action"` or `"action+offset"`) with decoded events; the held-pose, response, response-effect and CPU tables; and the idle bytecode. Every other fighter gets `<key>.json` from its `FIGHTERS` entry (`export_fighter`), holding the same plus the twins pairing its victim actions with Ryuko's. Also `stages.json`, `ui.json`, `select.json`, the title/select demos (`t1.json`, `t2.json`, `demos/`)
   - `src/game/__fixtures__/`, the Python oracle traces used only by tests
 - All three outputs are gitignored and regenerated. To add a pose or animation, add a `name: sourceActionIndex` entry to Ryuko's `actions` dict in `main()` (or the fighter's `FIGHTERS` entry), then reference it through `animations.ts`. To play a source action's own events, add it to that export's flatten queue (spawned objects, including every object a clip spawns, slot-2/3 handlers, op `0x0b` calls and the targets of op `0x16`/`0x1f`/`0x20` branches follow automatically; flattened displays carry their op `0x04`/`0x0e`/`0x1f`/`0x25` events like clip displays) and decode any new opcode in `decode_event`; `flatten` inlines op `0x09` calls and follows op `0x0a` jumps.
-- Do not publish or commit original assets. `dist/` is for private development only.
+- Do not commit original assets. The one place they are published is the public R2 bucket the Cloudflare deploy reads (the owner's choice; README, "Deploy to Cloudflare"). Cloudflare's git build has no handoff, so `scripts/upload_r2.sh` also uploads `generated/` as a tarball for `scripts/cloudflare_build.sh` to fetch. Art and audio URLs come from `ASSET_BASE` (`src/game/assetBase.ts`, set by `VITE_ASSET_BASE`), never a hardcoded `/assets/`.
 
 ## Architecture (`src/game/`)
 
