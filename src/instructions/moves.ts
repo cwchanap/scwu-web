@@ -170,7 +170,7 @@ export const GUIDES_DATA = {
             name: 'Daisetsuzan',
             input:
               '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
-            desc: 'Command throw: transforms, spins the opponent overhead, hurls them skyward, two missiles catch the fall. Long recovery on a miss; started far, its shorter grab stays open through it. Below 30% health becomes <b>EVIL DST</b> (five strikes first).',
+            desc: 'Command throw: transforms, spins the opponent overhead, hurls them skyward, two missiles catch the fall. Long recovery on a miss; started far, its shorter grab stays open through it. At 30% health or less becomes <b>EVIL DST</b> (five strikes first).',
             cost: 0,
           },
         ],
@@ -184,7 +184,7 @@ export const GUIDES_DATA = {
             name: 'Getter Beam',
             input:
               '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
-            desc: 'Also in the air. Below 30% health takes its stronger form.',
+            desc: 'Also in the air. At 30% health or less takes its stronger form.',
             cost: 1,
           },
           {
@@ -231,11 +231,9 @@ export const GUIDES_DATA = {
       },
     ],
   },
-  // The 44 below ship their hero art and nameplate now; role/tag/sections
-  // arrive with each fighter's content task (empty = the page renders just
-  // the hero until then). Art/plate indices were picked from contact sheets
-  // of every exported frame; '' plate = the fighter has no VS banner, so the
-  // page draws its display name as text.
+  // Art/plate indices were picked from contact sheets of every exported
+  // frame; '' plate = the fighter has no VS banner, so the page draws its
+  // display name as text.
   zoma: {
     art: '/assets/zoma/174.png',
     nameplate: '/assets/zoma/340.png',
@@ -1737,7 +1735,7 @@ export const GUIDES_DATA = {
     art: '/assets/sakuya/414.png',
     nameplate: '/assets/sakuya/445.png',
     role: 'Swordswoman',
-    tag: 'A brown-haired girl in purple who dresses up as a different swordswoman, armored figure or mecha; seven specials, two of them on <kbd>4</kbd> and <kbd>5</kbd>.',
+    tag: 'A brown-haired girl in purple who dresses up as a different swordswoman, armored figure or mecha; seven specials, two of them on 4 and 5.',
     ex: true,
     sections: [
       {
@@ -4301,8 +4299,8 @@ export const GUIDES_DATA = {
   shinz: {
     art: '/assets/shinz/3001.png',
     nameplate: '/assets/shinz/323.png',
-    role: 'White-haired, moustached brawler in a black vest and purple trousers',
-    tag: 'Z-MEGA as Shin Z for good; a hit from his basics is followed by H, a special or a super, and on a hit a super cancels SAMA, Fire BALL, REFLACT or GAISA. He double jumps and air dashes, and has no Hit Up or Counter Attack.',
+    role: 'Moustached brawler in a black vest',
+    tag: 'Z-MEGA as Shin Z for good; a hit from his basics is followed by H, a special or a super, and on a hit a super cancels SAMA, Fire BALL, REFLACT or GAISA. He double jumps and air dashes.',
     ex: false,
     sections: [
       {
@@ -4551,8 +4549,8 @@ export const GUIDES_DATA = {
   golf: {
     art: '/assets/golf/129.png',
     nameplate: '/assets/golf/155.png',
-    role: 'Squat blue armoured trooper with only 300 life',
-    tag: 'A trooper with only 300 life who slashes with a glowing sword and lashes a whip; on a hit G cancels into H, a special or the super, H into a special or the super, and a special into the super; he has no double jump, air dash, Hit Up or chuck.',
+    role: 'Squat blue trooper with 300 life',
+    tag: 'A trooper with 300 life who slashes with a glowing sword and lashes a whip; on a hit G cancels into H, a special or the super; no double jump, air dash, Hit Up or chuck.',
     ex: false,
     sections: [
       {
@@ -4624,8 +4622,8 @@ export const GUIDES_DATA = {
   asura: {
     art: '/assets/asura/129.png',
     nameplate: '/assets/asura/137.png',
-    role: 'Hooded brawler in a purple and grey robe with only 300 life',
-    tag: 'A hooded brawler with only 300 life whose punches and kicks come three at a time; his Tatumaki rises and drifts forward, on the ground or in the air. No double jump, air dash, Hit Up or chuck.',
+    role: 'Hooded brawler with only 300 life',
+    tag: 'A hooded brawler with only 300 life whose punches and kicks come three at a time; his Tatumaki rises and drifts forward. No double jump, air dash, Hit Up or chuck.',
     ex: false,
     sections: [
       {
@@ -4906,7 +4904,7 @@ export const GUIDES_DATA = {
     art: '/assets/yinan/132.png',
     nameplate: '/assets/yinan/205.png',
     role: 'White-haired wolf girl with 450 life',
-    tag: 'A wolf girl with 450 life who borrows armour, mecha and costumes for her moves and switches between a Normal and an EX type for half a stock; under 150 life her Eat leaps to catch a jumping opponent and heal her.',
+    tag: 'A wolf girl who borrows armour, mecha and costumes and switches between a Normal and an EX type for half a stock; under 150 life her Eat leaps to catch a jumping opponent and heal her.',
     ex: true,
     sections: [
       {
@@ -5372,7 +5370,7 @@ export const GUIDES_DATA = {
     art: '/assets/training/150.png',
     nameplate: '',
     role: "RARIO's practice copy with 500 life",
-    tag: "RARIO's practice copy, with his look and 500 life, whose buttons run the training; standing still refills his life and the opponent's power, and empties his. He has no supers, no air attacks and no double jump.",
+    tag: "RARIO's practice copy with 500 life, whose buttons run the training; standing still refills his life and the opponent's power, and empties his. He has no supers and no air attacks.",
     ex: false,
     sections: [
       {
@@ -5433,4 +5431,4 @@ export const GUIDES_DATA = {
       },
     ],
   },
-} as Record<Who, FighterGuide>;
+} satisfies Record<Who, FighterGuide>;

@@ -29,6 +29,7 @@
   $effect(() => {
     const onHash = () => {
       picked = location.hash.slice(1);
+      scrollTo(0, 0);
     };
     addEventListener('hashchange', onHash);
     return () => removeEventListener('hashchange', onHash);
@@ -44,10 +45,16 @@
 
   // Folded on narrow screens, open beside the content on wide ones.
   let open = $state(matchMedia('(min-width: 900px)').matches);
+  $effect(() => {
+    const mq = matchMedia('(min-width: 900px)');
+    const widen = () => {
+      if (mq.matches) open = true;
+    };
+    mq.addEventListener('change', widen);
+    return () => mq.removeEventListener('change', widen);
+  });
 
   // Stocks on the power gauge, three pips to a gauge.
-  const pipLabel = (cost: number) =>
-    cost === 0.5 ? 'Half a stock' : `${cost} of 3 stocks`;
   const pipText = (cost: number) =>
     cost === 0.5 ? '½ stock' : `${cost} stock${cost > 1 ? 's' : ''}`;
   const halfStock = (cost: number) => cost !== Math.floor(cost);
@@ -87,7 +94,7 @@
 
   <main>
     <header class="hero">
-      <img class="hero-art" src={guide.art} width="195" height="447" alt="" />
+      <img class="hero-art" src={guide.art} alt="" />
       <div class="hero-body">
         <div class="name-row">
           <h1>
@@ -110,6 +117,11 @@
         </div>
       </div>
     </header>
+
+    <p class="motion-note">
+      Motions are read toward the opponent; hold the last direction a moment
+      before the button.
+    </p>
 
     {#each guide.sections as section (section.title)}
       <section>
@@ -144,7 +156,7 @@
                         <div
                           class="pips"
                           role="img"
-                          aria-label={pipLabel(row.cost)}
+                          aria-label={pipText(row.cost)}
                         >
                           {#each [0, 1, 2] as i (i)}
                             <i
@@ -420,6 +432,10 @@
   .hero-art {
     position: relative;
     display: block;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 447px;
     animation: step-in 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both;
   }
   @keyframes step-in {
@@ -470,6 +486,11 @@
   .role {
     font: italic 900 28px/1.1 var(--display);
     color: var(--ink);
+  }
+  .motion-note {
+    margin-top: 10px;
+    font-size: 13px;
+    color: var(--muted);
   }
   .tag {
     margin-top: 8px;
