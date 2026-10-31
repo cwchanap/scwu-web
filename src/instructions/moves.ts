@@ -2283,7 +2283,7 @@ export const GUIDES_DATA = {
     art: '/assets/erus/360.png',
     nameplate: '/assets/erus/366.png',
     role: 'Blond figure in a black coat',
-    tag: 'Dresses up as a different character for most moves; her Coin lands seven times before every other press fails, and EX mode takes a full stock.',
+    tag: 'Dresses up as a different character for most moves; her Coin, seven uses in all before every other press fails, and EX mode takes a full stock.',
     ex: true,
     sections: [
       {
