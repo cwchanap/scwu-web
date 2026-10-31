@@ -80,14 +80,16 @@
       onpointerleave={show}
       onfocusout={show}
     >
-      {#each faces as face (face.id)}
-        <a
-          href={'#' + face.id}
-          aria-label={face.name}
-          aria-current={face.id === current ? 'page' : null}
-          style="--x: {face.x}; --y: {face.y}"
-        ></a>
-      {/each}
+      <div class="faces-scale">
+        {#each faces as face (face.id)}
+          <a
+            href={'#' + face.id}
+            aria-label={face.name}
+            aria-current={face.id === current ? 'page' : null}
+            style="--x: {face.x}; --y: {face.y}"
+          ></a>
+        {/each}
+      </div>
     </nav>
     <p class="pick" aria-hidden="true">{pick}</p>
   </details>
@@ -328,20 +330,31 @@
   }
   .faces {
     position: relative;
-    isolation: isolate;
     width: calc(206px * var(--s));
     height: calc(417px * var(--s));
     margin: 0 auto;
   }
+  /* The grid renders at 1:1 integer sheet coordinates; the scale transform
+     magnifies it as a whole, so no tile ever samples the sheet at a
+     fractional texel. */
+  .faces-scale {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 206px;
+    height: 417px;
+    transform: scale(var(--s));
+    transform-origin: top left;
+    isolation: isolate;
+  }
   .faces a {
     position: absolute;
-    left: calc(var(--x) * var(--s) * 1px);
-    top: calc(var(--y) * var(--s) * 1px);
-    width: calc(24px * var(--s));
-    height: calc(60px * var(--s));
-    background: url(/assets/select/13.png) calc(var(--x) * var(--s) * -1px)
-      calc(var(--y) * var(--s) * -1px) / calc(206px * var(--s))
-      calc(417px * var(--s)) no-repeat;
+    left: calc(var(--x) * 1px);
+    top: calc(var(--y) * 1px);
+    width: 24px;
+    height: 60px;
+    background: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
     image-rendering: pixelated;
     filter: brightness(0.74) saturate(0.85);
     transition:
@@ -364,12 +377,10 @@
     z-index: -1;
     background: linear-gradient(var(--gold), var(--ember));
     transform: scale(1.42);
-    -webkit-mask: url(/assets/select/13.png) calc(var(--x) * var(--s) * -1px)
-      calc(var(--y) * var(--s) * -1px) / calc(206px * var(--s))
-      calc(417px * var(--s)) no-repeat;
-    mask: url(/assets/select/13.png) calc(var(--x) * var(--s) * -1px)
-      calc(var(--y) * var(--s) * -1px) / calc(206px * var(--s))
-      calc(417px * var(--s)) no-repeat;
+    -webkit-mask: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
+    mask: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
     animation: cursor 1s steps(2) infinite;
   }
   @keyframes cursor {

@@ -55,13 +55,12 @@ export const GRID: readonly (string | null)[] = [
   'TRAINING',
 ];
 
-// Tile origins in the 206 x 417 sheet (1x source pixels). The drawn grid
-// pitches columns at 26px with 1px hand jitter (0, 25, 52, 77, ...) and rows
-// at 68.8px (5 * 68.8 = 344, last ink to 417), odd columns 7px lower — the
-// engine's cursor grid (select.ts LAYOUT: origin (233, 50), step (26, 70))
-// steps the cursor, which drifts off this tighter drawn grid by the last row.
-export const XS: readonly number[] = [0, 25, 52, 77, 104, 129, 157, 182];
-export const YS: readonly number[] = [0, 68, 137, 206, 275, 344];
+// Tile origins in the 206 x 417 sheet (1x source pixels), derived from the
+// engine's own grid (select.ts LAYOUT: origin (233, 50), step (26, 70))
+// plus the sheet's baked odd-column stagger: 7 x 26 + 24 = 206 wide and
+// 5 x 70 + 60 + 7 = 417 tall, matching the sheet exactly.
+export const XS: readonly number[] = [0, 26, 52, 78, 104, 130, 156, 182];
+export const YS: readonly number[] = [0, 70, 140, 210, 280, 350];
 
 // name/input/desc are authored static HTML, exactly the mockup's cell contents.
 export interface FighterGuide {
