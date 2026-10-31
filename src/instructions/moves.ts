@@ -4143,7 +4143,7 @@ export const GUIDES_DATA = {
             name: 'GAISA',
             input:
               '<kbd>1</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
-            desc: 'A charge through three levels, whose <kbd>G</kbd> fires at the level reached before he collapses.',
+            desc: 'A charge through three levels, whose wave <kbd>G</kbd> fires at the level reached before he collapses.',
             cost: 1,
           },
           {
@@ -4452,7 +4452,7 @@ export const GUIDES_DATA = {
           {
             name: 'DASH P',
             input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
-            desc: 'A dashing axe swing; cancels into a super.',
+            desc: 'A dashing axe swing; on a hit, cancels into a super.',
             cost: 0,
           },
         ],
@@ -4552,7 +4552,7 @@ export const GUIDES_DATA = {
     art: '/assets/golf/129.png',
     nameplate: '/assets/golf/155.png',
     role: 'Squat blue armoured trooper with only 300 life',
-    tag: 'A trooper with only 300 life who slashes with a glowing sword and lashes a whip; on a hit each attack cancels into a later one, up into a special or the super, and he has no double jump, air dash, Hit Up or chuck.',
+    tag: 'A trooper with only 300 life who slashes with a glowing sword and lashes a whip; on a hit G cancels into H, a special or the super, H into a special or the super, and a special into the super; he has no double jump, air dash, Hit Up or chuck.',
     ex: false,
     sections: [
       {
@@ -4594,13 +4594,13 @@ export const GUIDES_DATA = {
           {
             name: 'Sp P',
             input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
-            desc: 'Four dashing slashes; cancels into the super.',
+            desc: 'Four dashing slashes; on a hit, cancels into the super.',
             cost: 0,
           },
           {
             name: 'Sp K',
             input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
-            desc: 'A low lash and a high one.',
+            desc: 'A low lash and a high one; on a hit, cancels into the super.',
             cost: 0,
           },
         ],
@@ -4636,7 +4636,7 @@ export const GUIDES_DATA = {
           {
             name: 'Triple jab / triple kick',
             input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
-            desc: 'Jabs three times with <kbd>G</kbd>, kicks three times with <kbd>H</kbd>; on a hit, <kbd>G</kbd> cancels into <kbd>H</kbd>, the special or the super.',
+            desc: 'Jabs three times with <kbd>G</kbd>, kicks three times with <kbd>H</kbd>; on a hit, <kbd>G</kbd> cancels into <kbd>H</kbd>, the special or the super, and <kbd>H</kbd> into the special or the super.',
             cost: 0,
           },
           {
@@ -4668,7 +4668,7 @@ export const GUIDES_DATA = {
           {
             name: 'Tatumaki',
             input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
-            desc: 'A spinning kick that rises and drifts forward, also in the air; cancels into the super.',
+            desc: 'A spinning kick that rises and drifts forward, also in the air; on a hit, cancels into the super.',
             cost: 0,
           },
         ],
@@ -4741,7 +4741,7 @@ export const GUIDES_DATA = {
           {
             name: 'DASH P',
             input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
-            desc: 'A dashing swipe; cancels into DASH K.',
+            desc: 'A dashing swipe; on a hit, cancels into DASH K.',
             cost: 0,
           },
           {
@@ -5028,7 +5028,7 @@ export const GUIDES_DATA = {
             name: 'R300',
             input:
               '<kbd>5</kbd> or <span class="motion">→←↓→</span><kbd>H</kbd>',
-            desc: 'For three stocks: a shell that calls in her friends.',
+            desc: 'Under 150 life only, for three stocks: a shell that calls in her friends.',
             cost: 3,
           },
           {
@@ -5051,7 +5051,7 @@ export const GUIDES_DATA = {
     art: '/assets/aya/4137.png',
     nameplate: '',
     role: 'White-haired, bunny-eared girl with 500 life',
-    tag: "A bunny-eared girl with 500 life who dresses as other fighters for her moves; her SHO raises purple pillars and cancels into Slash's and Rocket's SC forms for two stocks.",
+    tag: "A bunny-eared girl with 500 life who dresses as other fighters for her moves; her SHO raises purple pillars and, on a hit, cancels into Slash's and Rocket's SC forms for two stocks.",
     ex: false,
     sections: [
       {
@@ -5125,7 +5125,7 @@ export const GUIDES_DATA = {
             name: 'SHO',
             input:
               '<kbd>F</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
-            desc: "A sword stroke that raises purple pillars; cancels into Slash's and Rocket's SC forms for two stocks.",
+            desc: "A sword stroke that raises purple pillars; on a hit, cancels into Slash's and Rocket's SC forms for two stocks.",
             cost: 0,
           },
           {
