@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import { ROSTER } from './fighters';
-import { GRID, GUIDES_DATA, XS, YS } from './moves';
+import { GRID, GUIDES_DATA, FACES, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
@@ -57,6 +57,16 @@ describe('instructions page', () => {
         );
       }
     }
+  });
+
+  it('gives every fighter their own select-screen portrait', () => {
+    const paths = ROSTER.map((entry) => FACES[entry.id]);
+    for (const path of paths) {
+      expect(typeof path, 'face path').toBe('string');
+      // The portraits are exported with the fighters, under public/assets.
+      expect(statSync(here + '../../public' + path).isFile(), path).toBe(true);
+    }
+    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it('imports nothing from the game or Phaser at runtime', () => {
