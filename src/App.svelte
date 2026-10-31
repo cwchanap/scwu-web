@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { ASSET_BASE } from './game/assetBase';
   import { buttonsOf, KEYS, usesButton } from './game/commands';
   import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
@@ -67,7 +68,7 @@
     mode: 'practice',
   });
   let help = $state(false);
-  const asset = `${import.meta.env.BASE_URL}assets/`;
+  const asset = ASSET_BASE;
   const touchControls: { control: Control; label: string; symbol: string }[] = [
     { control: 'left', label: 'Move left', symbol: '←' },
     { control: 'right', label: 'Move right', symbol: '→' },
