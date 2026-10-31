@@ -5291,7 +5291,7 @@ export const GUIDES_DATA = {
       },
       {
         title: 'Supers & system',
-        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        note: 'Power gauge: his stocks hold 90 power each, up to five — once full he taunts, giving the opponent 20.',
         cost: true,
         rows: [
           {
