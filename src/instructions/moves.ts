@@ -237,7 +237,7 @@ export const GUIDES_DATA = {
   zoma: {
     art: '/assets/zoma/174.png',
     nameplate: '/assets/zoma/340.png',
-    role: 'Vanishing dragon strikes and falling bombs',
+    role: 'Vanishing dragon strikes',
     tag: 'Chains three from any standing punch or kick; runs while forward is held, and below 30% health his fourth super becomes Shin Spark.',
     ex: false,
     sections: [
@@ -3603,7 +3603,7 @@ export const GUIDES_DATA = {
     art: '/assets/ziro/420.png',
     nameplate: '/assets/ziro/478.png',
     role: 'Teal-haired young man',
-    tag: 'Calls up a different robot suit, winged, caped, horned or heavily armed, for most moves; his Fire Ball throws two at 30% life or less, and below 30% life TWIN SHOT sweeps twin beams round the whole screen.',
+    tag: 'Calls up a different robot suit for most moves; his Fire Ball throws two at 30% life or less, and below 30% life TWIN SHOT sweeps twin beams round the whole screen.',
     ex: true,
     sections: [
       {
@@ -4064,7 +4064,7 @@ export const GUIDES_DATA = {
   zmega: {
     art: '/assets/zmega/3001.png',
     nameplate: '/assets/zmega/322.png',
-    role: 'White-haired, moustached brawler in a black vest',
+    role: 'Moustached brawler in a black vest',
     tag: 'Turns into Shin Z at a keypress, trading life for power; he double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
     sections: [
@@ -4171,7 +4171,7 @@ export const GUIDES_DATA = {
   alpha: {
     art: '/assets/alpha/3001.png',
     nameplate: '/assets/alpha/576.png',
-    role: 'Red-haired boy in a chained white suit',
+    role: 'Boy in a chained white suit',
     tag: "Fights through four armours — a white tiger's, a green knight's, a red one with a snake and a winged blue one; a hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.",
     ex: false,
     sections: [
@@ -4407,7 +4407,7 @@ export const GUIDES_DATA = {
   zaku: {
     art: '/assets/zaku/118.png',
     nameplate: '/assets/zaku/139.png',
-    role: 'Squat green armoured trooper with only 200 life',
+    role: 'Squat green trooper with 200 life',
     tag: 'A trooper with only 200 life who swings a purple axe and lobs grenades; he has no double jump, air dash, Hit Up or chuck.',
     ex: false,
     sections: [
@@ -4481,7 +4481,7 @@ export const GUIDES_DATA = {
   pachelo: {
     art: '/assets/pachelo/134.png',
     nameplate: '/assets/pachelo/149.png',
-    role: 'Round yellow Pac-Man robot with only 200 life',
+    role: 'Yellow Pac-Man robot with 200 life',
     tag: 'A Pac-Man robot with only 200 life who rolls along instead of running; his Roll charge bounces him off on a hit or guard, and on a hit G or H cancels into a special or the super.',
     ex: false,
     sections: [
@@ -4796,7 +4796,7 @@ export const GUIDES_DATA = {
   astroman: {
     art: '/assets/astroman/186.png',
     nameplate: '',
-    role: 'Hulking, muscle-bound boy robot with 780 life',
+    role: 'Hulking boy robot with 780 life',
     tag: 'A muscle-bound boy robot with 780 life whose steps shake the screen; his Shift is a rocket dash that hovers on, and he has no Hit Up or Counter Attack.',
     ex: false,
     sections: [
@@ -4903,7 +4903,7 @@ export const GUIDES_DATA = {
   yinan: {
     art: '/assets/yinan/132.png',
     nameplate: '/assets/yinan/205.png',
-    role: 'White-haired wolf girl with 450 life',
+    role: 'Wolf girl with 450 life',
     tag: 'A wolf girl who borrows armour, mecha and costumes and switches between a Normal and an EX type for half a stock; under 150 life her Eat leaps to catch a jumping opponent and heal her.',
     ex: true,
     sections: [
@@ -5048,7 +5048,7 @@ export const GUIDES_DATA = {
   aya: {
     art: '/assets/aya/4137.png',
     nameplate: '',
-    role: 'White-haired, bunny-eared girl with 500 life',
+    role: 'Bunny-eared girl with 500 life',
     tag: "A bunny-eared girl with 500 life who dresses as other fighters for her moves; her SHO raises purple pillars and, on a hit, cancels into Slash's and Rocket's SC forms for two stocks.",
     ex: false,
     sections: [
@@ -5167,7 +5167,7 @@ export const GUIDES_DATA = {
   dora: {
     art: '/assets/dora/273.png',
     nameplate: '',
-    role: 'Muscle-bound blue robot cat with 600 life',
+    role: 'Blue robot cat with 600 life',
     tag: "Built on SEAN's file, whose name plate he still wears. Each key presses two of the original six buttons; his motions take the time the other fighters' do, and his keys enter them too.",
     ex: false,
     sections: [
@@ -5288,7 +5288,7 @@ export const GUIDES_DATA = {
   rario: {
     art: '/assets/rario/169.png',
     nameplate: '/assets/rario/235.png',
-    role: 'Muscle-bound, barefoot plumber in a red cap with 450 life',
+    role: 'Barefoot plumber with 450 life',
     tag: "A plumber with 450 life who fights in Ryu's stance; his Shoryu knocks a ? block loose for a coin or a mushroom, and knocked out he jumps straight up and falls through the floor.",
     ex: false,
     sections: [
