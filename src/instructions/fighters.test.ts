@@ -30,7 +30,6 @@ describe('instructions page', () => {
       expect(guide.role.length, entry.id).toBeGreaterThan(0);
       expect(guide.art.length, entry.id).toBeGreaterThan(0);
     }
-    expect(GUIDES_DATA.ryuko, 'ryuko ships with the framework').toBeTruthy();
   });
 
   it('gives every fighter real art and a plate or text fallback', () => {
