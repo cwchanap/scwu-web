@@ -24,7 +24,7 @@ bun run format   # apply Prettier
 
 ## Deploy to Cloudflare
 
-The site is a static Worker (`wrangler.jsonc` serves `dist/`). The 28,000 art and audio files are over a Worker's 20,000-file limit, so they sit in a public R2 bucket and the page loads them from `VITE_ASSET_BASE` (`src/game/assetBase.ts`; unset, they come from this site's own `/assets/`). `vite.config.ts` cuts the data bundle into chunks under 15 MiB, since a Worker serves no file over 25 MiB.
+The site is a static Worker (`wrangler.jsonc` serves `dist/`). The 28,000 art and audio files are over a Worker's 20,000-file static-assets limit on the Free plan (Paid allows 100,000 and needs Wrangler 4.34.0+), so they sit in a public R2 bucket and the page loads them from `VITE_ASSET_BASE` (`src/game/assetBase.ts`; unset, they come from this site's own `/assets/`). `vite.config.ts` cuts the data bundle into chunks under 15 MiB, since a Worker serves no file over 25 MiB.
 
 Cloudflare's build cannot run `bun run assets`: `scwu-web-handoff/` is not in git. `scripts/upload_r2.sh` therefore also puts `src/game/generated/` in the bucket as `generated.tar.gz`, and `bun run build` (`scripts/build.sh`) downloads it instead of exporting when it runs on Workers Builds, which sets `WORKERS_CI`.
 
@@ -42,7 +42,7 @@ One-time setup:
 
 4. In the Cloudflare dashboard, create a Worker named `scwu-web` from this repo (Workers Builds fails if the names differ). Leave the build command at its default, `bun run build`, and the deploy command `npx wrangler deploy`; add a build variable `VITE_ASSET_BASE` set to the bucket's public URL.
 
-Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. It uploads only what changed.
+Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. The art and audio sync (`aws s3 sync`) uploads only what changed; `generated.tar.gz` is rebuilt and copied on every run.
 
 ## Play
 
