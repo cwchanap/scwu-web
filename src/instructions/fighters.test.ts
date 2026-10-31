@@ -17,6 +17,7 @@ describe('instructions page', () => {
   it('gives every fighter real guide text', () => {
     for (const entry of ROSTER) {
       expect(GUIDE_TEXT[entry.id].length, entry.id).toBeGreaterThan(200);
+      expect(GUIDE_TEXT[entry.id].startsWith('<p>'), entry.id).toBe(true);
     }
   });
 
