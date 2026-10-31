@@ -42,7 +42,7 @@ One-time setup:
 
 4. In the Cloudflare dashboard, create a Worker named `scwu-web` from this repo (Workers Builds fails if the names differ). Leave the build command at its default, `bun run build`, and the deploy command `npx wrangler deploy`; add a build variable `VITE_ASSET_BASE` set to the bucket's public URL.
 
-Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. The art and audio sync (`aws s3 sync`) uploads only what changed; `generated.tar.gz` is rebuilt and copied on every run.
+Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. The art and audio sync (`aws s3 sync`) uploads only what changed and deletes what the export dropped; `generated.tar.gz` is rebuilt and copied on every run. The Workers build refuses to build a commit whose `scripts/export_assets.py` does not match the tarball's `.exporter` fingerprint, so a forgotten re-upload fails the build instead of shipping stale data.
 
 ## Play
 

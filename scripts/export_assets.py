@@ -4836,6 +4836,11 @@ def inputs():
     return digest.hexdigest()
 
 
+def exporter():
+    """This script's fingerprint: the part of inputs() a git checkout can reproduce."""
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+
+
 if __name__ == "__main__":
     # Its outputs stand while nothing it reads has changed since the last export.
     stamp = GENERATED / ".inputs"
@@ -4846,3 +4851,6 @@ if __name__ == "__main__":
         stamp.unlink(missing_ok=True)
         main()
         stamp.write_text(key)
+    # build.sh checks this against the checked-out script before it trusts the
+    # generated.tar.gz it downloads on Workers Builds.
+    (GENERATED / ".exporter").write_text(exporter())
