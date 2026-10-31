@@ -1030,7 +1030,7 @@ In Settings, you can also choose your fighter and the opponent directly (Ryuko, 
 - **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
 - **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match. A Vs. CPU match the character select screen starts plays the original's VS single paths: each fighter's VS intro, no power or stock from it, and the VS forms (ZA) of the finishers that have them. Choosing a fighter in Settings returns to the intros above.
 
-Tick **Music** in Settings for the stage's track. Leaving the window pauses the match. The touch buttons cover every control the fighter has, as does the keyboard guide at the bottom of the screen; landscape is recommended on phones. The **Controls guide** link in Settings opens [instructions.html](instructions.html), which lists every fighter's moves.
+Tick **Music** in Settings for the stage's track. Leaving the window pauses the match. The touch buttons cover every control the fighter has, as does the keyboard guide at the top of the screen; landscape is recommended on phones. The **Controls guide** link in Settings opens [instructions.html](instructions.html), which lists every fighter's moves.
 
 [docs/gameplay.md](docs/gameplay.md) describes how each move, chain, cancel, reaction and round rule plays.
 
@@ -1047,7 +1047,8 @@ The port keeps behavior recovered from the source apart from rules authored for 
 
 ## Files and assets
 
-- `src/App.svelte`: accessible Svelte interface, mode selection, status, and touch controls.
+- `src/App.svelte`: accessible full-screen game shell, settings modal, status, and touch controls.
+- `instructions.html` / `src/instructions/`: the standalone controls guide — the fighters roster, the per-fighter prose, the page (`Instructions.svelte`) and its entry (`main.ts`).
 - `src/game/scene.ts`: Phaser loading/rendering and keyboard lifecycle.
 - `src/game/match.ts`: deterministic prototype rules and fixed clock.
 - `src/game/commands.ts`: the recovered command recognizer, and the command each shortcut key enters.

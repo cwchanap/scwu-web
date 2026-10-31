@@ -35,4 +35,10 @@ describe('instructions page', () => {
       'src/instructions/main.ts',
     );
   });
+
+  it('never pulls the guide prose into the game page', () => {
+    expect(readFileSync(here + '../App.svelte', 'utf8')).not.toMatch(
+      /instructions\/guides/,
+    );
+  });
 });

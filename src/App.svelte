@@ -788,6 +788,7 @@
     class="settings-dialog"
     bind:this={dialog}
     aria-label="Settings"
+    tabindex="-1"
     onkeydown={(event) => event.stopPropagation()}
     onclose={settingsClosed}
   >
@@ -819,6 +820,8 @@
       class="text-button"
       disabled={!status.ready || status.selecting}
       onclick={() => {
+        // The select screen opens unpaused; don't re-pause it on close.
+        pausedBefore = false;
         dialog.close();
         openSelect();
       }}>Character select</button
