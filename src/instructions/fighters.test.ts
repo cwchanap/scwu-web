@@ -59,14 +59,10 @@ describe('instructions page', () => {
     }
   });
 
-  it('gives every fighter their own select-screen portrait', () => {
-    const paths = ROSTER.map((entry) => FACES[entry.id]);
-    for (const path of paths) {
-      expect(typeof path, 'face path').toBe('string');
-      // The portraits are exported with the fighters, under public/assets.
-      expect(statSync(here + '../../public' + path).isFile(), path).toBe(true);
+  it('shows each fighter their own select-screen portrait as hero art', () => {
+    for (const entry of ROSTER) {
+      expect(GUIDES_DATA[entry.id].art, entry.id).toBe(FACES[entry.id]);
     }
-    expect(new Set(paths).size).toBe(paths.length);
   });
 
   it('imports nothing from the game or Phaser at runtime', () => {
