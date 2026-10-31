@@ -1,14 +1,13 @@
 <script lang="ts">
   import type { Who } from '../game/characters';
   import { ROSTER } from './fighters';
-  import { GRID, GUIDES_DATA, FACES, XS, YS } from './moves';
+  import { GRID, GUIDES_DATA, XS, YS } from './moves';
 
   const byName = new Map(ROSTER.map((entry) => [entry.name, entry]));
   const byId = new Map(ROSTER.map((entry) => [entry.id, entry]));
   const nameOf = (id: Who) => byId.get(id)?.name ?? id;
 
-  // Roster: each fighter's own select-screen portrait, on the select grid's
-  // lattice (the engine's 26/70 step with the drawn odd-column stagger).
+  // Roster: the select grid's own faces, positioned on its sheet.
   const faces = GRID.flatMap((name, i) => {
     const entry = byName.get(name ?? '');
     if (!entry) return [];
@@ -16,7 +15,6 @@
       {
         id: entry.id,
         name: entry.name,
-        face: FACES[entry.id],
         x: XS[i % 8],
         y: YS[Math.floor(i / 8)] + (i % 2 ? 7 : 0),
       },
@@ -88,7 +86,7 @@
             href={'#' + face.id}
             aria-label={face.name}
             aria-current={face.id === current ? 'page' : null}
-            style="--face: url('{face.face}'); --x: {face.x}; --y: {face.y}"
+            style="--x: {face.x}; --y: {face.y}"
           ></a>
         {/each}
       </div>
@@ -355,7 +353,8 @@
     top: calc(var(--y) * 1px);
     width: 24px;
     height: 60px;
-    background: var(--face) center bottom / contain no-repeat;
+    background: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
     image-rendering: pixelated;
     filter: brightness(0.74) saturate(0.85);
     transition:
@@ -371,8 +370,6 @@
   .faces a[aria-current] {
     filter: none;
   }
-  /* The current fighter: a gold silhouette of their own portrait glows
-     behind it. */
   .faces a[aria-current]::before {
     content: '';
     position: absolute;
@@ -380,8 +377,10 @@
     z-index: -1;
     background: linear-gradient(var(--gold), var(--ember));
     transform: scale(1.42);
-    -webkit-mask: var(--face) center bottom / contain no-repeat;
-    mask: var(--face) center bottom / contain no-repeat;
+    -webkit-mask: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
+    mask: url(/assets/select/13.png) calc(var(--x) * -1px)
+      calc(var(--y) * -1px) / 206px 417px no-repeat;
     animation: cursor 1s steps(2) infinite;
   }
   @keyframes cursor {
