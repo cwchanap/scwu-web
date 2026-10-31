@@ -19,8 +19,8 @@ bun run check               # svelte-check + tsc --noEmit
 bun run lint                # ESLint
 bun run format              # Prettier write (format:check to verify)
 bun run validate            # assets + format:check + lint + check + test (the pre-commit hook runs this)
-bun run build               # assets + check + vite build (on Workers Builds, WORKERS_CI: fetch generated/ from R2, then vite build — export and check skipped)
-bun run upload:r2           # sync public/assets and generated/ to the R2 bucket (needs R2_* and AWS_* env)
+bun run build               # assets + check + vite build (on Workers Builds, WORKERS_CI: fetch generated/ from R2, check its .exporter fingerprint against export_assets.py, then vite build — export and check skipped)
+bun run upload:r2           # sync public/assets and generated/ to the R2 bucket, deleting dropped keys (needs R2_* and AWS_* env)
 ```
 
 ## Source data pipeline
