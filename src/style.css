@@ -453,3 +453,54 @@ kbd {
     font-size: 7px;
   }
 }
+
+/* Standalone instructions page (instructions.html) */
+.guide-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 14px;
+}
+.guide-page h1 {
+  font-size: 18px;
+  padding: 14px 0;
+}
+.guide-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 0;
+  background: #0b0d10;
+  border-bottom: 1px solid #252d35;
+  font-size: 11px;
+}
+.guide-nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.guide-nav a:hover {
+  text-decoration: underline;
+}
+.guide-page section {
+  padding: 12px 0;
+  border-bottom: 1px solid #1b2229;
+}
+.guide-page h2 {
+  font-size: 15px;
+  color: var(--accent);
+  padding: 8px 0;
+  scroll-margin-top: 48px;
+}
+.guide-page p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #d2d9e0;
+  padding: 4px 0;
+}
+.guide-footer {
+  font-size: 9px;
+  color: #74808f;
+  padding: 14px 0;
+}
