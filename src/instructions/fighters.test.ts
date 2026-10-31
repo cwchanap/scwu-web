@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import { ROSTER } from './fighters';
-import { GUIDE_TEXT } from './guides';
+import { GRID, GUIDES_DATA } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
@@ -10,15 +10,27 @@ const stripTypeImports = (text: string) =>
   text.replace(/^\s*import type [^;]+;/gm, '');
 
 describe('instructions page', () => {
-  it('lists every fighter in roster order', () => {
-    expect(ROSTER.map((entry) => entry.id)).toEqual(Object.keys(CHARACTERS));
+  it('orders the grid over every fighter, GATE LOCK cells null', () => {
+    const idOf = new Map(ROSTER.map((entry) => [entry.name, entry.id]));
+    const ids = GRID.filter((name) => name !== null).map((name) =>
+      idOf.get(name),
+    );
+    expect(ids).toEqual(Object.keys(CHARACTERS));
   });
 
-  it('gives every fighter real guide text', () => {
+  it('gives every shipped guide complete sections', () => {
     for (const entry of ROSTER) {
-      expect(GUIDE_TEXT[entry.id].length, entry.id).toBeGreaterThan(200);
-      expect(GUIDE_TEXT[entry.id].startsWith('<p>'), entry.id).toBe(true);
+      const guide = GUIDES_DATA[entry.id];
+      if (!guide) continue; // the remaining fighters arrive with their tasks
+      expect(guide.sections.length, entry.id).toBeGreaterThanOrEqual(2);
+      expect(
+        guide.sections.reduce((n, section) => n + section.rows.length, 0),
+        entry.id,
+      ).toBeGreaterThanOrEqual(4);
+      expect(guide.role.length, entry.id).toBeGreaterThan(0);
+      expect(guide.art.length, entry.id).toBeGreaterThan(0);
     }
+    expect(GUIDES_DATA.ryuko, 'ryuko ships with the framework').toBeTruthy();
   });
 
   it('imports nothing from the game or Phaser at runtime', () => {
@@ -36,9 +48,9 @@ describe('instructions page', () => {
     );
   });
 
-  it('never pulls the guide prose into the game page', () => {
+  it('never pulls the guide data into the game page', () => {
     expect(readFileSync(here + '../App.svelte', 'utf8')).not.toMatch(
-      /instructions\/guides/,
+      /instructions\/(guides|moves)/,
     );
   });
 });
