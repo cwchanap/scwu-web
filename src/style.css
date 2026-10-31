@@ -45,33 +45,6 @@ h2,
 p {
   margin: 0;
 }
-.app-shell {
-  width: min(100%, 992px, calc((100svh - 145px) * 4 / 3 + 32px));
-  min-width: 320px;
-  margin: auto;
-  padding: 0 16px;
-}
-.game-toolbar {
-  min-height: 54px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-h1 {
-  font:
-    bold italic 22px Arial,
-    sans-serif;
-  letter-spacing: -1px;
-  white-space: nowrap;
-}
-h1 span {
-  font:
-    10px Arial,
-    sans-serif;
-  letter-spacing: 1.6px;
-  color: var(--muted);
-  margin-left: 8px;
-}
 .mode-switch {
   display: flex;
   gap: 3px;
@@ -104,14 +77,9 @@ h1 span {
   accent-color: var(--accent);
   margin: 0;
 }
-.cabinet {
-  background: #141a20;
-  border: 1px solid #3d4753;
-  box-shadow: 0 12px 48px #0009;
-}
 .stage-shell {
-  position: relative;
-  aspect-ratio: 4 / 3;
+  position: fixed;
+  inset: 0;
   overflow: hidden;
   background: #080a0d;
 }
@@ -191,14 +159,27 @@ h1 span {
 .rematch:hover:not(:disabled) {
   background: #d6edfc;
 }
-.match-footer {
+.stats-chip {
+  position: absolute;
+  top: 10px;
+  left: 10px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 46px;
-  padding: 7px 12px;
-  border-top: 1px solid #3d4753;
+  padding: 5px 10px;
+  background: #141a20d9;
+  border: 1px solid #3d4753;
+  border-radius: 2px;
+}
+.floating-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+.floating-controls button {
+  padding: 6px 10px;
+  font-size: 11px;
 }
 .match-stats {
   display: flex;
@@ -218,13 +199,10 @@ h1 span {
     sans-serif;
   color: #bce9ff;
 }
-.match-actions {
-  display: flex;
-  gap: 8px;
-}
 .practice-options {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
   font-size: 11px;
   color: var(--muted);
@@ -250,10 +228,6 @@ h1 span {
 .practice-options :disabled {
   opacity: 0.45;
 }
-.match-actions button {
-  padding: 6px 10px;
-  font-size: 11px;
-}
 kbd {
   font: 10px monospace;
   border: 1px solid #546171;
@@ -265,15 +239,25 @@ kbd {
   color: #d2dfe9;
   background: #1e2932;
 }
-.match-actions kbd {
+.floating-controls kbd {
   margin-left: 5px;
 }
 .keyboard-guide {
+  position: fixed;
+  /* Below the floating control row (top: 10px + ~34px buttons). */
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 17px;
-  margin-top: 14px;
+  gap: 8px 17px;
+  max-width: calc(100% - 20px);
+  margin: 0;
+  padding: 6px 12px;
+  background: #141a20d9;
+  border: 1px solid #3d4753;
+  border-radius: 2px;
   color: #929daa;
   font-size: 10px;
 }
@@ -284,9 +268,13 @@ kbd {
 }
 .touch-controls {
   display: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 6px;
-  margin-top: 10px;
+  padding: 8px;
 }
 .touch-controls button {
   display: flex;
@@ -315,66 +303,59 @@ kbd {
   border-color: #a4834f;
   color: #ffe2a8;
 }
-.help-panel {
-  padding: 20px 0;
+.settings-dialog {
+  width: min(92vw, 440px);
+  max-height: min(86svh, 640px);
+  padding: 18px;
+  border: 1px solid #3d4753;
+  border-radius: 2px;
+  background: #141a20;
+  color: #e2e7ed;
+  box-shadow: 0 12px 48px #0009;
+  overflow: auto;
+}
+/* Only the open dialog lays out; a closed one keeps display: none. */
+.settings-dialog[open] {
   display: flex;
-  gap: 24px;
-  border-bottom: 1px solid #39424e;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
 }
-.help-panel h2 {
-  font-size: 20px;
+.settings-dialog::backdrop {
+  background: #05070ae6;
 }
-.help-panel p {
-  font-size: 13px;
-  line-height: 1.7;
-  margin-top: 12px;
-  color: #b6bfc9;
+.settings-dialog .mode-switch {
+  margin-left: 0;
 }
-.help-panel > button {
-  flex-shrink: 0;
-  align-self: flex-start;
-}
-.page-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 9px;
-  color: #74808f;
-  padding: 14px 0;
-  letter-spacing: 0.5px;
+.settings-dialog .guide-link {
+  color: var(--accent);
+  font-size: 12px;
 }
 @media (pointer: coarse), (max-width: 700px) {
+  /* The pad sits below the court in normal flow, not over it. */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100svh;
+  }
+  .cabinet {
+    flex: 1;
+    min-height: 0;
+  }
+  .stage-shell {
+    position: relative;
+    inset: auto;
+    height: 100%;
+  }
   .touch-controls {
     display: grid;
+    position: static;
   }
   .keyboard-guide {
     display: none;
   }
 }
 @media (max-width: 700px) {
-  .app-shell {
-    padding: 0 10px;
-  }
-  .match-footer {
-    flex-wrap: wrap;
-  }
-  .practice-options {
-    order: 3;
-    width: 100%;
-    flex-wrap: wrap;
-    gap: 8px 12px;
-  }
-  .game-toolbar {
-    gap: 10px;
-    flex-wrap: wrap;
-    padding: 10px 0;
-  }
-  h1 {
-    font-size: 20px;
-  }
-  h1 span {
-    display: none;
-  }
   .mode-switch button {
     padding: 7px 8px;
     font-size: 10px;
@@ -383,63 +364,19 @@ kbd {
   .music-toggle {
     font-size: 10px;
   }
-  .match-footer {
-    padding: 7px 8px;
-  }
-  .match-actions kbd {
+  .floating-controls kbd {
     display: none;
-  }
-  .match-stats {
-    gap: 5px;
-    font-size: 8px;
-  }
-  .match-stats strong {
-    font-size: 12px;
-  }
-  .help-panel {
-    flex-direction: column;
-    gap: 12px;
-  }
-  .page-footer {
-    font-size: 8px;
-    letter-spacing: 0;
   }
 }
 @media (max-height: 550px) and (min-width: 701px) {
-  .app-shell {
-    width: calc((100svh - 117px) * 4 / 3 + 20px);
-    padding: 0 10px;
-  }
-  .game-toolbar {
-    min-height: 33px;
-    gap: 8px;
-  }
-  h1 {
-    font-size: 15px;
-  }
-  h1 span,
-  .page-footer,
   .keyboard-guide,
-  .match-actions kbd {
+  .floating-controls kbd {
     display: none;
-  }
-  .mode-switch button,
-  .text-button {
-    font-size: 9px;
-    padding: 4px 7px;
-  }
-  .match-footer {
-    min-height: 31px;
-    padding: 4px 8px;
-  }
-  .match-actions button {
-    padding: 4px 7px;
-    font-size: 10px;
   }
   .touch-controls {
     display: grid;
-    margin-top: 5px;
     gap: 5px;
+    padding: 5px;
   }
   .touch-controls button {
     min-height: 42px;
@@ -452,4 +389,59 @@ kbd {
   .touch-controls span {
     font-size: 7px;
   }
+}
+
+/* Standalone instructions page (instructions.html) */
+.guide-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0 16px 14px;
+}
+.guide-page h1 {
+  font:
+    bold italic 18px Arial,
+    sans-serif;
+  letter-spacing: -1px;
+  white-space: nowrap;
+  padding: 14px 0;
+}
+.guide-nav {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  padding: 10px 0;
+  background: #0b0d10;
+  border-bottom: 1px solid #252d35;
+  font-size: 11px;
+}
+.guide-nav a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.guide-nav a:hover {
+  text-decoration: underline;
+}
+.guide-page section {
+  padding: 12px 0;
+  border-bottom: 1px solid #1b2229;
+  scroll-margin-top: 150px;
+}
+.guide-page h2 {
+  font-size: 15px;
+  color: var(--accent);
+  padding: 8px 0;
+}
+.guide-page p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #d2d9e0;
+  padding: 4px 0;
+}
+.guide-footer {
+  font-size: 9px;
+  color: #74808f;
+  padding: 14px 0;
 }
