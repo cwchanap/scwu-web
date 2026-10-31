@@ -21,7 +21,7 @@ endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
 # The art and audio go to the bucket root: ASSET_BASE points there.
 aws s3 sync public/assets "s3://$R2_BUCKET/" --endpoint-url "$endpoint" --only-show-errors
 
-# The generated JSON is the Cloudflare build's input (cloudflare_build.sh),
+# The generated JSON is the Cloudflare build's input (build.sh),
 # since scwu-web-handoff/ is not in git. Upload it last: once it exists, the
 # art is already there.
 tarball=$(mktemp)
