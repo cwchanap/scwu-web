@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import { ROSTER } from './fighters';
@@ -21,7 +21,9 @@ describe('instructions page', () => {
   it('gives every shipped guide complete sections', () => {
     for (const entry of ROSTER) {
       const guide = GUIDES_DATA[entry.id];
-      if (!guide) continue; // the remaining fighters arrive with their tasks
+      // Guides ship art/plate first and prose rows with the fighter's content
+      // task; skip the not-yet-written ones (the final batch removes this).
+      if (!guide || !guide.sections.length) continue;
       expect(guide.sections.length, entry.id).toBeGreaterThanOrEqual(2);
       expect(
         guide.sections.reduce((n, section) => n + section.rows.length, 0),
@@ -31,6 +33,19 @@ describe('instructions page', () => {
       expect(guide.art.length, entry.id).toBeGreaterThan(0);
     }
     expect(GUIDES_DATA.ryuko, 'ryuko ships with the framework').toBeTruthy();
+  });
+
+  it('gives every fighter real art and a plate or text fallback', () => {
+    for (const entry of ROSTER) {
+      const guide = GUIDES_DATA[entry.id];
+      expect(guide, entry.id).toBeTruthy();
+      expect(statSync(`public${guide.art}`).isFile(), entry.id).toBe(true);
+      if (guide.nameplate !== '') {
+        expect(statSync(`public${guide.nameplate}`).isFile(), entry.id).toBe(
+          true,
+        );
+      }
+    }
   });
 
   it('imports nothing from the game or Phaser at runtime', () => {
