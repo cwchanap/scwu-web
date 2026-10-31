@@ -1,7 +1,8 @@
 import type { Who } from '../game/characters';
 
-// Roster order matches `Who`/`CHARACTERS`; names match App.svelte's Fighter
-// `<option>` labels. Consumed by the instructions page and Task 2's settings.
+// Roster order matches `Who`/`CHARACTERS`. This list is the single source of
+// fighter display names: the instructions nav and guide sections, and both
+// pickers (fighter and opponent) in the settings modal.
 export const ROSTER: readonly { id: Who; name: string }[] = [
   { id: 'ryuko', name: 'Ryuko' },
   { id: 'zoma', name: 'Zoma' },

@@ -1,8 +1,8 @@
 import type { Who } from '../game/characters';
 
-// Verbatim paragraphs from the game page's controls guide; each string is one
-// complete <p> element, tags included. BASICS is shared, GUIDE_TEXT one
-// fighter's paragraphs.
+// Verbatim paragraphs from the game page's controls guide, tags included.
+// BASICS: one complete <p> element per string. GUIDE_TEXT: one string per
+// fighter, holding that fighter's paragraphs joined with newlines.
 export const BASICS: readonly string[] = [
   '<p>Move into range, then tap <kbd>G</kbd> for a quick punch or <kbd>H</kbd> for a longer kick. Hold away from the opponent to block. Jump with <kbd>W</kbd> or the up arrow. Left and right arrows also move.</p>',
   '<p>Hold <kbd>S</kbd> or the down arrow to crouch. Punch, kick, and guard change with your stance: try them while crouching or in the air. When a standing punch or kick hits or is blocked, tap punch or kick again for the next attack, up to three; the two chains can cross. A missed attack has no follow-up. The second punch and jumping kick each strike three times; the third standing kick strikes eight times. Holding a button never repeats an attack. Jumping attacks break a crouching guard.</p>',
