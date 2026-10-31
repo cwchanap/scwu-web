@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Who } from '../game/characters';
   import { ROSTER } from './fighters';
-  import { GRID, GUIDES_DATA, XS } from './moves';
+  import { GRID, GUIDES_DATA, XS, YS } from './moves';
 
   const byName = new Map(ROSTER.map((entry) => [entry.name, entry]));
   const byId = new Map(ROSTER.map((entry) => [entry.id, entry]));
@@ -16,7 +16,7 @@
         id: entry.id,
         name: entry.name,
         x: XS[i % 8],
-        y: Math.floor(i / 8) * 69 + (i % 2 ? 7 : 0),
+        y: YS[Math.floor(i / 8)] + (i % 2 ? 7 : 0),
       },
     ];
   });
