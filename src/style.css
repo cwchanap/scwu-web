@@ -244,7 +244,7 @@ kbd {
 }
 .keyboard-guide {
   position: fixed;
-  bottom: 10px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -311,22 +311,44 @@ kbd {
   background: #141a20;
   color: #e2e7ed;
   box-shadow: 0 12px 48px #0009;
+  overflow: auto;
+}
+/* Only the open dialog lays out; a closed one keeps display: none. */
+.settings-dialog[open] {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 14px;
-  overflow: auto;
 }
 .settings-dialog::backdrop {
   background: #05070ae6;
+}
+.settings-dialog .mode-switch {
+  margin-left: 0;
 }
 .settings-dialog .guide-link {
   color: var(--accent);
   font-size: 12px;
 }
 @media (pointer: coarse), (max-width: 700px) {
+  /* The pad sits below the court in normal flow, not over it. */
+  .app-shell {
+    display: flex;
+    flex-direction: column;
+    height: 100svh;
+  }
+  .cabinet {
+    flex: 1;
+    min-height: 0;
+  }
+  .stage-shell {
+    position: relative;
+    inset: auto;
+    height: 100%;
+  }
   .touch-controls {
     display: grid;
+    position: static;
   }
   .keyboard-guide {
     display: none;
@@ -340,6 +362,9 @@ kbd {
   .text-button,
   .music-toggle {
     font-size: 10px;
+  }
+  .floating-controls kbd {
+    display: none;
   }
 }
 @media (max-height: 550px) and (min-width: 701px) {
@@ -401,12 +426,12 @@ kbd {
 .guide-page section {
   padding: 12px 0;
   border-bottom: 1px solid #1b2229;
+  scroll-margin-top: 150px;
 }
 .guide-page h2 {
   font-size: 15px;
   color: var(--accent);
   padding: 8px 0;
-  scroll-margin-top: 48px;
 }
 .guide-page p {
   font-size: 13px;
