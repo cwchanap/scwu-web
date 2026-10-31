@@ -18,18 +18,10 @@ describe('instructions page', () => {
     expect(ids).toEqual(Object.keys(CHARACTERS));
   });
 
-  it('gives every shipped guide complete sections', () => {
+  it('gives every fighter a complete guide', () => {
     for (const entry of ROSTER) {
       const guide = GUIDES_DATA[entry.id];
-      // Ryuko ships with the framework; keep an explicit floor until the
-      // final batch removes this skip — before the skip, so an empty guide
-      // cannot slip through.
-      if (entry.id === 'ryuko') {
-        expect(guide && guide.sections.length >= 2, entry.id).toBe(true);
-      }
-      // Guides ship art/plate first and prose rows with the fighter's content
-      // task; skip the not-yet-written ones (the final batch removes this).
-      if (!guide || !guide.sections.length) continue;
+      expect(guide, entry.id).toBeTruthy();
       expect(guide.sections.length, entry.id).toBeGreaterThanOrEqual(2);
       expect(
         guide.sections.reduce((n, section) => n + section.rows.length, 0),

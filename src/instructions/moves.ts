@@ -4066,113 +4066,1371 @@ export const GUIDES_DATA = {
   zmega: {
     art: '/assets/zmega/3001.png',
     nameplate: '/assets/zmega/322.png',
-    role: '',
-    tag: '',
+    role: 'White-haired, moustached brawler in a black vest',
+    tag: 'Turns into Shin Z at a keypress, trading life for power; he double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Palm / spin kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A lunging palm strike that hits twice and a stepping spin kick, standing or crouching.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'A punch and a kick.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs on while → is held, ↑ leaping into a high jump; Shift with ← hops back. He double jumps and air dashes. No Hit Up or Counter Attack.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab into a beating and a blow that knocks the opponent away.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'SAMA',
+            input:
+              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            desc: 'A rising somersault kick, also in the air.',
+            cost: 0,
+          },
+          {
+            name: 'Fire BALL',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A fireball that bounces twice and rolls along the floor.',
+            cost: 0,
+          },
+          {
+            name: 'GIGA',
+            input:
+              '<kbd>F</kbd> or <span class="motion">→↓←</span><kbd>G</kbd>',
+            desc: "A dash behind a glowing palm that carries the opponent into the screen's edge.",
+            cost: 0,
+          },
+          {
+            name: 'REFLACT',
+            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            desc: "A round shield's shove, which doesn't reflect shots here.",
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'GAISA',
+            input:
+              '<kbd>1</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            desc: 'A charge through three levels, whose <kbd>G</kbd> fires at the level reached before he collapses.',
+            cost: 1,
+          },
+          {
+            name: 'SGIGA',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            desc: 'A bigger GIGA.',
+            cost: 1,
+          },
+          {
+            name: 'AKUMA SP',
+            input:
+              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+            desc: 'For three stocks: a dash that grabs into a storm of flashes for 250. Shin Z plays it even short of stock.',
+            cost: 3,
+          },
+          {
+            name: 'TYPE CHANGE',
+            input: '<kbd>E</kbd> or <span class="motion">↓↓</span><kbd>K</kbd>',
+            desc: 'Turns him into Shin Z, trading life for power: he loses a point of life every 0.1 seconds while his power rises 15, and his moves take their Shin forms. Again turns him back, which holds his power at zero until he next turns.',
+            cost: 0,
+          },
+        ],
+      },
+    ],
   },
   alpha: {
     art: '/assets/alpha/3001.png',
     nameplate: '/assets/alpha/576.png',
-    role: '',
-    tag: '',
+    role: 'Red-haired boy in a chained white suit',
+    tag: "Fights through four armours — a white tiger's, a green knight's, a red one with a snake and a winged blue one; a hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.",
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Chained punch / kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: "A chained punch and a kick; after a hit, <kbd>G</kbd> brings the tiger's punches and <kbd>H</kbd> the red armour's kick, then <kbd>G</kbd> the blue armour's wing slash or <kbd>H</kbd> the knight's shield.",
+            cost: 0,
+          },
+          {
+            name: 'Crouch',
+            input:
+              '<span class="motion">↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: "Down with <kbd>G</kbd> the tiger's swipe, with <kbd>H</kbd> the knight's shield; <span class=\"motion\">↘</span><kbd>G</kbd> the knight's rising blow.",
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'The blue armour\'s slash with <kbd>G</kbd>, the red armour\'s kick with <kbd>H</kbd>, its diving kick with <span class="motion">↘</span><kbd>H</kbd>.',
+            cost: 0,
+          },
+          {
+            name: 'Double jump / air dash',
+            input: '<kbd>W</kbd>, <span class="motion">→→</span> in air',
+            desc: 'He double jumps and air dashes.',
+            cost: 0,
+          },
+          {
+            name: 'Hit Up',
+            input: '<kbd>K</kbd>',
+            desc: "The red armour's snake, which ↑ chases into the air after a hit.",
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: "The blue armour's grab into a beam.",
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'CC',
+            input:
+              '<kbd>U</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            desc: "The knight's lunge that grabs into a throw.",
+            cost: 0,
+          },
+          {
+            name: 'Munt',
+            input:
+              '<kbd>I</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            desc: 'A rock pillar thrust up from the floor well ahead.',
+            cost: 0,
+          },
+          {
+            name: 'NC',
+            input: '<kbd>F</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'The tiger\'s chain strikes, which <span class="motion">↓←</span><kbd>G</kbd> follows twice more; a hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'SNAKE FIRE',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: "A giant snake's strike.",
+            cost: 1,
+          },
+          {
+            name: 'RYUON HASANKEN',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: "For three stocks: the blue armour's flight behind a fire dragon.",
+            cost: 3,
+          },
+          {
+            name: 'Rambu',
+            input:
+              '<kbd>3</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            desc: "The tiger's leap into a long flurry.",
+            cost: 1,
+          },
+          {
+            name: 'NEW EN3',
+            input:
+              '<kbd>4</kbd> or <span class="motion">↓↓↓</span><kbd>G</kbd>',
+            desc: 'For three stocks: pillars of fire.',
+            cost: 3,
+          },
+          {
+            name: 'SCC',
+            input:
+              '<kbd>5</kbd> or <span class="motion">→↓←→↓←</span><kbd>H</kbd>',
+            desc: "The knight's grab into a launch and a slam.",
+            cost: 1,
+          },
+          {
+            name: 'Counter Hit',
+            input: '<kbd>K</kbd> while blocking',
+            desc: 'Spend a stock while guarding.',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   shinz: {
     art: '/assets/shinz/3001.png',
     nameplate: '/assets/shinz/323.png',
-    role: '',
-    tag: '',
+    role: 'White-haired, moustached brawler in a black vest and purple trousers',
+    tag: 'Z-MEGA as Shin Z for good; a hit from his basics is followed by H, a special or a super, and on a hit a super cancels SAMA, Fire BALL, REFLACT or GAISA. He double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Palm / spin kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A lunging palm strike that hits twice and a stepping spin kick, standing or crouching; on a hit, <kbd>H</kbd>, a special or a super follows them.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'A punch and a kick.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs on while → is held, ↑ leaping into a high jump; Shift with ← hops back. He double jumps and air dashes. No Hit Up or Counter Attack.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab into a beating and a blow that knocks the opponent away.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'SAMA',
+            input:
+              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            desc: 'A rising somersault kick, also in the air, where <span class="motion">→↓↘</span><kbd>H</kbd> kicks again; on a hit a super cancels it.',
+            cost: 0,
+          },
+          {
+            name: 'Fire BALL',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A fast straight fireball; on a hit a super cancels it.',
+            cost: 0,
+          },
+          {
+            name: 'GIGA',
+            input:
+              '<kbd>F</kbd> or <span class="motion">→↓←</span><kbd>G</kbd>',
+            desc: "A dash behind a glowing palm that carries the opponent into the screen's edge.",
+            cost: 0,
+          },
+          {
+            name: 'REFLACT',
+            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            desc: "A round shield's shove that hurls the shield back at a shot it meets; on a hit a super cancels it.",
+            cost: 0,
+          },
+          {
+            name: 'GAISA',
+            input:
+              '<kbd>E</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            desc: 'A blue wave; on a hit a super cancels it.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'KAISA SUPER',
+            input:
+              '<kbd>1</kbd> or <span class="motion">→←↓→</span><kbd>H</kbd>',
+            desc: 'A giant ghostly head of his that charges across the screen.',
+            cost: 1,
+          },
+          {
+            name: 'SGIGA',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            desc: 'A bigger GIGA.',
+            cost: 1,
+          },
+          {
+            name: 'AKUMA SP',
+            input:
+              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+            desc: 'For three stocks: a dash that grabs into a storm of flashes for 250.',
+            cost: 3,
+          },
+        ],
+      },
+    ],
   },
   zaku: {
     art: '/assets/zaku/118.png',
     nameplate: '/assets/zaku/139.png',
-    role: '',
-    tag: '',
+    role: 'Squat green armoured trooper with only 200 life',
+    tag: 'A trooper with only 200 life who swings a purple axe and lobs grenades; he has no double jump, air dash, Hit Up or chuck.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Axe swing',
+            input: '<kbd>G</kbd>',
+            desc: 'Swings his purple axe, standing or crouching; on a hit, cancels into DASH P or a super.',
+            cost: 0,
+          },
+          {
+            name: 'Grenade',
+            input: '<kbd>H</kbd>',
+            desc: 'Lobbed to bounce lower each time and burst where it lands.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Swings the axe with <kbd>G</kbd>, fires his gun with <kbd>H</kbd>.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs on while → is held, ↑ leaping into a high jump; Shift with ← hops back. No double jump, air dash, Hit Up or chuck.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'DASH P',
+            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A dashing axe swing; cancels into a super.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Super P',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'Four dashing swings and a stronger fifth.',
+            cost: 1,
+          },
+          {
+            name: 'Super K',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'Five grenades.',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   pachelo: {
     art: '/assets/pachelo/134.png',
     nameplate: '/assets/pachelo/149.png',
-    role: '',
-    tag: '',
+    role: 'Round yellow Pac-Man robot with only 200 life',
+    tag: 'A Pac-Man robot with only 200 life who rolls along instead of running; his Roll charge bounces him off on a hit or guard, and on a hit G or H cancels into a special or the super.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Spiked fist / kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'Punches with a spiked fist, standing or crouching, or kicks; on a hit, either cancels into a special or the super.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Either stomps.',
+            cost: 0,
+          },
+          {
+            name: 'Shift roll',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Rolls on while → is held, ↑ leaping into a high jump; Shift with ← hops back. No double jump, air dash, Hit Up or chuck.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Roll',
+            input:
+              '<kbd>U</kbd> or <span class="motion">←</span> held for 0.6s then <span class="motion">→</span><kbd>G</kbd>',
+            desc: 'A rolling charge, also in the air, that bounces him off on a hit or guard.',
+            cost: 0,
+          },
+          {
+            name: 'Electric',
+            input: '<kbd>I</kbd>, or <kbd>G</kbd> five times within a second',
+            desc: 'A crackling orb that sparks on while <kbd>G</kbd> comes again within 0.2 seconds.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Super roll',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A roll steered by the direction held as it starts (on the ground, not down).',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   golf: {
     art: '/assets/golf/129.png',
     nameplate: '/assets/golf/155.png',
-    role: '',
-    tag: '',
+    role: 'Squat blue armoured trooper with only 300 life',
+    tag: 'A trooper with only 300 life who slashes with a glowing sword and lashes a whip; on a hit each attack cancels into a later one, up into a special or the super, and he has no double jump, air dash, Hit Up or chuck.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Sword slash',
+            input: '<kbd>G</kbd>',
+            desc: 'Slashes twice with his glowing sword, standing or crouching; on a hit, cancels into <kbd>H</kbd>, a special or the super.',
+            cost: 0,
+          },
+          {
+            name: 'Whip',
+            input: '<kbd>H</kbd>',
+            desc: 'Lashes out his whip; on a hit, cancels into a special or the super.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Slashes with <kbd>G</kbd>, fires his finger guns with <kbd>H</kbd>; on a hit, <kbd>G</kbd> in the air cancels into <kbd>H</kbd>.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs on while → is held, ↑ leaping into a high jump; Shift with ← hops back. No double jump, air dash, Hit Up or chuck.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Sp P',
+            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'Four dashing slashes; cancels into the super.',
+            cost: 0,
+          },
+          {
+            name: 'Sp K',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            desc: 'A low lash and a high one.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Super P',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'Six lashes and a long thrust.',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   asura: {
     art: '/assets/asura/129.png',
     nameplate: '/assets/asura/137.png',
-    role: '',
-    tag: '',
+    role: 'Hooded brawler in a purple and grey robe with only 300 life',
+    tag: 'A hooded brawler with only 300 life whose punches and kicks come three at a time; his Tatumaki rises and drifts forward, on the ground or in the air. No double jump, air dash, Hit Up or chuck.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Triple jab / triple kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'Jabs three times with <kbd>G</kbd>, kicks three times with <kbd>H</kbd>; on a hit, <kbd>G</kbd> cancels into <kbd>H</kbd>, the special or the super.',
+            cost: 0,
+          },
+          {
+            name: 'Crouch',
+            input:
+              '<span class="motion">↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A hopping uppercut and a hopping kick that lunges forward; on a hit, both cancel into the special or the super, into their air forms.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'A punch and a kick; on a hit, both cancel into the special or the super, into their air forms.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs on while → is held, ↑ leaping into a high jump; Shift with ← hops back. No double jump, air dash, Hit Up or chuck.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Tatumaki',
+            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            desc: 'A spinning kick that rises and drifts forward, also in the air; cancels into the super.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Shinku TATU',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'A rising whirlwind of kicks that carries the opponent round him, also in the air.',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   ttro: {
     art: '/assets/ttro/142.png',
     nameplate: '/assets/ttro/170.png',
-    role: '',
-    tag: '',
+    role: 'Huge grey Totoro with 820 life',
+    tag: 'A huge Totoro with 820 life whose steps shake the screen; under his umbrella he double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Arm swipe / claw',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A long swipe of his arm and a sweeping claw, standing or crouching; on a hit, both cancel into a special (CC only from afar) or SUPER FIRE.',
+            cost: 0,
+          },
+          {
+            name: 'Belly bounce',
+            input: '<span class="motion">↓</span><kbd>G</kbd>',
+            desc: 'Down with <kbd>G</kbd>: a belly bounce that hops forward.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: "Swipes at his chest's height with <kbd>G</kbd>, a diving bite with <kbd>H</kbd>; on a hit, both cancel into a double jump or air dash.",
+            cost: 0,
+          },
+          {
+            name: 'Hop',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Shift hops forward, and Shift with ← hops back; he double jumps and air dashes under his umbrella. No Hit Up or Counter Attack.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab into a throw.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'DASH P',
+            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'A dashing swipe; cancels into DASH K.',
+            cost: 0,
+          },
+          {
+            name: 'Fire',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A blazing ball that the girl in his mouth fires, striking well ahead of him.',
+            cost: 0,
+          },
+          {
+            name: 'DASH K',
+            input: '<kbd>F</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            desc: 'A dashing claw.',
+            cost: 0,
+          },
+          {
+            name: 'CC',
+            input:
+              '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            desc: 'Close in, a grab into a leap and a slam.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'SCC',
+            input:
+              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            desc: 'Close in, a grab into two leaps and slams and a higher one for 200.',
+            cost: 1,
+          },
+          {
+            name: 'SUPER FIRE',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'Five blazing balls.',
+            cost: 1,
+          },
+          {
+            name: 'EN300',
+            input:
+              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'For three stocks: a phone call that sends a yellow car charging across the court.',
+            cost: 3,
+          },
+        ],
+      },
+    ],
   },
   astroman: {
     art: '/assets/astroman/186.png',
     nameplate: '',
-    role: '',
-    tag: '',
+    role: 'Hulking, muscle-bound boy robot with 780 life',
+    tag: 'A muscle-bound boy robot with 780 life whose steps shake the screen; his Shift is a rocket dash that hovers on, and he has no Hit Up or Counter Attack.',
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Jab / stepping kicks',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A jab and two stepping kicks; on a hit, both cancel into a special (C Chuck aside) or a super (S CC aside).',
+            cost: 0,
+          },
+          {
+            name: 'Rushing punch / leaping kick',
+            input:
+              '<span class="motion">↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'Down with <kbd>G</kbd> a rushing punch, down with <kbd>H</kbd> a leaping kick.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Both strike ahead, in other forms after a double jump, an air dash or a dash; on a hit, both cancel into a double jump, an air dash or Jump att.',
+            cost: 0,
+          },
+          {
+            name: 'Rocket dash',
+            input: '<kbd>⇧</kbd>',
+            desc: 'A rocket dash that hovers on while → is held; Shift with ← dashes back. He double jumps and air dashes. No Hit Up or Counter Attack.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab into a rocket leap and a slam.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Jump att',
+            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            desc: 'A rocket leap that lands in a blast, also in the air.',
+            cost: 0,
+          },
+          {
+            name: 'Punch',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A rocket fist.',
+            cost: 0,
+          },
+          {
+            name: 'ASS GUN',
+            input: '<kbd>F</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            desc: 'Five bullets from a gun in his backside.',
+            cost: 0,
+          },
+          {
+            name: 'C Chuck',
+            input:
+              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>G</kbd>',
+            desc: 'Close in, a grab into kisses that heal him 60.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'S CC',
+            input:
+              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            desc: 'For three stocks: close in, a grab into knees, blasts and kisses that heal him 50, for 300.',
+            cost: 3,
+          },
+          {
+            name: 'SUPER P',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A huge black rocket fist.',
+            cost: 1,
+          },
+          {
+            name: 'ASS GUN SUPER',
+            input:
+              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'A beam from his backside that strikes twenty times from a little ahead of him.',
+            cost: 1,
+          },
+        ],
+      },
+    ],
   },
   yinan: {
     art: '/assets/yinan/132.png',
     nameplate: '/assets/yinan/205.png',
-    role: '',
-    tag: '',
-    ex: false,
-    sections: [],
+    role: 'White-haired wolf girl with 450 life',
+    tag: 'A wolf girl with 450 life who borrows armour, mecha and costumes for her moves and switches between a Normal and an EX type for half a stock; under 150 life her Eat leaps to catch a jumping opponent and heal her.',
+    ex: true,
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Punch / kick chain',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A punch and a kick, each chaining on a hit into a second and third with <kbd>G</kbd> or <kbd>H</kbd>; on a hit, her normals cancel into a special or super.',
+            cost: 0,
+          },
+          {
+            name: 'Crouch',
+            input:
+              '<span class="motion">↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'Either strikes low.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Both strike, in other forms after a double jump or an air dash.',
+            cost: 0,
+          },
+          {
+            name: 'Double jump / air dash',
+            input: '<kbd>W</kbd>, <span class="motion">→→</span> in air',
+            desc: 'She double jumps and air dashes.',
+            cost: 0,
+          },
+          {
+            name: 'Run',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Runs while → is held, jumping out on ↑ or into Savage on → with <kbd>H</kbd>; Shift with ← dashes back.',
+            cost: 0,
+          },
+          {
+            name: 'Hit Up',
+            input: '<kbd>K</kbd>',
+            desc: 'A launcher that ↑ follows with a jump.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: '—',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Driver',
+            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: "A strike that ← or → with <kbd>G</kbd> or <kbd>H</kbd> follows into four armoured attacks (EX: a rushing punch); on a hit, cancels into its supers' SC forms for two stocks.",
+            cost: 0,
+          },
+          {
+            name: 'Assault',
+            input: '<kbd>I</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'A long rush (EX: rapid fists that more <kbd>G</kbd> extends).',
+            cost: 0,
+          },
+          {
+            name: 'DogeAttack',
+            input: '<kbd>F</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            desc: 'A dodge back that <kbd>G</kbd>, <kbd>H</kbd>, <kbd>O</kbd> or <kbd>K</kbd> (a rising Dragon) follows, also a dive in the air (EX: a counter stance in a Bonta-kun suit or, in the air, a P90 burst).',
+            cost: 0,
+          },
+          {
+            name: 'ECS',
+            input:
+              '<kbd>J</kbd> or <span class="motion">↓↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'An unseen dash through (EX: a flashbang).',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'SS',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: "A sniper's aim that <kbd>G</kbd> fires up to four times and <kbd>H</kbd> lowers (EX: a claymore trap).",
+            cost: 1,
+          },
+          {
+            name: 'EN Driver',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd>',
+            desc: "A shield that strikes up close and counters projectiles (EX: a batter's swing).",
+            cost: 1,
+          },
+          {
+            name: 'Eat',
+            input:
+              '<kbd>3</kbd> or <span class="motion">←→←→</span><kbd>G</kbd>',
+            desc: 'Under 150 life only: leaps to catch a jumping opponent and heal her.',
+            cost: 1,
+          },
+          {
+            name: 'EN Chuck',
+            input:
+              '<kbd>4</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            desc: 'A Venom doll that grabs (EX: Lin charges in).',
+            cost: 1,
+          },
+          {
+            name: 'R300',
+            input:
+              '<kbd>5</kbd> or <span class="motion">→←↓→</span><kbd>H</kbd>',
+            desc: 'For three stocks: a shell that calls in her friends.',
+            cost: 3,
+          },
+          {
+            name: 'EN3',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'For three stocks: the Arbalest against a Venom (EX: MUSIKI).',
+            cost: 3,
+          },
+          {
+            name: 'EX Mode',
+            input: '<kbd>E</kbd> or <span class="motion">↓↓</span><kbd>K</kbd>',
+            desc: 'Switches her type for half a stock, changing every special and super.',
+            cost: 0.5,
+          },
+        ],
+      },
+    ],
   },
   aya: {
     art: '/assets/aya/4137.png',
     nameplate: '',
-    role: '',
-    tag: '',
+    role: 'White-haired, bunny-eared girl with 500 life',
+    tag: "A bunny-eared girl with 500 life who dresses as other fighters for her moves; her SHO raises purple pillars and cancels into Slash's and Rocket's SC forms for two stocks.",
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Punch / kick chain',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A punch and a kick, each chaining on a hit into a second and third with <kbd>G</kbd> or <kbd>H</kbd>; on a hit, her normals cancel into a special or super.',
+            cost: 0,
+          },
+          {
+            name: 'Crouch',
+            input:
+              '<span class="motion">↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'Either strikes low.',
+            cost: 0,
+          },
+          {
+            name: 'Air attack',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd> in air',
+            desc: 'Both strike, in other forms after a double jump or an air dash.',
+            cost: 0,
+          },
+          {
+            name: 'Double jump / air dash',
+            input: '<kbd>W</kbd>, <span class="motion">→→</span> in air',
+            desc: 'She double jumps and air dashes.',
+            cost: 0,
+          },
+          {
+            name: 'Dash',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Shift dashes forward, and Shift with ← hops back.',
+            cost: 0,
+          },
+          {
+            name: 'Hit Up',
+            input: '<kbd>K</kbd>',
+            desc: 'A launcher that ↑ follows with a jump.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab into a lightning shock.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'FB',
+            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: "A black mage's fireball; in the air, Air Crush, a dive.",
+            cost: 0,
+          },
+          {
+            name: 'DH',
+            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            desc: 'A caped rush; in the air, Air Kick, a diving kick.',
+            cost: 0,
+          },
+          {
+            name: 'SHO',
+            input:
+              '<kbd>F</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            desc: "A sword stroke that raises purple pillars; cancels into Slash's and Rocket's SC forms for two stocks.",
+            cost: 0,
+          },
+          {
+            name: 'TE P / TE K',
+            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'A long unseen dash that stops beside the opponent, into a leaping slash (<kbd>E</kbd> or <span class="motion">↓←</span><kbd>H</kbd>: TE K).',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Slash',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A crescent hurled from a shield.',
+            cost: 1,
+          },
+          {
+            name: 'Rocket',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'A diving kick that pins the opponent and pummels them from every side, also in the air.',
+            cost: 1,
+          },
+          {
+            name: 'EN3',
+            input:
+              '<kbd>3</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            desc: 'For three stocks: a sword sweep into a holy blast.',
+            cost: 3,
+          },
+        ],
+      },
+    ],
   },
   dora: {
     art: '/assets/dora/273.png',
     nameplate: '',
-    role: '',
-    tag: '',
+    role: 'Muscle-bound blue robot cat with 600 life',
+    tag: "Built on SEAN's file, whose name plate he still wears. Each key presses two of the original six buttons; his motions take the time the other fighters' do, and his keys enter them too.",
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Paired buttons',
+            input: '<kbd>G</kbd><kbd>H</kbd><kbd>K</kbd><kbd>J</kbd>',
+            desc: 'His attacks each take two of the original six buttons, which his keys press together: <kbd>G</kbd> LP, <kbd>H</kbd> LK, <kbd>K</kbd> HP and <kbd>J</kbd> HK — low with ↓ and in the air, where an air dash or a double jump changes their form.',
+            cost: 0,
+          },
+          {
+            name: 'Dash-in punch / kick',
+            input:
+              '<span class="motion">→</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: '→ with <kbd>G</kbd> or <kbd>H</kbd> dashes in with a punch or kick.',
+            cost: 0,
+          },
+          {
+            name: 'Hit Up',
+            input: '<span class="motion">↘</span><kbd>K</kbd>',
+            desc: 'A launcher that ↑ follows with a jump.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>O</kbd> close',
+            desc: 'A grab and beating.',
+            cost: 0,
+          },
+          {
+            name: 'Dash',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Shift dashes forward, and Shift with ← hops back.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Air Cannon',
+            input: '<kbd>U</kbd>',
+            desc: 'A blast from a cannon on his arm that starts too far ahead to hit an opponent close in.',
+            cost: 0,
+          },
+          {
+            name: 'Sky Rise',
+            input: '<kbd>I</kbd>',
+            desc: 'A rising flying punch, also in the air.',
+            cost: 0,
+          },
+          {
+            name: 'Charge',
+            input: '<kbd>F</kbd>',
+            desc: 'A flying rush.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Cannon',
+            input: '<kbd>1</kbd>',
+            desc: 'A shockwave across the screen.',
+            cost: 1,
+          },
+          {
+            name: 'Gadgets',
+            input: '<kbd>2</kbd>',
+            desc: 'Green shells and gadgets that pummel the opponent.',
+            cost: 1,
+          },
+          {
+            name: 'Fists',
+            input: '<kbd>3</kbd>',
+            desc: 'A punch flurry into a dash and uppercut.',
+            cost: 1,
+          },
+          {
+            name: 'Pierce',
+            input: '<kbd>4</kbd>',
+            desc: 'A flying multi-hit rush.',
+            cost: 1,
+          },
+          {
+            name: 'Hug',
+            input: '<kbd>5</kbd>',
+            desc: 'For three stocks: carries the opponent through the Anywhere Door.',
+            cost: 3,
+          },
+          {
+            name: 'EN',
+            input: 'hold <kbd>E</kbd>',
+            desc: 'Charges his gauge; his stocks hold 90 power each, up to five, and once full he taunts, giving the opponent 20.',
+            cost: 0,
+          },
+          {
+            name: 'Command-only moves',
+            input: 'commands only',
+            desc: 'His Twin Hammer, his Anywhere Door teleport and his FK之意思 super take their commands only.',
+            cost: 0,
+          },
+        ],
+      },
+    ],
   },
   rario: {
     art: '/assets/rario/169.png',
     nameplate: '/assets/rario/235.png',
-    role: '',
-    tag: '',
+    role: 'Muscle-bound, barefoot plumber in a red cap with 450 life',
+    tag: "A plumber with 450 life who fights in Ryu's stance; his Shoryu knocks a ? block loose for a coin or a mushroom, and knocked out he jumps straight up and falls through the floor.",
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Punch / kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'A punch that chains into <kbd>H</kbd>, a kick, or a special; both strike in the air. He has no double jump.',
+            cost: 0,
+          },
+          {
+            name: 'Dash',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Shift dashes forward, and Shift with ← hops back.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'Hado',
+            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A dark fireball that bounces along the floor, one at a time.',
+            cost: 0,
+          },
+          {
+            name: 'Shoryu',
+            input:
+              '<kbd>I</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            desc: "A rising uppercut that knocks a ? block loose for a coin, which gives him life and power, or a mushroom that bounces off along the floor and changes the opponent's life as it meets them: one gives 31, a poison one takes 29 and a 1UP gives 50 and a stock.",
+            cost: 0,
+          },
+          {
+            name: 'Tatumaki',
+            input: '<kbd>F</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            desc: 'A hopping spin kick.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — each full gauge becomes one stock, up to three for most fighters.',
+        cost: true,
+        rows: [
+          {
+            name: 'Shinku',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A leap that hurls a red shell along the floor.',
+            cost: 1,
+          },
+          {
+            name: 'Shin Shoryu',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: "For two stocks: a grab into a chain of stomps on the opponent's head that ends at a flagpole.",
+            cost: 2,
+          },
+          {
+            name: 'Knocked out',
+            input: '—',
+            desc: 'He jumps straight up and falls through the floor.',
+            cost: 0,
+          },
+        ],
+      },
+    ],
   },
   training: {
     art: '/assets/training/150.png',
     nameplate: '',
-    role: '',
-    tag: '',
+    role: "RARIO's practice copy with 500 life",
+    tag: "RARIO's practice copy, with his look and 500 life, whose buttons run the training; standing still refills his life and the opponent's power, and empties his. He has no supers, no air attacks and no double jump.",
     ex: false,
-    sections: [],
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Dash',
+            input: '<kbd>⇧</kbd>',
+            desc: 'Shift dashes forward, and Shift with ← hops back. He has no air attacks and no double jump.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Training buttons',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Drain',
+            input: '<kbd>G</kbd>',
+            desc: 'Takes 100 life from the opponent wherever they stand.',
+            cost: 0,
+          },
+          {
+            name: 'Refill',
+            input: '<kbd>H</kbd>',
+            desc: "Refills the opponent's life.",
+            cost: 0,
+          },
+          {
+            name: 'Self KO',
+            input: '<kbd>O</kbd>',
+            desc: 'Knocks himself out.',
+            cost: 0,
+          },
+          {
+            name: 'Standing still',
+            input: '—',
+            desc: "Refills his life and the opponent's power, and empties his.",
+            cost: 0,
+          },
+          {
+            name: 'Uppercut',
+            input: '<kbd>K</kbd>',
+            desc: 'After a three-second countdown.',
+            cost: 0,
+          },
+          {
+            name: 'Hado',
+            input: '<kbd>U</kbd> or <span class="motion">→</span><kbd>K</kbd>',
+            desc: "RARIO's bouncing Hado, after a three-second countdown.",
+            cost: 0,
+          },
+        ],
+      },
+    ],
   },
 } as Record<Who, FighterGuide>;
