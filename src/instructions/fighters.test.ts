@@ -2,7 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import { ROSTER } from './fighters';
-import { GRID, GUIDES_DATA } from './moves';
+import { GRID, GUIDES_DATA, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
@@ -16,6 +16,20 @@ describe('instructions page', () => {
       idOf.get(name),
     );
     expect(ids).toEqual(Object.keys(CHARACTERS));
+  });
+
+  it('tiles the roster inside the 206 x 417 face sheet', () => {
+    expect(GRID.length).toBe(XS.length * YS.length);
+    for (let i = 0; i < GRID.length; i++) {
+      if (GRID[i] === null) continue;
+      expect(XS[i % XS.length] + 24, `col of ${GRID[i]}`).toBeLessThanOrEqual(
+        206,
+      );
+      expect(
+        YS[Math.floor(i / XS.length)] + (i % 2 ? 7 : 0) + 60,
+        `row of ${GRID[i]}`,
+      ).toBeLessThanOrEqual(417);
+    }
   });
 
   it('gives every fighter a complete guide', () => {
