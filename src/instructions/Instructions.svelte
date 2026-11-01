@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { ASSET_BASE } from '../game/assetBase';
   import type { Who } from '../game/characters';
   import { ROSTER } from './fighters';
   import { GRID, GUIDES_DATA, XS, YS } from './moves';
@@ -6,6 +7,12 @@
   const byName = new Map(ROSTER.map((entry) => [entry.name, entry]));
   const byId = new Map(ROSTER.map((entry) => [entry.id, entry]));
   const nameOf = (id: Who) => byId.get(id)?.name ?? id;
+
+  // CSS url()s cannot read ASSET_BASE, so the stylesheet takes them as properties.
+  const root = document.documentElement.style;
+  root.setProperty('--select-bg', `url(${ASSET_BASE}select/15.png)`);
+  root.setProperty('--face-sheet', `url(${ASSET_BASE}select/13.png)`);
+  root.setProperty('--gauge-art', `url(${ASSET_BASE}ui/27.png)`);
 
   // Roster: the select grid's own faces, positioned on its sheet.
   const faces = GRID.flatMap((name, i) => {
@@ -67,7 +74,7 @@
     <summary>Fighter: {nameOf(current)}</summary>
     <img
       class="title"
-      src="/assets/select/2.png"
+      src="{ASSET_BASE}select/2.png"
       alt="Cosplayer select"
       width="256"
       height="37"
@@ -96,13 +103,13 @@
 
   <main>
     <header class="hero">
-      <img class="hero-art" src={guide.art} alt="" />
+      <img class="hero-art" src={ASSET_BASE + guide.art} alt="" />
       <div class="hero-body">
         <div class="name-row">
           <h1>
             {#if guide.nameplate}
               <img
-                src={guide.nameplate}
+                src={ASSET_BASE + guide.nameplate}
                 width="85"
                 height="26"
                 alt={nameOf(current)}
@@ -232,8 +239,7 @@
     margin: 0;
     color: var(--text);
     font: 500 15px/1.5 var(--body);
-    background: var(--cyan) url(/assets/select/15.png) center top / cover fixed
-      no-repeat;
+    background: var(--cyan) var(--select-bg) center top / cover fixed no-repeat;
     image-rendering: pixelated;
   }
   /* Darken the corners so the panels sit in the frame, like the game's vignette. */
@@ -353,8 +359,8 @@
     top: calc(var(--y) * 1px);
     width: 24px;
     height: 60px;
-    background: url(/assets/select/13.png) calc(var(--x) * -1px)
-      calc(var(--y) * -1px) / 206px 417px no-repeat;
+    background: var(--face-sheet) calc(var(--x) * -1px) calc(var(--y) * -1px) /
+      206px 417px no-repeat;
     image-rendering: pixelated;
     filter: brightness(0.74) saturate(0.85);
     transition:
@@ -377,10 +383,10 @@
     z-index: -1;
     background: linear-gradient(var(--gold), var(--ember));
     transform: scale(1.42);
-    -webkit-mask: url(/assets/select/13.png) calc(var(--x) * -1px)
+    -webkit-mask: var(--face-sheet) calc(var(--x) * -1px)
       calc(var(--y) * -1px) / 206px 417px no-repeat;
-    mask: url(/assets/select/13.png) calc(var(--x) * -1px)
-      calc(var(--y) * -1px) / 206px 417px no-repeat;
+    mask: var(--face-sheet) calc(var(--x) * -1px) calc(var(--y) * -1px) / 206px
+      417px no-repeat;
     animation: cursor 1s steps(2) infinite;
   }
   @keyframes cursor {
@@ -680,7 +686,7 @@
     position: relative;
     height: 21px;
     margin-bottom: 12px;
-    background: url(/assets/ui/27.png) 0 0 / 100% 100% no-repeat;
+    background: var(--gauge-art) 0 0 / 100% 100% no-repeat;
     image-rendering: pixelated;
     clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
   }
