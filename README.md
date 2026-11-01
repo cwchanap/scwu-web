@@ -44,6 +44,8 @@ One-time setup:
 
 Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. The art and audio sync (`aws s3 sync`) uploads only what changed and deletes what the export dropped; `generated.tar.gz` is rebuilt and copied on every run. The Workers build refuses to build a commit whose `scripts/export_assets.py` does not match the tarball's `.exporter` fingerprint, so a forgotten re-upload fails the build instead of shipping stale data.
 
+Builds of other branches (Worker Previews) do not inherit production settings. In the Worker's **Settings** → **Build**, add the same `VITE_ASSET_BASE` to the Previews build variables and set the Preview command to `npx wrangler preview` (`wrangler` is not a project dependency, so `bun run wrangler preview` fails the way `bun run deploy` does). `wrangler.jsonc` carries the empty `previews` block that command requires.
+
 ## CI
 
 GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint** (Prettier, ESLint, `svelte-check`, `vite build`), **Run Unit Tests** (Vitest) and **Playwright Tests** (`e2e/`, against the production build). Dependabot (`.github/dependabot.yml`) opens weekly grouped PRs for Bun and Actions updates.
