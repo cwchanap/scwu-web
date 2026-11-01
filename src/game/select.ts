@@ -626,20 +626,17 @@ export const MODES = ['story', 'vs', 'multi'] as const;
 let place = 0;
 
 // The title (0x4080a0) by its state (+0x152): 0 loads T1, 1 plays it, 2 loads
-// T2, 3 waits for a press, 4 sets up the menu and 5 runs it.
+// T2, 3 waits for a press, 4 sets up the menu and 5 runs it. Authored: the
+// port opens on T2, skipping T1's states 0 and 1.
 export class Title extends Screen {
-  state = 0;
+  state = 2;
   // The menu's modes, by MODES' index.
   items: number[] = [];
   // The mode chosen (0x470058).
   done: (typeof MODES)[number] | null = null;
-  // Ticks before T1 reads presses (+0x156), whether a press may skip it
-  // (+0x15a), and T2's countdown back to T1 (+0x15e).
-  private wait = 0;
-  private armed = false;
+  // T2's countdown back to T1 (+0x15e).
   private countdown = 0;
-  // The loaded demo's flags (0x424f04) and ticks left (0x424f08).
-  private flags = 0;
+  // The loaded demo's ticks left (0x424f08).
   private left = 0;
   private cursor: SelectObject | null = null;
   // A menu move or choice waits for every key to be let go (+8).
@@ -657,27 +654,11 @@ export class Title extends Screen {
     const pressed = (now ^ this.previous) & now;
     this.previous = now;
     switch (this.state) {
-      case 0:
-        this.state = 1;
-        this.play('t1');
-        return;
-      case 1:
-        // 0x408122: ten ticks, then a fresh button skips a demo whose flag
-        // allows it, else it runs its ticks out.
-        if (this.wait < 10) {
-          this.wait++;
-          return;
-        }
-        if (this.flags & 1) {
-          if (!(pressed & BUTTONS)) this.armed = true;
-          else if (this.armed) this.state = 2;
-          return;
-        }
-        if (this.left && --this.left === 0) this.state = 2;
-        return;
       case 2:
-        // 0x4081a6: T2, waiting for a press with 0x4438a4's bit 0x40.
-        this.play('t2');
+        // T1's action 2 zeroed globals 0–15 (op 0x1f set records); skipping the
+        // intro keeps its clear at T2's start, restart included (authored).
+        this.globals.fill(0, 0, 16);
+        this.left = this.load('t2').duration;
         this.countdown = this.left;
         this.state = TITLE.flags & 0x40 ? 3 : 4;
         return;
@@ -710,16 +691,9 @@ export class Title extends Screen {
     if (now) this.countdown = this.left;
   }
 
-  // 0x403fc0 loads a demo and 0x406790 makes its objects and reads its flags
-  // and ticks.
-  private play(demo: 't1' | 't2') {
-    const { flags, duration } = this.load(demo);
-    [this.flags, this.left] = [flags, duration];
-  }
-
   private restart() {
     for (const o of this.objects) o.alive = false;
-    this.state = 0;
+    this.state = 2;
   }
 }
 

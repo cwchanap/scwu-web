@@ -4,7 +4,6 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
-import t1 from './generated/t1.json';
 import t2 from './generated/t2.json';
 import {
   battlePalettes,
@@ -89,7 +88,7 @@ export const initialStatus: GameStatus = {
   mode: 'practice',
 };
 const ART_SCALE = 1.5;
-const DEMOS = { select: selectData, t1, t2 };
+const DEMOS = { select: selectData, t2 };
 // A story's demos, loaded as they play.
 type StoryDemoData = Demo & {
   images: { index: number; width: number; height: number; filename: string }[];
