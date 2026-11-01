@@ -424,6 +424,9 @@ export class TrainingScene extends Phaser.Scene {
     // A screen opens unpaused — the dialog's held pause with it.
     this.paused = false;
     this.pausedBefore = false;
+    // A match start still loading when the screen opens is obsolete.
+    this.wanted = undefined;
+    this.loading = false;
     this.clearInput();
     this.report();
   }
@@ -504,9 +507,10 @@ export class TrainingScene extends Phaser.Scene {
       this.storyHeld,
       this.globals,
     );
+    const wasPaused = this.paused;
     this.whenReady(match, () => {
       this.leaveScreen();
-      this.begin(match);
+      this.begin(match, this.paused && !wasPaused);
     });
   }
 
@@ -722,9 +726,11 @@ export class TrainingScene extends Phaser.Scene {
     // A reset the settings dialog asked for keeps the pause it found; the
     // toolbar's and a screen's start unpaused.
     const paused = this.modal && this.pausedBefore;
+    // A pause taken while the match loads (a window blur) is kept too.
+    const wasPaused = this.paused;
     this.whenReady(match, () => {
       if (leave) this.leaveScreen();
-      this.begin(match, paused);
+      this.begin(match, paused || (this.paused && !wasPaused));
     });
   }
   private begin(match: Match, paused = false) {
