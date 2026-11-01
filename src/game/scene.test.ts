@@ -161,3 +161,14 @@ it('keeps a pause taken while a reset is still loading', () => {
   finishLoad();
   expect(scene.paused).toBe(true);
 });
+
+it('keeps a resume pressed while a Settings reset is still loading', () => {
+  const { scene, finishLoad } = boot();
+  scene.togglePause();
+  scene.setModal(true);
+  scene.setFighter('zoma');
+  scene.setModal(false);
+  scene.togglePause();
+  finishLoad();
+  expect(scene.paused).toBe(false);
+});

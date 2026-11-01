@@ -723,14 +723,15 @@ export class TrainingScene extends Phaser.Scene {
             undefined,
             vs ? this.globals : undefined,
           );
-    // A reset the settings dialog asked for keeps the pause it found; the
-    // toolbar's and a screen's start unpaused.
-    const paused = this.modal && this.pausedBefore;
+    // A reset the settings dialog asked for keeps the pause it finds when
+    // the load ends — a resume pressed while it runs stands; the toolbar's
+    // and a screen's start unpaused.
+    const keep = this.modal;
     // A pause taken while the match loads (a window blur) is kept too.
     const wasPaused = this.paused;
     this.whenReady(match, () => {
       if (leave) this.leaveScreen();
-      this.begin(match, paused || (this.paused && !wasPaused));
+      this.begin(match, keep ? this.paused : this.paused && !wasPaused);
     });
   }
   private begin(match: Match, paused = false) {

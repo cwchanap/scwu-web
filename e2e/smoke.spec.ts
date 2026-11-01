@@ -13,10 +13,16 @@ test('boots into a ready arena', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('application').locator('canvas')).toBeVisible();
-  // Disabled until the scene has loaded; the overlay replaces "Loading" on error.
+  // Disabled until the scene has loaded; the overlay replaces "Loading" on
+  // error. Wait for either so a failed load names the overlay, not a Settings
+  // timeout.
   const settings = page.getByRole('button', { name: 'Settings' });
-  await expect(settings).toBeEnabled({ timeout: 60_000 });
-  await expect(page.getByText('Couldn’t enter the arena.')).toBeHidden();
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(settings.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  await expect(settings).toBeEnabled();
 
   // The mode switch lives in the Settings dialog now.
   await settings.click();
