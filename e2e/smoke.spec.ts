@@ -7,6 +7,19 @@ test('boots into a ready arena', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
 
+  // The bucket's CORS allows only the production origin, not this preview
+  // server's, so the browser would block every texture. Add the header here;
+  // the bytes are still the bucket's. Unset (local build), art is same-origin.
+  const bucket = process.env.VITE_ASSET_BASE;
+  if (bucket)
+    await page.route(`${new URL(bucket).origin}/**`, async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({
+        response,
+        headers: { ...response.headers(), 'access-control-allow-origin': '*' },
+      });
+    });
+
   await page.goto('/');
 
   await expect(
