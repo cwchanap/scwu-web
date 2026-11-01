@@ -3,8 +3,8 @@ import type { Mode } from './game/match';
 
 // The consolidated Opponent select's values: each practice partner, plus
 // 'vsCpu' for a real CPU match and 'story' as a placeholder while a story
-// battle runs. Reads status.mode — the App-side mode state never takes
-// 'story', so it cannot see a story battle.
+// battle runs. Reads status.mode, which alone takes 'story' for a battle's
+// duration.
 export const opponentChoiceOf = (mode: Mode, partner: DummyBehavior): string =>
   mode === 'cpu' ? 'vsCpu' : mode === 'story' ? 'story' : partner;
 

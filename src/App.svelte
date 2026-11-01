@@ -12,7 +12,6 @@
 
   let host: HTMLDivElement;
   let session: ReturnType<typeof createGame> | undefined;
-  let mode = $state<Mode>('practice');
   let practice = $state<PracticeOptions>({
     partner: 'stand',
     maxStock: false,
@@ -244,7 +243,6 @@
           session = createGame(host, (next) => {
             status = next;
             [fighter, opponent] = next.fighters;
-            if (next.mode !== 'story') mode = next.mode;
           });
       })
       .catch((error: unknown) => {
@@ -266,9 +264,9 @@
     if (settingsOpen) return;
     (session?.game.canvas ?? host).focus({ preventScroll: true });
   }
-  // A story battle starts over; otherwise the match starts in this mode.
-  function reset(next: Mode = mode) {
-    if (next !== 'story') mode = next;
+  // Restart the match in the picked mode — 'practice' or 'cpu' is all
+  // resetModeOf hands over (menu.ts).
+  function reset(next: Mode) {
     session?.scene.reset(next);
     focusArena();
   }
@@ -282,7 +280,7 @@
     focusArena();
   }
   // The one Opponent select: its value comes from status.mode, which takes
-  // 'story' while a story battle runs (the local mode state never does).
+  // 'story' while a story battle runs.
   const opponentChoice = $derived(
     opponentChoiceOf(status.mode, practice.partner),
   );

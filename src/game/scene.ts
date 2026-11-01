@@ -253,6 +253,9 @@ export class TrainingScene extends Phaser.Scene {
   // last loaded for.
   private players = new Set<Who>();
   private wanted?: Match;
+  // The demo load last asked for (openDemo): a screen opening, a match
+  // start or a newer request supersedes it — `wanted`'s twin for screens.
+  private demoRequest?: object;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -428,8 +431,10 @@ export class TrainingScene extends Phaser.Scene {
     // A screen opens unpaused — the dialog's held pause with it.
     this.paused = false;
     this.pausedBefore = false;
-    // A match start still loading when the screen opens is obsolete.
+    // A match start still loading when the screen opens is obsolete, and a
+    // demo load is too: its screen must not open over this one.
     this.wanted = undefined;
+    this.demoRequest = undefined;
     this.loading = false;
     this.clearInput();
     this.report();
@@ -481,7 +486,12 @@ export class TrainingScene extends Phaser.Scene {
     this.chosen = true;
     this.teams = select.team ? select.teams : null;
     this.palettes = battlePalettes(select.palettes);
-    this.reset(this.teams ? 'cpu' : this.match.mode, true);
+    // Authored: the pair plays in the mode the match it replaces was in —
+    // except a story battle's, whose session ended once a screen opened
+    // past it, so the picks start in free practice rather than restarting
+    // the battle they left.
+    const mode = this.match.mode === 'story' ? 'practice' : this.match.mode;
+    this.reset(this.teams ? 'cpu' : mode, true);
   }
 
   private leaveScreen() {
@@ -538,8 +548,14 @@ export class TrainingScene extends Phaser.Scene {
     index: number,
     make: (demo: StoryDemoData) => StoryDemo | Continue | CharacterSelect,
   ) {
+    // Authored: the request this load answers, superseded by any navigation
+    // or a newer one — an Escape to the title while it runs can't be pulled
+    // back into the screen the load would open. Checked after the module
+    // lands and again after its art, as `wanted` guards a match start.
+    const request = (this.demoRequest = {});
     this.loading = true;
     void STORY_DEMOS[`./generated/demos/${index}.json`]().then((demo) => {
+      if (this.demoRequest !== request) return;
       const prefix = `demo${index}`;
       for (const image of demo.images) {
         selectSizes.set(`${prefix}-${image.index}`, image);
@@ -551,6 +567,7 @@ export class TrainingScene extends Phaser.Scene {
         this.load.audio(key, BASE + sound.filename);
       }
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        if (this.demoRequest !== request) return;
         this.loading = false;
         this.open(make(demo));
       });
@@ -565,6 +582,8 @@ export class TrainingScene extends Phaser.Scene {
   // Only the last match asked for starts.
   private whenReady(match: Match, then: () => void) {
     this.wanted = match;
+    // A match start likewise supersedes a demo load still in flight.
+    this.demoRequest = undefined;
     const players = new Set([
       ...match.fighters.map((f) => f.who),
       ...(match.teams?.flat() ?? []),
