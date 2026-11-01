@@ -64,8 +64,14 @@ export const YS: readonly number[] = [0, 70, 140, 210, 280, 350];
 
 // name/input/desc are authored static HTML, exactly the mockup's cell contents.
 export interface FighterGuide {
+  // Image paths here are relative to the assets root; the page prefixes
+  // ASSET_BASE (the Cloudflare build serves art from R2, not this origin).
   art: string;
-  nameplate: string; // empty = render the fighter's display name as text
+  // The game's own name lettering: the image of the fighter's *name action,
+  // which its Vs. intro shows. Empty (the display name as text) only for the
+  // three whose file has none: ASTROMAN's VS NAME is a portrait, DoraEmon's is
+  // SEAN's lettering and TRAINING has no banner.
+  nameplate: string;
   role: string;
   tag: string;
   ex: boolean;
@@ -84,57 +90,57 @@ export interface FighterGuide {
 // action shows (from the game's select data — the exact art the character
 // select screen stands beside the grid), exported with the fighter.
 export const FACES: Record<Who, string> = {
-  ryuko: '/assets/ryuko/419.png',
-  zoma: '/assets/zoma/131.png',
-  kiki: '/assets/kiki/137.png',
-  chung: '/assets/chung/116.png',
-  amiro: '/assets/amiro/134.png',
-  anmc: '/assets/anmc/151.png',
-  giant: '/assets/giant/132.png',
-  suneo: '/assets/suneo/158.png',
-  yo: '/assets/yo/118.png',
-  sin: '/assets/sin/118.png',
-  lizard: '/assets/lizard/146.png',
-  kay: '/assets/kay/125.png',
-  dido: '/assets/dido/147.png',
-  sakuya: '/assets/sakuya/414.png',
-  alex: '/assets/alex/345.png',
-  sou: '/assets/sou/305.png',
-  hiso: '/assets/hiso/410.png',
-  erus: '/assets/erus/345.png',
-  feng: '/assets/feng/410.png',
-  sean: '/assets/sean/140.png',
-  gon: '/assets/gon/452.png',
-  kate: '/assets/kate/268.png',
-  remu: '/assets/remu/418.png',
-  rear: '/assets/rear/385.png',
-  gigi: '/assets/gigi/288.png',
-  sww: '/assets/sww/176.png',
-  ogi: '/assets/ogi/647.png',
-  ziro: '/assets/ziro/476.png',
-  masa: '/assets/masa/267.png',
-  times: '/assets/times/113.png',
-  zenka: '/assets/zenka/152.png',
-  zmega: '/assets/zmega/317.png',
-  alpha: '/assets/alpha/575.png',
-  shinz: '/assets/shinz/318.png',
-  zaku: '/assets/zaku/113.png',
-  pachelo: '/assets/pachelo/115.png',
-  golf: '/assets/golf/113.png',
-  asura: '/assets/asura/113.png',
-  ttro: '/assets/ttro/130.png',
-  astroman: '/assets/astroman/220.png',
-  yinan: '/assets/yinan/132.png',
-  aya: '/assets/aya/132.png',
-  dora: '/assets/dora/140.png',
-  rario: '/assets/rario/234.png',
-  training: '/assets/training/234.png',
+  ryuko: 'ryuko/419.png',
+  zoma: 'zoma/131.png',
+  kiki: 'kiki/137.png',
+  chung: 'chung/116.png',
+  amiro: 'amiro/134.png',
+  anmc: 'anmc/151.png',
+  giant: 'giant/132.png',
+  suneo: 'suneo/158.png',
+  yo: 'yo/118.png',
+  sin: 'sin/118.png',
+  lizard: 'lizard/146.png',
+  kay: 'kay/125.png',
+  dido: 'dido/147.png',
+  sakuya: 'sakuya/414.png',
+  alex: 'alex/345.png',
+  sou: 'sou/305.png',
+  hiso: 'hiso/410.png',
+  erus: 'erus/345.png',
+  feng: 'feng/410.png',
+  sean: 'sean/140.png',
+  gon: 'gon/452.png',
+  kate: 'kate/268.png',
+  remu: 'remu/418.png',
+  rear: 'rear/385.png',
+  gigi: 'gigi/288.png',
+  sww: 'sww/176.png',
+  ogi: 'ogi/647.png',
+  ziro: 'ziro/476.png',
+  masa: 'masa/267.png',
+  times: 'times/113.png',
+  zenka: 'zenka/152.png',
+  zmega: 'zmega/317.png',
+  alpha: 'alpha/575.png',
+  shinz: 'shinz/318.png',
+  zaku: 'zaku/113.png',
+  pachelo: 'pachelo/115.png',
+  golf: 'golf/113.png',
+  asura: 'asura/113.png',
+  ttro: 'ttro/130.png',
+  astroman: 'astroman/220.png',
+  yinan: 'yinan/132.png',
+  aya: 'aya/132.png',
+  dora: 'dora/140.png',
+  rario: 'rario/234.png',
+  training: 'training/234.png',
 };
 
 export const GUIDES_DATA = {
   ryuko: {
     art: FACES.ryuko,
-    nameplate: '/assets/ryuko/464.png',
+    nameplate: 'ryuko/464.png',
     role: 'Getter pilot',
     tag: 'All-round hero. Chains up to three from any standing punch or kick, and cancels any connected hit into his specials and supers.',
     ex: true,
@@ -291,7 +297,7 @@ export const GUIDES_DATA = {
   // display name as text.
   zoma: {
     art: FACES.zoma,
-    nameplate: '/assets/zoma/340.png',
+    nameplate: 'zoma/340.png',
     role: 'Vanishing dragon strikes',
     tag: 'Chains three from any standing punch or kick; runs while forward is held, and below 30% health his fourth super becomes Shin Spark.',
     ex: false,
@@ -412,7 +418,7 @@ export const GUIDES_DATA = {
   },
   kiki: {
     art: FACES.kiki,
-    nameplate: '/assets/kiki/217.png',
+    nameplate: 'kiki/217.png',
     role: "A branching K' and eleven fireballs",
     tag: "Chains as Zoma's; her K' branches into a dashing strike, a shot or BLACK OUT, and MAGIC FIRE throws eleven fireballs.",
     ex: false,
@@ -519,7 +525,7 @@ export const GUIDES_DATA = {
   },
   chung: {
     art: FACES.chung,
-    nameplate: '/assets/chung/375.png',
+    nameplate: 'chung/375.png',
     role: 'Wall kicks and thrown stars',
     tag: "Chains as Zoma's; his jump wall move clings to the wall, and gesar and lee turn Evil below 30% health.",
     ex: true,
@@ -652,7 +658,7 @@ export const GUIDES_DATA = {
   },
   amiro: {
     art: FACES.amiro,
-    nameplate: '/assets/amiro/336.png',
+    nameplate: 'amiro/427.png',
     role: 'Meteor drops and beam drones',
     tag: "Chains as Chung's; her Coment chuck throws straight up, and NT, funnal and medeo take Evil forms below 30% health.",
     ex: true,
@@ -775,7 +781,7 @@ export const GUIDES_DATA = {
   },
   anmc: {
     art: FACES.anmc,
-    nameplate: '/assets/anmc/183.png',
+    nameplate: 'anmc/183.png',
     role: 'Rocket leaps and beam-firing balls',
     tag: "Chains as Chung's; both of his shots also work in the air, and in EX mode he guards in a winged bird costume instead of his mecha suit.",
     ex: true,
@@ -888,7 +894,7 @@ export const GUIDES_DATA = {
   },
   giant: {
     art: FACES.giant,
-    nameplate: '/assets/giant/349.png',
+    nameplate: 'giant/349.png',
     role: 'Rocket punches and baseball pitches',
     tag: "Chains as Chung's; his counter eats double damage before striking back, and his chuck ends with a song that explodes.",
     ex: true,
@@ -1010,7 +1016,7 @@ export const GUIDES_DATA = {
   },
   suneo: {
     art: FACES.suneo,
-    nameplate: '',
+    nameplate: 'suneo/601.png',
     role: 'Lion rider',
     tag: "Chains as Chung's; her BIKE leaps on a golden lion, and below 30% health hh shocks the whole screen for three stocks.",
     ex: true,
@@ -1138,7 +1144,7 @@ export const GUIDES_DATA = {
   },
   yo: {
     art: FACES.yo,
-    nameplate: '',
+    nameplate: 'yo/390.png',
     role: 'Monster costume',
     tag: 'In a costume for most moves; ZOMBI WALK bites to heal her, and HIDDEN surfaces below 30% health.',
     ex: false,
@@ -1267,7 +1273,7 @@ export const GUIDES_DATA = {
   },
   sin: {
     art: FACES.sin,
-    nameplate: '',
+    nameplate: 'sin/368.png',
     role: 'Shapeshifter',
     tag: 'Another guise for most moves; RUN CHUCK and Clack chuck hit harder below 30% health, where he stands in a red blaze.',
     ex: true,
@@ -1403,7 +1409,7 @@ export const GUIDES_DATA = {
   },
   lizard: {
     art: FACES.lizard,
-    nameplate: '/assets/lizard/217.png',
+    nameplate: 'lizard/217.png',
     role: 'Mecha changer',
     tag: 'A man in a yellow suit who becomes a different mecha or armor for most moves; no EX mode, and HIDDEN waits below 30% health.',
     ex: false,
@@ -1519,7 +1525,7 @@ export const GUIDES_DATA = {
   },
   kay: {
     art: FACES.kay,
-    nameplate: '',
+    nameplate: 'kay/464.png',
     role: 'Monkey-faced boy',
     tag: 'Dresses up as a different angel or mecha for most moves; EX swaps most of them, and his air guards free him after 6 ticks.',
     ex: true,
@@ -1654,7 +1660,7 @@ export const GUIDES_DATA = {
   },
   dido: {
     art: FACES.dido,
-    nameplate: '/assets/dido/258.png',
+    nameplate: 'dido/258.png',
     role: 'Costume fighter',
     tag: 'A blonde girl in a black dress who dresses up as a different armored figure or mecha; ↑ during a forward dash is a long jump.',
     ex: false,
@@ -1788,7 +1794,7 @@ export const GUIDES_DATA = {
   },
   sakuya: {
     art: FACES.sakuya,
-    nameplate: '/assets/sakuya/445.png',
+    nameplate: 'sakuya/445.png',
     role: 'Swordswoman',
     tag: 'A brown-haired girl in purple who dresses up as a different swordswoman, armored figure or mecha; seven specials, two of them on 4 and 5.',
     ex: true,
@@ -1929,7 +1935,7 @@ export const GUIDES_DATA = {
   },
   alex: {
     art: FACES.alex,
-    nameplate: '/assets/alex/362.png',
+    nameplate: 'alex/362.png',
     role: 'Armored hero',
     tag: 'A boy in a cap who dresses up as a different armored hero or mecha for most moves; REFLACT turns projectiles back and en300 summons a white mecha dragon.',
     ex: true,
@@ -2058,7 +2064,7 @@ export const GUIDES_DATA = {
   },
   sou: {
     art: FACES.sou,
-    nameplate: '',
+    nameplate: 'sou/329.png',
     role: 'Mecha pilot',
     tag: 'A boy in a white headband who dresses up as a black-armored mecha or a helmeted pilot; EX mode calls beast mechas — panther, lion, eagle jet and mammoth.',
     ex: true,
@@ -2205,7 +2211,7 @@ export const GUIDES_DATA = {
   },
   hiso: {
     art: FACES.hiso,
-    nameplate: '/assets/hiso/445.png',
+    nameplate: 'hiso/445.png',
     role: 'Boy in a red sleeveless top',
     tag: 'Dresses up as a different character for most moves; his counter stance has a machine-gun man fire back, and en300 for three stocks calls a dark giant.',
     ex: false,
@@ -2334,7 +2340,7 @@ export const GUIDES_DATA = {
   },
   erus: {
     art: FACES.erus,
-    nameplate: '/assets/erus/366.png',
+    nameplate: 'erus/366.png',
     role: 'Blond figure in a black coat',
     tag: 'Dresses up as a different character for most moves; her Coin, seven uses in all before every other press fails, and EX mode takes a full stock.',
     ex: true,
@@ -2477,7 +2483,7 @@ export const GUIDES_DATA = {
   },
   feng: {
     art: FACES.feng,
-    nameplate: '/assets/feng/449.png',
+    nameplate: 'feng/449.png',
     role: 'Blue-haired boy in glasses',
     tag: "Dresses up as a different character for most moves; ↑ during a forward dash is a High Jump, and below 30% health his crouching punch, iori's sword and bp take their Evil forms.",
     ex: true,
@@ -2611,7 +2617,7 @@ export const GUIDES_DATA = {
   },
   sean: {
     art: FACES.sean,
-    nameplate: '/assets/sean/247.png',
+    nameplate: 'sean/247.png',
     role: 'Bald old monk in green robes',
     tag: 'Calls up a different character for most moves; ↑ during a forward dash is a High Jump, and below 30% health S Shoot takes its Evil form.',
     ex: false,
@@ -2732,7 +2738,7 @@ export const GUIDES_DATA = {
   },
   gon: {
     art: FACES.gon,
-    nameplate: '',
+    nameplate: 'gon/654.png',
     role: 'Brown-haired boy with goggles',
     tag: "Puts on a different creature's costume for most moves; ↑ during a forward dash is a High Jump, and only below 30% health does his Hidden en300 call a white-caped knight with him.",
     ex: true,
@@ -2879,7 +2885,7 @@ export const GUIDES_DATA = {
   },
   kate: {
     art: FACES.kate,
-    nameplate: '/assets/kate/276.png',
+    nameplate: 'kate/276.png',
     role: 'Blue-haired girl in a pink top',
     tag: 'Puts on a different costume for most moves; her Air fire leaves a blue star hovering that the ground follow-up drops, and below 30% health SLASH SUPER takes its Evil form.',
     ex: false,
@@ -3001,7 +3007,7 @@ export const GUIDES_DATA = {
   },
   remu: {
     art: FACES.remu,
-    nameplate: '/assets/remu/428.png',
+    nameplate: 'remu/428.png',
     role: 'Blond fighter in a teal jacket',
     tag: 'Puts on a different costume for most moves; his MINAMI works only at 155 health or less, and GOLD HAND for three stocks lands well ahead of him.',
     ex: false,
@@ -3136,7 +3142,7 @@ export const GUIDES_DATA = {
   },
   rear: {
     art: FACES.rear,
-    nameplate: '/assets/rear/387.png',
+    nameplate: 'rear/387.png',
     role: 'Masked blond fighter in a grey gi',
     tag: 'Puts on a different costume for most moves; his GYSA super raises a pink crystal (three, below 30% health), and evil en3 needs below 30% health and all three stocks.',
     ex: false,
@@ -3264,7 +3270,7 @@ export const GUIDES_DATA = {
   },
   gigi: {
     art: FACES.gigi,
-    nameplate: '/assets/gigi/328.png',
+    nameplate: 'gigi/328.png',
     role: 'Big-headed grunt in a black mask',
     tag: 'An FK crest and a skeleton-striped suit; his Change form for half a stock swaps his specials and two supers, and DIVE sinks him into the floor.',
     ex: false,
@@ -3386,7 +3392,7 @@ export const GUIDES_DATA = {
   },
   sww: {
     art: FACES.sww,
-    nameplate: '/assets/sww/399.png',
+    nameplate: 'sww/399.png',
     role: 'Red-haired boy in a red shirt',
     tag: 'Changes into a different suit of armour for each move, and into gold armour at 30% life or less; there ROLL CRASH for two stocks knocks out both fighters, and Healing restores 160 life.',
     ex: true,
@@ -3528,7 +3534,7 @@ export const GUIDES_DATA = {
   },
   ogi: {
     art: FACES.ogi,
-    nameplate: '/assets/ogi/108.png',
+    nameplate: 'ogi/648.png',
     role: 'White-haired, green-armed strongman',
     tag: 'Suits up in a different robot armour, or a caped red coat, for most moves; his Rose attack lands far off, taking 35 power, and at 30% life or less his third kick is a longer beating.',
     ex: false,
@@ -3656,7 +3662,7 @@ export const GUIDES_DATA = {
   },
   ziro: {
     art: FACES.ziro,
-    nameplate: '/assets/ziro/478.png',
+    nameplate: 'ziro/478.png',
     role: 'Teal-haired young man',
     tag: 'Calls up a different robot suit for most moves; his Fire Ball throws two at 30% life or less, and below 30% life TWIN SHOT sweeps twin beams round the whole screen.',
     ex: true,
@@ -3791,7 +3797,7 @@ export const GUIDES_DATA = {
   },
   masa: {
     art: FACES.masa,
-    nameplate: '/assets/masa/139.png',
+    nameplate: 'masa/139.png',
     role: 'Blond pilot in red armour',
     tag: "Swings a purple axe and swells into a bigger robot for his heaviest blows; his SCC super is a grab into the big robot's blows and a throw into the wall.",
     ex: false,
@@ -3904,7 +3910,7 @@ export const GUIDES_DATA = {
   },
   times: {
     art: FACES.times,
-    nameplate: '/assets/times/139.png',
+    nameplate: 'times/139.png',
     role: 'Blond pilot with two shadows',
     tag: "A blond pilot in red armour like MASA's, swinging a purple axe; he dashes with two shadows of himself and has no Hit Up, chuck, double jump, air dash or Counter Attack.",
     ex: false,
@@ -4005,7 +4011,7 @@ export const GUIDES_DATA = {
   },
   zenka: {
     art: FACES.zenka,
-    nameplate: '/assets/zenka/333.png',
+    nameplate: 'zenka/333.png',
     role: 'Silver-haired woman in a red coat',
     tag: "Fights with a knife and calls in robots — a blue drill robot, a red robot and her own purple armour; her En300 grab strips the opponent's clothes for 260 life.",
     ex: false,
@@ -4118,7 +4124,7 @@ export const GUIDES_DATA = {
   },
   zmega: {
     art: FACES.zmega,
-    nameplate: '/assets/zmega/322.png',
+    nameplate: 'zmega/322.png',
     role: 'Moustached brawler in a black vest',
     tag: 'Turns into Shin Z at a keypress, trading life for power; he double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
@@ -4225,7 +4231,7 @@ export const GUIDES_DATA = {
   },
   alpha: {
     art: FACES.alpha,
-    nameplate: '/assets/alpha/576.png',
+    nameplate: 'alpha/576.png',
     role: 'Boy in a chained white suit',
     tag: "Fights through four armours — a white tiger's, a green knight's, a red one with a snake and a winged blue one; a hit with NC cancels into SNAKE FIRE, Rambu or SCC for two stocks.",
     ex: false,
@@ -4353,7 +4359,7 @@ export const GUIDES_DATA = {
   },
   shinz: {
     art: FACES.shinz,
-    nameplate: '/assets/shinz/323.png',
+    nameplate: 'shinz/323.png',
     role: 'Moustached brawler in a black vest',
     tag: 'Z-MEGA as Shin Z for good; a hit from his basics is followed by H, a special or a super, and on a hit a super cancels SAMA, Fire BALL, REFLACT or GAISA. He double jumps and air dashes.',
     ex: false,
@@ -4461,7 +4467,7 @@ export const GUIDES_DATA = {
   },
   zaku: {
     art: FACES.zaku,
-    nameplate: '/assets/zaku/139.png',
+    nameplate: 'zaku/139.png',
     role: 'Squat green trooper with 200 life',
     tag: 'A trooper with only 200 life who swings a purple axe and lobs grenades; he has no double jump, air dash, Hit Up or chuck.',
     ex: false,
@@ -4535,7 +4541,7 @@ export const GUIDES_DATA = {
   },
   pachelo: {
     art: FACES.pachelo,
-    nameplate: '/assets/pachelo/149.png',
+    nameplate: 'pachelo/149.png',
     role: 'Yellow Pac-Man robot with 200 life',
     tag: 'A Pac-Man robot with only 200 life who rolls along instead of running; his Roll charge bounces him off on a hit or guard, and on a hit G or H cancels into a special or the super.',
     ex: false,
@@ -4603,7 +4609,7 @@ export const GUIDES_DATA = {
   },
   golf: {
     art: FACES.golf,
-    nameplate: '/assets/golf/155.png',
+    nameplate: 'golf/155.png',
     role: 'Squat blue trooper with 300 life',
     tag: 'A trooper with 300 life who slashes with a glowing sword and lashes a whip; on a hit G cancels into H, a special or the super; no double jump, air dash, Hit Up or chuck.',
     ex: false,
@@ -4676,7 +4682,7 @@ export const GUIDES_DATA = {
   },
   asura: {
     art: FACES.asura,
-    nameplate: '/assets/asura/137.png',
+    nameplate: 'asura/137.png',
     role: 'Hooded brawler with only 300 life',
     tag: 'A hooded brawler with only 300 life whose punches and kicks come three at a time; his Tatumaki rises and drifts forward. No double jump, air dash, Hit Up or chuck.',
     ex: false,
@@ -4744,7 +4750,7 @@ export const GUIDES_DATA = {
   },
   ttro: {
     art: FACES.ttro,
-    nameplate: '/assets/ttro/170.png',
+    nameplate: 'ttro/170.png',
     role: 'Huge grey Totoro with 820 life',
     tag: 'A huge Totoro with 820 life whose steps shake the screen; under his umbrella he double jumps and air dashes, and has no Hit Up or Counter Attack.',
     ex: false,
@@ -4957,7 +4963,7 @@ export const GUIDES_DATA = {
   },
   yinan: {
     art: FACES.yinan,
-    nameplate: '/assets/yinan/205.png',
+    nameplate: 'yinan/349.png',
     role: 'Wolf girl with 450 life',
     tag: 'A wolf girl who borrows armour, mecha and costumes and switches between a Normal and an EX type for half a stock; under 150 life her Eat leaps to catch a jumping opponent and heal her.',
     ex: true,
@@ -5102,7 +5108,7 @@ export const GUIDES_DATA = {
   },
   aya: {
     art: FACES.aya,
-    nameplate: '',
+    nameplate: 'aya/349.png',
     role: 'Bunny-eared girl with 500 life',
     tag: "A bunny-eared girl with 500 life who dresses as other fighters for her moves; her SHO raises purple pillars and, on a hit, cancels into Slash's and Rocket's SC forms for two stocks.",
     ex: false,
@@ -5257,9 +5263,9 @@ export const GUIDES_DATA = {
             cost: 0,
           },
           {
-            name: 'Dash',
-            input: '<kbd>⇧</kbd>',
-            desc: 'Shift dashes forward, and Shift with ← hops back.',
+            name: 'Dash / Hop back',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Shift, or a double-tap of →, dashes forward; Shift with ←, or ←←, hops back. In the air, an air dash.',
             cost: 0,
           },
         ],
@@ -5271,20 +5277,44 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Air Cannon',
-            input: '<kbd>U</kbd>',
+            input:
+              '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
             desc: 'A blast from a cannon on his arm that starts too far ahead to hit an opponent close in.',
             cost: 0,
           },
           {
             name: 'Sky Rise',
-            input: '<kbd>I</kbd>',
+            input:
+              '<kbd>I</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
             desc: 'A rising flying punch, also in the air.',
             cost: 0,
           },
           {
             name: 'Charge',
-            input: '<kbd>F</kbd>',
+            input:
+              '<kbd>F</kbd> or <span class="motion">↓→</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
             desc: 'A flying rush.',
+            cost: 0,
+          },
+          {
+            name: 'Twin Hammer',
+            input:
+              '<span class="motion">↓←</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
+            desc: 'A dashing punch into an uppercut. No key; the motion only.',
+            cost: 0,
+          },
+          {
+            name: 'Anywhere Door <em>forward</em>',
+            input:
+              '<span class="motion">↓↓</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
+            desc: 'Teleports forward through the Anywhere Door. No key; the motion only.',
+            cost: 0,
+          },
+          {
+            name: 'Anywhere Door <em>back</em>',
+            input:
+              '<span class="motion">↓↓</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
+            desc: 'Teleports back through the Anywhere Door. No key; the motion only.',
             cost: 0,
           },
         ],
@@ -5296,32 +5326,44 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Cannon',
-            input: '<kbd>1</kbd>',
+            input:
+              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
             desc: 'A shockwave across the screen.',
             cost: 1,
           },
           {
             name: 'Gadgets',
-            input: '<kbd>2</kbd>',
+            input:
+              '<kbd>2</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
             desc: 'Green shells and gadgets that pummel the opponent.',
             cost: 1,
           },
           {
             name: 'Fists',
-            input: '<kbd>3</kbd>',
+            input:
+              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
             desc: 'A punch flurry into a dash and uppercut.',
             cost: 1,
           },
           {
             name: 'Pierce',
-            input: '<kbd>4</kbd>',
+            input:
+              '<kbd>4</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
             desc: 'A flying multi-hit rush.',
             cost: 1,
           },
           {
             name: 'Hug',
-            input: '<kbd>5</kbd>',
+            input:
+              '<kbd>5</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>K</kbd>',
             desc: 'For three stocks: carries the opponent through the Anywhere Door.',
+            cost: 3,
+          },
+          {
+            name: 'FK之意思',
+            input:
+              '<span class="motion">→←↓→</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
+            desc: 'For three stocks: a leap into a flashing barrage. No key; the motion only.',
             cost: 3,
           },
           {
@@ -5330,19 +5372,13 @@ export const GUIDES_DATA = {
             desc: 'Charges his gauge; his stocks hold 90 power each, up to five, and once full he taunts, giving the opponent 20.',
             cost: 0,
           },
-          {
-            name: 'Command-only moves',
-            input: 'commands only',
-            desc: 'His Twin Hammer, his Anywhere Door teleport and his FK之意思 super take their commands only.',
-            cost: 0,
-          },
         ],
       },
     ],
   },
   rario: {
     art: FACES.rario,
-    nameplate: '/assets/rario/235.png',
+    nameplate: 'rario/235.png',
     role: 'Barefoot plumber with 450 life',
     tag: "A plumber with 450 life who fights in Ryu's stance; his Shoryu knocks a ? block loose for a coin or a mushroom, and knocked out he jumps straight up and falls through the floor.",
     ex: false,

@@ -1,6 +1,7 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
+import type { Who } from '../game/characters';
 import { ROSTER } from './fighters';
 import { GRID, GUIDES_DATA, FACES, XS, YS } from './moves';
 
@@ -50,11 +51,57 @@ describe('instructions page', () => {
     for (const entry of ROSTER) {
       const guide = GUIDES_DATA[entry.id];
       expect(guide, entry.id).toBeTruthy();
-      expect(statSync(`public${guide.art}`).isFile(), entry.id).toBe(true);
+      expect(statSync(`public/assets/${guide.art}`).isFile(), entry.id).toBe(
+        true,
+      );
       if (guide.nameplate !== '') {
-        expect(statSync(`public${guide.nameplate}`).isFile(), entry.id).toBe(
-          true,
-        );
+        expect(
+          statSync(`public/assets/${guide.nameplate}`).isFile(),
+          entry.id,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("uses each fighter's in-game name lettering as the header plate", () => {
+    // The *name action the Vs. intro shows: a looping, facing-independent
+    // script whose 100-tick first frame is a banner no taller than 40 px.
+    // ASTROMAN's VS NAME is a portrait, DoraEmon's is SEAN's lettering and
+    // TRAINING has no banner, so those three draw their name as text.
+    type Script = {
+      loop: number;
+      frames: {
+        image: number;
+        duration: number;
+        width: number;
+        height: number;
+        ignore_facing: boolean;
+      }[];
+    };
+    const plateOf = (id: Who) => {
+      const { scripts } = CHARACTERS[id] as unknown as {
+        scripts: Record<string, Script>;
+      };
+      const found = Object.entries(scripts).flatMap(([name, script]) => {
+        const f = script.frames[0];
+        return !name.includes('+') &&
+          script.loop === -1 &&
+          f?.ignore_facing &&
+          f.duration === 100 &&
+          f.height <= 40 &&
+          f.width <= 260
+          ? [f.image]
+          : [];
+      });
+      expect(found.length, id).toBe(1);
+      return `${id}/${found[0]}.png`;
+    };
+    for (const entry of ROSTER) {
+      const plate = GUIDES_DATA[entry.id].nameplate;
+      if (['astroman', 'dora', 'training'].includes(entry.id)) {
+        expect(plate, entry.id).toBe('');
+      } else {
+        expect(plate, entry.id).toBe(plateOf(entry.id));
       }
     }
   });
@@ -65,7 +112,16 @@ describe('instructions page', () => {
     }
   });
 
-  it('imports nothing from the game or Phaser at runtime', () => {
+  it('names art by ASSET_BASE, never a hardcoded /assets/', () => {
+    // The Cloudflare build serves art from R2, so a root-relative URL 404s there.
+    for (const name of ['moves.ts', 'Instructions.svelte']) {
+      expect(readFileSync(here + name, 'utf8'), name).not.toMatch(
+        /['"`(]\/assets\//,
+      );
+    }
+  });
+
+  it('imports nothing from the game or Phaser at runtime, but ASSET_BASE', () => {
     const sources = readdirSync(here).filter(
       (name) => /\.(ts|svelte)$/.test(name) && name !== 'fighters.test.ts',
     );
@@ -73,7 +129,7 @@ describe('instructions page', () => {
       expect(
         stripTypeImports(readFileSync(here + name, 'utf8')),
         name,
-      ).not.toMatch(/from '[^']*(game\/|\bphaser\b)/);
+      ).not.toMatch(/from '(?![^']*game\/assetBase')[^']*(game\/|\bphaser\b)/);
     }
     expect(readFileSync(here + '../../instructions.html', 'utf8')).toContain(
       'src/instructions/main.ts',
