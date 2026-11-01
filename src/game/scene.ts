@@ -327,6 +327,16 @@ export class TrainingScene extends Phaser.Scene {
       this.held.add(e.code);
       if (!e.repeat) this.pressed.add(keyMap[e.code]);
     }
+    // Esc on a select screen goes back to the title, not pause (authored).
+    if (
+      !e.repeat &&
+      e.code === 'Escape' &&
+      this.select instanceof CharacterSelect
+    ) {
+      e.preventDefault();
+      this.openTitle();
+      return;
+    }
     if (!e.repeat && (e.code === 'Escape' || e.code === 'KeyP')) {
       e.preventDefault();
       this.togglePause();
