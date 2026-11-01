@@ -66,7 +66,9 @@ and let Esc leave the character select for the title.
   accents):
   - **Opponent** select — optgroup "Practice partner": Stand, Guard, Crouch
     guard, Air guard, Attack, Jump in, CPU partner; optgroup "Match":
-    Vs. CPU.
+    Vs. CPU. While a story battle runs it shows a disabled "Story mode"
+    entry (`status.mode` is `'story'`, which the App-side `mode` state never
+    takes); picking any real option leaves the story for that mode.
   - **Fighter** / **Opponent** / **Stage** selects (existing data).
   - **Music** — switch, bound to a new `music` field on `GameStatus`.
   - **Max stock** / **Low health** checkboxes — enabled for the practice
