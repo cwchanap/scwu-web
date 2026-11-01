@@ -368,7 +368,7 @@ kbd {
     display: none;
   }
 }
-@media (max-height: 550px) and (min-width: 701px) {
+@media (max-height: 550px) and (min-width: 701px) and (pointer: coarse) {
   .keyboard-guide,
   .floating-controls kbd {
     display: none;

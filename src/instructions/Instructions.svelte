@@ -46,7 +46,7 @@
   let hovered = $state<string | null>(null);
   const pick = $derived(hovered ?? nameOf(current));
   const show = (e: Event) => {
-    const a = (e.target as Element).closest('a');
+    const a = e.type === 'focusout' ? null : (e.target as Element).closest('a');
     hovered = a ? a.getAttribute('aria-label') : null;
   };
 
@@ -206,6 +206,35 @@
 </div>
 
 <style>
+  /* The two families' latin subsets, self-hosted in public/fonts/. */
+  @font-face {
+    font-family: 'Barlow Semi Condensed';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('/fonts/barlow-semi-condensed-500.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Barlow Semi Condensed';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('/fonts/barlow-semi-condensed-600.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Barlow Semi Condensed';
+    font-style: normal;
+    font-weight: 700;
+    font-display: swap;
+    src: url('/fonts/barlow-semi-condensed-700.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'Exo 2';
+    font-style: italic;
+    font-weight: 900;
+    font-display: swap;
+    src: url('/fonts/exo-2-italic-900.woff2') format('woff2');
+  }
   /* Colours are sampled from the game: the select screen's cyan backdrop
      and select blue, the power gauge's gold-to-red ramp, the 1P block's
      ink, and the brushed-steel panel. */
