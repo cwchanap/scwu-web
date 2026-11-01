@@ -2,6 +2,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import type { Who } from '../game/characters';
+import { itWithArt } from '../game/testing';
 import { ROSTER } from './fighters';
 import { GRID, GUIDES_DATA, FACES, SHARED, STOCKS, XS, YS } from './moves';
 
@@ -57,7 +58,7 @@ describe('instructions page', () => {
     }
   });
 
-  it('gives every fighter real art and a plate or text fallback', () => {
+  itWithArt('gives every fighter real art and a plate or text fallback', () => {
     for (const entry of ROSTER) {
       const guide = GUIDES_DATA[entry.id];
       expect(guide, entry.id).toBeTruthy();
