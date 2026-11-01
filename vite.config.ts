@@ -1,8 +1,10 @@
 import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [
+    tailwindcss(),
     svelte(),
     // Vite 8's dev server sent each JSON export with an inline source map
     // seven times its size (sou.json's 4.5 MB as 38 MB), whose text the page

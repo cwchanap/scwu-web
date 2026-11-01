@@ -14,23 +14,83 @@ test('boots into a ready arena', async ({ page }) => {
 
   await expect(page.getByRole('application').locator('canvas')).toBeVisible();
   // Disabled until the scene has loaded; the overlay replaces "Loading" on
-  // error. Wait for either so a failed load names the overlay, not a Settings
+  // error. Wait for either so a failed load names the overlay, not a Menu
   // timeout.
-  const settings = page.getByRole('button', { name: 'Settings' });
+  const menu = page.getByRole('button', { name: 'Menu' });
   const failed = page.getByText('Couldn’t enter the arena.');
-  await expect(settings.and(page.locator(':enabled')).or(failed)).toBeVisible({
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
     timeout: 60_000,
   });
   await expect(failed).toBeHidden();
-  await expect(settings).toBeEnabled();
+  await expect(menu).toBeEnabled();
 
-  // The mode switch lives in the Settings dialog now.
-  await settings.click();
-  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  const health = page.locator('[aria-label="Match health"]');
+  // Through the title menu to a battle: a button opens the menu, down picks
+  // VS single, a button chooses. Both select cursors rest on Ryuko, so two
+  // button presses pick Ryuko vs Ryuko — already loaded, so the battle starts
+  // in about a second. The screens draw no DOM, so the presses are spaced by
+  // a few ticks each and the third covers a press that lands before the
+  // cursors arm.
+  await page.waitForTimeout(200);
+  await page.keyboard.press('g');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('s');
+  await page.waitForTimeout(300);
+  await page.keyboard.press('g');
+  await page.waitForTimeout(300);
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('g');
+    await page.waitForTimeout(250);
+  }
+  // The battle's life meters announce it: Zoma's 490 becomes a second
+  // Ryuko's 510. begin() clears the held keys, so the direction goes down
+  // only now — a held key walks her, taking the action off 'idle'; the
+  // menu's modal then freezes it mid-walk, so an R that reached the window
+  // handler would show a reset ('walk' → 'idle').
+  await expect(health).toContainText('510 510', { timeout: 15_000 });
+  await page.keyboard.down('d');
+  await expect(health).toContainText(/Action: (back)?walk/);
+
+  await menu.click();
+  await page.keyboard.up('d');
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
   await expect(dialog).toBeVisible();
+  // Tailwind's preflight zeroes the margin the UA centers a modal dialog
+  // with; m-auto restores it at desktop and mobile sizes.
+  const centered = async () => {
+    const box = (await dialog.boundingBox())!;
+    const { width, height } = page.viewportSize()!;
+    expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(2);
+    expect(Math.abs(box.y + box.height / 2 - height / 2)).toBeLessThan(2);
+  };
+  await centered();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await centered();
+  await page.setViewportSize({ width: 1280, height: 720 });
+
+  const opponent = dialog.getByLabel('Opponent');
+  await expect(opponent).toBeEnabled();
   await expect(
-    dialog.getByRole('button', { name: 'Free practice' }),
-  ).toBeEnabled();
-  await expect(dialog.getByRole('button', { name: 'Vs. CPU' })).toBeEnabled();
+    opponent.locator('option', { hasText: 'Vs. CPU' }),
+  ).toBeAttached();
+  // A partner pick while practice runs doesn't reset, keeping 'walk'.
+  await opponent.selectOption('guard');
+
+  // Keys go to a button: the scene's keydown ignores INPUT/SELECT/TEXTAREA,
+  // so a <button> is the target the dialog's stopPropagation alone shields
+  // the window handler from. A leaked R resets the match; a leaked P or
+  // Escape pauses it, which the close keeps since the match was unpaused
+  // when the dialog opened — either leak shows after it.
+  await dialog.getByRole('button', { name: 'Close' }).focus();
+  await page.keyboard.press('r');
+  await expect(health).toContainText(/Action: (back)?walk/);
+  await page.keyboard.press('p');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  const resume = page.getByRole('button', { name: 'Resume match' });
+  await expect(resume).toBeHidden();
+  await expect(page.locator('.arena canvas')).toBeFocused();
+  await page.keyboard.press('p');
+  await expect(resume).toBeVisible();
   expect(errors).toEqual([]);
 });
