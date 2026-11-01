@@ -13,6 +13,7 @@ import {
   RESPONSES,
   script,
 } from './animations';
+import { itWithArt } from './testing';
 
 describe('selected core animation assets', () => {
   it('exports the backward, crouching, airborne, and ending pose sequences', () => {
@@ -36,63 +37,73 @@ describe('selected core animation assets', () => {
     ]);
   });
 
-  it("exports the sounds each stage's scripts cue: its tracks (looping) and jingles", () => {
-    const tracks = (index: number, seconds: number) => [index, seconds, true];
-    for (const [stage, sounds] of [
-      ['court', [tracks(2, 75)]],
-      ['train', [tracks(1, 139)]],
-      ['sakuranight', [[2, 16, false], tracks(3, 131)]],
-      ['trainnight', [tracks(1, 114)]],
-      ['dojin', [tracks(1, 170)]],
-      ['japan', [tracks(1, 99)]],
-      ['park', [tracks(1, 126)]],
-      ['parknight', [tracks(2, 120)]],
-      ['sakura', [tracks(1, 129)]],
-      ['greek', [[1, 7, false], tracks(2, 71), tracks(3, 129), [4, 13, false]]],
-      ['space', [tracks(1, 94)]],
-      ['boss', [tracks(2, 126)]],
-      ['office', [tracks(2, 116)]],
-      ['office2', [tracks(2, 155)]],
-      ['brboss', [tracks(2, 129)]],
-      ['gi', [tracks(1, 134)]],
-      ['spacenight', [tracks(2, 91)]],
-      ['streetnight', [tracks(2, 82)]],
-    ] as const) {
-      expect(
-        STAGES[stage].sounds.map(({ index, filename, loop }) => {
-          const wav = readFileSync(
-            new URL(`../../public/assets/${filename}`, import.meta.url),
-          );
-          expect(wav.subarray(8, 12).toString()).toBe('WAVE');
-          // Seconds: payload bytes over the fmt chunk's byte rate.
-          return [index, Math.round(wav.length / wav.readUInt32LE(28)), loop];
-        }),
-      ).toEqual(sounds);
-    }
-  });
-
-  it('has loadable, non-empty textures for every selected display', () => {
-    const sources = [...Object.values(CHARACTERS), ...Object.values(STAGES)];
-    for (const image of sources.flatMap(({ images }) => images)) {
-      const png = readFileSync(
-        new URL(`../../public/assets/${image.filename}`, import.meta.url),
-      );
-      expect(png.subarray(1, 4).toString()).toBe('PNG');
-      expect(png.readUInt32BE(16)).toBe(image.width);
-      expect(png.readUInt32BE(20)).toBe(image.height);
-    }
-    for (const frames of Object.values(data.clips)) {
-      expect(frames.length).toBeGreaterThan(0);
-      for (const frame of frames) {
-        expect(frame.width).toBeGreaterThan(0);
-        expect(frame.height).toBeGreaterThan(0);
+  itWithArt(
+    "exports the sounds each stage's scripts cue: its tracks (looping) and jingles",
+    () => {
+      const tracks = (index: number, seconds: number) => [index, seconds, true];
+      for (const [stage, sounds] of [
+        ['court', [tracks(2, 75)]],
+        ['train', [tracks(1, 139)]],
+        ['sakuranight', [[2, 16, false], tracks(3, 131)]],
+        ['trainnight', [tracks(1, 114)]],
+        ['dojin', [tracks(1, 170)]],
+        ['japan', [tracks(1, 99)]],
+        ['park', [tracks(1, 126)]],
+        ['parknight', [tracks(2, 120)]],
+        ['sakura', [tracks(1, 129)]],
+        [
+          'greek',
+          [[1, 7, false], tracks(2, 71), tracks(3, 129), [4, 13, false]],
+        ],
+        ['space', [tracks(1, 94)]],
+        ['boss', [tracks(2, 126)]],
+        ['office', [tracks(2, 116)]],
+        ['office2', [tracks(2, 155)]],
+        ['brboss', [tracks(2, 129)]],
+        ['gi', [tracks(1, 134)]],
+        ['spacenight', [tracks(2, 91)]],
+        ['streetnight', [tracks(2, 82)]],
+      ] as const) {
         expect(
-          data.images.find((image) => image.index === frame.image),
-        ).toMatchObject({ width: frame.width, height: frame.height });
+          STAGES[stage].sounds.map(({ index, filename, loop }) => {
+            const wav = readFileSync(
+              new URL(`../../public/assets/${filename}`, import.meta.url),
+            );
+            expect(wav.subarray(8, 12).toString()).toBe('WAVE');
+            // Seconds: payload bytes over the fmt chunk's byte rate.
+            return [index, Math.round(wav.length / wav.readUInt32LE(28)), loop];
+          }),
+        ).toEqual(sounds);
       }
-    }
-    // Every fighter's exported PNGs: past the 5 s default under the full suite.
-  }, 30_000);
+    },
+  );
+
+  itWithArt(
+    'has loadable, non-empty textures for every selected display',
+    () => {
+      const sources = [...Object.values(CHARACTERS), ...Object.values(STAGES)];
+      for (const image of sources.flatMap(({ images }) => images)) {
+        const png = readFileSync(
+          new URL(`../../public/assets/${image.filename}`, import.meta.url),
+        );
+        expect(png.subarray(1, 4).toString()).toBe('PNG');
+        expect(png.readUInt32BE(16)).toBe(image.width);
+        expect(png.readUInt32BE(20)).toBe(image.height);
+      }
+      for (const frames of Object.values(data.clips)) {
+        expect(frames.length).toBeGreaterThan(0);
+        for (const frame of frames) {
+          expect(frame.width).toBeGreaterThan(0);
+          expect(frame.height).toBeGreaterThan(0);
+          expect(
+            data.images.find((image) => image.index === frame.image),
+          ).toMatchObject({ width: frame.width, height: frame.height });
+        }
+      }
+      // Every fighter's exported PNGs: past the 5 s default under the full suite.
+    },
+    30_000,
+  );
 
   it('plays the selected mobility and special poses across authored transitions', () => {
     expect(animationFrame(10, 0).image).toBe(29);

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import { itWithArt } from './testing';
 import ui from './generated/ui.json';
 import {
   faceImage,
@@ -57,31 +58,36 @@ it('anchors power bars at their inner ends and cycles the recovered shimmer', ()
     expect(ui.images.some((image) => image.index === index)).toBe(true);
 });
 
-it('exports every HUD and lettering texture at its original dimensions', () => {
-  for (const image of ui.images) {
-    const png = readFileSync(
-      new URL(`../../public/assets/${image.filename}`, import.meta.url),
-    );
-    expect(png.subarray(1, 4).toString()).toBe('PNG');
-    expect(png.readUInt32BE(16)).toBe(image.width);
-    expect(png.readUInt32BE(20)).toBe(image.height);
-  }
-  const { logo, rounds, fight, transition, vs } = ui.calls;
-  for (const { frames } of [
-    ui.ko,
-    logo,
-    ...rounds,
-    fight,
-    transition,
-    ...vs.first,
-    ...vs.later,
-    ...vs.team,
-  ])
-    for (const frame of frames) {
-      expect(ui.images.some((image) => image.index === frame.image)).toBe(true);
-      expect(frame.duration).toBeGreaterThan(0);
+itWithArt(
+  'exports every HUD and lettering texture at its original dimensions',
+  () => {
+    for (const image of ui.images) {
+      const png = readFileSync(
+        new URL(`../../public/assets/${image.filename}`, import.meta.url),
+      );
+      expect(png.subarray(1, 4).toString()).toBe('PNG');
+      expect(png.readUInt32BE(16)).toBe(image.width);
+      expect(png.readUInt32BE(20)).toBe(image.height);
     }
-});
+    const { logo, rounds, fight, transition, vs } = ui.calls;
+    for (const { frames } of [
+      ui.ko,
+      logo,
+      ...rounds,
+      fight,
+      transition,
+      ...vs.first,
+      ...vs.later,
+      ...vs.team,
+    ])
+      for (const frame of frames) {
+        expect(ui.images.some((image) => image.index === frame.image)).toBe(
+          true,
+        );
+        expect(frame.duration).toBeGreaterThan(0);
+      }
+  },
+);
 
 it("cycles Ryuko's HUD face in EX mode (action 70, PCs 712–730)", () => {
   expect(

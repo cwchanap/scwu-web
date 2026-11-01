@@ -4,4 +4,7 @@
   "name": "scwu-web",
   "compatibility_date": "2026-10-31",
   "assets": { "directory": "./dist" },
+  // Required by `wrangler preview` (Workers Builds on non-production branches).
+  // Previews don't inherit production settings; this one needs none.
+  "previews": {},
 }
