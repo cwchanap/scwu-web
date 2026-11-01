@@ -153,16 +153,8 @@ const keyMap: Record<string, Control> = {
   KeyF: 'iori',
   ShiftLeft: 'dash',
   ShiftRight: 'dash',
-  KeyU: 'drill',
-  KeyI: 'axe',
-  KeyO: 'throw',
-  KeyJ: 'dst',
+  KeyJ: 'throw',
   KeyE: 'ex',
-  Digit1: 'getterBeam',
-  Digit2: 'musashi',
-  Digit3: 'changeAttack',
-  Digit4: 'blackRush',
-  Digit5: 'megaBeam',
 };
 
 // The free state's program (action 1), which reads the fighter's variable 0

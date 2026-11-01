@@ -77,8 +77,8 @@ describe('instructions page', () => {
   it("uses each fighter's in-game name lettering as the header plate", () => {
     // The *name action the Vs. intro shows: a looping, facing-independent
     // script whose 100-tick first frame is a banner no taller than 40 px.
-    // ASTROMAN's VS NAME is a portrait, DoraEmon's is SEAN's lettering and
-    // TRAINING has no banner, so those three draw their name as text.
+    // ASTROMAN's VS NAME is a portrait and TRAINING has no banner;
+    // DoraEmon uses authored lettering.
     type Script = {
       loop: number;
       frames: {
@@ -109,8 +109,10 @@ describe('instructions page', () => {
     };
     for (const entry of ROSTER) {
       const plate = GUIDES_DATA[entry.id].nameplate;
-      if (['astroman', 'dora', 'training'].includes(entry.id)) {
+      if (['astroman', 'training'].includes(entry.id)) {
         expect(plate, entry.id).toBe('');
+      } else if (entry.id === 'dora') {
+        expect(plate).toBe('dora/247.png');
       } else {
         expect(plate, entry.id).toBe(plateOf(entry.id));
       }

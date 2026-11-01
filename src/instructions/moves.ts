@@ -84,8 +84,8 @@ export interface FighterGuide {
   art: string;
   // The game's own name lettering: the image of the fighter's *name action,
   // which its Vs. intro shows. Empty (the display name as text) only for the
-  // three whose file has none: ASTROMAN's VS NAME is a portrait, DoraEmon's is
-  // SEAN's lettering and TRAINING has no banner.
+  // two whose file has none: ASTROMAN's VS NAME is a portrait and TRAINING
+  // has no banner. DoraEmon uses an authored nameplate.
   nameplate: string;
   role: string;
   tag: string;
@@ -176,7 +176,7 @@ export const SHARED: FighterGuide['sections'] = [
       {
         name: 'Pause / Restart',
         input: '<kbd>P</kbd><span class="sep">/</span><kbd>R</kbd>',
-        desc: 'Leaving the window pauses the match. <kbd>P</kbd> toggles the pause; <kbd>R</kbd> restarts the match, or the screen. On touch devices the on-screen buttons play the same keys; landscape gives more room.',
+        desc: 'Leaving the window pauses the match. <kbd>P</kbd> toggles the pause; <kbd>R</kbd> restarts the match, or the screen. G punches, H kicks, J catches or throws, and K launches. Specials and supers use their motion commands; U, I and 1–5 have no shortcuts. On touch devices the on-screen buttons play the same keys; landscape gives more room.',
         cost: 0,
       },
     ],
@@ -251,13 +251,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Drill Punch',
-            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'Six hits on the ground; aerial drill while jumping — first hit lifts, each hit or block adds a weaker strike while in range. Landing ends it in recovery.',
             cost: 0,
           },
           {
             name: 'Spinning Axe',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'One axe out at a time; pressing again while it flies only makes Ryuko stand.',
             cost: 0,
           },
@@ -269,14 +269,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Throw',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'Grab and throw even through guard. A miss leaves recovery; jumping avoids it, a strike interrupts startup.',
             cost: 0,
           },
           {
             name: 'Daisetsuzan',
-            input:
-              '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: 'Command throw: transforms, spins the opponent overhead, hurls them skyward, two missiles catch the fall. Long recovery on a miss; started far, its shorter grab stays open through it. At 30% health or less becomes <b>EVIL DST</b> (five strikes first).',
             cost: 0,
           },
@@ -289,36 +288,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Getter Beam',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Also in the air. At 30% health or less takes its stronger form.',
             cost: 1,
           },
           {
             name: 'Musashi',
-            input:
-              '<kbd>2</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'Grabs at close range.',
             cost: 1,
           },
           {
             name: 'Getter Change Attack',
-            input:
-              '<kbd>3</kbd> or <span class="motion">→↓←→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>H</kbd>',
             desc: 'Grabs at close range.',
             cost: 1,
           },
           {
             name: 'Axe / Black Rush',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'Throws an axe; below 30% health becomes the Black Getter Mega Rush.',
             cost: 1,
           },
           {
             name: 'Mega Getter Beam',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Needs all three stocks.',
             cost: 3,
           },
@@ -331,7 +325,7 @@ export const GUIDES_DATA = {
           {
             name: 'EX Mode',
             input: '<kbd>E</kbd> or <span class="motion">↓↓</span><kbd>K</kbd>',
-            desc: 'Toggle. In EX: <kbd>I</kbd> fires EX Fire (hold forward to charge; full charge launches), <kbd>1</kbd> fires EFS (four shots + launcher). Vs. CPU: hold ↓ as the round begins.',
+            desc: 'Toggle. In EX: ↓→ G fires EX Fire (hold forward to charge; full charge launches), ↓→↓→ G fires EFS (four shots + launcher). Vs. CPU: hold ↓ as the round begins.',
             cost: 0.5,
           },
         ],
@@ -374,7 +368,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A close grab that slams and tosses the opponent, then throws a hatchet.',
             cost: 0,
           },
@@ -387,14 +381,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DRAGON',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'Also in the air. After it connects, SPAKE or DST cancels it for two stocks.',
             cost: 0,
           },
           {
             name: 'FIRE',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'One fireball at a time; again while it flies, he punches.',
             cost: 0,
           },
@@ -406,7 +399,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'BOMB',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'Three bombs falling on marks ahead — five, then he reloads.',
             cost: 0,
           },
@@ -426,29 +419,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SPAKE',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A charging dash, also in the air.',
             cost: 1,
           },
           {
             name: 'DST',
-            input:
-              '<kbd>2</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A close command grab that tosses, juggles and blasts the opponent.',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: '—',
             cost: 3,
           },
           {
             name: 'BOMB / Shin Spark',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>H</kbd>',
             desc: 'Below 30% health, <b>Shin Spark</b> for three stocks; BOMB otherwise (no stock).',
             cost: 3,
           },
@@ -502,7 +491,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A close grab that ends in a blast.',
             cost: 0,
           },
@@ -515,13 +504,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DRAGON O',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A rising multi-hit, also in the air.',
             cost: 0,
           },
           {
             name: "K'",
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'Then <span class="motion">→</span><kbd>H</kbd> a dashing strike (stronger if repeated soon after it hits), <span class="motion">→</span><kbd>G</kbd> a shot or <span class="motion">←</span><kbd>H</kbd> BLACK OUT.',
             cost: 0,
           },
@@ -540,22 +529,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'ranbu',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: 'A dash into a slam and flurry.',
             cost: 1,
           },
           {
             name: 'MAGIC FIRE',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Eleven fireballs.',
             cost: 1,
           },
           {
             name: 'EN3 majic dance',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: lifts the opponent, then witches fly in and a beam hops them in and out.',
             cost: 3,
           },
@@ -609,7 +595,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A close grab that hurls the opponent into the screen's edge.",
             cost: 0,
           },
@@ -622,14 +608,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'Also in the air.',
             cost: 0,
           },
           {
             name: 'Fire ball',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A thrown star.',
             cost: 0,
           },
@@ -642,7 +627,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Burn Knock',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: '—',
             cost: 0,
           },
@@ -667,22 +652,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'gesar',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'In the air, nin star; below 30% health, <b>Evil gesar</b>.',
             cost: 1,
           },
           {
             name: 'lee',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Kicks that carry the opponent up and leave them floating; below 30% health, <b>Evil Lee</b>.',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'For three stocks: shocks the opponent, then lifts and tosses them about.',
             cost: 3,
           },
@@ -736,7 +718,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab and a spinning toss.',
             cost: 0,
           },
@@ -749,15 +731,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'Also in the air.',
             cost: 0,
           },
           {
             name: 'BEAM',
-            input:
-              '<kbd>I</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: '—',
             cost: 0,
           },
@@ -770,7 +750,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'morning star',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A flail.',
             cost: 0,
           },
@@ -783,29 +763,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'scc',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A grab, a toss up and a beam.',
             cost: 1,
           },
           {
             name: 'medeo',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'A meteor drop; below 30% health, its <b>Evil</b> form.',
             cost: 3,
           },
           {
             name: 'NT',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'A flying unit that strikes from range; below 30% health, its <b>Evil</b> form.',
             cost: 1,
           },
           {
             name: 'funnal',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Drones that fire beams; below 30% health, its <b>Evil</b> form.',
             cost: 1,
           },
@@ -859,7 +835,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab that spins the opponent away.',
             cost: 0,
           },
@@ -872,13 +848,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'fly move',
-            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A rocket leap.',
             cost: 0,
           },
           {
             name: 'fire ball',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'Lobbed in a high arc; also in the air.',
             cost: 0,
           },
@@ -890,7 +866,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'ball fire',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A straight shot; also in the air.',
             cost: 0,
           },
@@ -903,22 +879,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SUPER CHUCK',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A grab and a beating.',
             cost: 1,
           },
           {
             name: 'super ball',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Balls that fire beams.',
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A barrage of shots.',
             cost: 3,
           },
@@ -979,7 +952,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab, then a song that dazes the opponent until the music explodes, throwing you both.',
             cost: 0,
           },
@@ -992,14 +965,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Rock punch',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>G</kbd>',
             desc: 'A rocket punch that flies out from range.',
             cost: 0,
           },
           {
             name: 'base ball',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A pitch of random kind; in the air, a diving punch.',
             cost: 0,
           },
@@ -1011,8 +983,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'counter',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: 'Struck during its stance he takes double damage, then strikes back, rushing in to beat the opponent inside a cloud of dust.',
             cost: 0,
           },
@@ -1025,22 +996,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'fire',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A fire beam, also in the air; below 30% health, <b>Evil fire</b>.',
             cost: 1,
           },
           {
             name: 'HARIKEN',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A whirlwind.',
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'Calls his friends, then a screen-wide barrage.',
             cost: 3,
           },
@@ -1101,7 +1069,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab, a hop back and a leaping throw that spins the opponent away.',
             cost: 0,
           },
@@ -1114,14 +1082,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DRILL KNIEE',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: 'A rising knee, also in the air.',
             cost: 0,
           },
           {
             name: 'FIRE BALL',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A shot that speeds up, which a super can cancel.',
             cost: 0,
           },
@@ -1133,7 +1100,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'BIKE',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'A leap on a golden lion, also in the air; in EX mode a wheel that strikes again and again.',
             cost: 0,
           },
@@ -1147,28 +1114,25 @@ export const GUIDES_DATA = {
           {
             name: 'hh',
             input:
-              '<kbd>1</kbd> or <kbd>H</kbd><kbd>H</kbd><span class="motion">←</span><kbd>G</kbd><kbd>H</kbd>',
+              '<kbd>H</kbd><kbd>H</kbd><span class="motion">←</span><kbd>G</kbd><kbd>H</kbd>',
             desc: 'Below 30% health only: a screen-wide shock into a long beating.',
             cost: 3,
           },
           {
             name: 'GP',
-            input:
-              '<kbd>2</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A grab and a beating out of sight.',
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A shock, then a hammer.',
             cost: 3,
           },
           {
             name: 'BP',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A flying fist that strikes three times; a ring below 30% health.',
             cost: 1,
           },
@@ -1229,7 +1193,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'Zombie hands burst from the floor to hold the opponent, then a kick.',
             cost: 0,
           },
@@ -1242,14 +1206,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A man springing out of a trunk with the opponent.',
             cost: 0,
           },
           {
             name: 'TOFU',
-            input: '<kbd>I</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'A gatling burst.',
             cost: 0,
           },
@@ -1262,7 +1225,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Run in',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: "A monster's charge and claw.",
             cost: 0,
           },
@@ -1281,29 +1244,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'GIGA PRESS',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: "A charge that carries the opponent into the screen's edge, then slams them.",
             cost: 1,
           },
           {
             name: 'HIDDEN',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: "Below 30% health only: a hidden brute's rush and beating.",
             cost: 1,
           },
           {
             name: 'snake',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'A giant snake rising from the floor.',
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A cannon blast across the screen.',
             cost: 3,
           },
@@ -1358,7 +1317,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A masked man's grab and throw.",
             cost: 0,
           },
@@ -1371,14 +1330,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'S PUNCH',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A dashing flurry of blasts; BAKU or SUP RUN C cancels it for two stocks.',
             cost: 0,
           },
           {
             name: 'low chuck',
-            input:
-              '<kbd>I</kbd> or <span class="motion">←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>G</kbd>',
             desc: "A hooked pole that catches the opponent's feet and flips them.",
             cost: 0,
           },
@@ -1391,8 +1349,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Clack chuck',
-            input:
-              '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: 'A grab, a leap and a slam; harder below 30% health.',
             cost: 0,
           },
@@ -1411,29 +1368,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'BAKU',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: "A masked brute's charge.",
             cost: 1,
           },
           {
             name: 'SUP RUN C',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "RUN CHUCK into a clawed figure's slashes, also in the air.",
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A grab and machete cuts; in EX mode three lion-head pillars.',
             cost: 3,
           },
           {
             name: 'NOZAN',
-            input:
-              '<kbd>4</kbd> or <span class="motion">→↓←→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>H</kbd>',
             desc: 'Below 30% health only: a grab and a long beating out of sight.',
             cost: 3,
           },
@@ -1494,7 +1447,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A blue-armored grab that spins the opponent away.',
             cost: 0,
           },
@@ -1507,14 +1460,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Cross',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A red mecha raising a pillar of red light.',
             cost: 0,
           },
           {
             name: 'FIRE',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A blast of red lightning.',
             cost: 0,
           },
@@ -1533,29 +1485,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'HIDDEN',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: "Below 30% health only: a rush into a fanged maw's bite.",
             cost: 1,
           },
           {
             name: 'chuck sup',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: 'A leap that catches an opponent in the air, swallows them in a giant striped sphere and drops them.',
             cost: 1,
           },
           {
             name: 'dragon sp',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A leap in a black slab's disguise whose hit calls a flight of white winged beasts down on the opponent.",
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "A pale spirit's orb that bursts into a dome of light.",
             cost: 3,
           },
@@ -1616,7 +1564,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A nurse's syringe.",
             cost: 0,
           },
@@ -1629,15 +1577,14 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'air chuck',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A spider's leap that catches only an airborne opponent and crashes down with them, knocking him down too; also in the air.",
             cost: 0,
           },
           {
             name: 'Fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
-            desc: "A spinning red lance thrown from a cross; in EX mode a stance — <kbd>O</kbd> turns it into a dashing grab, <kbd>K</kbd> a claw's beam.",
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
+            desc: "A spinning red lance thrown from a cross; in EX mode a stance — <kbd>J</kbd> turns it into a dashing grab, <kbd>K</kbd> a claw's beam.",
             cost: 0,
           },
           {
@@ -1649,8 +1596,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Comment chuck',
-            input:
-              '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: "A clawed black figure's grab; harder below 30% health, and in EX mode a pink figure's whips.",
             cost: 0,
           },
@@ -1669,22 +1615,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'en300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "A purple mecha's grab and berserk mauling; in EX mode the mecha's claw wave.",
             cost: 3,
           },
           {
             name: 'KAORU',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A silver-haired boy's low grab into a long scene with a giant purple hand; in EX mode a ribbon-armed figure's slashes.",
             cost: 1,
           },
           {
             name: 'SUPER P',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A wound-up stretching punch; in EX mode a blue crystal's beam.",
             cost: 1,
           },
@@ -1751,7 +1694,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A green arm cannon's grab.",
             cost: 0,
           },
@@ -1764,13 +1707,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'slid',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A low dive on a white jet sled.',
             cost: 0,
           },
           {
             name: 'fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "A gold-winged figure's blue flames; in the air a purple winged figure's, harder below 30% health.",
             cost: 0,
           },
@@ -1782,7 +1725,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'doge',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: "A pink heart-armored figure's dash, low enough to pass under most strikes; it strikes once beside the opponent.",
             cost: 0,
           },
@@ -1795,36 +1738,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Hidden En300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>H</kbd>',
             desc: "Below 30% health: a white-robed girl's magic circle whose catch plays a long scene of wings and water (slid otherwise).",
             cost: 3,
           },
           {
             name: 'Temjin fly',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A white-suited girl surfing a giant blade, also in the air.',
             cost: 1,
           },
           {
             name: 'dragon super',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: "A hooded figure's blue lightning dragon coiling around her.",
             cost: 1,
           },
           {
             name: 'Raiden',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A red mecha's barrage fired diagonally up the screen.",
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: "A purple winged mecha's dash whose catch sends giant hands sweeping across the stage behind her.",
             cost: 3,
           },
@@ -1842,7 +1780,7 @@ export const GUIDES_DATA = {
     art: FACES.sakuya,
     nameplate: 'sakuya/445.png',
     role: 'Swordswoman',
-    tag: 'A brown-haired girl in purple who dresses up as a different swordswoman, armored figure or mecha; seven specials, two of them on 4 and 5.',
+    tag: 'A brown-haired girl in purple who dresses up as a different swordswoman, armored figure or mecha; seven specials entered by motion commands.',
     ex: true,
     sections: [
       {
@@ -1879,7 +1817,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A scythe's grab.",
             cost: 0,
           },
@@ -1892,14 +1830,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon punch',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'Rising on white wings.',
             cost: 0,
           },
           {
             name: 'FIRE',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A fireball, also in the air.',
             cost: 0,
           },
@@ -1911,21 +1848,19 @@ export const GUIDES_DATA = {
           },
           {
             name: 'counter',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: 'A stance that grabs and throws whoever strikes her.',
             cost: 0,
           },
           {
             name: 'DRAGON KICK',
-            input:
-              '<kbd>4</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: 'A dash with red blades.',
             cost: 0,
           },
           {
             name: 'LOW FIRE',
-            input: '<kbd>5</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A low staff sweep.',
             cost: 0,
           },
@@ -1944,22 +1879,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'en300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: "A swordswoman's dash whose catch turns into a mecha girl's blade combo.",
             cost: 3,
           },
           {
             name: 'super HIT UP',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A swing that calls an airship; in the air a mecha's diving dash.",
             cost: 1,
           },
           {
             name: 'SPARK',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A horned mecha girl's blade dash.",
             cost: 1,
           },
@@ -2020,7 +1952,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A drill lance's grab.",
             cost: 0,
           },
@@ -2033,14 +1965,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A rising drill lance.',
             cost: 0,
           },
           {
             name: 'Arrow',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "In the air: a pink-armored archer's arrow.",
             cost: 0,
           },
@@ -2052,15 +1983,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'counter',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: 'A stance that slashes back at whoever strikes him.',
             cost: 0,
           },
           {
             name: 'HAOU',
-            input:
-              '<kbd>4</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>G</kbd>',
             desc: "A combined blaster's shot.",
             cost: 0,
           },
@@ -2073,22 +2002,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'en300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'Summons a white mecha dragon.',
             cost: 3,
           },
           {
             name: 'GYSA',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A red-horned mecha's three sword strikes.",
             cost: 1,
           },
           {
             name: 'super fire',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A red dinosaur tank's cannon.",
             cost: 1,
           },
@@ -2149,7 +2075,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "The mecha's grab.",
             cost: 0,
           },
@@ -2162,14 +2088,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'AKUMA jump',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: "A leap that <kbd>G</kbd> or <kbd>H</kbd> turns into a diving punch or a flying kick; in EX mode the mecha's rising uppercut.",
             cost: 0,
           },
           {
             name: 'Fire Kick',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: "The mecha's low rifle shot; in the air a flying kick, in EX mode it calls a black panther.",
             cost: 0,
           },
@@ -2181,8 +2106,8 @@ export const GUIDES_DATA = {
           },
           {
             name: 'BK',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
-            desc: "The mecha's dashing punch; in EX mode it calls a yellow lion — in the air an eagle jet the pilot hangs from, steered with the directions for up to five seconds and dropped with <kbd>G</kbd>, <kbd>H</kbd> or <kbd>O</kbd>.",
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
+            desc: "The mecha's dashing punch; in EX mode it calls a yellow lion — in the air an eagle jet the pilot hangs from, steered with the directions for up to five seconds and dropped with <kbd>G</kbd>, <kbd>H</kbd> or <kbd>J</kbd>.",
             cost: 0,
           },
           {
@@ -2207,35 +2132,31 @@ export const GUIDES_DATA = {
           {
             name: 'KOKAKEN',
             input:
-              '<kbd>1</kbd> or <kbd>O</kbd><kbd>G</kbd><span class="motion">←</span><kbd>H</kbd><kbd>K</kbd>',
+              '<kbd>J</kbd><kbd>G</kbd><span class="motion">←</span><kbd>H</kbd><kbd>K</kbd>',
             desc: "Below 30% health only: the pilot's sword dash.",
             cost: 3,
           },
           {
             name: 'Command 1',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
             desc: "The mecha's punch rush.",
             cost: 1,
           },
           {
             name: 'Beast att',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'The lion, panther and mammoth charging in turn.',
             cost: 3,
           },
           {
             name: 'SPARK',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A dive as a black jet, also in the air.',
             cost: 1,
           },
           {
             name: 'DANKU SHOT',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "The mecha's shoulder cannons.",
             cost: 1,
           },
@@ -2296,7 +2217,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "The clown-faced boy's grab and sliding kick.",
             cost: 0,
           },
@@ -2309,14 +2230,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon p',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A samurai's rising sword slashes, also in the air.",
             cost: 0,
           },
           {
             name: 'FIRE',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "The clown-faced boy's thrown card.",
             cost: 0,
           },
@@ -2328,14 +2248,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'counter',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: 'A stance with a phone: struck in it, a machine-gun man fires back.',
             cost: 0,
           },
           {
             name: 'striker',
-            input: '<kbd>5</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A gunwoman behind him whose shot holds whoever it meets still.',
             cost: 0,
           },
@@ -2348,29 +2267,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'FISH',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: "A suited man's red book whose fish spirit seizes the opponent up close.",
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: a shirtless, tattooed man who calls a dark giant.',
             cost: 3,
           },
           {
             name: 'fly arm',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "The clown-faced boy's flying fists up close.",
             cost: 1,
           },
           {
             name: 'S Shoot',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A blue-coated boy's palm blast.",
             cost: 1,
           },
@@ -2425,7 +2340,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "The blue-robed figure's chains.",
             cost: 0,
           },
@@ -2438,14 +2353,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'INATUMA',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "The spiky-haired boy's electric strike.",
             cost: 0,
           },
           {
             name: 'VO5',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "The green-clad boy's punch; in the air he hurls a boulder; in EX mode she calls two headbanded boys who drop in and charge.",
             cost: 0,
           },
@@ -2457,8 +2371,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'COUNTER',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: "The girl's stance: struck in it, she hits back; in EX mode a book that also answers specials.",
             cost: 0,
           },
@@ -2478,36 +2391,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'コマンド 3',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
             desc: 'Below 30% health only: a card that heals her or drops planks on the opponent.',
             cost: 3,
           },
           {
             name: 'lizard fly',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: "The spiky-haired boy's flying grab, which catches only an opponent in the air.",
             cost: 1,
           },
           {
             name: 'SCC',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'His rush up close.',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "For three stocks: a headbanded boy's punch rush.",
             cost: 3,
           },
           {
             name: 'Super slash',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "The cap-wearing figure's scythe slash.",
             cost: 1,
           },
@@ -2574,7 +2482,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A shirtless man in sunglasses who turns the opponent into a strawberry shortcake.',
             cost: 0,
           },
@@ -2587,14 +2495,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: "A black-pompadoured man's punch.",
             cost: 0,
           },
           {
             name: 'Fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "A winged girl's arrow; in the air an orange-headbanded boy throws a yellow spirit.",
             cost: 0,
           },
@@ -2606,14 +2513,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'bp',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: "The sunglassed man's clawed lunge; below 30% health its <b>Evil</b> form.",
             cost: 0,
           },
           {
             name: 'SUCK',
-            input:
-              '<kbd>4</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: "A white-robed archer's line that reels the opponent in.",
             cost: 0,
           },
@@ -2626,22 +2532,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'EN300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: an orange-haired swordsman in red armour.',
             cost: 3,
           },
           {
             name: 'ICE punch',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>H</kbd>',
             desc: "A black-robed fighter's dashing punch that looses an ice wolf.",
             cost: 1,
           },
           {
             name: 'sshoot',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A blond-pigtailed girl's cannon.",
             cost: 1,
           },
@@ -2714,7 +2617,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A chubby pigtailed figure's long tongue.",
             cost: 0,
           },
@@ -2727,20 +2630,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A small red-robed man's crescent; a super cancels it for two stocks.",
             cost: 0,
           },
           {
             name: 'whip attack',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'An eye-patched man\'s five whips — <kbd>F</kbd> or <span class="motion">↓→</span><kbd>H</kbd> lashes farther off.',
             cost: 0,
           },
           {
             name: 'CC',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: "An elf-eared hooded figure's red card, a grab that also works in the air.",
             cost: 0,
           },
@@ -2753,22 +2655,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'EN300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: a rider on a yellow beast who calls down lightning.',
             cost: 3,
           },
           {
             name: 'SCC',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'An old man in yellow robes whose grab reaches across the screen.',
             cost: 1,
           },
           {
             name: 'S Shoot',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "The swordsman's crescent wave; below 30% health its <b>Evil</b> form.",
             cost: 1,
           },
@@ -2835,7 +2734,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A blue metal dinosaur's jaws.",
             cost: 0,
           },
@@ -2848,14 +2747,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DRAGON',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A lion-maned figure\'s rising sword, which <span class="motion">→↓↘</span><kbd>G</kbd> again takes on to <b>Evil Dragon</b>.',
             cost: 0,
           },
           {
             name: 'fire ball',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "An orange armoured dragon's dark crescent; in the air a winged gunner's lightning ball.",
             cost: 0,
           },
@@ -2867,8 +2765,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'COUNTER',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: 'A 0.4-second stance: struck in it, he takes double damage, then strikes back in three costumes.',
             cost: 0,
           },
@@ -2887,29 +2784,26 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'EN300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "For three stocks: a golden armoured beast's exploding sun.",
             cost: 3,
           },
           {
             name: 'KURENCOUNTER',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "A caped lancer's stance that counters a hit.",
             cost: 1,
           },
           {
             name: 'Super heart',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A yellow teddy bear's breaking heart.",
             cost: 1,
           },
           {
             name: 'Hidden en300',
             input:
-              '<kbd>4</kbd> or <kbd>K</kbd><span class="motion">↓↓</span><kbd>G</kbd><kbd>O</kbd>',
+              '<kbd>K</kbd><span class="motion">↓↓</span><kbd>G</kbd><kbd>J</kbd>',
             desc: 'Only below 30% health: an orange-haired girl who calls a white-caped knight with him.',
             cost: 3,
           },
@@ -2976,7 +2870,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A white-suited figure's red crosshairs.",
             cost: 0,
           },
@@ -2989,14 +2883,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'neko punch',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A cat girl's rising paw.",
             cost: 0,
           },
           {
             name: 'Air fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'In the air, a turquoise mage leaves a blue star hovering for 6 seconds; on the ground her af add strikes and drops it onto whoever is below (<span class="motion">↓→</span><kbd>H</kbd> sends it down at a slant); BEAM or SLASH SUPER cancels af add for two stocks.',
             cost: 0,
           },
@@ -3008,8 +2901,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Counter',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>H</kbd>',
             desc: "A 0.3-second stance with a winged girl's axe: struck in it, she takes 30% of the damage and swings it.",
             cost: 0,
           },
@@ -3022,22 +2914,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'en300',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "For three stocks: a goggled sorcerer's yellow spirits.",
             cost: 3,
           },
           {
             name: 'SLASH SUPER',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "An archer's arrow that brings her lunging in with a halberd when it strikes; below 30% health its <b>Evil</b> form.",
             cost: 1,
           },
           {
             name: 'BEAM',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A red-clad fighter's long beam.",
             cost: 1,
           },
@@ -3098,7 +2987,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A white and red horned robot's punches.",
             cost: 0,
           },
@@ -3111,14 +3000,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'tatsumaki',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "The swordsman's swing that calls a grey whirlwind; Thander p, Phsy driver or MINAMI cancels it for two stocks.",
             cost: 0,
           },
           {
             name: 'slash',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "The swordsman's dashing cut; in the air a diving one, which slash again on landing after a hit follows with a quicker cut.",
             cost: 0,
           },
@@ -3130,14 +3018,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Drill',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'His call for a drill that bursts from the ground.',
             cost: 0,
           },
           {
             name: 'BAKURETU',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "The swordsman's thrust that fires a yellow beam.",
             cost: 0,
           },
@@ -3150,29 +3037,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'GOLD HAND',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>H</kbd>',
             desc: "For three stocks: the robot's climb and dive with a golden hand, which lands well ahead of him, into a long beating.",
             cost: 3,
           },
           {
             name: 'MINAMI',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'Only at 155 health or less (else it is Drill): a 1-second stance as the hero — struck in it, he takes 30% of the damage and strikes back.',
             cost: 1,
           },
           {
             name: 'Phsy driver',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "The robot's leaping kick into a piledriver.",
             cost: 1,
           },
           {
             name: 'Thander p',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "The robot's lightning-charged dashing punch.",
             cost: 1,
           },
@@ -3233,7 +3116,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A purple serpent's grab.",
             cost: 0,
           },
@@ -3246,14 +3129,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SAMA',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: "The purple robot's rising shield punch, also in the air.",
             cost: 0,
           },
           {
             name: 'Fire ball',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "The red robot's fireball; cancels into GYSA or VIPER FINAL for two stocks.",
             cost: 0,
           },
@@ -3265,7 +3147,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'VIPER WHIP',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: "The red robot's whip.",
             cost: 0,
           },
@@ -3278,29 +3160,26 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'GYSA',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: "The red robot's hammer that raises a pink crystal ahead of him; below 30% health its <b>Evil</b> form, three crystals.",
             cost: 1,
           },
           {
             name: 'VIPER FINAL',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A long whip that catches the opponent for a purple blast.',
             cost: 1,
           },
           {
             name: 'en300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "For three stocks: a giant sword's slashes, which miss an opponent standing close.",
             cost: 3,
           },
           {
             name: 'evil en3',
             input:
-              '<kbd>4</kbd> or <kbd>K</kbd><kbd>H</kbd><span class="motion">→</span><kbd>G</kbd><kbd>O</kbd>',
+              '<kbd>K</kbd><kbd>H</kbd><span class="motion">→</span><kbd>G</kbd><kbd>J</kbd>',
             desc: 'Only below 30% health, with three stocks: spends one on a green clock shot; when it strikes he spends the other two, takes a winged form and fires seven beams.',
             cost: 3,
           },
@@ -3355,7 +3234,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab that leaps up with the opponent and slams them down.',
             cost: 0,
           },
@@ -3368,14 +3247,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A rising spin, also in the air; in Change form, Jump att, a leap that grabs the opponent's head.",
             cost: 0,
           },
           {
             name: "K'",
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A rifle butt that <span class="motion">→</span><kbd>G</kbd> follows with a shot or <span class="motion">→</span><kbd>H</kbd> with a swing; in Change form, Chuck ECC, a tumbling toy robot that bursts.',
             cost: 0,
           },
@@ -3388,7 +3266,7 @@ export const GUIDES_DATA = {
           {
             name: 'Bike Doge D',
             input:
-              '<kbd>J</kbd>, <kbd>4</kbd> or <kbd>5</kbd>, or <span class="motion">↓↓</span><kbd>G</kbd>, <kbd>H</kbd> or both',
+              '<span class="motion">↓↓</span><kbd>G</kbd>, <kbd>H</kbd> or both',
             desc: 'A charge or a leap on an orange motorbike, also in the air; in Change form, Doge D, sinking into the floor to come up ahead or where he stands. Bike Doge D P cancels into Ranbu or S chuck for two stocks.',
             cost: 0,
           },
@@ -3401,22 +3279,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Ranbu',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A punch flurry whose last blow ↑ or ↓ turns into a rising or a low strike; in Change form, Bean, a ray gun's beam across the screen, which misses an opponent standing close.",
             cost: 1,
           },
           {
             name: 'S chuck',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
             desc: 'A grab and a beating; in Change form, Counter, a stance — struck in it, he kicks back.',
             cost: 1,
           },
           {
             name: 'EN3',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: a stampede of GIGIs led by a blonde masked woman.',
             cost: 3,
           },
@@ -3477,7 +3352,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab and a throw.',
             cost: 0,
           },
@@ -3490,14 +3365,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon P',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A rising uppercut (EX: a flying knee).',
             cost: 0,
           },
           {
             name: 'ICE Punch',
-            input: '<kbd>I</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A punch with an ice spark (EX: a dash through the opponent).',
             cost: 0,
           },
@@ -3509,7 +3383,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Ryuseiken',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A punch flurry that <span class="motion">↓→</span><kbd>G</kbd> follows with a dashing one; in the air a flaming bird (EX: fists of light flying across the screen). Cancels into SUPER RSK, GOD DRAGON or COUNTER CHAIN for two stocks.',
             cost: 0,
           },
@@ -3522,36 +3396,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SUPER RSK',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A flurry under a winged horse (EX: Gysa, an ice blast that flies past an opponent standing close).',
             cost: 1,
           },
           {
             name: 'GOD DRAGON',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Charging uppercuts (EX: a rising dragon).',
             cost: 1,
           },
           {
             name: 'COUNTER CHAIN',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'A stance: struck in it, he lashes back (EX: a dashing chain lash).',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'For three stocks: a winged charge across the whole screen.',
             cost: 3,
           },
           {
             name: 'Healing',
-            input:
-              '<kbd>5</kbd> or <span class="motion">↓←↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
             desc: 'At 30% life or less: restores 160 life.',
             cost: 3,
           },
@@ -3619,7 +3488,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab and a throw.',
             cost: 0,
           },
@@ -3632,14 +3501,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A rising claw.',
             cost: 0,
           },
           {
             name: 'Crush attack',
-            input: '<kbd>I</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A shield-bash dash; in the air a dive.',
             cost: 0,
           },
@@ -3651,13 +3519,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'fire p',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A straight cannon shot; cancels into s shoot, SCC or S Crush for two stocks.',
             cost: 0,
           },
           {
             name: 'FIRE K',
-            input: '<kbd>5</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A cannon shell that bounces along.',
             cost: 0,
           },
@@ -3670,29 +3538,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 's shoot',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A giant cannon blast, also in the air.',
             cost: 1,
           },
           {
             name: 'SCC',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Close: a grab and a beam-saber stab, which <span class="motion">↓→</span><kbd>H</kbd> follows with an uppercut and <span class="motion">→↓←</span><kbd>H</kbd> with a throw; farther: a leap into a beating.',
             cost: 1,
           },
           {
             name: 'S Crush',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: 'A shield-bash dash and four more.',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'For three stocks: a blast thrown in a high arc that flies over a close opponent but drops short near a wall.',
             cost: 3,
           },
@@ -3747,7 +3611,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab and a throw.',
             cost: 0,
           },
@@ -3760,15 +3624,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Fire Ball',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: "A shell that speeds up as it flies, two at 30% life or less (EX: a winged robot's rising slash).",
             cost: 0,
           },
           {
             name: 'nataku p',
-            input:
-              '<kbd>I</kbd> or <span class="motion">←↓↙</span><kbd>G</kbd>',
+            input: '<span class="motion">←↓↙</span><kbd>G</kbd>',
             desc: 'A dragon arm thrust up and out, or <span class="motion">←↓↙</span><kbd>H</kbd> straight out (EX: a cloaked robot\'s charge); cancels into MISS ALL or RAMBU for two stocks.',
             cost: 0,
           },
@@ -3780,14 +3642,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'IORI3HIT',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A winged robot\'s dashing slash that <span class="motion">↓→</span><kbd>G</kbd> follows twice more; in the air a shot down at the floor (EX: a fire ball; in the air a spin).',
             cost: 0,
           },
           {
             name: 'CC',
-            input:
-              '<kbd>5</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: 'A grab into blows and a leaping slam (EX: a trident flurry).',
             cost: 0,
           },
@@ -3800,28 +3661,25 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'MISS ALL',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A gunner robot's barrage of bullets and missiles (EX: a winged robot's beam).",
             cost: 1,
           },
           {
             name: 'RAMBU',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: 'A dash into a rush of blows from each robot (EX: a grab into one).',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'For three stocks: a winged robot rising to rain beams down, also in the air (EX: a diving slash).',
             cost: 3,
           },
           {
             name: 'TWIN SHOT',
-            input: '<kbd>4</kbd> or a full turn of the stick and <kbd>G</kbd>',
+            input: 'a full turn of the stick and <kbd>G</kbd>',
             desc: 'Below 30% life only: twin beams swept round the whole screen (otherwise the CC).',
             cost: 3,
           },
@@ -3880,7 +3738,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "A grab into the big robot's blows.",
             cost: 0,
           },
@@ -3893,14 +3751,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SHORYU',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A rising uppercut that <span class="motion">→↓↘</span><kbd>G</kbd> follows twice more, also in the air.',
             cost: 0,
           },
           {
             name: '3Fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A kick that fires a missile, a second and third with → and <kbd>H</kbd>.',
             cost: 0,
           },
@@ -3912,7 +3769,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'BANDO BOX',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'A bazooka\'s canister that arcs out and bursts, which <span class="motion">↓←</span><kbd>H</kbd> fires twice more.',
             cost: 0,
           },
@@ -3925,22 +3782,20 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'RAMBU SUP',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: "A dash into a rush of blows from the other fighters' shadows.",
             cost: 1,
           },
           {
             name: 'SCC',
-            input:
-              '<kbd>2</kbd> or <span class="motion">←↓→←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→←↓→</span><kbd>H</kbd>',
             desc: "A grab into the big robot's blows and a throw into the wall.",
             cost: 1,
           },
           {
             name: 'MESATSU',
             input:
-              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+              '<kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
             desc: 'For three stocks: a dash that grabs into a flurry of flashing blows.',
             cost: 3,
           },
@@ -3969,7 +3824,7 @@ export const GUIDES_DATA = {
           {
             name: 'Dashing axe swing',
             input: '<kbd>G</kbd>',
-            desc: 'Strikes three times; cancels into <kbd>O</kbd> or a special.',
+            desc: 'Strikes three times; cancels into <kbd>J</kbd> or a special.',
             cost: 0,
           },
           {
@@ -3980,15 +3835,15 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Heavy axe swing',
-            input: '<kbd>O</kbd>',
+            input: '<kbd>J</kbd>',
             desc: 'Shakes the screen, standing or crouching; cancels into a special.',
             cost: 0,
           },
           {
             name: 'Air attack',
             input:
-              '<kbd>G</kbd><span class="sep">/</span><kbd>O</kbd> or <kbd>H</kbd> in air',
-            desc: '<kbd>G</kbd> or <kbd>O</kbd> swings the axe; <kbd>H</kbd> fires two shots angled down.',
+              '<kbd>G</kbd><span class="sep">/</span><kbd>J</kbd> or <kbd>H</kbd> in air',
+            desc: '<kbd>G</kbd> or <kbd>J</kbd> swings the axe; <kbd>H</kbd> fires two shots angled down.',
             cost: 0,
           },
           {
@@ -4006,14 +3861,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SHORYU',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A crescent slash that rises forward.',
             cost: 0,
           },
           {
             name: 'FIRE',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A pink crescent that flies across the screen.',
             cost: 0,
           },
@@ -4032,22 +3886,20 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Rambu',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: "His armour bursting off for a dash into a rush of the other fighters' shadows.",
             cost: 1,
           },
           {
             name: 'SB',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Fifteen grenades lobbed in a spread.',
             cost: 1,
           },
           {
             name: 'MESATSU',
             input:
-              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+              '<kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
             desc: 'For three stocks: a cut-in, then a dash that grabs into a flurry.',
             cost: 3,
           },
@@ -4100,7 +3952,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'The blue robot\'s sword skewering the opponent, which <span class="motion">↓↘→</span><kbd>H</kbd> follows with the red robot\'s leaping spin.',
             cost: 0,
           },
@@ -4113,14 +3965,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Dragon P',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "The red robot's rising slash, also in the air.",
             cost: 0,
           },
           {
             name: 'FIRE BALL',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "Her purple armour's slash across the screen; cancels into Ranbu or DAISHARIN for two stocks.",
             cost: 0,
           },
@@ -4139,22 +3990,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Ranbu',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A grab into blows from both robots and her own last slash.',
             cost: 1,
           },
           {
             name: 'DAISHARIN',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A giant sword hurled to spin out and back.',
             cost: 1,
           },
           {
             name: 'En300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
             desc: "For three stocks: warnings, then a leap that drops with a giant sword, whose grab strips the opponent's clothes for 260 life before flinging them.",
             cost: 3,
           },
@@ -4200,7 +4048,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab into a beating and a blow that knocks the opponent away.',
             cost: 0,
           },
@@ -4213,14 +4061,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SAMA',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: 'A rising somersault kick, also in the air.',
             cost: 0,
           },
           {
             name: 'Fire BALL',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A fireball that bounces twice and rolls along the floor.',
             cost: 0,
           },
@@ -4233,7 +4080,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'REFLACT',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: "A round shield's shove, which doesn't reflect shots here.",
             cost: 0,
           },
@@ -4246,22 +4093,20 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'GAISA',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>G</kbd>',
             desc: 'A charge through three levels, whose wave <kbd>G</kbd> fires at the level reached before he collapses.',
             cost: 1,
           },
           {
             name: 'SGIGA',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: 'A bigger GIGA.',
             cost: 1,
           },
           {
             name: 'AKUMA SP',
             input:
-              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+              '<kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
             desc: 'For three stocks: a dash that grabs into a storm of flashes for 250. Shin Z plays it even short of stock.',
             cost: 3,
           },
@@ -4320,7 +4165,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: "The blue armour's grab into a beam.",
             cost: 0,
           },
@@ -4333,15 +4178,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'CC',
-            input:
-              '<kbd>U</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: "The knight's lunge that grabs into a throw.",
             cost: 0,
           },
           {
             name: 'Munt',
-            input:
-              '<kbd>I</kbd> or <span class="motion">→←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>G</kbd>',
             desc: 'A rock pillar thrust up from the floor well ahead.',
             cost: 0,
           },
@@ -4360,36 +4203,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SNAKE FIRE',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "A giant snake's strike.",
             cost: 1,
           },
           {
             name: 'RYUON HASANKEN',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "For three stocks: the blue armour's flight behind a fire dragon.",
             cost: 3,
           },
           {
             name: 'Rambu',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: "The tiger's leap into a long flurry.",
             cost: 1,
           },
           {
             name: 'NEW EN3',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓↓↓</span><kbd>G</kbd>',
+            input: '<span class="motion">↓↓↓</span><kbd>G</kbd>',
             desc: 'For three stocks: pillars of fire.',
             cost: 3,
           },
           {
             name: 'SCC',
-            input:
-              '<kbd>5</kbd> or <span class="motion">→↓←→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>H</kbd>',
             desc: "The knight's grab into a launch and a slam.",
             cost: 1,
           },
@@ -4435,7 +4273,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab into a beating and a blow that knocks the opponent away.',
             cost: 0,
           },
@@ -4448,14 +4286,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SAMA',
-            input:
-              '<kbd>U</kbd> or <span class="motion">→↓↘</span><kbd>H</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>H</kbd>',
             desc: 'A rising somersault kick, also in the air, where <span class="motion">→↓↘</span><kbd>H</kbd> kicks again; on a hit a super cancels it.',
             cost: 0,
           },
           {
             name: 'Fire BALL',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A fast straight fireball; on a hit a super cancels it.',
             cost: 0,
           },
@@ -4468,7 +4305,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'REFLACT',
-            input: '<kbd>J</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: "A round shield's shove that hurls the shield back at a shot it meets; on a hit a super cancels it.",
             cost: 0,
           },
@@ -4488,22 +4325,20 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'KAISA SUPER',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>H</kbd>',
             desc: 'A giant ghostly head of his that charges across the screen.',
             cost: 1,
           },
           {
             name: 'SGIGA',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>G</kbd>',
             desc: 'A bigger GIGA.',
             cost: 1,
           },
           {
             name: 'AKUMA SP',
             input:
-              '<kbd>3</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
+              '<kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
             desc: 'For three stocks: a dash that grabs into a storm of flashes for 250.',
             cost: 3,
           },
@@ -4556,7 +4391,7 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DASH P',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A dashing axe swing; on a hit, cancels into a super.',
             cost: 0,
           },
@@ -4569,15 +4404,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Super P',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Four dashing swings and a stronger fifth.',
             cost: 1,
           },
           {
             name: 'Super K',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'Five grenades.',
             cost: 1,
           },
@@ -4625,13 +4458,13 @@ export const GUIDES_DATA = {
           {
             name: 'Roll',
             input:
-              '<kbd>U</kbd> or <span class="motion">←</span> held for 0.6s then <span class="motion">→</span><kbd>G</kbd>',
+              '<span class="motion">←</span> held for 0.6s then <span class="motion">→</span><kbd>G</kbd>',
             desc: 'A rolling charge, also in the air, that bounces him off on a hit or guard.',
             cost: 0,
           },
           {
             name: 'Electric',
-            input: '<kbd>I</kbd>, or <kbd>G</kbd> five times within a second',
+            input: '<kbd>G</kbd> five times within a second',
             desc: 'A crackling orb that sparks on while <kbd>G</kbd> comes again within 0.2 seconds.',
             cost: 0,
           },
@@ -4644,8 +4477,7 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Super roll',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A roll steered by the direction held as it starts (on the ground, not down).',
             cost: 1,
           },
@@ -4698,13 +4530,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Sp P',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'Four dashing slashes; on a hit, cancels into the super.',
             cost: 0,
           },
           {
             name: 'Sp K',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A low lash and a high one; on a hit, cancels into the super.',
             cost: 0,
           },
@@ -4717,8 +4549,7 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Super P',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Six lashes and a long thrust.',
             cost: 1,
           },
@@ -4772,7 +4603,7 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Tatumaki',
-            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'A spinning kick that rises and drifts forward, also in the air; on a hit, cancels into the super.',
             cost: 0,
           },
@@ -4785,8 +4616,7 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Shinku TATU',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A rising whirlwind of kicks that carries the opponent round him, also in the air.',
             cost: 1,
           },
@@ -4832,7 +4662,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab into a throw.',
             cost: 0,
           },
@@ -4845,13 +4675,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'DASH P',
-            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A dashing swipe; on a hit, cancels into DASH K.',
             cost: 0,
           },
           {
             name: 'Fire',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A blazing ball that the girl in his mouth fires, striking well ahead of him.',
             cost: 0,
           },
@@ -4863,8 +4693,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'CC',
-            input:
-              '<kbd>J</kbd> or <span class="motion">←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
             desc: 'Close in, a grab into a leap and a slam.',
             cost: 0,
           },
@@ -4877,22 +4706,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SCC',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'Close in, a grab into two leaps and slams and a higher one for 200.',
             cost: 1,
           },
           {
             name: 'SUPER FIRE',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'Five blazing balls.',
             cost: 1,
           },
           {
             name: 'EN300',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'For three stocks: a phone call that sends a yellow car charging across the court.',
             cost: 3,
           },
@@ -4939,7 +4765,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab into a rocket leap and a slam.',
             cost: 0,
           },
@@ -4952,13 +4778,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Jump att',
-            input: '<kbd>U</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓←</span><kbd>H</kbd>',
             desc: 'A rocket leap that lands in a blast, also in the air.',
             cost: 0,
           },
           {
             name: 'Punch',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A rocket fist.',
             cost: 0,
           },
@@ -4970,8 +4796,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'C Chuck',
-            input:
-              '<kbd>J</kbd> or <span class="motion">→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←</span><kbd>G</kbd>',
             desc: 'Close in, a grab into kisses that heal him 60.',
             cost: 0,
           },
@@ -4984,22 +4809,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'S CC',
-            input:
-              '<kbd>1</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'For three stocks: close in, a grab into knees, blasts and kisses that heal him 50, for 300.',
             cost: 3,
           },
           {
             name: 'SUPER P',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A huge black rocket fist.',
             cost: 1,
           },
           {
             name: 'ASS GUN SUPER',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A beam from his backside that strikes twenty times from a little ahead of him.',
             cost: 1,
           },
@@ -5058,7 +4880,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: '—',
             cost: 0,
           },
@@ -5071,26 +4893,26 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Driver',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "A strike that ← or → with <kbd>G</kbd> or <kbd>H</kbd> follows into four armoured attacks (EX: a rushing punch); on a hit, cancels into its supers' SC forms for two stocks.",
             cost: 0,
           },
           {
             name: 'Assault',
-            input: '<kbd>I</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A long rush (EX: rapid fists that more <kbd>G</kbd> extends).',
             cost: 0,
           },
           {
             name: 'DogeAttack',
             input: '<kbd>F</kbd> or <span class="motion">↓←</span><kbd>H</kbd>',
-            desc: 'A dodge back that <kbd>G</kbd>, <kbd>H</kbd>, <kbd>O</kbd> or <kbd>K</kbd> (a rising Dragon) follows, also a dive in the air (EX: a counter stance in a Bonta-kun suit or, in the air, a P90 burst).',
+            desc: 'A dodge back that <kbd>G</kbd>, <kbd>H</kbd>, <kbd>J</kbd> or <kbd>K</kbd> (a rising Dragon) follows, also a dive in the air (EX: a counter stance in a Bonta-kun suit or, in the air, a P90 burst).',
             cost: 0,
           },
           {
             name: 'ECS',
             input:
-              '<kbd>J</kbd> or <span class="motion">↓↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+              '<span class="motion">↓↓</span><kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
             desc: 'An unseen dash through (EX: a flashbang).',
             cost: 0,
           },
@@ -5103,36 +4925,31 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'SS',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: "A sniper's aim that <kbd>G</kbd> fires up to four times and <kbd>H</kbd> lowers (EX: a claymore trap).",
             cost: 1,
           },
           {
             name: 'EN Driver',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
             desc: "A shield that strikes up close and counters projectiles (EX: a batter's swing).",
             cost: 1,
           },
           {
             name: 'Eat',
-            input:
-              '<kbd>3</kbd> or <span class="motion">←→←→</span><kbd>G</kbd>',
+            input: '<span class="motion">←→←→</span><kbd>G</kbd>',
             desc: 'Under 150 life only: leaps to catch a jumping opponent and heal her.',
             cost: 1,
           },
           {
             name: 'EN Chuck',
-            input:
-              '<kbd>4</kbd> or <span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
             desc: 'A Venom doll that grabs (EX: Lin charges in).',
             cost: 1,
           },
           {
             name: 'R300',
-            input:
-              '<kbd>5</kbd> or <span class="motion">→←↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">→←↓→</span><kbd>H</kbd>',
             desc: 'Under 150 life only, for three stocks: a shell that calls in her friends.',
             cost: 3,
           },
@@ -5203,7 +5020,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab into a lightning shock.',
             cost: 0,
           },
@@ -5216,13 +5033,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'FB',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: "A black mage's fireball; in the air, Air Crush, a dive.",
             cost: 0,
           },
           {
             name: 'DH',
-            input: '<kbd>I</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A caped rush; in the air, Air Kick, a diving kick.',
             cost: 0,
           },
@@ -5235,7 +5052,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'TE P / TE K',
-            input: '<kbd>J</kbd> or <span class="motion">↓←</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
             desc: 'A long unseen dash that stops beside the opponent, into a leaping slash (<kbd>E</kbd> or <span class="motion">↓←</span><kbd>H</kbd>: TE K).',
             cost: 0,
           },
@@ -5248,22 +5065,19 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Slash',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A crescent hurled from a shield.',
             cost: 1,
           },
           {
             name: 'Rocket',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: 'A diving kick that pins the opponent and pummels them from every side, also in the air.',
             cost: 1,
           },
           {
             name: 'EN3',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'For three stocks: a sword sweep into a holy blast.',
             cost: 3,
           },
@@ -5273,9 +5087,9 @@ export const GUIDES_DATA = {
   },
   dora: {
     art: FACES.dora,
-    nameplate: '',
+    nameplate: 'dora/247.png',
     role: 'Blue robot cat with 600 life',
-    tag: "Built on SEAN's file, whose name plate he still wears. Each key presses two of the original six buttons; his motions take the time the other fighters' do, and his keys enter them too.",
+    tag: 'A muscular blue robot cat. G punches, H kicks, J throws and K launches; his supers use motion commands and his stocks hold 90 power each.',
     ex: false,
     sections: [
       {
@@ -5284,9 +5098,9 @@ export const GUIDES_DATA = {
         cost: false,
         rows: [
           {
-            name: 'Paired buttons',
-            input: '<kbd>G</kbd><kbd>H</kbd><kbd>K</kbd><kbd>J</kbd>',
-            desc: 'His attacks each take two of the original six buttons, which his keys press together: <kbd>G</kbd> LP, <kbd>H</kbd> LK, <kbd>K</kbd> HP and <kbd>J</kbd> HK — low with ↓ and in the air, where an air dash or a double jump changes their form.',
+            name: 'Punch / kick',
+            input: '<kbd>G</kbd><span class="sep">/</span><kbd>H</kbd>',
+            desc: 'G punches and H kicks, low with ↓ and in the air. An air dash or a double jump changes the air attacks.',
             cost: 0,
           },
           {
@@ -5298,13 +5112,13 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Hit Up',
-            input: '<span class="motion">↘</span><kbd>K</kbd>',
+            input: '<kbd>K</kbd>',
             desc: 'A launcher that ↑ follows with a jump.',
             cost: 0,
           },
           {
             name: 'Chuck',
-            input: '<kbd>O</kbd> close',
+            input: '<kbd>J</kbd> close',
             desc: 'A grab and beating.',
             cost: 0,
           },
@@ -5323,43 +5137,37 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Air Cannon',
-            input:
-              '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A blast from a cannon on his arm that starts too far ahead to hit an opponent close in.',
             cost: 0,
           },
           {
             name: 'Sky Rise',
-            input:
-              '<kbd>I</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: 'A rising flying punch, also in the air.',
             cost: 0,
           },
           {
             name: 'Charge',
-            input:
-              '<kbd>F</kbd> or <span class="motion">↓→</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
+            input: '<kbd>F</kbd> or <span class="motion">↓→</span><kbd>H</kbd>',
             desc: 'A flying rush.',
             cost: 0,
           },
           {
             name: 'Twin Hammer',
-            input:
-              '<span class="motion">↓←</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
-            desc: 'A dashing punch into an uppercut. No key; the motion only.',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'A dashing punch into an uppercut. Invincible during casting and the follow-up.',
             cost: 0,
           },
           {
             name: 'Anywhere Door <em>forward</em>',
-            input:
-              '<span class="motion">↓↓</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
+            input: '<span class="motion">↓↓</span><kbd>G</kbd>',
             desc: 'Teleports forward through the Anywhere Door. No key; the motion only.',
             cost: 0,
           },
           {
             name: 'Anywhere Door <em>back</em>',
-            input:
-              '<span class="motion">↓↓</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
+            input: '<span class="motion">↓↓</span><kbd>H</kbd>',
             desc: 'Teleports back through the Anywhere Door. No key; the motion only.',
             cost: 0,
           },
@@ -5372,44 +5180,39 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Cannon',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
-            desc: 'A shockwave across the screen.',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A shockwave across the screen. Invincible during casting.',
             cost: 1,
           },
           {
             name: 'Gadgets',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓←↓→</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
-            desc: 'Green shells and gadgets that pummel the opponent.',
+            input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
+            desc: 'Green shells and gadgets that pummel the opponent. Invincible during casting.',
             cost: 1,
           },
           {
             name: 'Fists',
-            input:
-              '<kbd>3</kbd> or <span class="motion">↓←↓←</span><kbd>G</kbd><span class="sep">/</span><kbd>K</kbd>',
-            desc: 'A punch flurry into a dash and uppercut.',
+            input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
+            desc: 'A punch flurry into a dash and uppercut. Invincible during casting.',
             cost: 1,
           },
           {
             name: 'Pierce',
-            input:
-              '<kbd>4</kbd> or <span class="motion">↓→↓←</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
-            desc: 'A flying multi-hit rush.',
+            input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
+            desc: 'A flying multi-hit rush. Invincible during casting.',
             cost: 1,
           },
           {
             name: 'Hug',
             input:
-              '<kbd>5</kbd> or <kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>K</kbd>',
+              '<kbd>G</kbd><kbd>G</kbd><span class="motion">→</span><kbd>H</kbd><kbd>G</kbd>',
             desc: 'For three stocks: carries the opponent through the Anywhere Door.',
             cost: 3,
           },
           {
             name: 'FK之意思',
-            input:
-              '<span class="motion">→←↓→</span><kbd>H</kbd><span class="sep">/</span><kbd>J</kbd>',
-            desc: 'For three stocks: a leap into a flashing barrage. No key; the motion only.',
+            input: '<span class="motion">→←↓→</span><kbd>H</kbd>',
+            desc: 'A leap into a flashing barrage. Requires three stocks; spends them when the casting flash starts, so an interrupted wind-up costs nothing.',
             cost: 3,
           },
           {
@@ -5455,14 +5258,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Hado',
-            input: '<kbd>U</kbd> or <span class="motion">↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
             desc: 'A dark fireball that bounces along the floor, one at a time.',
             cost: 0,
           },
           {
             name: 'Shoryu',
-            input:
-              '<kbd>I</kbd> or <span class="motion">→↓↘</span><kbd>G</kbd>',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
             desc: "A rising uppercut that knocks a ? block loose for a coin, which gives him life and power, or a mushroom that bounces off along the floor and changes the opponent's life as it meets them: one gives 31, a poison one takes 29 and a 1UP gives 50 and a stock.",
             cost: 0,
           },
@@ -5481,15 +5283,13 @@ export const GUIDES_DATA = {
         rows: [
           {
             name: 'Shinku',
-            input:
-              '<kbd>1</kbd> or <span class="motion">↓→↓→</span><kbd>G</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
             desc: 'A leap that hurls a red shell along the floor.',
             cost: 1,
           },
           {
             name: 'Shin Shoryu',
-            input:
-              '<kbd>2</kbd> or <span class="motion">↓→↓→</span><kbd>H</kbd>',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
             desc: "For two stocks: a grab into a chain of stomps on the opponent's head that ends at a flagpole.",
             cost: 2,
           },
@@ -5542,7 +5342,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Self KO',
-            input: '<kbd>O</kbd>',
+            input: '<kbd>J</kbd>',
             desc: 'Knocks himself out.',
             cost: 0,
           },
@@ -5560,7 +5360,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Hado',
-            input: '<kbd>U</kbd> or <span class="motion">→</span><kbd>K</kbd>',
+            input: '<span class="motion">→</span><kbd>K</kbd>',
             desc: "RARIO's bouncing Hado, after a three-second countdown.",
             cost: 0,
           },

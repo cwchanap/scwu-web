@@ -1939,6 +1939,17 @@ export class Match {
     return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
   }
 
+  // Authored: all hostile seats count, except Chii acting as difficulty buttons.
+  private get brawlEnemies() {
+    if (!this.battle) return null;
+    const [one] = this.fighters;
+    const enemies = this.fighters.filter((_, i) => one.enemies & (1 << i));
+    const choosingMode =
+      this.globals[10] === 10 &&
+      enemies.every((f) => f.who === 'zaku' || f.who === 'pachelo');
+    return enemies.length > 1 && !choosingMode ? enemies : null;
+  }
+
   // State 300 in a story (0x409062). At a time-up, seat 1 scores the step's
   // +0x11 for more life than the 1P and the 1P each slot's +0x14 for more
   // than that slot's player, by per mille. The 1P's side then counts the
@@ -1968,6 +1979,12 @@ export class Match {
       if (ally(i)) ours = Math.max(ours, f.points);
       else theirs = Math.max(theirs, f.points);
     });
+    const enemies = this.brawlEnemies;
+    // Authored: combat brawls resolve by survival; mode selection keeps its points.
+    if (!timeUp && enemies) {
+      ours = one.hp > 0 ? 1 : 0;
+      theirs = enemies.some((f) => f.hp > 0) ? 1 : 0;
+    }
     const winner =
       ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
     if (winner !== 'player') this.lost++;
@@ -5025,7 +5042,10 @@ export class Match {
     // 0x7f: its fight state reads the lives after every step (0x408e90), so
     // a lose action that restores life on its first step (ALPHA's KO Boss,
     // PC 1037) is never seen at 0. A story's ends as the 1P is KO'd or any
-    // player reaches 100 points (0x408eda). Seeing the end it sets state 300
+    // player reaches 100 points (0x408eda). Authored: a brawl instead waits
+    // for every hostile seat to have no life, including waiting ones. Mode
+    // selection's Chii (global 10 = 10) keep their scripted point objective.
+    // Seeing the end it sets state 300
     // (0x408ec7), which picks the result the tick after from the lives then,
     // by per mille (+0xdf09, 0x408f68) as lives differ, or a story's
     // (0x409062). The tick after that the result state credits the winner,
@@ -5033,8 +5053,12 @@ export class Match {
     // 0x40966b), gives the players their results (+0xe007) and spawns its
     // lettering.
     const [one, two] = this.fighters;
+    const enemies = this.brawlEnemies;
     const over = this.battle
-      ? !one.hp || this.fighters.some((f) => f.points >= 100)
+      ? !one.hp ||
+        (enemies
+          ? enemies.every((f) => !f.hp)
+          : this.fighters.some((f) => f.points >= 100))
       : !one.hp || !two.hp;
     if (this.picking?.winner) {
       this.winner = this.picking.winner;

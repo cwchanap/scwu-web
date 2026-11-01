@@ -1,3 +1,4 @@
+import { CHARACTERS } from './characters';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
@@ -161,9 +162,14 @@ describe('character select (object type 10, VS single)', () => {
     select.step();
     expect(select.hover[0]).toBe(45);
     // His face (84) holds a blank display at PC 1, his file's lock; the
-    // port runs past it, so his image 140 shows (authored).
+    // port runs past it, so his muscular portrait shows (authored).
     for (let t = 0; t < 30; t++) select.step();
     expect(shown(select, 'dora', 84)?.frame?.image).toBe(140);
+    expect(shown(select, 'dora', 83)?.frame?.image).toBe(247);
+    expect(CHARACTERS.dora.images.find((i) => i.index === 140)).toMatchObject({
+      width: 207,
+      height: 400,
+    });
     run(select, [{ punch: true }, {}]);
     run(select, tap({ kick: true }));
     while (!select.done) select.step();

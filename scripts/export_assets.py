@@ -4237,7 +4237,44 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     sounds = export_sounds(c, key, {i for i in cued(clips, scripts) | {u16(r, 2) for r in p.records[idle.start:idle.end]
                                                                      if r[0] == 0x03} if c.sounds[i]["size"]})
     select = select_program(p, tables["selectFace"], image_ids)
+    if key == "dora":
+        # Authored: show his own name on both select modes, before the TEAM branch.
+        select["actions"]["83"] = [list(r) for r in p.records[p.action(83).start:p.action(83).end]]
+        select["actions"]["84"][1] = [4, 1, 83, 0, 0, 0, 0, 0, 224, 255, 171, 255, 0, 0, 0, 0]
+        select["actions"]["85"][1] = [0] * 16
+        # Keep the stock requirement during the wind-up; spend at the flash (age 75).
+        fk = scripts["356"]
+        cost = next(e for e in fk["events"] if e["op"] == "stock")
+        fk["events"].insert(next(i for i, e in enumerate(fk["events"]) if e["t"] == 75),
+                            {**cost, "t": 75})
+        cost["add"] = 0
+        fk["loopEvent"] += 1
+        # Casting bodies still push, but take neither strikes nor grabs, including follow-ups.
+        protected = {250, 252, 254, 296, 297, 305, 306, 327, 328, 330, 331, 332, 338, 339, 340, 341, 342}
+        for name, script in scripts.items():
+            if int(name.split("+")[0]) in protected:
+                for frame in script["frames"]:
+                    for body in frame.get("body", []):
+                        body["kind"] &= ~6
     images = export_images(c, key, image_ids)
+    if key == "dora":
+        # A standard-height select portrait from his muscular pose; gameplay sprites stay native.
+        face = image_rgba(c, 221)
+        source_face = c.images[221]
+        width, height = 207, 400
+        portrait = bytearray()
+        for y in range(height):
+            for x in range(width):
+                at = 4 * (y * source_face.height // height * source_face.width + x * source_face.width // width)
+                portrait.extend(face[at:at + 4])
+        write_if_changed(PUBLIC / "dora/140.png", rgba_png(width, height, portrait))
+        nameplate = (ROOT / "art/dora/name.png").read_bytes()
+        name_width, name_height = struct.unpack_from(">II", nameplate, 16)
+        write_if_changed(PUBLIC / "dora/247.png", nameplate)
+        for image in images:
+            if image["index"] in (140, 247):
+                image.update(width=width if image["index"] == 140 else name_width,
+                             height=height if image["index"] == 140 else name_height, own=True)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, resultScripts=result_scripts, twins=pairs, aliases=aliases,
         counters=counters, neutralTests=neutral_tests, select=select, palettes=export_palettes(c, image_ids),
@@ -4829,6 +4866,7 @@ def export_demo(key, name, sha256, out):
 def inputs():
     """What the export reads: this script, and the handoff's files by name, size and time."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
+    digest.update((ROOT / "art/dora/name.png").read_bytes())
     for path in sorted(RESEARCH.rglob("*")):
         if path.is_file():
             stat = path.stat()

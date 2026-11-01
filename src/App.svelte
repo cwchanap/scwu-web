@@ -2,7 +2,6 @@
   import { onMount } from 'svelte';
   import { ASSET_BASE } from './game/assetBase';
   import { buttonsOf, KEYS, usesButton } from './game/commands';
-  import { SUPER_CONTROLS } from './game/match';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
   import { DUMMY_BEHAVIORS } from './game/dummy';
@@ -79,440 +78,152 @@
     { control: 'punch', label: 'Punch', symbol: 'G' },
     { control: 'kick', label: 'Kick', symbol: 'H' },
     { control: 'dash', label: 'Dash', symbol: '⇧' },
-    { control: 'drill', label: 'Drill punch', symbol: 'U' },
-    { control: 'axe', label: 'Axe throw', symbol: 'I' },
-    { control: 'throw', label: 'Throw', symbol: 'O' },
+    { control: 'throw', label: 'Throw', symbol: 'J' },
     { control: 'hitUp', label: 'Hit Up', symbol: 'K' },
     { control: 'iori', label: 'IORI', symbol: 'F' },
-    { control: 'dst', label: 'Daisetsuzan', symbol: 'J' },
     { control: 'ex', label: 'EX mode', symbol: 'E' },
-    { control: 'getterBeam', label: 'Getter Beam', symbol: '1' },
-    { control: 'musashi', label: 'Musashi', symbol: '2' },
-    { control: 'changeAttack', label: 'Change Attack', symbol: '3' },
-    { control: 'blackRush', label: 'Black Rush', symbol: '4' },
-    { control: 'megaBeam', label: 'Mega Beam', symbol: '5' },
   ];
-  const supers = new Set<Control>(SUPER_CONTROLS);
   // The others' moves take Ryuko's keys (commands.ts).
   const fighterLabels: Partial<Record<Who, Partial<Record<Control, string>>>> =
     {
       zoma: {
-        getterBeam: 'Spake',
-        musashi: 'DST',
-        changeAttack: 'EN300',
-        blackRush: 'Shin Spark',
-        drill: 'Dragon',
-        axe: 'Fire',
         iori: 'Dragon 2',
-        dst: 'Bomb',
         ex: 'G Beam',
       },
       kiki: {
-        getterBeam: 'Ranbu',
-        musashi: 'Magic Fire',
-        changeAttack: 'EN3',
-        drill: 'Dragon O',
-        axe: "K'",
         iori: 'Tatumaki',
       },
       chung: {
-        getterBeam: 'Gesar',
-        musashi: 'Lee',
-        changeAttack: 'EN300',
-        drill: 'Dragon',
-        axe: 'Fire Ball',
         iori: 'Orochi',
-        dst: 'Burn Knock',
       },
       amiro: {
-        getterBeam: 'SCC',
-        musashi: 'Medeo',
-        changeAttack: 'NT',
-        blackRush: 'Funnal',
-        drill: 'Dragon',
-        axe: 'Beam',
         iori: 'Coment Chuck',
-        dst: 'Morning Star',
       },
       anmc: {
-        getterBeam: 'Super Chuck',
-        musashi: 'Super Ball',
-        changeAttack: 'EN300',
-        drill: 'Fly Move',
-        axe: 'Fire Ball',
         iori: 'Twis Att',
-        dst: 'Ball Fire',
       },
       giant: {
-        getterBeam: 'Fire',
-        musashi: 'Hariken',
-        changeAttack: 'EN300',
-        drill: 'Rock Punch',
-        axe: 'Base Ball',
         iori: 'H Punch',
-        dst: 'Counter',
       },
       suneo: {
-        getterBeam: 'HH',
-        musashi: 'GP',
-        changeAttack: 'EN300',
-        blackRush: 'BP',
-        drill: 'Drill Knee',
-        axe: 'Fire Ball',
         iori: 'G Driver',
-        dst: 'Bike',
       },
       yo: {
-        getterBeam: 'Giga Press',
-        musashi: 'Hidden',
-        changeAttack: 'Snake',
-        blackRush: 'EN300',
-        drill: 'Dragon',
-        axe: 'Tofu',
         iori: 'Zombi Walk',
-        dst: 'Run In',
       },
       sin: {
-        getterBeam: 'Baku',
-        musashi: 'Sup Run C',
-        changeAttack: 'EN300',
-        blackRush: 'Nozan',
-        drill: 'S Punch',
-        axe: 'Low Chuck',
         iori: 'Run Chuck',
-        dst: 'Clack Chuck',
       },
       lizard: {
-        getterBeam: 'Hidden',
-        musashi: 'Chuck Sup',
-        changeAttack: 'Dragon SP',
-        blackRush: 'EN300',
-        drill: 'Cross',
-        axe: 'Fire',
         iori: 'Jump Att',
       },
       kay: {
-        getterBeam: 'EN300',
-        musashi: 'Kaoru',
-        changeAttack: 'Super P',
-        drill: 'Air Chuck',
-        axe: 'Fire',
         iori: 'Counter',
-        dst: 'Comment Chuck',
       },
       dido: {
-        getterBeam: 'Hidden EN300',
-        musashi: 'Temjin Fly',
-        changeAttack: 'Dragon',
-        blackRush: 'Raiden',
-        megaBeam: 'EN300',
-        drill: 'Slide',
-        axe: 'Fire',
         iori: 'RAiden',
-        dst: 'Dodge',
       },
       sakuya: {
-        getterBeam: 'EN300',
-        musashi: 'Super Hit Up',
-        changeAttack: 'Spark',
-        blackRush: 'Dragon Kick',
-        megaBeam: 'Low Fire',
-        drill: 'Dragon Punch',
-        axe: 'Fire',
         iori: 'Iori',
-        dst: 'Counter',
       },
       alex: {
-        getterBeam: 'EN300',
-        musashi: 'Gysa',
-        changeAttack: 'Super Fire',
-        blackRush: 'Haou',
-        drill: 'Dragon',
-        axe: 'Air Fire',
         iori: 'Reflect',
-        dst: 'Counter',
       },
       sou: {
-        getterBeam: 'Kokaken',
-        musashi: 'Rengeki',
-        changeAttack: 'Beast Attack',
-        blackRush: 'Spark',
-        megaBeam: 'Danku Shot',
-        drill: 'Akuma Jump',
-        axe: 'Fire Kick',
         iori: 'Iori',
-        dst: 'BK',
       },
       hiso: {
-        getterBeam: 'Fish',
-        musashi: 'EN300',
-        changeAttack: 'Fly Arm',
-        blackRush: 'S Shoot',
-        megaBeam: 'Striker',
-        drill: 'Dragon',
-        axe: 'Fire',
         iori: 'Bannaku',
-        dst: 'Counter',
       },
       erus: {
-        getterBeam: 'Hidden EN3',
-        musashi: 'Lizard Fly',
-        changeAttack: 'SCC',
-        blackRush: 'EN300',
-        megaBeam: 'Super Slash',
-        drill: 'Inatuma',
-        axe: 'VO5',
         iori: 'Coin',
-        dst: 'Counter',
       },
       feng: {
-        getterBeam: 'EN300',
-        musashi: 'ICE Punch',
-        changeAttack: 'S Shoot',
-        blackRush: 'Suck',
-        drill: 'Dragon',
-        axe: 'Fire',
         iori: 'Iori',
-        dst: 'BP',
       },
       sean: {
-        getterBeam: 'EN300',
-        musashi: 'SCC',
-        changeAttack: 'S Shoot',
-        drill: 'Dragon',
-        axe: 'Whip',
         iori: 'Whip K',
-        dst: 'CC',
       },
       gon: {
-        getterBeam: 'EN300',
-        musashi: 'Kuren',
-        changeAttack: 'Heart',
-        blackRush: 'Hidden',
-        drill: 'Dragon',
-        axe: 'Fire Ball',
         iori: 'Drill',
-        dst: 'Counter',
       },
       kate: {
-        getterBeam: 'en300',
-        musashi: 'Slash',
-        changeAttack: 'Beam',
-        drill: 'Neko',
-        axe: 'Air Fire',
         iori: 'Dash Att',
-        dst: 'Counter',
       },
       remu: {
-        getterBeam: 'Gold Hand',
-        musashi: 'Minami',
-        changeAttack: 'Bakuretu',
-        blackRush: 'Phsy',
-        megaBeam: 'Thander',
-        drill: 'Tatsumaki',
-        axe: 'Slash',
         iori: 'Jet',
-        dst: 'Drill',
       },
       rear: {
-        getterBeam: 'Gysa',
-        musashi: 'Viper F',
-        changeAttack: 'en300',
-        blackRush: 'Evil en3',
-        drill: 'Sama',
-        axe: 'Fire Ball',
         iori: 'Down Att',
-        dst: 'Viper',
       },
       gigi: {
-        getterBeam: 'Ranbu',
-        musashi: 'S Chuck',
-        changeAttack: 'EN3',
-        blackRush: 'Bike K',
-        megaBeam: 'Bike PK',
-        drill: 'Dragon',
-        axe: "K'",
         iori: 'Dive',
-        dst: 'Bike P',
         ex: 'Change',
       },
       sww: {
-        getterBeam: 'Super RSK',
-        musashi: 'God Dragon',
-        changeAttack: 'C. Chain',
-        blackRush: 'EN300',
-        megaBeam: 'Healing',
-        drill: 'Dragon P',
-        axe: 'Ice Punch',
         iori: 'Chain',
-        dst: 'Ryuseiken',
         ex: 'Chan',
       },
       ogi: {
-        getterBeam: 's shoot',
-        musashi: 'SCC',
-        changeAttack: 'S Crush',
-        blackRush: 'EN300',
-        megaBeam: 'Fire K',
-        drill: 'Dragon',
-        axe: 'Crush',
         iori: 'Rose',
-        dst: 'Fire P',
       },
       ziro: {
-        getterBeam: 'Miss All',
-        musashi: 'Rambu',
-        changeAttack: 'EN300',
-        blackRush: 'Twin Shot',
-        megaBeam: 'CC',
-        drill: 'Fire Ball',
-        axe: 'Nataku',
         iori: 'Telepot',
-        dst: 'Iori',
         ex: 'Type',
       },
       masa: {
-        getterBeam: 'Rambu',
-        musashi: 'SCC',
-        changeAttack: 'Mesatsu',
-        drill: 'Shoryu',
-        axe: '3 Fire',
         iori: '3 Hit',
-        dst: 'Bando',
       },
       times: {
-        getterBeam: 'Rambu',
-        musashi: 'Super Boom',
-        changeAttack: 'Mesatsu',
-        drill: 'Shoryu',
-        axe: 'Fire',
         iori: 'Dash P',
       },
       zenka: {
-        getterBeam: 'Ranbu',
-        musashi: 'Daisharin',
-        changeAttack: 'En300',
-        drill: 'Dragon P',
-        axe: 'Fire Ball',
         iori: 'New Move',
       },
       zmega: {
-        getterBeam: 'Gaisa',
-        musashi: 'S Giga',
-        changeAttack: 'Akuma',
-        drill: 'Sama',
-        axe: 'Fire Ball',
         iori: 'Giga',
-        dst: 'Reflect',
         ex: 'Shin Z',
       },
       alpha: {
-        getterBeam: 'Snake Fire',
-        musashi: 'Ryuon',
-        changeAttack: 'Rambu',
-        blackRush: 'New En3',
-        megaBeam: 'SCC',
-        drill: 'CC',
-        axe: 'Munt',
         iori: 'NC',
       },
       shinz: {
-        getterBeam: 'Kaisa',
-        musashi: 'S Giga',
-        changeAttack: 'Akuma',
-        drill: 'Sama',
-        axe: 'Fire Ball',
         iori: 'Giga',
-        dst: 'Reflect',
         ex: 'Gaisa',
       },
-      zaku: {
-        getterBeam: 'Super P',
-        musashi: 'Super K',
-        drill: 'Dash P',
-      },
-      pachelo: {
-        getterBeam: 'Super Roll',
-        drill: 'Roll',
-        axe: 'Electric',
-      },
-      golf: {
-        getterBeam: 'Super P',
-        drill: 'Sp P',
-        axe: 'Sp K',
-      },
-      asura: {
-        getterBeam: 'Shinku TATU',
-        drill: 'Tatumaki',
-      },
+      zaku: {},
+      pachelo: {},
+      golf: {},
+      asura: {},
       ttro: {
-        getterBeam: 'SCC',
-        musashi: 'Super Fire',
-        changeAttack: 'EN300',
-        drill: 'Dash P',
-        axe: 'Fire',
         iori: 'Dash K',
-        dst: 'CC',
       },
       astroman: {
-        getterBeam: 'S CC',
-        musashi: 'Super P',
-        changeAttack: 'Gun Super',
-        drill: 'Jump Att',
-        axe: 'Punch',
         iori: 'Ass Gun',
-        dst: 'C Chuck',
       },
       yinan: {
-        getterBeam: 'SS',
-        musashi: 'EN Driver',
-        changeAttack: 'Eat',
-        blackRush: 'EN Chuck',
-        megaBeam: 'R300',
-        drill: 'Driver',
-        axe: 'Assault',
         iori: 'Doge',
-        dst: 'ECS',
         ex: 'Type',
       },
       aya: {
-        getterBeam: 'Slash',
-        musashi: 'Rocket',
-        changeAttack: 'EN3',
-        drill: 'FB',
-        axe: 'DH',
         iori: 'SHO',
-        dst: 'TE P',
         ex: 'TE K',
       },
       dora: {
-        punch: 'LP',
-        kick: 'LK',
-        hitUp: 'HP',
-        dst: 'HK',
+        punch: 'Punch',
+        kick: 'Kick',
+        hitUp: 'Hit Up',
         throw: 'Chuck',
         ex: 'EN',
-        getterBeam: 'Cannon',
-        musashi: 'Gadgets',
-        changeAttack: 'Fists',
-        blackRush: 'Pierce',
-        megaBeam: 'Hug',
-        drill: 'Air Cannon',
-        axe: 'Sky Rise',
         iori: 'Charge',
       },
       rario: {
-        getterBeam: 'Shinku',
-        musashi: 'Shin Shoryu',
-        drill: 'Hado',
-        axe: 'Shoryu',
         iori: 'Tatumaki',
       },
       training: {
         punch: 'Drain',
         kick: 'Refill',
         throw: 'Self KO',
-        drill: 'Hado',
       },
     };
   const labelOf = (control: Control, label: string) =>
@@ -652,21 +363,13 @@
             >{/if}{#if has('kick')}<span
               ><kbd>H</kbd> {labelOf('kick', 'Kick')}</span
             >{/if}<span>Hold back Guard</span><span><kbd>Shift</kbd> Dash</span
-          >{#if has('drill')}<span
-              ><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
-            >{/if}{#if has('axe')}<span
-              ><kbd>I</kbd> {labelOf('axe', 'Axe')}</span
-            >{/if}{#if has('throw')}<span
-              ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
+          >{#if has('throw')}<span
+              ><kbd>J</kbd> {labelOf('throw', 'Throw')}</span
             >{/if}{#if has('hitUp')}<span
               ><kbd>K</kbd> {labelOf('hitUp', 'Hit Up')}</span
             >{/if}{#if has('iori')}<span
               ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
-            >{/if}{#if has('dst')}<span
-              ><kbd>J</kbd> {labelOf('dst', 'Daisetsuzan')}</span
             >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-            >{/if}{#if SUPER_CONTROLS.some(has)}<span
-              ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
             >{/if}
         </p>
         <div class="floating-controls">
@@ -695,7 +398,7 @@
           tabindex="-1"
           role="application"
           aria-roledescription="fighting game"
-          aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, hold back to guard, G to punch, H to kick, K for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, Shift to dash, double-tap left or right to dash on the ground or in the air, U for Drill Punch, I for Axe throw, O to grab and throw, J for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
+          aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, hold back to guard, G to punch, H to kick, K for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, Shift to dash, double-tap left or right to dash on the ground or in the air, J to grab and throw, E to switch EX mode, motion commands for specials and supers. P to pause."
         ></div>
         <div class="sr-only" aria-label="Match health">
           <div
@@ -767,7 +470,6 @@
           'dst',
           'ex',
         ].includes(item.control)}
-        class:super-control={supers.has(item.control)}
         aria-label={labelOf(item.control, item.label)}
         disabled={!status.ready ||
           status.paused ||

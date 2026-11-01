@@ -184,33 +184,147 @@ describe('story battles', () => {
     expect(held).toEqual([0, 1, 2, 3, 4, -1, -1, 5]);
   });
 
-  it('ends the round at 100 points, the 1P winning and the slots losing', () => {
-    const match = Match.story('ryuko', FIRST);
+  it.each([
+    ['dora', 5, 0],
+    ['dora', 5, 10],
+    ['ryuko', 0, 0],
+    ['shinz', 5, 0],
+    ['masa', 0, 0],
+    ['yinan', 0, 0],
+  ] as const)(
+    'keeps %s step %i running past 100 points (global 10: %i)',
+    (who, step, global10) => {
+      const globals = Object.assign(Array<number>(64).fill(0), {
+        10: global10,
+      });
+      const match = Match.story(
+        who,
+        scenarioOf(who)[step] as Battle,
+        0,
+        undefined,
+        globals,
+      );
+      fight(match);
+      const [one, early] = match.fighters;
+      knockOut(match, early, one);
+      // Later hits on an already KO'd fighter can award these points again.
+      one.points = 100;
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner).toBeNull();
+      expect(match.matchOver).toBe(false);
+      expect(
+        match.fighters.some((f, i) => one.enemies & (1 << i) && f.hp > 0),
+      ).toBe(true);
+      expect(match.fighters.some((f) => !f.present && f.hp > 0)).toBe(true);
+    },
+  );
+
+  it('wins a brawl only after the final enemy falls, regardless of points or a living ally', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        slots: [
+          slot({ points: 0 }),
+          slot({ flags: 0x201, points: 0 }),
+          slot({ points: 0 }),
+        ],
+      }),
+    );
     fight(match);
-    const [ryuko, zaku, pachelo, three] = match.fighters;
-    knockOut(match, pachelo, ryuko);
-    // Seat 2 gives seat 0 nothing; its reinforcements 100 each.
-    expect(ryuko.points).toBe(0);
-    match.step();
-    expect(match.winner).toBeNull();
-    knockOut(match, three, ryuko);
-    expect(ryuko.points).toBe(100);
-    // State 300 picks the result, and its state credits it (0x409062).
+    const [one, early, ally, last] = match.fighters;
+    knockOut(match, early, one);
     for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBeNull();
+    knockOut(match, last, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(one.points).toBe(0);
+    expect(ally.hp).toBeGreaterThan(0);
     expect(match).toMatchObject({ winner: 'player', wins: [1, 0], lost: 0 });
     expect(match.matchOver).toBe(true);
-    // Back in neutral each takes its result: ZAKU, standing, the lose action.
-    while (ryuko.action !== 'win') match.step();
-    expect(zaku.action).toBe('down');
   });
 
-  it('draws when the 1P falls and no one scores', () => {
+  it('waits for a delayed enemy after the active enemy is defeated', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ slots: [slot({ points: 100 }), slot({ flags: 2, delay: 10 })] }),
+    );
+    fight(match);
+    const [one, early, delayed] = match.fighters;
+    expect(delayed.shown).toBe(false);
+    knockOut(match, early, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBeNull();
+    expect(delayed.shown).toBe(false);
+    while (!delayed.shown) match.step();
+    knockOut(match, delayed, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
+  });
+
+  it('finishes Doraemon’s brawl after all six enemy waves, leaving the ally alive', () => {
+    const match = Match.story('dora', scenarioOf('dora')[5] as Battle);
+    fight(match);
+    const [one] = match.fighters;
+    const enemies = match.fighters.filter((_, i) => one.enemies & (1 << i));
+    expect(enemies).toHaveLength(6);
+    for (const [i, enemy] of enemies.entries()) {
+      expect(enemy.present).toBe(true);
+      knockOut(match, enemy, one);
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner).toBe(i === 5 ? 'player' : null);
+    }
+    expect(match.fighters[7].hp).toBeGreaterThan(0);
+  });
+
+  it('keeps the point-based objective in a duel', () => {
+    const match = Match.story('ryuko', battle());
+    fight(match);
+    match.fighters[0].points = 100;
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match).toMatchObject({ winner: 'player', wins: [1, 0] });
+    expect(match.fighters[1].hp).toBeGreaterThan(0);
+  });
+
+  it('loses a brawl when the player falls even if nobody scores points', () => {
     const match = Match.story('ryuko', FIRST);
     fight(match);
     const [ryuko, zaku] = match.fighters;
     knockOut(match, ryuko, zaku);
     for (let t = 0; t < 3; t++) match.step();
+    expect(match).toMatchObject({ winner: 'opponent', wins: [0, 1], lost: 1 });
+  });
+
+  it('draws a brawl when the player and every enemy fall together', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        koPoints: 0,
+        slots: [slot({ points: 0 }), slot({ points: 0 })],
+      }),
+    );
+    fight(match);
+    const [one, a, b] = match.fighters;
+    knockOut(match, a, one);
+    knockOut(match, b, one);
+    knockOut(match, one, a);
+    for (let t = 0; t < 3; t++) match.step();
     expect(match).toMatchObject({ winner: 'draw', wins: [1, 1], lost: 1 });
+  });
+
+  it('still resolves a timed brawl at time-up with surviving enemies', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        time: 1,
+        timeUp: 100,
+        slots: [slot({ timeUp: 100 }), slot({ timeUp: 100 })],
+      }),
+    );
+    fight(match);
+    match.fighters[0].hp = 1;
+    while (!match.winner) match.step();
+    expect(match.winner).toBe('opponent');
+    expect(match.fighters.slice(1).every((f) => f.hp > 0)).toBe(true);
   });
 
   it('scores a time-up by life per mille', () => {
