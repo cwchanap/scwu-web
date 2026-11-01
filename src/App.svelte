@@ -70,7 +70,6 @@
   });
   let settingsOpen = $state(false);
   let dialog: HTMLDialogElement;
-  let pausedBefore = false;
   const asset = ASSET_BASE;
   const touchControls: { control: Control; label: string; symbol: string }[] = [
     { control: 'left', label: 'Move left', symbol: '←' },
@@ -543,8 +542,13 @@
       .catch((error: unknown) => {
         if (!disposed) status = { ...status, error: String(error) };
       });
+    // The chrome band wraps under narrow windows, shrinking the arena without
+    // a window resize; keep the letterbox in step.
+    const observer = new ResizeObserver(() => session?.game.scale.refresh());
+    observer.observe(host);
     return () => {
       disposed = true;
+      observer.disconnect();
       session?.game.destroy(true);
     };
   });
@@ -589,24 +593,18 @@
     focusArena();
   }
   function openSettings() {
-    pausedBefore = status.paused;
-    if (status.ready && !status.paused && !status.resultReady)
-      session?.scene.togglePause();
+    // The scene holds the modal's freeze, so a reset's unpause can't slip a
+    // tick through and a select screen after a match freezes too.
+    session?.scene.setModal(true);
     settingsOpen = true;
     dialog.showModal();
   }
   // close fires on every path (Close button, Character select, native Esc).
   function settingsClosed() {
     settingsOpen = false;
-    if (status.ready && !status.resultReady && status.paused !== pausedBefore)
-      session?.scene.togglePause();
+    session?.scene.setModal(false);
     focusArena();
   }
-  // begin() unpauses on every reset; re-pause while the modal is open.
-  $effect(() => {
-    if (settingsOpen && status.ready && !status.paused && !status.resultReady)
-      session?.scene.togglePause();
-  });
   const sayWinner = (winner: GameStatus['winner']) =>
     winner === 'draw'
       ? 'Draw.'
@@ -629,100 +627,129 @@
 <main class="app-shell" id="main">
   <section class="cabinet" aria-label="SCWU training match">
     <div class="stage-shell">
-      <div
-        class="arena"
-        bind:this={host}
-        tabindex="-1"
-        role="application"
-        aria-roledescription="fighting game"
-        aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, hold back to guard, G to punch, H to kick, K for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, Shift to dash, double-tap left or right to dash on the ground or in the air, U for Drill Punch, I for Axe throw, O to grab and throw, J for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
-      ></div>
-      <div class="sr-only" aria-label="Match health">
-        <div
-          role="meter"
-          aria-label="Player health"
-          aria-valuemin="0"
-          aria-valuemax={status.life[0]}
-          aria-valuenow={status.hp[0]}
-        >
-          {status.hp[0]}
+      <div class="stage-chrome">
+        <div class="stats-chip">
+          {#if status.resultReady}
+            <strong class="result-label"
+              >{status.matchWinner === 'draw'
+                ? 'DRAW GAME'
+                : status.matchWinner === 'player'
+                  ? '1P WIN'
+                  : '2P WIN'}</strong
+            >
+          {:else}
+            <span class="match-stats"
+              ><strong>{status.hits}</strong> HITS <span>·</span>
+              <strong>{status.damage}</strong> DAMAGE</span
+            >
+          {/if}
         </div>
-        <div
-          role="meter"
-          aria-label="Opponent health"
-          aria-valuemin="0"
-          aria-valuemax={status.life[1]}
-          aria-valuenow={status.hp[1]}
-        >
-          {status.hp[1]}
-        </div>
-        <span
-          >Time: {Number.isFinite(status.seconds)
-            ? status.seconds
-            : 'Unlimited'}</span
-        >
-        <span>Action: {status.action}</span>
-      </div>
-      {#if status.error}
-        <div class="stage-overlay">
-          <h2>Couldn’t enter the arena.</h2>
-          <p>{status.error}</p>
+        <p class="keyboard-guide">
+          <span><kbd>A</kbd><kbd>D</kbd> Move</span><span
+            ><kbd>W</kbd> Jump</span
+          ><span><kbd>S</kbd> Crouch</span>{#if has('punch')}<span
+              ><kbd>G</kbd> {labelOf('punch', 'Punch')}</span
+            >{/if}{#if has('kick')}<span
+              ><kbd>H</kbd> {labelOf('kick', 'Kick')}</span
+            >{/if}<span>Hold back Guard</span><span><kbd>Shift</kbd> Dash</span
+          >{#if has('drill')}<span
+              ><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
+            >{/if}{#if has('axe')}<span
+              ><kbd>I</kbd> {labelOf('axe', 'Axe')}</span
+            >{/if}{#if has('throw')}<span
+              ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
+            >{/if}{#if has('hitUp')}<span
+              ><kbd>K</kbd> {labelOf('hitUp', 'Hit Up')}</span
+            >{/if}{#if has('iori')}<span
+              ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
+            >{/if}{#if has('dst')}<span
+              ><kbd>J</kbd> {labelOf('dst', 'Daisetsuzan')}</span
+            >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
+            >{/if}{#if SUPER_CONTROLS.some(has)}<span
+              ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
+            >{/if}
+        </p>
+        <div class="floating-controls">
           <button
-            class="primary-button"
-            onclick={() => window.location.reload()}>Try again</button
+            aria-haspopup="dialog"
+            disabled={!status.ready}
+            onclick={openSettings}>Settings</button
+          >
+          <button
+            disabled={!status.ready || status.resultReady || !!status.error}
+            onclick={pause}
+            >{status.paused ? 'Resume' : 'Pause'} <kbd>P</kbd></button
+          >
+          <button
+            class:rematch={status.resultReady}
+            disabled={!status.ready || !!status.error}
+            onclick={() => reset(status.story ? 'story' : mode)}
+            >{status.resultReady ? 'Fight again' : 'Reset'} <kbd>R</kbd></button
           >
         </div>
-      {:else if !status.ready}
-        <div class="stage-overlay">
-          <h2>Loading SCWU…</h2>
-          <p>Opening {stageLabels[stage]}.</p>
-        </div>
-      {:else if status.paused}
-        <div class="pause-overlay" aria-live="polite">
-          <img src={`${asset}ui/146.png`} alt="Pause" />
-          <button class="primary-button" onclick={pause}>Resume match</button>
-        </div>
-      {/if}
-      <div class="sr-only" aria-live="polite">
-        {#if status.winner}{status.seconds === 0 ? 'Time up.' : 'KO.'}
-          {sayWinner(status.winner)}
-          {#if status.matchWinner}Match over: {sayWinner(
-              status.matchWinner,
-            )}{/if}{/if}
       </div>
-      <div class="stats-chip">
-        {#if status.resultReady}
-          <strong class="result-label"
-            >{status.matchWinner === 'draw'
-              ? 'DRAW GAME'
-              : status.matchWinner === 'player'
-                ? '1P WIN'
-                : '2P WIN'}</strong
+      <div class="stage-body">
+        <div
+          class="arena"
+          bind:this={host}
+          tabindex="-1"
+          role="application"
+          aria-roledescription="fighting game"
+          aria-label="Training arena. A and D to move, W to jump or double jump, S to crouch, hold back to guard, G to punch, H to kick, K for Hit Up then W to chase on hit, F for IORI, tap again for each follow-up, Shift to dash, double-tap left or right to dash on the ground or in the air, U for Drill Punch, I for Axe throw, O to grab and throw, J for the Daisetsuzan command throw, E to switch EX mode, 1 to 5 for the supers, or Ryuko's original motion commands. P to pause."
+        ></div>
+        <div class="sr-only" aria-label="Match health">
+          <div
+            role="meter"
+            aria-label="Player health"
+            aria-valuemin="0"
+            aria-valuemax={status.life[0]}
+            aria-valuenow={status.hp[0]}
           >
-        {:else}
-          <span class="match-stats"
-            ><strong>{status.hits}</strong> HITS <span>·</span>
-            <strong>{status.damage}</strong> DAMAGE</span
+            {status.hp[0]}
+          </div>
+          <div
+            role="meter"
+            aria-label="Opponent health"
+            aria-valuemin="0"
+            aria-valuemax={status.life[1]}
+            aria-valuenow={status.hp[1]}
           >
+            {status.hp[1]}
+          </div>
+          <span
+            >Time: {Number.isFinite(status.seconds)
+              ? status.seconds
+              : 'Unlimited'}</span
+          >
+          <span>Action: {status.action}</span>
+        </div>
+        {#if status.error}
+          <div class="stage-overlay">
+            <h2>Couldn’t enter the arena.</h2>
+            <p>{status.error}</p>
+            <button
+              class="primary-button"
+              onclick={() => window.location.reload()}>Try again</button
+            >
+          </div>
+        {:else if !status.ready}
+          <div class="stage-overlay">
+            <h2>Loading SCWU…</h2>
+            <p>Opening {stageLabels[stage]}.</p>
+          </div>
+        {:else if status.paused}
+          <div class="pause-overlay" aria-live="polite">
+            <img src={`${asset}ui/146.png`} alt="Pause" />
+            <button class="primary-button" onclick={pause}>Resume match</button>
+          </div>
         {/if}
-      </div>
-      <div class="floating-controls">
-        <button
-          aria-haspopup="dialog"
-          disabled={!status.ready}
-          onclick={openSettings}>Settings</button
-        >
-        <button
-          disabled={!status.ready || status.resultReady || !!status.error}
-          onclick={pause}
-          >{status.paused ? 'Resume' : 'Pause'} <kbd>P</kbd></button
-        >
-        <button
-          class:rematch={status.resultReady}
-          disabled={!status.ready || !!status.error}
-          onclick={() => reset(status.story ? 'story' : mode)}
-          >{status.resultReady ? 'Fight again' : 'Reset'} <kbd>R</kbd></button
-        >
+        <div class="sr-only" aria-live="polite">
+          {#if status.winner}{status.seconds === 0 ? 'Time up.' : 'KO.'}
+            {sayWinner(status.winner)}
+            {#if status.matchWinner}Match over: {sayWinner(
+                status.matchWinner,
+              )}{/if}{/if}
+        </div>
       </div>
     </div>
   </section>
@@ -764,27 +791,6 @@
     {/each}
   </div>
 
-  <p class="keyboard-guide">
-    <span><kbd>A</kbd><kbd>D</kbd> Move</span><span><kbd>W</kbd> Jump</span
-    ><span><kbd>S</kbd> Crouch</span>{#if has('punch')}<span
-        ><kbd>G</kbd> {labelOf('punch', 'Punch')}</span
-      >{/if}{#if has('kick')}<span><kbd>H</kbd> {labelOf('kick', 'Kick')}</span
-      >{/if}<span>Hold back Guard</span><span><kbd>Shift</kbd> Dash</span
-    >{#if has('drill')}<span><kbd>U</kbd> {labelOf('drill', 'Drill')}</span
-      >{/if}{#if has('axe')}<span><kbd>I</kbd> {labelOf('axe', 'Axe')}</span
-      >{/if}{#if has('throw')}<span
-        ><kbd>O</kbd> {labelOf('throw', 'Throw')}</span
-      >{/if}{#if has('hitUp')}<span
-        ><kbd>K</kbd> {labelOf('hitUp', 'Hit Up')}</span
-      >{/if}{#if has('iori')}<span><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
-      >{/if}{#if has('dst')}<span
-        ><kbd>J</kbd> {labelOf('dst', 'Daisetsuzan')}</span
-      >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-      >{/if}{#if SUPER_CONTROLS.some(has)}<span
-        ><kbd>1</kbd>–<kbd>{SUPER_CONTROLS.filter(has).length}</kbd> Supers</span
-      >{/if}
-  </p>
-
   <dialog
     class="settings-dialog"
     bind:this={dialog}
@@ -821,8 +827,6 @@
       class="text-button"
       disabled={!status.ready || status.selecting}
       onclick={() => {
-        // The select screen opens unpaused; don't re-pause it on close.
-        pausedBefore = false;
         dialog.close();
         openSelect();
       }}>Character select</button
@@ -902,7 +906,7 @@
     </div>
     <a
       class="guide-link"
-      href="instructions.html"
+      href={`instructions.html#${fighter}`}
       target="_blank"
       rel="noopener">Controls guide</a
     >

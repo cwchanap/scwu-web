@@ -2,9 +2,8 @@
   import { ASSET_BASE } from '../game/assetBase';
   import type { Who } from '../game/characters';
   import { ROSTER } from './fighters';
-  import { GRID, GUIDES_DATA, XS, YS } from './moves';
+  import { GRID, GUIDES_DATA, SHARED, STOCKS, XS, YS } from './moves';
 
-  const byName = new Map(ROSTER.map((entry) => [entry.name, entry]));
   const byId = new Map(ROSTER.map((entry) => [entry.id, entry]));
   const nameOf = (id: Who) => byId.get(id)?.name ?? id;
 
@@ -15,8 +14,8 @@
   root.setProperty('--gauge-art', `url(${ASSET_BASE}ui/27.png)`);
 
   // Roster: the select grid's own faces, positioned on its sheet.
-  const faces = GRID.flatMap((name, i) => {
-    const entry = byName.get(name ?? '');
+  const faces = GRID.flatMap((id, i) => {
+    const entry = id && byId.get(id);
     if (!entry) return [];
     return [
       {
@@ -36,6 +35,8 @@
   $effect(() => {
     const onHash = () => {
       picked = location.hash.slice(1);
+      // On narrow screens the pick leaves the folded roster open over the page.
+      if (!wide.matches) open = false;
       scrollTo(0, 0);
     };
     addEventListener('hashchange', onHash);
@@ -51,23 +52,46 @@
   };
 
   // Folded on narrow screens, open beside the content on wide ones.
-  let open = $state(matchMedia('(min-width: 900px)').matches);
+  const wide = matchMedia('(min-width: 900px)');
+  let open = $state(wide.matches);
   $effect(() => {
-    const mq = matchMedia('(min-width: 900px)');
     const widen = () => {
-      if (mq.matches) open = true;
+      if (wide.matches) open = true;
     };
-    mq.addEventListener('change', widen);
-    return () => mq.removeEventListener('change', widen);
+    wide.addEventListener('change', widen);
+    return () => wide.removeEventListener('change', widen);
   });
 
-  // Stocks on the power gauge, three pips to a gauge.
+  // Stocks on the fighter's power gauge (moves.ts STOCKS; three for most).
+  const cap = $derived(STOCKS[current] ?? 3);
+  const slots = $derived([...Array(cap).keys()]);
   const pipText = (cost: number) =>
     cost === 0.5 ? '½ stock' : `${cost} stock${cost > 1 ? 's' : ''}`;
+  const pipLabel = (cost: number) =>
+    cost === 0.5 ? 'Half a stock' : `${cost} of ${cap} stocks`;
   const halfStock = (cost: number) => cost !== Math.floor(cost);
+  // At 18 px a pip, six fill the cost column.
+  const pipWidth = $derived(
+    Math.min(18, Math.floor((104 - 3 * (cap - 1)) / cap)),
+  );
+
+  // The guide opens in a new tab, so Back closes it when the browser allows;
+  // a tab it can't close (typed-in, or history grown past hash picks) goes to
+  // the game itself.
+  const back = (event: MouseEvent) => {
+    event.preventDefault();
+    window.close();
+    setTimeout(() => {
+      location.href = import.meta.env.BASE_URL;
+    }, 150);
+  };
 </script>
 
-<div class="topbar"><a class="back" href="/">◂ Back to game</a></div>
+<div class="topbar">
+  <a class="back" href={import.meta.env.BASE_URL} onclick={back}
+    >◂ Back to game</a
+  >
+</div>
 
 <div class="shell">
   <details class="roster" bind:open>
@@ -132,7 +156,7 @@
       before the button.
     </p>
 
-    {#each guide.sections as section (section.title)}
+    {#each [...SHARED, ...guide.sections] as section (section.title)}
       <section>
         <h2>
           <span>{section.title}</span>
@@ -165,9 +189,10 @@
                         <div
                           class="pips"
                           role="img"
-                          aria-label={pipText(row.cost)}
+                          aria-label={pipLabel(row.cost)}
+                          style="--pw: {pipWidth}px"
                         >
-                          {#each [0, 1, 2] as i (i)}
+                          {#each slots as i (i)}
                             <i
                               class:on={i < Math.floor(row.cost)}
                               class:half={halfStock(row.cost) &&
@@ -193,8 +218,12 @@
             <div
               class="gauge"
               role="img"
-              aria-label="Power gauge: three stocks"
-            ></div>
+              aria-label="Power gauge: {cap} stock{cap > 1 ? 's' : ''}"
+            >
+              {#each slots.slice(1) as i (i)}
+                <i style="left: {(i / cap) * 100}%"></i>
+              {/each}
+            </div>
             <p>{section.note}</p>
           </aside>
         {/if}
@@ -353,6 +382,12 @@
     display: none;
   }
   @media (min-width: 900px) {
+    .roster {
+      /* Sticky and taller than the window: let it scroll so the bottom
+         row stays reachable. */
+      max-height: calc(100vh - 24px);
+      overflow-y: auto;
+    }
     .roster summary {
       display: none;
     }
@@ -401,9 +436,20 @@
     filter: none;
     transform: translateY(-3px);
   }
-  /* The current fighter: a gold silhouette of the tile glows behind it. */
+  /* The current fighter: a gold silhouette of the tile glows behind it. The
+     hover lift's transform makes the tile a stacking context, where a
+     z-index: -1 child would paint over its own background — so the face
+     moves to an ::after above the ::before glow. */
   .faces a[aria-current] {
     filter: none;
+    background: none;
+  }
+  .faces a[aria-current]::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--face-sheet) calc(var(--x) * -1px) calc(var(--y) * -1px) /
+      206px 417px no-repeat;
   }
   .faces a[aria-current]::before {
     content: '';
@@ -687,7 +733,7 @@
     margin-bottom: 3px;
   }
   .pips i {
-    width: 18px;
+    width: var(--pw, 18px);
     height: 14px;
     background: #2a4d85;
     clip-path: polygon(24% 0, 100% 0, 76% 100%, 0 100%);
@@ -719,20 +765,13 @@
     image-rendering: pixelated;
     clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
   }
-  .gauge::before,
-  .gauge::after {
-    content: '';
+  .gauge i {
     position: absolute;
     top: 0;
     bottom: 0;
     width: 4px;
+    margin-left: -2px;
     background: var(--ink);
-  }
-  .gauge::before {
-    left: 33.3%;
-  }
-  .gauge::after {
-    left: 66.6%;
   }
   .gauge-note p {
     max-width: 70ch;
@@ -749,7 +788,8 @@
   }
 
   /* ---- Narrow screens: the roster folds away, rows stack ---- */
-  @media (max-width: 899px) {
+  /* not (min-width) so a fractional width like 899.5px can't fall between. */
+  @media not all and (min-width: 900px) {
     .shell {
       grid-template-columns: minmax(0, 1fr);
       gap: 20px;

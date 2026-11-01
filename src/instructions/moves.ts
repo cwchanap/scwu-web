@@ -4,55 +4,55 @@ import type { Who } from '../game/characters';
 // guide tables port docs/superpowers/specs/2026-10-31-guide-revamp-mockup.html.
 
 // Grid order of the select screen (src/game/select.ts ROSTER); null = GATE LOCK.
-export const GRID: readonly (string | null)[] = [
-  'Ryuko',
-  'Zoma',
-  'Kiki',
-  'Chung',
-  'Amiro',
-  'ANMC P',
-  'Giant',
-  'G Suneo',
-  'Yo',
-  'SIN',
-  'LIZARD',
-  'KAY',
-  'DIDO',
-  'SAKUYA',
-  'ALEX',
-  'SOU',
-  'HISO',
-  'ERUS',
-  'OS FENG',
-  'SEAN',
-  'GON',
-  'KATE',
-  'REMU',
-  'REAR',
-  'GIGI',
-  'SWW',
-  'OGI',
-  'ZIRO',
-  'MASA',
-  '3-TIMES',
-  'ZENKA',
-  'Z-MEGA',
-  'ALPHA',
-  'SHIN-Z',
-  'ZAKU',
-  'PAC-HELO',
-  'GOLF',
-  'ASURA',
-  'TTRO',
-  'ASTROMAN',
-  'YINAN',
-  'AYA',
+export const GRID: readonly (Who | null)[] = [
+  'ryuko',
+  'zoma',
+  'kiki',
+  'chung',
+  'amiro',
+  'anmc',
+  'giant',
+  'suneo',
+  'yo',
+  'sin',
+  'lizard',
+  'kay',
+  'dido',
+  'sakuya',
+  'alex',
+  'sou',
+  'hiso',
+  'erus',
+  'feng',
+  'sean',
+  'gon',
+  'kate',
+  'remu',
+  'rear',
+  'gigi',
+  'sww',
+  'ogi',
+  'ziro',
+  'masa',
+  'times',
+  'zenka',
+  'zmega',
+  'alpha',
+  'shinz',
+  'zaku',
+  'pachelo',
+  'golf',
+  'asura',
+  'ttro',
+  'astroman',
+  'yinan',
+  'aya',
   null,
   null,
   null,
-  'DoraEmon',
-  'RARIO',
-  'TRAINING',
+  'dora',
+  'rario',
+  'training',
 ];
 
 // Tile origins in the 206 x 417 sheet (1x source pixels), derived from the
@@ -61,6 +61,21 @@ export const GRID: readonly (string | null)[] = [
 // 5 x 70 + 60 + 7 = 417 tall, matching the sheet exactly.
 export const XS: readonly number[] = [0, 26, 52, 78, 104, 130, 156, 182];
 export const YS: readonly number[] = [0, 70, 140, 210, 280, 350];
+
+// Stocks on a full power gauge when it differs from three (characters.ts
+// stocksOf): one for ZAKU and PAC-HELO, two for GOLF and ASURA, five for
+// ZENKA, Z-MEGA, ALPHA and DoraEmon, six for SHIN-Z.
+export const STOCKS: Partial<Record<Who, number>> = {
+  zaku: 1,
+  pachelo: 1,
+  golf: 2,
+  asura: 2,
+  zenka: 5,
+  zmega: 5,
+  alpha: 5,
+  dora: 5,
+  shinz: 6,
+};
 
 // name/input/desc are authored static HTML, exactly the mockup's cell contents.
 export interface FighterGuide {
@@ -136,6 +151,37 @@ export const FACES: Record<Who, string> = {
   rario: 'rario/234.png',
   training: 'training/234.png',
 };
+
+// The rules every page shares, rendered ahead of the fighter's own sections:
+// the select screen's keys, the settings modal's options and the global keys.
+export const SHARED: FighterGuide['sections'] = [
+  {
+    title: 'How to play',
+    note: '',
+    cost: false,
+    rows: [
+      {
+        name: 'Character select',
+        input:
+          '<kbd>A</kbd><kbd>D</kbd><kbd>W</kbd><kbd>S</kbd><span class="sep">+</span>any attack',
+        desc: "The game opens on the original's select screen. A direction held repeats after half a second; any attack key chooses the 1P fighter, then the same keys pick the opponent. A GATE LOCK cell can't be chosen, though DoraEmon's can. A won Vs. CPU match returns here, and Character select in Settings opens it again.",
+        cost: 0,
+      },
+      {
+        name: 'Settings',
+        input: 'gear button',
+        desc: 'The fighter, opponent and stage pickers and the mode switch each take effect at once, starting a fresh match. Free practice has no timer; its partner can stand, guard high, low or in the air, attack in range, jump in or play as the original CPU. <b>Max stock</b> refills your supers while you stand idle, <b>Low health</b> keeps you just under 30% for desperation moves. Vs. CPU is the original CPU playing the opponent’s own moves and supers.',
+        cost: 0,
+      },
+      {
+        name: 'Pause / Restart',
+        input: '<kbd>P</kbd><span class="sep">/</span><kbd>R</kbd>',
+        desc: 'Leaving the window pauses the match. <kbd>P</kbd> toggles the pause; <kbd>R</kbd> restarts the match, or the screen. On touch devices the on-screen buttons play the same keys; landscape gives more room.',
+        cost: 0,
+      },
+    ],
+  },
+];
 
 export const GUIDES_DATA = {
   ryuko: {
