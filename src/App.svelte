@@ -66,6 +66,7 @@
     fighters: ['ryuko', 'zoma'],
     story: false,
     mode: 'practice',
+    music: true,
   });
   let settingsOpen = $state(false);
   let dialog: HTMLDialogElement;

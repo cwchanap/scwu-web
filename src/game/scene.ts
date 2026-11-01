@@ -68,6 +68,8 @@ export interface GameStatus {
   story: boolean;
   // The match's mode: TEAM VS's is always Vs. CPU.
   mode: Mode;
+  // The scene's music toggle.
+  music: boolean;
 }
 export const initialStatus: GameStatus = {
   ready: false,
@@ -86,6 +88,7 @@ export const initialStatus: GameStatus = {
   fighters: ['ryuko', 'zoma'],
   story: false,
   mode: 'practice',
+  music: true,
 };
 const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t2 };
@@ -224,8 +227,8 @@ export class TrainingScene extends Phaser.Scene {
   private voices = new Map<string, Phaser.Sound.BaseSound>();
   // The stage's music: the last track or jingle its scripts cued since they
   // last stopped every sound (export_stage). Authored: it plays only with
-  // Music ticked, off by default, and loads on first use.
-  private music = false;
+  // Music ticked, on by default, and loads on first use.
+  private music = true;
   private cue?: { index: number; filename: string; loop: boolean };
   private track?: Phaser.Sound.BaseSound;
   // The character select screen (select.ts) the game opens on, and returns
@@ -777,9 +780,8 @@ export class TrainingScene extends Phaser.Scene {
         this.selectTrack?.play();
         if (this.frozen()) this.selectTrack?.pause();
       } else this.selectTrack?.stop();
-      return;
-    }
-    this.playMusic();
+    } else this.playMusic();
+    this.report();
   }
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).
@@ -1340,6 +1342,7 @@ export class TrainingScene extends Phaser.Scene {
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
       mode: this.match.mode,
+      music: this.music,
     };
     const serialized = JSON.stringify(status);
     if (serialized !== this.lastStatus) {
