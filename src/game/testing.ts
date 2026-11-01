@@ -1,11 +1,18 @@
 // Test helpers. Ryuko's moves play from their own timelines, entered by
 // source action; these name the ones the tests drive, and the objects they
 // spawn (the axe, DST's missiles).
+import { it } from 'vitest';
 import type { ObjectKey } from './animations';
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import { fighterPose, firstStrike, HUD_FACES, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
+
+// For the tests that read the exported PNGs and WAVs in public/assets/. They
+// check what `bun run assets` wrote, so they run where it ran (`bun run
+// validate`, the pre-commit hook). GitHub Actions has only the generated JSON:
+// the art lives in R2 (28,000 files), so they skip when CI is set.
+export const itWithArt = it.skipIf(!!process.env.CI);
 
 export const RYUKO = {
   fall: 7,

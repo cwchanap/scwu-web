@@ -17,6 +17,7 @@ import {
 } from './select';
 import type { Demo } from './select';
 import type { Input } from './match';
+import { itWithArt } from './testing';
 import continueDemo from './generated/demos/9.json';
 import next from './generated/demos/3.json';
 import ending from './generated/demos/22.json';
@@ -124,7 +125,7 @@ describe('character select (object type 10, VS single)', () => {
     ]);
   });
 
-  it("paints DoraEmon's face over his GATE LOCK cell (authored)", () => {
+  itWithArt("paints DoraEmon's face over his GATE LOCK cell (authored)", () => {
     // A pixel of the export's RGBA, filter-0 PNG.
     const pixel = (file: string, x: number, y: number) => {
       const png = readFileSync(
