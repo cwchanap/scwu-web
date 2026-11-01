@@ -80,8 +80,29 @@ p {
 .stage-shell {
   position: fixed;
   inset: 0;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: #080a0d;
+}
+/* The chrome band keeps the stats, key hints and buttons off the canvas; the
+   HUD fills the canvas's top and bottom edges, so nothing may overlay it. */
+.stage-chrome {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  padding: 6px 10px;
+  background: #10151b;
+  border-bottom: 1px solid #3d4753;
+}
+/* The canvas letterboxes inside this box; it is the pause overlay's
+   container so its cqw/cqh measure the letterboxed space. */
+.stage-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  container-type: size;
 }
 .arena {
   position: absolute;
@@ -129,9 +150,16 @@ p {
   overflow-wrap: anywhere;
   font-size: 13px;
 }
+/* Sized to the letterboxed 4:3 canvas, not the window: its art and button
+   sit at their in-game positions at every aspect ratio. */
 .pause-overlay {
   position: absolute;
   inset: 0;
+  margin: auto;
+  width: 100%;
+  height: 100%;
+  width: min(100cqw, calc(100cqh * 4 / 3));
+  height: min(100cqh, calc(100cqw * 3 / 4));
   background: #0003;
 }
 .pause-overlay img {
@@ -160,22 +188,17 @@ p {
   background: #d6edfc;
 }
 .stats-chip {
-  position: absolute;
-  top: 10px;
-  left: 10px;
   display: flex;
   align-items: center;
   padding: 5px 10px;
-  background: #141a20d9;
+  background: #141a20;
   border: 1px solid #3d4753;
   border-radius: 2px;
 }
 .floating-controls {
-  position: absolute;
-  top: 10px;
-  right: 10px;
   display: flex;
   gap: 6px;
+  margin-left: auto;
 }
 .floating-controls button {
   padding: 6px 10px;
@@ -243,21 +266,13 @@ kbd {
   margin-left: 5px;
 }
 .keyboard-guide {
-  position: fixed;
-  /* Below the floating control row (top: 10px + ~34px buttons). */
-  top: 48px;
-  left: 50%;
-  transform: translateX(-50%);
+  flex: 1;
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
   gap: 8px 17px;
-  max-width: calc(100% - 20px);
+  min-width: 200px;
   margin: 0;
-  padding: 6px 12px;
-  background: #141a20d9;
-  border: 1px solid #3d4753;
-  border-radius: 2px;
   color: #929daa;
   font-size: 10px;
 }

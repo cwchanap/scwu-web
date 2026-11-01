@@ -194,6 +194,10 @@ export class TrainingScene extends Phaser.Scene {
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
+  // The settings dialog's own hold on the game: App sets and clears it rather
+  // than toggling the pause state, so a screen's or a reset's unpause can't
+  // let a tick through while it is open.
+  private modal = false;
   private clock = new FixedClock();
   private held = new Set<string>();
   private virtual = new Set<Control>();
@@ -371,7 +375,18 @@ export class TrainingScene extends Phaser.Scene {
   togglePause() {
     if (!this.ready || (this.match.resultReady && !this.select)) return;
     this.paused = !this.paused;
-    if (this.paused) this.sound.pauseAll();
+    if (this.frozen()) this.sound.pauseAll();
+    else this.sound.resumeAll();
+    this.clearInput();
+    this.report();
+  }
+  private frozen() {
+    return this.paused || this.modal;
+  }
+  setModal(open: boolean) {
+    if (this.modal === open) return;
+    this.modal = open;
+    if (this.frozen()) this.sound.pauseAll();
     else this.sound.resumeAll();
     this.clearInput();
     this.report();
@@ -734,8 +749,10 @@ export class TrainingScene extends Phaser.Scene {
   setMusic(on: boolean) {
     this.music = on;
     if (this.select) {
-      if (on) this.selectTrack?.play();
-      else this.selectTrack?.stop();
+      if (on) {
+        this.selectTrack?.play();
+        if (this.frozen()) this.selectTrack?.pause();
+      } else this.selectTrack?.stop();
       return;
     }
     this.playMusic();
@@ -763,7 +780,7 @@ export class TrainingScene extends Phaser.Scene {
     }
     this.track = this.sound.get(key) ?? this.sound.add(key, { loop: cue.loop });
     this.track.play();
-    if (this.paused) this.track.pause();
+    if (this.frozen()) this.track.pause();
   }
 
   private play(key: string, owner = 0) {
@@ -1023,7 +1040,7 @@ export class TrainingScene extends Phaser.Scene {
     if (!this.ready || this.error || this.loading) return;
     try {
       if (this.select) {
-        if (!this.paused)
+        if (!this.frozen())
           this.clock.advance(delta, () => {
             // A screen that finished waits for what it opens to load.
             if (!this.select || this.loading) return;
@@ -1045,7 +1062,7 @@ export class TrainingScene extends Phaser.Scene {
           return;
         }
       }
-      if (!this.paused && !this.match.resultReady)
+      if (!this.frozen() && !this.match.resultReady)
         this.clock.advance(delta, () => {
           // The match is over once it opens a screen or loads the next.
           if (this.select || this.loading) return;
@@ -1280,7 +1297,7 @@ export class TrainingScene extends Phaser.Scene {
     const over = this.match.resultReady && !(this.select && this.match.battle);
     const status: GameStatus = {
       ready: this.ready,
-      paused: this.paused,
+      paused: this.frozen(),
       hp: [a.hp, b.hp],
       life: [lifeOf(a.who), lifeOf(b.who)],
       seconds: this.match.seconds,

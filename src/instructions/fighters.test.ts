@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import type { Who } from '../game/characters';
 import { ROSTER } from './fighters';
-import { GRID, GUIDES_DATA, FACES, XS, YS } from './moves';
+import { GRID, GUIDES_DATA, FACES, SHARED, STOCKS, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
@@ -12,11 +12,7 @@ const stripTypeImports = (text: string) =>
 
 describe('instructions page', () => {
   it('orders the grid over every fighter, GATE LOCK cells null', () => {
-    const idOf = new Map(ROSTER.map((entry) => [entry.name, entry.id]));
-    const ids = GRID.filter((name) => name !== null).map((name) =>
-      idOf.get(name),
-    );
-    expect(ids).toEqual(Object.keys(CHARACTERS));
+    expect(GRID.filter((id) => id !== null)).toEqual(Object.keys(CHARACTERS));
   });
 
   it('tiles the roster inside the 206 x 417 face sheet', () => {
@@ -30,6 +26,20 @@ describe('instructions page', () => {
         YS[Math.floor(i / XS.length)] + (i % 2 ? 7 : 0) + 60,
         `row of ${GRID[i]}`,
       ).toBeLessThanOrEqual(417);
+    }
+  });
+
+  it("matches each fighter's power-gauge stock cap to the game data", () => {
+    for (const entry of ROSTER)
+      expect(STOCKS[entry.id] ?? 3, entry.id).toBe(CHARACTERS[entry.id].stocks);
+  });
+
+  it('keeps the shared how-to-play rules ahead of every guide', () => {
+    expect(SHARED[0].title).toBe('How to play');
+    expect(SHARED[0].rows.length).toBeGreaterThanOrEqual(3);
+    for (const row of SHARED[0].rows) {
+      expect(row.name.length).toBeGreaterThan(0);
+      expect(row.desc.length).toBeGreaterThan(0);
     }
   });
 
