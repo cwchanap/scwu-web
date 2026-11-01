@@ -198,3 +198,18 @@ it('still pauses on Escape during a match', () => {
   });
   expect(scene.paused).toBe(true);
 });
+
+it('reports music on by default and follows setMusic', () => {
+  const { scene, view, statuses } = boot();
+  (view.report as () => void)();
+  expect(statuses.at(-1)?.music).toBe(true);
+  scene.setMusic(false);
+  expect(statuses.at(-1)?.music).toBe(false);
+});
+
+it('reports music while a screen is open', () => {
+  const { scene, statuses } = boot();
+  scene.openSelect();
+  scene.setMusic(false);
+  expect(statuses.at(-1)?.music).toBe(false);
+});
