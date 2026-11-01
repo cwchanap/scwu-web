@@ -54,21 +54,21 @@ GitHub's runners have no `scwu-web-handoff/`, so `.github/scripts/fetch-generate
 
 ## Play
 
-| Input                        | Action                                              |
-| ---------------------------- | --------------------------------------------------- |
-| A / D or left / right arrows | Move                                                |
-| W or up arrow                | Jump; from neutral, again in the air: double jump   |
-| S or down arrow (hold)       | Crouch                                              |
-| G / H                        | Punch / kick; after contact, G or H chains          |
-| Back (hold)                  | Guard, away from the opponent                       |
-| Shift                        | Dash; hold away for backdash                        |
-| Left / right                 | Double-tap to dash, on the ground or in the air     |
-| J                            | Grab and throw (close range, ground only)           |
-| E                            | Enter or leave EX mode (50 power)                   |
-| K                            | Hit Up (Jump on hit chases); COUNTER HIT in a block |
-| F                            | IORI; tap again for each of two follow-ups          |
-| P / Escape                   | Pause / resume                                      |
-| R                            | Reset the current mode                              |
+| Input                        | Action                                                        |
+| ---------------------------- | ------------------------------------------------------------- |
+| A / D or left / right arrows | Move                                                          |
+| W or up arrow                | Jump; from neutral, again in the air: double jump             |
+| S or down arrow (hold)       | Crouch                                                        |
+| G / H                        | Punch / kick; after contact, G or H chains                    |
+| Back (hold)                  | Guard, away from the opponent                                 |
+| Shift                        | Dash; hold away for backdash                                  |
+| Left / right                 | Double-tap to dash, on the ground or in the air               |
+| J                            | Grab and throw (close range, ground only)                     |
+| E                            | Enter or leave EX mode (50 power)                             |
+| K                            | Hit Up (Jump on hit chases); COUNTER HIT in a block           |
+| F                            | IORI; tap again for each of two follow-ups                    |
+| P / Escape                   | Pause / resume; Escape on the select screen goes to the title |
+| R                            | Reset the current mode                                        |
 
 Ryuko's specials and supers use these motion commands. Directions read toward the opponent (→ forward, ← back), and the button follows the last direction by at least a tick:
 
@@ -1044,16 +1044,14 @@ And TRAINING's, RARIO's practice copy, with his look and 500 life. Standing stil
 
 Controls for every fighter: **G punch, H kick, J catch/throw, K Hit Up**. U, I and 1–5 move shortcuts are removed; use motion commands for specials and supers.
 
-The game opens on the original's title: its volume warning and two logos for seven seconds, then the title screen, where any key brings up the SINGLE / VS / TEAM VS menu. Move its cursor with W and S and press an attack key on SINGLE for story mode, on VS for the character select screen or on TEAM VS for its team form; R starts the title over. Story mode opens the select screen with only the 1P arrow: choose a fighter (SHIN-Z can play his too) and play through their story: battles among several CPUs at once, with reinforcements, and demos, which an attack key skips where the original allows. Lose a battle that offers it and the continue screen asks YES or NO: YES fights the battle again, NO returns to the title. During a story battle **Reset** starts it over. The select screen is the original's VS single one: move the 1P arrow over the grid with A, D, W and S (held, a direction repeats after half a second, then every 50 ms) and choose with any attack key, then move the 2P arrow the same way to choose the opponent. The key picks the fighter's colours, as in the original: H, K, G and J each give one of their eight palettes, and the second side moves on to the next if it picks the first's. Hovering a fighter stands their portrait and name at your side; a GATE LOCK cell (SHIN-Z and the empty slots) can't be chosen, while DoraEmon's, locked in the original, shows his face and can be. Once both are chosen the panels close and the match starts. A won Vs. CPU match returns to the screen, and **Character select** in Settings opens it again. TEAM VS's screen picks three fighters a side, each in its own colours, and fights them in turn against the CPU's: the side that loses a round sends in its next member, and the first to win three rounds takes the match.
+The game opens on the title screen — the original's volume warning and two logos are skipped — where any key brings up the SINGLE / VS / TEAM VS menu. Move its cursor with W and S and press an attack key on SINGLE for story mode, on VS for the character select screen or on TEAM VS for its team form; R starts the title over. Story mode opens the select screen with only the 1P arrow: choose a fighter (SHIN-Z can play his too) and play through their story: battles among several CPUs at once, with reinforcements, and demos, which an attack key skips where the original allows. Lose a battle that offers it and the continue screen asks YES or NO: YES fights the battle again, NO returns to the title. During a story battle R starts it over. The select screen is the original's VS single one: move the 1P arrow over the grid with A, D, W and S (held, a direction repeats after half a second, then every 50 ms) and choose with any attack key, then move the 2P arrow the same way to choose the opponent. The key picks the fighter's colours, as in the original: H, K, G and J each give one of their eight palettes, and the second side moves on to the next if it picks the first's. Hovering a fighter stands their portrait and name at your side; a GATE LOCK cell (SHIN-Z and the empty slots) can't be chosen, while DoraEmon's, locked in the original, shows his face and can be. Once both are chosen the panels close and the match starts; Escape on the screen returns to the title. A won Vs. CPU match returns to the screen, and **Character select** in the Menu opens it again. TEAM VS's screen picks three fighters a side, each in its own colours, and fights them in turn against the CPU's: the side that loses a round sends in its next member, and the first to win three rounds takes the match.
 
-In story brawls, defeat every enemy, including reinforcements, to win. Allies do not need to be defeated, and reaching 100 KO points no longer ends a brawl early. Player defeat and time-up can still end it; duels and the opening difficulty selection retain their scripted objectives.
+The floating **Menu** button at the arena's top right opens the menu, where you can also choose your fighter and the opponent directly (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon, RARIO or TRAINING), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode, through the one **Opponent** select (while a story battle runs it shows a disabled Story mode entry):
 
-In Settings, you can also choose your fighter and the opponent directly (Ryuko, Zoma, Kiki, Chung, Amiro, ANMC P, Giant, G Suneo, Yo, SIN, LIZARD, KAY, DIDO, SAKUYA, ALEX, SOU, HISO, ERUS, OS FENG, SEAN, GON, KATE, REMU, REAR, GIGI, SWW, OGI, ZIRO, MASA, 3-TIMES, ZENKA, Z-MEGA, ALPHA, SHIN-Z, ZAKU, PAC-HELO, GOLF, ASURA, TTRO, ASTROMAN, YINAN, AYA, DoraEmon, RARIO or TRAINING), the stage (Sport Court, Train Morning, Sakura Night, Train Night, Dojin BKG, Japan Street, Park Morning, Park Night, Sakura Street, Greek, Space, Boss Base, ZM Office, ZM Office T2, BR Boss Base, GI Stage, Space Night or Street Night) and the mode:
+- A **practice partner** — Stand, Guard, Crouch guard, Air guard, Attack, Jump in or CPU partner — plays free practice, which has no timer. **Max stock** keeps both fighters' stocks full, and **Low health** holds your fighter just under 30% health for the desperation moves; both grey out on Vs. CPU and in a story battle.
+- **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match. A Vs. CPU match started from the character select screen plays the original's VS single paths: each fighter's VS intro, no power or stock from it, and the VS forms (ZA) of the finishers that have them. Choosing a fighter in the Menu returns to the intros above.
 
-- **Free practice** has no timer. Choose the partner's behavior (stand, guard, jump and guard, punch, jump in with an air kick, or the original CPU), **Max stock** to keep both fighters' stocks full, and **Low health** to hold your fighter just under 30% health for the desperation moves.
-- **Vs. CPU** plays the original CPU in 60-second rounds, opened and closed by the source's intros, calls and KO lettering. The first to win three rounds takes the match. A Vs. CPU match started from the character select screen plays the original's VS single paths: each fighter's VS intro, no power or stock from it, and the VS forms (ZA) of the finishers that have them. Choosing a fighter in Settings returns to the intros above.
-
-Tick **Music** in Settings for the stage's track. Leaving the window pauses the match. The touch buttons cover every control the fighter has, as does the keyboard guide at the top of the screen; landscape is recommended on phones. The **Controls guide** link in Settings opens [instructions.html](instructions.html) — one page per fighter, with the select screen's face grid for navigation and every move in table form.
+**Music** is ticked by default for the stage's track — untick it in the Menu. Leaving the window pauses the match. Pause and reset have no buttons: P or Escape pauses and R resets. The touch buttons cover every control the fighter has; landscape is recommended on phones. The **Controls guide** link in the Menu opens [instructions.html](instructions.html) — one page per fighter, with the select screen's face grid for navigation and every move in table form.
 
 [docs/gameplay.md](docs/gameplay.md) describes how each move, chain, cancel, reaction and round rule plays.
 
