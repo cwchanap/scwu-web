@@ -12,14 +12,19 @@ test('boots into a ready arena', async ({ page }) => {
   // bucket's policy (scripts/r2_cors.json) is live. Unset, art is same-origin.
   await page.goto('/');
 
-  await expect(
-    page.getByRole('heading', { name: 'SCWU TRAINING' }),
-  ).toBeVisible();
   await expect(page.getByRole('application').locator('canvas')).toBeVisible();
   // Disabled until the scene has loaded; the overlay replaces "Loading" on error.
-  await expect(page.getByRole('button', { name: 'Free practice' })).toBeEnabled(
-    { timeout: 60_000 },
-  );
+  const settings = page.getByRole('button', { name: 'Settings' });
+  await expect(settings).toBeEnabled({ timeout: 60_000 });
   await expect(page.getByText('Couldn’t enter the arena.')).toBeHidden();
+
+  // The mode switch lives in the Settings dialog now.
+  await settings.click();
+  const dialog = page.getByRole('dialog', { name: 'Settings' });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole('button', { name: 'Free practice' }),
+  ).toBeEnabled();
+  await expect(dialog.getByRole('button', { name: 'Vs. CPU' })).toBeEnabled();
   expect(errors).toEqual([]);
 });

@@ -137,3 +137,27 @@ it('keeps a pause taken while the dialog is up', () => {
   scene.setModal(false);
   expect(scene.paused).toBe(true);
 });
+
+it('drops a Settings reset still loading when the character select opens', () => {
+  const { scene, view, finishLoad } = boot();
+  scene.togglePause();
+  scene.setModal(true);
+  scene.setFighter('zoma');
+  expect(view.loading).toBe(true);
+  scene.openSelect();
+  scene.setModal(false);
+  finishLoad();
+  expect(view.select).toBeInstanceOf(CharacterSelect);
+  expect(view.loading).toBe(false);
+  expect(scene.paused).toBe(false);
+});
+
+it('keeps a pause taken while a reset is still loading', () => {
+  const { scene, view, finishLoad } = boot();
+  scene.setModal(true);
+  scene.setFighter('zoma');
+  view.blur();
+  scene.setModal(false);
+  finishLoad();
+  expect(scene.paused).toBe(true);
+});
