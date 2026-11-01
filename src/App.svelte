@@ -8,6 +8,7 @@
   import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
   import { ROSTER } from './instructions/fighters';
+  import { opponentChoiceOf, resetModeOf } from './menu';
 
   let host: HTMLDivElement;
   let session: ReturnType<typeof createGame> | undefined;
@@ -249,8 +250,8 @@
       .catch((error: unknown) => {
         if (!disposed) status = { ...status, error: String(error) };
       });
-    // The chrome band wraps under narrow windows, shrinking the arena without
-    // a window resize; keep the letterbox in step.
+    // The touch pad or a viewport change can resize the arena without a
+    // window resize; keep the letterbox in step.
     const observer = new ResizeObserver(() => session?.game.scale.refresh());
     observer.observe(host);
     return () => {
@@ -279,6 +280,17 @@
     practice = { ...practice, ...changes };
     session?.scene.setPractice(practice);
     focusArena();
+  }
+  // The one Opponent select: its value comes from status.mode, which takes
+  // 'story' while a story battle runs (the local mode state never does).
+  const opponentChoice = $derived(
+    opponentChoiceOf(status.mode, practice.partner),
+  );
+  function setOpponentChoice(value: string) {
+    const partner = DUMMY_BEHAVIORS.find((b) => b === value);
+    if (partner) setPractice({ partner });
+    const to = resetModeOf(value, status.mode);
+    if (to) reset(to);
   }
   function setFighter(who: Who) {
     fighter = who;
@@ -334,59 +346,6 @@
 <main class="app-shell" id="main">
   <section class="cabinet" aria-label="SCWU training match">
     <div class="stage-shell">
-      <div class="stage-chrome">
-        <div class="stats-chip">
-          {#if status.resultReady}
-            <strong class="result-label"
-              >{status.matchWinner === 'draw'
-                ? 'DRAW GAME'
-                : status.matchWinner === 'player'
-                  ? '1P WIN'
-                  : '2P WIN'}</strong
-            >
-          {:else}
-            <span class="match-stats"
-              ><strong>{status.hits}</strong> HITS <span>·</span>
-              <strong>{status.damage}</strong> DAMAGE</span
-            >
-          {/if}
-        </div>
-        <p class="keyboard-guide">
-          <span><kbd>A</kbd><kbd>D</kbd> Move</span><span
-            ><kbd>W</kbd> Jump</span
-          ><span><kbd>S</kbd> Crouch</span>{#if has('punch')}<span
-              ><kbd>G</kbd> {labelOf('punch', 'Punch')}</span
-            >{/if}{#if has('kick')}<span
-              ><kbd>H</kbd> {labelOf('kick', 'Kick')}</span
-            >{/if}<span>Hold back Guard</span><span><kbd>Shift</kbd> Dash</span
-          >{#if has('throw')}<span
-              ><kbd>J</kbd> {labelOf('throw', 'Throw')}</span
-            >{/if}{#if has('hitUp')}<span
-              ><kbd>K</kbd> {labelOf('hitUp', 'Hit Up')}</span
-            >{/if}{#if has('iori')}<span
-              ><kbd>F</kbd> {labelOf('iori', 'IORI')}</span
-            >{/if}{#if has('ex')}<span><kbd>E</kbd> {labelOf('ex', 'EX')}</span
-            >{/if}
-        </p>
-        <div class="floating-controls">
-          <button
-            aria-haspopup="dialog"
-            disabled={!status.ready}
-            onclick={openSettings}>Settings</button
-          >
-          <button
-            disabled={!status.ready || status.resultReady || !!status.error}
-            onclick={pause}
-            >{status.paused ? 'Resume' : 'Pause'} <kbd>P</kbd></button
-          >
-          <button
-            class:rematch={status.resultReady}
-            disabled={!status.ready || !!status.error}
-            onclick={() => reset(status.story ? 'story' : mode)}
-            >{status.resultReady ? 'Fight again' : 'Reset'} <kbd>R</kbd></button
-          >
-        </div>
-      </div>
       <div class="stage-body">
         <div
           class="arena"
@@ -436,7 +395,9 @@
             <h2>Loading SCWU…</h2>
             <p>Opening {stageLabels[stage]}.</p>
           </div>
-        {:else if status.paused}
+        {:else if status.paused && !settingsOpen}
+          <!-- status.paused includes the modal's freeze; the open dialog
+               covers the overlay's unclickable Resume button. -->
           <div class="pause-overlay" aria-live="polite">
             <img src={`${asset}ui/146.png`} alt="Pause" />
             <button class="primary-button" onclick={pause}>Resume match</button>
@@ -449,6 +410,26 @@
                 status.matchWinner,
               )}{/if}{/if}
         </div>
+        <button
+          class="absolute top-2 right-2 z-10 flex items-center gap-1.5 border border-[#8a6a2f] bg-[#141a20e6] px-3 py-2 font-bold italic text-[#ffd24a] hover:bg-[#241a0c] disabled:opacity-40"
+          aria-haspopup="dialog"
+          disabled={!status.ready}
+          onclick={openSettings}
+        >
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            aria-hidden="true"
+            ><circle cx="12" cy="12" r="3" /><path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+            /></svg
+          >
+          Menu
+        </button>
       </div>
     </div>
   </section>
@@ -487,49 +468,61 @@
   </div>
 
   <dialog
-    class="settings-dialog"
+    class="menu-dialog m-auto w-[min(92vw,400px)] max-h-[86svh] overflow-auto border border-[#6b4e1f] bg-[#0d0b08] p-5 text-xs text-[#f2e6c8] open:flex open:flex-col open:gap-3"
     bind:this={dialog}
-    aria-label="Settings"
+    aria-label="Menu"
     tabindex="-1"
     onkeydown={(event) => event.stopPropagation()}
     onclose={settingsClosed}
   >
-    <div class="mode-switch" aria-label="Opponent mode">
-      <button
-        class:active={mode === 'practice'}
-        aria-pressed={mode === 'practice'}
-        disabled={!status.ready}
-        onclick={() => reset('practice')}>Free practice</button
-      >
-      <button
-        class:active={mode === 'cpu'}
-        aria-pressed={mode === 'cpu'}
-        disabled={!status.ready}
-        onclick={() => reset('cpu')}>Vs. CPU</button
-      >
+    <div>
+      <div class="flex items-baseline justify-between">
+        <span
+          class="text-lg font-black italic tracking-[1px] text-[#ffd24a] [text-shadow:2px_2px_0_#7a2d00]"
+          >SCWU MENU</span
+        >
+        <span class="text-[10px] text-[#8a7a5a]">Esc to close</span>
+      </div>
+      <div
+        class="mt-2 h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
+      ></div>
     </div>
-    <label class="music-toggle"
-      ><input
-        type="checkbox"
+    <label class="block"
+      ><span
+        class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
+        >Opponent</span
+      >
+      <select
+        class="mt-1.5 w-full border border-[#8a6a2f] border-l-4 border-l-[#ffd24a] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
+        value={opponentChoice}
         disabled={!status.ready}
-        onchange={(event) => {
-          session?.scene.setMusic(event.currentTarget.checked);
-          focusArena();
-        }}
-      /> Music</label
+        onchange={(event) => setOpponentChoice(event.currentTarget.value)}
+      >
+        {#if opponentChoice === 'story'}
+          <option value="story" disabled>Story mode</option>
+        {/if}
+        <optgroup label="Practice partner">
+          {#each DUMMY_BEHAVIORS as behavior (behavior)}
+            <option value={behavior}
+              >{behavior === 'cpu'
+                ? 'CPU partner'
+                : partnerLabels[behavior]}</option
+            >
+          {/each}
+        </optgroup>
+        <optgroup label="Match">
+          <option value="vsCpu">Vs. CPU</option>
+        </optgroup>
+      </select></label
     >
-    <button
-      class="text-button"
-      disabled={!status.ready || status.selecting}
-      onclick={() => {
-        dialog.close();
-        openSelect();
-      }}>Character select</button
-    >
-    <div class="practice-options" role="group" aria-label="Match settings">
-      <label
-        >Fighter
+    <div class="flex gap-2">
+      <label class="min-w-0 flex-1"
+        ><span
+          class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
+          >1P</span
+        >
         <select
+          class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
           value={fighter}
           disabled={!status.ready || status.selecting || status.story}
           onchange={(event) => setFighter(event.currentTarget.value as Who)}
@@ -539,9 +532,13 @@
           {/each}
         </select></label
       >
-      <label
-        >Opponent
+      <label class="min-w-0 flex-1"
+        ><span
+          class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
+          >2P</span
+        >
         <select
+          class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
           value={opponent}
           disabled={!status.ready || status.selecting || status.story}
           onchange={(event) => setOpponent(event.currentTarget.value as Who)}
@@ -551,60 +548,86 @@
           {/each}
         </select></label
       >
-      <label
-        >Stage
-        <select
-          value={stage}
-          disabled={!status.ready || status.story}
-          onchange={(event) => setStage(event.currentTarget.value as Stage)}
-        >
-          {#each Object.entries(stageLabels) as [value, label] (value)}
-            <option {value}>{label}</option>
-          {/each}
-        </select></label
-      >
-      {#if mode === 'practice'}
-        <label
-          >Partner
-          <select
-            value={practice.partner}
-            disabled={!status.ready}
-            onchange={(event) =>
-              setPractice({
-                partner: event.currentTarget.value as DummyBehavior,
-              })}
-          >
-            {#each DUMMY_BEHAVIORS as behavior (behavior)}
-              <option value={behavior}>{partnerLabels[behavior]}</option>
-            {/each}
-          </select></label
-        >
-        <label
-          ><input
-            type="checkbox"
-            checked={practice.maxStock}
-            disabled={!status.ready}
-            onchange={(event) =>
-              setPractice({ maxStock: event.currentTarget.checked })}
-          /> Max stock</label
-        >
-        <label
-          ><input
-            type="checkbox"
-            checked={practice.lowHealth}
-            disabled={!status.ready}
-            onchange={(event) =>
-              setPractice({ lowHealth: event.currentTarget.checked })}
-          /> Low health</label
-        >
-      {/if}
     </div>
-    <a
-      class="guide-link"
-      href={`instructions.html#${fighter}`}
-      target="_blank"
-      rel="noopener">Controls guide</a
+    <label class="block"
+      ><span
+        class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
+        >Stage</span
+      >
+      <select
+        class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
+        value={stage}
+        disabled={!status.ready || status.story}
+        onchange={(event) => setStage(event.currentTarget.value as Stage)}
+      >
+        {#each Object.entries(stageLabels) as [value, label] (value)}
+          <option {value}>{label}</option>
+        {/each}
+      </select></label
     >
-    <button class="text-button" onclick={() => dialog.close()}>Close</button>
+    <label class="flex items-center justify-between font-bold italic"
+      >Music
+      <input
+        type="checkbox"
+        class="size-4 accent-[#ffd24a] disabled:opacity-40"
+        checked={status.music}
+        disabled={!status.ready}
+        onchange={(event) => {
+          session?.scene.setMusic(event.currentTarget.checked);
+          focusArena();
+        }}
+      /></label
+    >
+    <div class="flex gap-3.5 font-bold">
+      <label class="flex items-center gap-1.5"
+        ><input
+          type="checkbox"
+          class="size-4 accent-[#ffd24a] disabled:opacity-40"
+          checked={practice.maxStock}
+          disabled={!status.ready ||
+            opponentChoice === 'vsCpu' ||
+            opponentChoice === 'story'}
+          onchange={(event) =>
+            setPractice({ maxStock: event.currentTarget.checked })}
+        />
+        Max stock</label
+      >
+      <label class="flex items-center gap-1.5"
+        ><input
+          type="checkbox"
+          class="size-4 accent-[#ffd24a] disabled:opacity-40"
+          checked={practice.lowHealth}
+          disabled={!status.ready ||
+            opponentChoice === 'vsCpu' ||
+            opponentChoice === 'story'}
+          onchange={(event) =>
+            setPractice({ lowHealth: event.currentTarget.checked })}
+        />
+        Low health</label
+      >
+    </div>
+    <div
+      class="h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
+    ></div>
+    <div class="flex items-center justify-between gap-3">
+      <button
+        class="border-0 bg-transparent p-0 text-[11px] font-bold italic text-[#ffd24a] hover:text-[#ffe08a] disabled:opacity-40"
+        disabled={!status.ready || status.selecting}
+        onclick={() => {
+          dialog.close();
+          openSelect();
+        }}>Character select</button
+      >
+      <a
+        class="text-[11px] italic text-[#ffd24a] hover:text-[#ffe08a]"
+        href={`instructions.html#${fighter}`}
+        target="_blank"
+        rel="noopener">Controls guide</a
+      >
+      <button
+        class="rounded-[2px] border-0 bg-linear-to-b from-[#ffd24a] to-[#e8a91f] px-4 py-1.5 text-[12px] font-black italic text-[#241a0c]"
+        onclick={() => dialog.close()}>Close</button
+      >
+    </div>
   </dialog>
 </main>
