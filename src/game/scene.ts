@@ -198,6 +198,10 @@ export class TrainingScene extends Phaser.Scene {
   // than toggling the pause state, so a screen's or a reset's unpause can't
   // let a tick through while it is open.
   private modal = false;
+  // The pause the match was under when the dialog opened, held while it is
+  // so a reset inside it — or one still loading as it closes — restores it
+  // rather than dropping it. A screen opening clears it with the pause.
+  private pausedBefore = false;
   private clock = new FixedClock();
   private held = new Set<string>();
   private virtual = new Set<Control>();
@@ -386,6 +390,13 @@ export class TrainingScene extends Phaser.Scene {
   setModal(open: boolean) {
     if (this.modal === open) return;
     this.modal = open;
+    // Opening holds the pause the match was under; closing puts it back,
+    // keeping a pause taken while the dialog was up (a window blur).
+    if (open) this.pausedBefore = this.paused;
+    else {
+      this.paused ||= this.pausedBefore;
+      this.pausedBefore = false;
+    }
     if (this.frozen()) this.sound.pauseAll();
     else this.sound.resumeAll();
     this.clearInput();
@@ -410,7 +421,9 @@ export class TrainingScene extends Phaser.Scene {
     this.select = screen;
     this.sound.stopAll();
     this.selectTrack = undefined;
+    // A screen opens unpaused — the dialog's held pause with it.
     this.paused = false;
+    this.pausedBefore = false;
     this.clearInput();
     this.report();
   }
@@ -706,12 +719,15 @@ export class TrainingScene extends Phaser.Scene {
             undefined,
             vs ? this.globals : undefined,
           );
+    // A reset the settings dialog asked for keeps the pause it found; the
+    // toolbar's and a screen's start unpaused.
+    const paused = this.modal && this.pausedBefore;
     this.whenReady(match, () => {
       if (leave) this.leaveScreen();
-      this.begin(match);
+      this.begin(match, paused);
     });
   }
-  private begin(match: Match) {
+  private begin(match: Match, paused = false) {
     this.match = match;
     this.roundPalettes();
     this.match.practice = { ...this.practice };
@@ -721,7 +737,7 @@ export class TrainingScene extends Phaser.Scene {
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
     this.resetIdle();
-    this.paused = false;
+    this.paused = paused;
     this.clearInput();
     this.report();
   }
