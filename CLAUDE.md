@@ -16,6 +16,7 @@ bun run test                # Vitest. NOT `bun test`, which runs Bun's own runne
 bunx vitest run src/game/match.test.ts          # single file
 bunx vitest run src/game/match.test.ts -t "Hit Up"  # single test by name
 bun run check               # svelte-check + tsc --noEmit
+bun run e2e                 # Playwright smoke test (e2e/) against dist/; `bun run build` first. CI: .github/workflows/, fed by R2 (README, "CI")
 bun run lint                # ESLint
 bun run format              # Prettier write (format:check to verify)
 bun run validate            # assets + format:check + lint + check + test (the pre-commit hook runs this)

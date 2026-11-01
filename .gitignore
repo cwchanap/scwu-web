@@ -11,3 +11,6 @@ __pycache__/
 .worktrees/
 .superpowers/
 .wrangler/
+.env
+playwright-report/
+test-results/

@@ -14,6 +14,8 @@ export default ts.config(
       '**/generated/**',
       '**/__fixtures__/**',
       '.husky/**',
+      'playwright-report/**',
+      'test-results/**',
     ],
   },
   js.configs.recommended,

@@ -44,6 +44,12 @@ One-time setup:
 
 Run `bun run upload:r2` again whenever `bun run assets` changes its output, before the next deploy. The art and audio sync (`aws s3 sync`) uploads only what changed and deletes what the export dropped; `generated.tar.gz` is rebuilt and copied on every run. The Workers build refuses to build a commit whose `scripts/export_assets.py` does not match the tarball's `.exporter` fingerprint, so a forgotten re-upload fails the build instead of shipping stale data.
 
+## CI
+
+GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint** (Prettier, ESLint, `svelte-check`, `vite build`), **Run Unit Tests** (Vitest) and **Playwright Tests** (`e2e/`, against the production build). Dependabot (`.github/dependabot.yml`) opens weekly grouped PRs for Bun and Actions updates.
+
+GitHub's runners have no `scwu-web-handoff/`, so `.github/scripts/fetch-generated.sh` downloads `generated.tar.gz` and `fixtures.tar.gz` from the R2 bucket instead, and refuses data whose `.exporter` fingerprint does not match the commit's `scripts/export_assets.py`. Set the repository variable `VITE_ASSET_BASE` to the bucket's public URL (Settings → Secrets and variables → Actions → Variables). After changing `export_assets.py`, run `bun run assets && bun run upload:r2` before pushing, or CI fails on the fingerprint. Locally, `bun run build && bun run e2e` runs the browser test.
+
 ## Play
 
 | Input                        | Action                                              |
