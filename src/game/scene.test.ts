@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest';
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
-import { CharacterSelect } from './select';
+import { CharacterSelect, Title } from './select';
 import type { GameStatus } from './scene';
 
 // scene.ts imports Phaser at runtime, which a browser-only module; the pause
@@ -171,4 +171,30 @@ it('keeps a resume pressed while a Settings reset is still loading', () => {
   scene.togglePause();
   finishLoad();
   expect(scene.paused).toBe(false);
+});
+
+it('opens the title when Escape is pressed on the character select', () => {
+  vi.stubGlobal('HTMLElement', class {});
+  const { scene, view } = boot();
+  scene.openSelect();
+  expect(view.select).toBeInstanceOf(CharacterSelect);
+  (view.keydown as (e: unknown) => void)({
+    code: 'Escape',
+    repeat: false,
+    target: {},
+    preventDefault: () => {},
+  });
+  expect(view.select).toBeInstanceOf(Title);
+});
+
+it('still pauses on Escape during a match', () => {
+  vi.stubGlobal('HTMLElement', class {});
+  const { scene, view } = boot();
+  (view.keydown as (e: unknown) => void)({
+    code: 'Escape',
+    repeat: false,
+    target: {},
+    preventDefault: () => {},
+  });
+  expect(scene.paused).toBe(true);
 });
