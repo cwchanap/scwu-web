@@ -353,24 +353,14 @@ describe('title (0x4080a0)', () => {
     title.objects.find((o) => o.container === container && o.action === action)
       ?.frame?.image;
 
-  it('plays T1 for its 700 ticks, then T2 until a press brings the menu', () => {
+  it('opens on T2 until a press brings the menu, clearing the session globals (authored)', () => {
     const title = new Title();
+    title.globals[3] = 100;
+    title.globals[15] = 5;
     title.step();
-    expect([title.state, title.objects.map((o) => o.container)]).toEqual([
-      1,
-      ['t1', 't1', 't1'],
-    ]);
-    // Its backdrop shows the volume warning (2) for 300 ticks, ALICUU (0) for
-    // 150, then NEO TEAM F.K. (1), cueing sounds 1–3.
-    title.step();
-    expect(frame(title, 't1', 3)).toBe(2);
-    expect(title.sounds).toEqual([{ container: 't1', index: 1 }]);
-    // T1's flags don't let a press skip it: ten ticks, then its 700.
-    for (let t = 2; t < 710; t++) title.step({ punch: !(t % 2) });
-    expect(title.state).toBe(1);
-    title.step();
-    expect(title.state).toBe(2);
-    title.step();
+    // T1's action 2 zeroed globals 0–15; skipping the intro keeps that clear
+    // at T2's start (authored).
+    expect([title.globals[3], title.globals[15]]).toEqual([0, 0]);
     expect([title.state, title.objects.map((o) => o.container)]).toEqual([
       3,
       Array(9).fill('t2'),
