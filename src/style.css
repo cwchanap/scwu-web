@@ -313,11 +313,6 @@ kbd {
   border-color: #5e839e;
   color: #c2eaff;
 }
-.touch-controls .super-control {
-  background: #3d3020;
-  border-color: #a4834f;
-  color: #ffe2a8;
-}
 .settings-dialog {
   width: min(92vw, 440px);
   max-height: min(86svh, 640px);

@@ -176,7 +176,7 @@ export const SHARED: FighterGuide['sections'] = [
       {
         name: 'Pause / Restart',
         input: '<kbd>P</kbd><span class="sep">/</span><kbd>R</kbd>',
-        desc: 'Leaving the window pauses the match. <kbd>P</kbd> toggles the pause; <kbd>R</kbd> restarts the match, or the screen. G punches, H kicks, J catches or throws, and K launches. Specials and supers use their motion commands; U, I and 1–5 have no shortcuts. On touch devices the on-screen buttons play the same keys; landscape gives more room.',
+        desc: 'Leaving the window pauses the match. <kbd>P</kbd> toggles the pause; <kbd>R</kbd> restarts the match, or the screen. G punches, H kicks, J catches or throws, and K launches. Specials and supers use their motion commands; U, I and 1–5 have no shortcuts. On touch devices the on-screen buttons play the same keys, so motions are tapped on the arrow buttons; landscape gives more room.',
         cost: 0,
       },
     ],
@@ -5220,6 +5220,13 @@ export const GUIDES_DATA = {
             input: 'hold <kbd>E</kbd>',
             desc: 'Charges his gauge; his stocks hold 90 power each, up to five, and once full he taunts, giving the opponent 20.',
             cost: 0,
+          },
+          {
+            name: 'Counter Hit',
+            input:
+              '<kbd>G</kbd>+<kbd>H</kbd> or <kbd>G</kbd>+<kbd>K</kbd> while blocking',
+            desc: 'Spend a stock while guarding — two keys at once, one of G, J or E and one of H or K.',
+            cost: 1,
           },
         ],
       },

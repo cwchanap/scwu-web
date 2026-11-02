@@ -1207,6 +1207,10 @@ export interface Fighter {
   // +0xdfbb: a story's points, which KOs (knockOut) and a time-up
   // (storyResult) score; 100 ends the round (0x408ef1).
   points: number;
+  // Authored: the round controller saw this fighter at 0 life — a brawl's
+  // win counts a revived hostile once it has fallen, not while it stands
+  // again.
+  downed: boolean;
   // Priority (+4): the step and the draw take it at the tick's start. Each
   // contact and ops 0x07/0x14 set it about its plane's base (0x41f130), and
   // a KO drops it to 0x3c (0x40e8cd).
@@ -1541,6 +1545,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   present: true,
   shown: true,
   points: 0,
+  downed: false,
   z: FIGHTER_Z,
   branch: null,
   copy: null,
@@ -1939,7 +1944,9 @@ export class Match {
     return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
   }
 
-  // Authored: all hostile seats count, except Chii acting as difficulty buttons.
+  // Authored: all hostile seats count, except Chii acting as difficulty
+  // buttons — ponytail: guessed from seats (global 10 = 10, every hostile
+  // ZAKU or PAC-HELO), not a stance or state flag the battle leaves.
   private get brawlEnemies() {
     if (!this.battle) return null;
     const [one] = this.fighters;
@@ -1980,10 +1987,12 @@ export class Match {
       else theirs = Math.max(theirs, f.points);
     });
     const enemies = this.brawlEnemies;
-    // Authored: combat brawls resolve by survival; mode selection keeps its points.
-    if (!timeUp && enemies) {
+    // Authored: combat brawls resolve by survival — a wipe-out on the last
+    // tick still wins, not the time-up's points. Mode selection keeps its
+    // points. A fallen hostile stays defeated for the result even risen.
+    if (enemies && (!timeUp || enemies.every((f) => f.downed))) {
       ours = one.hp > 0 ? 1 : 0;
-      theirs = enemies.some((f) => f.hp > 0) ? 1 : 0;
+      theirs = enemies.some((f) => !f.downed) ? 1 : 0;
     }
     const winner =
       ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
@@ -5043,8 +5052,9 @@ export class Match {
     // a lose action that restores life on its first step (ALPHA's KO Boss,
     // PC 1037) is never seen at 0. A story's ends as the 1P is KO'd or any
     // player reaches 100 points (0x408eda). Authored: a brawl instead waits
-    // for every hostile seat to have no life, including waiting ones. Mode
-    // selection's Chii (global 10 = 10) keep their scripted point objective.
+    // for every hostile seat to have fallen, including waiting ones — a
+    // revived boss still counting once it has been KO'd. Mode selection's
+    // Chii (global 10 = 10) keep their scripted point objective.
     // Seeing the end it sets state 300
     // (0x408ec7), which picks the result the tick after from the lives then,
     // by per mille (+0xdf09, 0x408f68) as lives differ, or a story's
@@ -5054,10 +5064,14 @@ export class Match {
     // lettering.
     const [one, two] = this.fighters;
     const enemies = this.brawlEnemies;
+    // A hostile that has fallen counts for the brawl even after it rises:
+    // ZAKU and PAC-HELO get back up about 5 s after a KO (global 4 = 70,
+    // ZAKU also 50), so all-dead-at-once barely happens in those brawls.
+    for (const f of this.fighters) f.downed ||= !f.hp;
     const over = this.battle
       ? !one.hp ||
         (enemies
-          ? enemies.every((f) => !f.hp)
+          ? enemies.every((f) => f.downed)
           : this.fighters.some((f) => f.points >= 100))
       : !one.hp || !two.hp;
     if (this.picking?.winner) {

@@ -191,10 +191,6 @@
         iori: 'Giga',
         ex: 'Gaisa',
       },
-      zaku: {},
-      pachelo: {},
-      golf: {},
-      asura: {},
       ttro: {
         iori: 'Dash K',
       },
@@ -210,9 +206,9 @@
         ex: 'TE K',
       },
       dora: {
-        punch: 'Punch',
-        kick: 'Kick',
-        hitUp: 'Hit Up',
+        punch: 'HP',
+        kick: 'LK',
+        hitUp: 'HK',
         throw: 'Chuck',
         ex: 'EN',
         iori: 'Charge',
@@ -462,12 +458,9 @@
         class:attack-control={[
           'punch',
           'kick',
-          'drill',
-          'axe',
           'throw',
           'hitUp',
           'iori',
-          'dst',
           'ex',
         ].includes(item.control)}
         aria-label={labelOf(item.control, item.label)}

@@ -161,8 +161,9 @@ describe('character select (object type 10, VS single)', () => {
     ]);
     select.step();
     expect(select.hover[0]).toBe(45);
-    // His face (84) holds a blank display at PC 1, his file's lock; the
-    // port runs past it, so his muscular portrait shows (authored).
+    // His face (84) tests the mode at record 1 and calls the name (83) after
+    // it in VS, as SEAN's layout his file keeps; his muscular portrait shows
+    // (authored).
     for (let t = 0; t < 30; t++) select.step();
     expect(shown(select, 'dora', 84)?.frame?.image).toBe(140);
     expect(shown(select, 'dora', 83)?.frame?.image).toBe(247);
@@ -200,6 +201,11 @@ describe('character select (object type 10, VS single)', () => {
       if (t >= 20) images.add(face?.frame?.image);
     }
     expect([...images].sort()).toEqual([0, 140]);
+    // The name call sits past the TEAM branch, as the original's: no other
+    // fighter's name shows there.
+    expect(
+      select.objects.some((o) => o.container === 'dora' && o.action === 83),
+    ).toBe(false);
   });
 
   it('leaves locked cells empty and unchoosable', () => {

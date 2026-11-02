@@ -82,13 +82,18 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(gaugeCrop(45, perStockOf('dora'))).toEqual({ x: 63, width: 63 });
   });
 
-  it('keeps J for throws and K for the launcher', () => {
+  it('keeps J for throws, ↘G for the launch and K for heavy kicks', () => {
     expect(byKey({ throw: true }).mine).toEqual([234, 235, 'idle']);
-    expect(byKey({ hitUp: true }).mine).toEqual([231, 232, 'idle']);
+    expect(byKey({ punch: true, right: true, crouch: true }).mine).toEqual([
+      231,
+      232,
+      'idle',
+    ]);
+    expect(byKey({ hitUp: true }).mine).toEqual([204, 'idle']);
   });
 
   it.each([false, true])(
-    'takes Hug as G G → H G (hold forward: %s)',
+    'takes Hug as G G → H G — his LP LP → LK HP, the last press neutral (forward held through the kick: %s)',
     (holdForward) => {
       const { dora, other, steps } = doraPlayer(90);
       dora.stock = 3;
@@ -100,10 +105,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       steps({ right: true }, 6);
       steps({ kick: true, right: holdForward });
       steps({ right: holdForward }, 5);
-      steps({ punch: true, right: holdForward });
+      steps({ punch: true });
       // The final press may land during the normal attack's contact pause.
       for (let t = 0; t < 100 && dora.branch !== 347; t++)
-        steps({ right: holdForward });
+        steps({ punch: true });
       expect(dora.branch).toBe(347);
       expect(dora.stock).toBe(0);
       const before = other.hp;
@@ -113,7 +118,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     },
   );
 
-  it('refuses the old J/K ending and requires three stocks for Hug', () => {
+  it('ends Hug on a press holding the source’s E — G or J — and needs three stocks', () => {
     const hug = (last: Input, stock: number) =>
       play(
         presses({
@@ -125,8 +130,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         }),
         { gap: 90, stock },
       );
+    expect(hug({ punch: true }, 3).mine).toContain(347);
+    // J's chuck pair holds E too; K's HK pair does not.
+    expect(hug({ throw: true }, 3).mine).toContain(347);
     expect(hug({ hitUp: true }, 3).stock).toBe(3);
-    expect(hug({ throw: true }, 3).stock).toBe(3);
     expect(hug({ punch: true }, 2).mine).toContain(290);
   });
 
@@ -176,7 +183,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       expect(dora.stock).toBe(0);
       for (
         let t = 0;
-        t < 800 && dora.action === 'script' && dora.branch !== 270;
+        t < 800 &&
+        dora.action === 'script' &&
+        dora.branch !== 270 &&
+        dora.branch !== '305+46';
         t++
       ) {
         expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
@@ -184,7 +194,8 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         match.step({}, { punch: t % 60 === 0 });
         expect(dora.hp).toBe(600);
       }
-      // Pierce's shared landing recovery (270) ends casting and can be hit.
+      // The shared landing recoveries (270; 305+46, which 356 lands through
+      // too) end casting and can be hit.
       steps({}, 30);
       expect(dora.action).toBe('idle');
     },
@@ -221,6 +232,45 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       expect(pushboxes(action, 0, 'dora').length).toBeGreaterThan(0);
     },
   );
+
+  it.each([
+    { punch: true, kick: true }, // G with H
+    { punch: true, hitUp: true }, // G with K
+    { throw: true, hitUp: true }, // J with K
+  ])(
+    'spends a stock on COUNTER HIT from a block with two keys (%s)',
+    (keys) => {
+      const { match, dora } = doraPlayer(90);
+      dora.stock = 2;
+      const seen: unknown[] = [];
+      for (let t = 0; t < 500 && dora.branch !== 197; t++) {
+        const input: Input = { left: true };
+        // The guard reaction's checks (172's at ages 0, 8 and 18) take a
+        // fresh B+E press — one E key and one B key — inside their window.
+        if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
+          Object.assign(input, keys);
+        match.step(input, { punch: t % 60 === 0 });
+        const now = dora.action === 'script' ? dora.branch : dora.action;
+        if (seen.at(-1) !== now) seen.push(now);
+      }
+      expect(seen).toEqual(['backwalk', 'block', 197]);
+      expect(dora.stock).toBe(1);
+    },
+  );
+
+  it('takes no counter pair from two keys without an E button', () => {
+    const { match, dora } = doraPlayer(90);
+    dora.stock = 2;
+    for (let t = 0; t < 500; t++) {
+      const input: Input = { left: true };
+      // H and K both hold B but neither holds E.
+      if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
+        Object.assign(input, { hitUp: true, kick: true });
+      match.step(input, { punch: t % 60 === 0 });
+    }
+    expect(dora.branch).not.toBe(197);
+    expect(dora.stock).toBe(2);
+  });
 
   it("pairs every victim action with Ryuko's", () => {
     const twins = CHARACTERS.dora.twins as Record<string, number>;
@@ -297,43 +347,48 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('punches and kicks standing, crouching and after a forward step', () => {
+    // G his HP normals, H LK, K HK; the LP pair has no key (authored).
     expect(byKey({ punch: true })).toMatchObject({
-      mine: [201, 'idle'],
-      damage: 5,
+      mine: [203, 'idle'],
+      damage: 12,
     });
     expect(byKey({ kick: true })).toMatchObject({
       mine: [202, 'idle'],
       damage: 8,
     });
+    expect(byKey({ hitUp: true })).toMatchObject({
+      mine: [204, 'idle'],
+      damage: 12,
+    });
     expect(byKey({ punch: true, crouch: true })).toMatchObject({
-      mine: [205, 'idle'],
-      damage: 7,
+      mine: [207, 'idle'],
+      damage: 15,
     });
     expect(byKey({ kick: true, crouch: true })).toMatchObject({
       mine: [206, 'idle'],
       damage: 10,
     });
-    expect(byKey({ punch: true, right: true })).toMatchObject({
-      mine: [223, 'idle'],
-      damage: 25,
+    expect(byKey({ hitUp: true, crouch: true })).toMatchObject({
+      mine: [208, 'idle'],
+      damage: 12,
     });
+    // → with LK: SP2 6LK, his dashing punch; SP1 6LP takes the LP pair.
     expect(byKey({ kick: true, right: true })).toMatchObject({
       mine: [225, 'idle'],
       damage: 30,
     });
+    // LP's hit opened levels 22–50 (PC 2740) for a cancel; the LP pair has
+    // no key, so his normal chain starts with the CPU only.
     expect(
-      play(presses({ 0: { punch: true }, 8: { kick: true } })),
-    ).toMatchObject({
-      mine: [201, 202, 'idle'],
-      damage: 13,
-    });
+      play(presses({ 0: { kick: true }, 8: { punch: true } })).mine,
+    ).toEqual([202, 'idle']);
     expect(
       play(presses({ 0: { punch: true }, 12: { punch: true } })).mine,
-    ).toEqual([201, 'idle']);
+    ).toEqual([203, 'idle']);
   });
 
-  it('launches with K, jumps after it on ↑, grabs with his chuck and dashes', () => {
-    const hitUp = { hitUp: true };
+  it('launches with ↘G, jumps after it on ↑, grabs with his chuck and dashes', () => {
+    const hitUp = { punch: true, right: true, crouch: true };
     expect(byKey(hitUp)).toMatchObject({
       mine: [231, 232, 'idle'],
       damage: 15,
@@ -357,9 +412,8 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   it('strikes in the air, its dash form after an air dash, its 2 form after a double jump', () => {
     expect(
       play(presses({ 0: { jump: true }, 30: { punch: true } })).mine,
-    ).toEqual(['takeoff', 'jump', 209, 'land', 'idle']);
-    // J LP tests variable 1 for 20 (Dash AF, PC 224) into J LPD (210, PC
-    // 2906).
+    ).toEqual(['takeoff', 'jump', 215, 'land', 'idle']);
+    // J HP tests variable 1 for 20 (Dash AF) into its dash form (216).
     expect(
       play(
         presses({
@@ -373,7 +427,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
           gap: 400,
         },
       ).mine,
-    ).toEqual(['takeoff', 'jump', 16, 210, 'land', 'idle']);
+    ).toEqual(['takeoff', 'jump', 16, 216, 'land', 'idle']);
     // His file gives Jump 2's two steps a 1-tick window (0x410171–0x41087c
     // run it once), which never matches; authored, it takes the others' 10,
     // so ↑ again double jumps (11) and J HK takes its 2 form (220).
@@ -383,10 +437,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
           0: { jump: true },
           20: {},
           21: { jump: true },
-          40: { kick: true },
+          40: { hitUp: true },
         }),
       ).mine,
-    ).toEqual(['takeoff', 'jump', 11, 214, 'land', 'idle']);
+    ).toEqual(['takeoff', 'jump', 11, 220, 'land', 'idle']);
   });
 
   it('plays his keyed specials', () => {
@@ -425,7 +479,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(first({ 0: d, 6: df, 12: f, 18: { punch: true }, 19: {} })).toBe(
       260,
     );
-    // →↓↘ G: 機猫神天翔 LP.
+    // →↓↘ G: 機猫神天翔 HP.
     expect(first({ 0: f, 6: d, 12: df, 18: { punch: true }, 19: {} })).toBe(
       278,
     );
@@ -449,14 +503,38 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it.each([
-    ['cannon', ['d', 'df', 'f', 'd', 'df', 'f'], 'punch', 296],
-    ['gadgets', ['d', 'db', 'b', 'd', 'df', 'f'], 'punch', 305],
-    ['fists', ['d', 'db', 'b', 'd', 'db', 'b'], 'punch', 327],
-    ['pierce', ['d', 'df', 'f', 'd', 'db', 'b'], 'kick', 338],
-    ['FK', ['f', 'b', 'd', 'f'], 'kick', 356],
+    [
+      'cannon',
+      ['d', 'df', 'f', 'd', 'df', 'f'],
+      ['punch', 'throw'],
+      ['kick', 'hitUp'],
+      296,
+    ],
+    [
+      'gadgets',
+      ['d', 'db', 'b', 'd', 'df', 'f'],
+      ['punch', 'throw'],
+      ['kick', 'hitUp'],
+      305,
+    ],
+    [
+      'fists',
+      ['d', 'db', 'b', 'd', 'db', 'b'],
+      ['punch', 'throw'],
+      ['kick', 'hitUp'],
+      327,
+    ],
+    [
+      'pierce',
+      ['d', 'df', 'f', 'd', 'db', 'b'],
+      ['kick', 'hitUp'],
+      ['punch', 'throw'],
+      338,
+    ],
+    ['FK', ['f', 'b', 'd', 'f'], ['kick', 'hitUp'], ['punch', 'throw'], 356],
   ] as const)(
-    'casts %s with its G/H motion ending, never J or K',
-    (_, motion, ending, action) => {
+    'casts %s on a press holding its source ending',
+    (_, motion, casting, failing, action) => {
       const directions: Record<string, Input> = {
         d: { crouch: true },
         df: { crouch: true, right: true },
@@ -472,8 +550,11 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         steps({ [button]: true });
         return dora;
       };
-      expect(cast(ending).branch).toBe(action);
-      for (const button of ['throw', 'hitUp'] as const) {
+      // A punch ending (D or E) takes G or J, both holding E; a kick ending
+      // (A or B) takes H, or K for the HK form. The strong variant wins in
+      // table order.
+      for (const button of casting) expect(cast(button).branch).toBe(action);
+      for (const button of failing) {
         const f = cast(button);
         expect(f.branch).not.toBe(action);
         expect(f.stock).toBe(5);
@@ -679,19 +760,20 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     ]);
   });
 
-  it('plays his own CPU table in Vs. CPU', () => {
-    // Authored inputs choose one G/H variant; the CPU still charges,
-    // teleports and completes its supers through the same command scan.
+  it('plays his own CPU table in Vs. CPU, light variants and all', () => {
+    // The shared scan resolves the injected LP/LK steps to their own
+    // entries: the light 機猫神双槌 (250), 空砲 (259), 突進 (266), 天翔
+    // (277/279) and 瞬移 (283/284) all play.
     for (const [seed, wanted] of [
-      [4, [421, 245, 241, 285, 296]],
-      [37, [286, 305, 296]],
-      [2, [347, 348]],
-      [15, [338, 342, 347, 348]],
+      [4, [421, 245, 241, 296, 283, 266]],
+      [37, [260, 285, 266, 327]],
+      [2, [250, 284, 277, 347, 348]],
+      [15, [338, 342, 259]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'dora']);
       const dora = match.fighters[1];
       const entered = new Set<unknown>();
-      for (let t = 0; t < 4000 && !wanted.every((b) => entered.has(b)); t++) {
+      for (let t = 0; t < 6000 && !wanted.every((b) => entered.has(b)); t++) {
         match.step({});
         if (dora.action === 'script') entered.add(dora.branch);
       }

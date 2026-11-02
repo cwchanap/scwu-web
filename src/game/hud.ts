@@ -246,7 +246,7 @@ export const faceImage = (face: number, who?: Who) => {
 // PAC-HELO's 68 149 (PC 617), GOLF's 52 155 (PC 475), ASURA's 52 137
 // (PC 479) and TTRO's 66 170 (PC 636); ASTROMAN, with no *NAME, shows VS
 // NAME's (56) 170 (PC 610). YINAN's 99 and AYA's 93 show 349 (PCs 1197,
-// 705), DoraEmon's 83 SEAN's 247 (PC 1047) and RARIO's 58 235 (PC 546).
+// 705), DoraEmon's 83 his authored 247 and RARIO's 58 235 (PC 546).
 // TRAINING has no *NAME, and his VS NAME (33) shows 235, a blank image (PC
 // 356), so he shows none.
 const NAMES: Record<Who, number | null> = {

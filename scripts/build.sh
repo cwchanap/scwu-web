@@ -7,10 +7,11 @@
 set -euo pipefail
 
 script_sha() {
+  # The exporter fingerprint: script bytes, then the committed name PNG it reads.
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum scripts/export_assets.py
+    cat scripts/export_assets.py art/dora/name.png | sha256sum
   else
-    shasum -a 256 scripts/export_assets.py
+    cat scripts/export_assets.py art/dora/name.png | shasum -a 256
   fi | awk '{print $1}'
 }
 
