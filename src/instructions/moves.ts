@@ -5112,7 +5112,7 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Hit Up',
-            input: '<kbd>K</kbd>',
+            input: '<kbd>K</kbd> or <span class="motion">↘</span><kbd>G</kbd>',
             desc: 'A launcher that ↑ follows with a jump.',
             cost: 0,
           },

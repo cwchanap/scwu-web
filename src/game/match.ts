@@ -1988,9 +1988,10 @@ export class Match {
     });
     const enemies = this.brawlEnemies;
     // Authored: combat brawls resolve by survival — a wipe-out on the last
-    // tick still wins, not the time-up's points. Mode selection keeps its
-    // points. A fallen hostile stays defeated for the result even risen.
-    if (enemies && (!timeUp || enemies.every((f) => f.downed))) {
+    // tick still wins and a knockout on it still loses, not the time-up's
+    // points. Mode selection keeps its points. A fallen hostile stays
+    // defeated for the result even risen.
+    if (enemies && (!timeUp || !one.hp || enemies.every((f) => f.downed))) {
       ours = one.hp > 0 ? 1 : 0;
       theirs = enemies.some((f) => !f.downed) ? 1 : 0;
     }

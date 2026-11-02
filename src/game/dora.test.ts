@@ -82,14 +82,14 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(gaugeCrop(45, perStockOf('dora'))).toEqual({ x: 63, width: 63 });
   });
 
-  it('keeps J for throws, ↘G for the launch and K for heavy kicks', () => {
+  it('keeps J for throws, K and ↘G for the launch', () => {
     expect(byKey({ throw: true }).mine).toEqual([234, 235, 'idle']);
+    expect(byKey({ hitUp: true }).mine).toEqual([231, 232, 'idle']);
     expect(byKey({ punch: true, right: true, crouch: true }).mine).toEqual([
       231,
       232,
       'idle',
     ]);
-    expect(byKey({ hitUp: true }).mine).toEqual([204, 'idle']);
   });
 
   it.each([false, true])(
@@ -347,7 +347,8 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('punches and kicks standing, crouching and after a forward step', () => {
-    // G his HP normals, H LK, K HK; the LP pair has no key (authored).
+    // G his HP normals, H LK, K the launch; the LP pair has no key, and HK
+    // leaves the grounded keys to it too (authored).
     expect(byKey({ punch: true })).toMatchObject({
       mine: [203, 'idle'],
       damage: 12,
@@ -357,8 +358,8 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       damage: 8,
     });
     expect(byKey({ hitUp: true })).toMatchObject({
-      mine: [204, 'idle'],
-      damage: 12,
+      mine: [231, 232, 'idle'],
+      damage: 15,
     });
     expect(byKey({ punch: true, crouch: true })).toMatchObject({
       mine: [207, 'idle'],
@@ -369,10 +370,15 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       damage: 10,
     });
     expect(byKey({ hitUp: true, crouch: true })).toMatchObject({
-      mine: [208, 'idle'],
-      damage: 12,
+      mine: [231, 232, 'idle'],
+      damage: 15,
     });
-    // → with LK: SP2 6LK, his dashing punch; SP1 6LP takes the LP pair.
+    // → with HP or LK: SP1 6LP and SP2 6LK, the dashing punches — 6LP's
+    // step rides the HP pair, the LP pair having no key.
+    expect(byKey({ punch: true, right: true })).toMatchObject({
+      mine: [223, 'idle'],
+      damage: 25,
+    });
     expect(byKey({ kick: true, right: true })).toMatchObject({
       mine: [225, 'idle'],
       damage: 30,
@@ -387,7 +393,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     ).toEqual([203, 'idle']);
   });
 
-  it('launches with ↘G, jumps after it on ↑, grabs with his chuck and dashes', () => {
+  it('launches with ↘G or K, jumps after it on ↑, grabs with his chuck and dashes', () => {
     const hitUp = { punch: true, right: true, crouch: true };
     expect(byKey(hitUp)).toMatchObject({
       mine: [231, 232, 'idle'],
@@ -401,6 +407,9 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       'land',
       'idle',
     ]);
+    expect(
+      play(presses({ 0: { hitUp: true }, 30: { jump: true } })).mine,
+    ).toEqual([231, 232, 233, 'land', 'idle']);
     expect(byKey({ throw: true })).toMatchObject({
       mine: [234, 235, 'idle'],
       damage: 30,
@@ -768,7 +777,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       [4, [421, 245, 241, 296, 283, 266]],
       [37, [260, 285, 266, 327]],
       [2, [250, 284, 277, 347, 348]],
-      [15, [338, 342, 259]],
+      [3, [338, 342, 259]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'dora']);
       const dora = match.fighters[1];
@@ -884,6 +893,18 @@ describe("DoraEmon's story (authored)", () => {
     expect(result.path).toContain('72');
     expect(result.path).toContain('74');
     expect(Math.max(...result.points.slice(1))).toBeGreaterThanOrEqual(100);
+  });
+
+  it('loses a brawl knocked out at time-up, however many points he holds', () => {
+    const globals = reach(5);
+    const battle = { ...(scenarioOf('dora')[5] as Battle), time: 60 };
+    const match = Match.story('dora', battle, 0, undefined, globals);
+    const [dora] = match.fighters;
+    while (match.roundTicks <= match.fightTick) match.step();
+    match.ticks = 6000;
+    [dora.points, dora.hp] = [200, 0];
+    for (let t = 0; t < 10 && !match.winner; t++) match.step();
+    expect(match.winner).toBe('opponent');
   });
 
   it('loses the final SHIN-Z battle (step 24) on a KO', () => {

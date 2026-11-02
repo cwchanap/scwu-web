@@ -144,11 +144,19 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     aya: aya.commands,
     dora: {
       ...dora.commands,
-      entries: dora.commands.entries.map((entry, i) =>
-        DORA_WINDOWS[i] === undefined
-          ? entry
-          : { ...entry, window: DORA_WINDOWS[i] },
-      ),
+      entries: dora.commands.entries.map((entry, i) => {
+        const e =
+          DORA_WINDOWS[i] === undefined
+            ? entry
+            : { ...entry, window: DORA_WINDOWS[i] };
+        // Authored: SP1 6LP's step takes the HP pair, so →G keeps the
+        // dashing punch (the LP pair has no key), and K's grounded HK
+        // presses take SP3 Hitup's launch — Hit Up on K, as on every
+        // fighter.
+        if (i === 33) return { ...e, steps: [0x2182] };
+        if (i === 35) return { ...e, near: 231, far: 231, crouch: 231 };
+        return e;
+      }),
     },
     rario: rario.commands,
     training: training.commands,
@@ -167,11 +175,13 @@ const BUTTONS: Partial<Record<Control, number>> = {
 // Authored: DoraEmon's attacks each take two of the source's six buttons
 // (A–F, bits 4–9, 0x414340), which no two keys press on one tick, so his
 // keys press both: G HP (D, E), so his normals and a motion's strong
-// ending — ↘G his SP3 Hitup launch (entry 32); H LK and HK (A, B), the HK
-// ending winning in table order; K his HK normals (B, C); J his chuck (C,
-// D, E); and E, held, EN (E, F). His guard reactions' counter pair (B, E,
-// reactions 172, 174 → COUNTER HIT 197) takes two keys: one with E (G, J or
-// E) and one with B (H or K).
+// ending — ↘G his SP3 Hitup launch (entry 32), →G his SP1 6LP dash (entry
+// 34, retargeted to this pair); H LK and HK (A, B), the HK ending winning
+// in table order; K his HK normals (B, C), whose grounded entry plays that
+// same launch — Hit Up on K; J his chuck (C, D, E); and E, held, EN (E,
+// F). His guard reactions' counter pair (B, E, reactions 172, 174 →
+// COUNTER HIT 197) takes two keys: one with E (G, J or E) and one with B
+// (H or K).
 // The light pair (C, D) has no key: LP normals and the light endings play
 // through the CPU only.
 const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
