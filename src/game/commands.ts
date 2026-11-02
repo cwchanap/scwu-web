@@ -144,36 +144,11 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     aya: aya.commands,
     dora: {
       ...dora.commands,
-      entries: dora.commands.entries.map((entry, i) => ({
-        ...entry,
-        window: [30, 34, 35].includes(i)
-          ? 0
-          : (DORA_WINDOWS[i] ?? entry.window),
-        // One G/H ending per motion; the strong variant wins in table order.
-        steps:
-          i === 0
-            ? [0x3081, 0x3081, 0x3002, 0x3010, 0x2080] // G G → H G
-            : i < 24
-              ? entry.steps.map((step, k) =>
-                  k === entry.steps.length - 1
-                    ? (step & ~0x3f0) | (step & 0x180 ? 0x80 : 0x10)
-                    : step,
-                )
-              : ((
-                  {
-                    29: [0x2100], // J: throw
-                    30: [0x2080],
-                    31: [0x2020], // K: launcher
-                    32: [0x2012],
-                    33: [0x2082],
-                    34: [0x2080],
-                    35: [0x2010],
-                    36: [0x2080],
-                    37: [0x2010],
-                    38: [0xa200],
-                  } as Record<number, number[]>
-                )[i] ?? entry.steps),
-      })),
+      entries: dora.commands.entries.map((entry, i) =>
+        DORA_WINDOWS[i] === undefined
+          ? entry
+          : { ...entry, window: DORA_WINDOWS[i] },
+      ),
     },
     rario: rario.commands,
     training: training.commands,
@@ -189,11 +164,23 @@ const BUTTONS: Partial<Record<Control, number>> = {
   punch: 0x80,
   throw: 0x100,
 };
-// Authored: DoraEmon uses the shared G/H/J/K layout and E to charge.
+// Authored: DoraEmon's attacks each take two of the source's six buttons
+// (A–F, bits 4–9, 0x414340), which no two keys press on one tick, so his
+// keys press both: G HP (D, E), so his normals and a motion's strong
+// ending — ↘G his SP3 Hitup launch (entry 32); H LK and HK (A, B), the HK
+// ending winning in table order; K his HK normals (B, C); J his chuck (C,
+// D, E); and E, held, EN (E, F). His guard reactions' counter pair (B, E,
+// reactions 172, 174 → COUNTER HIT 197) takes two keys: one with E (G, J or
+// E) and one with B (H or K).
+// The light pair (C, D) has no key: LP normals and the light endings play
+// through the CPU only.
 const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
   dora: {
-    ...BUTTONS,
-    ex: 0x200,
+    punch: 0x180,
+    kick: 0x30,
+    hitUp: 0x60,
+    throw: 0x1c0,
+    ex: 0x300,
   },
 };
 export const buttonsOf = (who: Who) => OWN_BUTTONS[who] ?? BUTTONS;
@@ -846,11 +833,12 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['ex', 6],
     ['dash', 14],
   ],
-  // DoraEmon's supers 魔神空大砲 HP (10), 秘神具騒嵐 HP (6), 鬼神双乱槌 HP
-  // (8), 覇神極突貫 HK (4) and 激神超抱擁 (1) on 1-5; his specials 機猫神空砲
-  // HP (17), 機猫神天翔 HP (13) and 機猫神突進 HK (19) on Ryuko's drill, axe
-  // and iori keys, then Dash F (28) and Dash B (29). FK之意思 (2, 3),
-  // 機猫神双槌 (15, 16) and 機猫神瞬移 (21–24) take their commands only.
+  // DoraEmon's supers 魔神空大砲 (10), 秘神具騒嵐 (6), 鬼神双乱槌 (8),
+  // 覇神極突貫 (4) and 激神超抱擁 (1), his specials 機猫神空砲 (17),
+  // 機猫神天翔 (13) and 機猫神突進 (19) and Dash F (28) and Dash B (29)
+  // take the move controls — of which only F (iori) and Shift (dash) keep
+  // keys; the rest enter by motion. FK之意思 (2, 3), 機猫神双槌 (15, 16)
+  // and 機猫神瞬移 (21–24) take their commands only.
   dora: [
     ['getterBeam', 10],
     ['musashi', 6],

@@ -1016,7 +1016,7 @@ And DoraEmon's, a muscular blue robot cat with 600 life. G punches, H kicks, J t
 | G G → H G                     | Hug, 3 stocks                                 |
 | →←↓→ H                        | FK之意思, 3 stocks spent at the casting flash |
 
-The four one-stock supers are invincible during casting. FK's wind-up can be interrupted without spending stock. Knocked out with three stocks, he reloads to full 600 life.
+The four one-stock supers are invincible during casting. FK's wind-up can be interrupted without spending stock. Knocked out in a brawl where no enemy has hit him, he reloads to full 600 life for three stocks — fewer, or in a duel, and the KO stands.
 
 And RARIO's, a muscle-bound, barefoot plumber in a red cap and blue overalls who fights in Ryu's stance, with 450 life:
 

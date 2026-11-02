@@ -311,6 +311,51 @@ describe('story battles', () => {
     expect(match).toMatchObject({ winner: 'draw', wins: [1, 1], lost: 1 });
   });
 
+  it('ends a brawl once every hostile has fallen, a revived one still counting', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        koPoints: 0,
+        slots: [slot({ points: 0 }), slot({ points: 0 })],
+      }),
+    );
+    fight(match);
+    const [one, a, b] = match.fighters;
+    knockOut(match, a, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBeNull();
+    // ZAKU and PAC-HELO rise about 5 s after a KO: it stands again, and
+    // the brawl still ends once the last hostile falls.
+    a.hp = 400;
+    knockOut(match, b, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match).toMatchObject({ winner: 'player', wins: [1, 0] });
+    expect(a.hp).toBe(400);
+  });
+
+  it('wins a timed brawl whose last enemy fell on the final tick, not the time-up’s points', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({
+        time: 1,
+        timeUp: 100,
+        slots: [slot({ timeUp: 100 }), slot({ timeUp: 100 })],
+      }),
+    );
+    fight(match);
+    const [one, a, b] = match.fighters;
+    one.hp = 1;
+    knockOut(match, a, one);
+    for (let t = 0; t < 3; t++) match.step();
+    // A risen hostile at time-up would score its slot's points; the last
+    // one falling as the clock runs out still wins the wipe-out.
+    a.hp = 400;
+    while (match.ticks < 99) match.step();
+    knockOut(match, b, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
+  });
+
   it('still resolves a timed brawl at time-up with surviving enemies', () => {
     const match = Match.story(
       'ryuko',

@@ -803,8 +803,10 @@ def cued(clips, scripts):
     return ids | {e["index"] for s in scripts.values() for e in s["events"] if e["op"] == "sound"}
 
 
-def export_images(c, folder, image_ids):
-    """Write a player's selected images to public/assets/<folder>/, dropping stale ones."""
+def export_images(c, folder, image_ids, exclude=()):
+    """Write a player's selected images to public/assets/<folder>/, dropping stale ones.
+    `exclude` keeps an index's metadata but skips its write, for images written
+    elsewhere (DoraEmon's resampled portrait and generated nameplate)."""
     (PUBLIC / folder).mkdir(parents=True, exist_ok=True)
     # An empty image (Zoma's 2000, which dragon 2 shows as he vanishes) draws nothing.
     image_ids = {index for index in image_ids if c.images[index].width and c.images[index].height}
@@ -813,7 +815,8 @@ def export_images(c, folder, image_ids):
         record = c.images[index]
         pixels, palette, _ = c.pixels_and_palette(index)
         filename = f"{folder}/{index}.png"
-        write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
+        if index not in exclude:
+            write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         # One with its own palette (flag 1) keeps it whichever the player draws with.
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename,
                            **({"own": True} if record.flags & 1 else {})))
@@ -4238,9 +4241,11 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                                                                      if r[0] == 0x03} if c.sounds[i]["size"]})
     select = select_program(p, tables["selectFace"], image_ids)
     if key == "dora":
-        # Authored: show his own name on both select modes, before the TEAM branch.
+        # Authored: show his own name in VS only, after the TEAM branch — the
+        # layout of SEAN's file his is reworked from (test at 1, call at 2).
         select["actions"]["83"] = [list(r) for r in p.records[p.action(83).start:p.action(83).end]]
-        select["actions"]["84"][1] = [4, 1, 83, 0, 0, 0, 0, 0, 224, 255, 171, 255, 0, 0, 0, 0]
+        select["actions"]["84"][1] = select["actions"]["84"][2]
+        select["actions"]["84"][2] = [4, 1, 83, 0, 0, 0, 0, 0, 224, 255, 171, 255, 0, 0, 0, 0]
         select["actions"]["85"][1] = [0] * 16
         # Keep the stock requirement during the wind-up; spend at the flash (age 75).
         fk = scripts["356"]
@@ -4249,14 +4254,20 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                             {**cost, "t": 75})
         cost["add"] = 0
         fk["loopEvent"] += 1
-        # Casting bodies still push, but take neither strikes nor grabs, including follow-ups.
+        # Casting bodies still push, but take neither strikes nor grabs, including
+        # follow-ups. A fragment replays the casting only while its frames are the
+        # protected action's own records: the shared landing tail 305+46, which
+        # 356+43 also lands through, is not — nor is 356's wind-up.
         protected = {250, 252, 254, 296, 297, 305, 306, 327, 328, 330, 331, 332, 338, 339, 340, 341, 342}
-        for name, script in scripts.items():
-            if int(name.split("+")[0]) in protected:
-                for frame in script["frames"]:
+        casting = {frame["pc"] for name, script in scripts.items()
+                   if "+" not in name and int(name) in protected
+                   for frame in script["frames"]}
+        for script in scripts.values():
+            for frame in script["frames"]:
+                if frame["pc"] in casting:
                     for body in frame.get("body", []):
                         body["kind"] &= ~6
-    images = export_images(c, key, image_ids)
+    images = export_images(c, key, image_ids, {140, 247} if key == "dora" else ())
     if key == "dora":
         # A standard-height select portrait from his muscular pose; gameplay sprites stay native.
         face = image_rgba(c, 221)
@@ -4273,8 +4284,10 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         write_if_changed(PUBLIC / "dora/247.png", nameplate)
         for image in images:
             if image["index"] in (140, 247):
+                # 140 keeps the source's flag 0 so the chosen palette recolours
+                # it; 247's flag 1 already marked it own, as a name's should be.
                 image.update(width=width if image["index"] == 140 else name_width,
-                             height=height if image["index"] == 140 else name_height, own=True)
+                             height=height if image["index"] == 140 else name_height)
     write_json(GENERATED / f"{key}.json", dict(source_sha256=hashlib.sha256(data).hexdigest(), images=images,
         sounds=sounds, clips=clips, **tables, scripts=scripts, resultScripts=result_scripts, twins=pairs, aliases=aliases,
         counters=counters, neutralTests=neutral_tests, select=select, palettes=export_palettes(c, image_ids),
@@ -4875,8 +4888,11 @@ def inputs():
 
 
 def exporter():
-    """This script's fingerprint: the part of inputs() a git checkout can reproduce."""
-    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+    """This script's fingerprint: the part of inputs() a git checkout can reproduce —
+    the script itself and the committed art it reads (art/dora/name.png)."""
+    digest = hashlib.sha256(Path(__file__).read_bytes())
+    digest.update((ROOT / "art/dora/name.png").read_bytes())
+    return digest.hexdigest()
 
 
 if __name__ == "__main__":
@@ -4889,6 +4905,6 @@ if __name__ == "__main__":
         stamp.unlink(missing_ok=True)
         main()
         stamp.write_text(key)
-    # build.sh checks this against the checked-out script before it trusts the
-    # generated.tar.gz it downloads on Workers Builds.
+    # build.sh checks this against the checked-out script and name PNG before
+    # it trusts the generated.tar.gz it downloads on Workers Builds.
     (GENERATED / ".exporter").write_text(exporter())
