@@ -852,6 +852,7 @@ describe("DoraEmon's story (authored)", () => {
       path,
       stock: dora.stock,
       hp: dora.hp,
+      downed: dora.downed,
     };
   };
 
@@ -877,7 +878,15 @@ describe("DoraEmon's story (authored)", () => {
   // met his (KO scorer 0); KO'd from FIGHT, before any has, nobody scores it.
   it('revives through KO RELOAD in a brawl when nobody has caught him, spending three stocks for 600 life', () => {
     const result = lose(5, 4, (m) => m.fighters[0].hp >= 600);
-    expect(result).toMatchObject({ g3: 0, atFight: 'idle', stock: 1, hp: 600 });
+    // The KO marks him downed even though KO RELOAD restores his life before
+    // the run loop can read the 0.
+    expect(result).toMatchObject({
+      g3: 0,
+      atFight: 'idle',
+      stock: 1,
+      hp: 600,
+      downed: true,
+    });
     const reload = result.path.indexOf('72');
     expect(reload).toBeGreaterThanOrEqual(0);
     expect(result.path.indexOf('74')).toBeGreaterThan(reload);
