@@ -7,7 +7,14 @@ import {
   responsesOf,
   stocksOf,
 } from './characters';
-import { animationDuration, animationFrame, BLACK } from './animations';
+import {
+  animationDuration,
+  animationFrame,
+  BLACK,
+  hurtboxes,
+  pushboxes,
+  script,
+} from './animations';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -61,7 +68,7 @@ const holding = (keys: Record<number, Input>) => (t: number) => {
 };
 
 describe('DoraEmon (46 B6.PLAYER)', () => {
-  it('takes 600 life and five stocks of 90 power from his parameter block', () => {
+  it('starts with 600 life and five stocks of 90 power', () => {
     expect([lifeOf('dora'), desperationOf('dora')]).toEqual([600, 180]);
     expect([perStockOf('dora'), stocksOf('dora')]).toEqual([90, 5]);
     const { dora } = doraPlayer();
@@ -74,6 +81,146 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     // The gauge draws power × 126 / 90 pixels (0x40de1b).
     expect(gaugeCrop(45, perStockOf('dora'))).toEqual({ x: 63, width: 63 });
   });
+
+  it('keeps J for throws and K for the launcher', () => {
+    expect(byKey({ throw: true }).mine).toEqual([234, 235, 'idle']);
+    expect(byKey({ hitUp: true }).mine).toEqual([231, 232, 'idle']);
+  });
+
+  it.each([false, true])(
+    'takes Hug as G G → H G (hold forward: %s)',
+    (holdForward) => {
+      const { dora, other, steps } = doraPlayer(90);
+      dora.stock = 3;
+      steps({}, 2);
+      steps({ punch: true });
+      steps({}, 5);
+      steps({ punch: true });
+      steps({}, 5);
+      steps({ right: true }, 6);
+      steps({ kick: true, right: holdForward });
+      steps({ right: holdForward }, 5);
+      steps({ punch: true, right: holdForward });
+      // The final press may land during the normal attack's contact pause.
+      for (let t = 0; t < 100 && dora.branch !== 347; t++)
+        steps({ right: holdForward });
+      expect(dora.branch).toBe(347);
+      expect(dora.stock).toBe(0);
+      const before = other.hp;
+      steps({}, 700);
+      expect(before - other.hp).toBe(270);
+      expect(dora.stock).toBe(0);
+    },
+  );
+
+  it('refuses the old J/K ending and requires three stocks for Hug', () => {
+    const hug = (last: Input, stock: number) =>
+      play(
+        presses({
+          0: { punch: true },
+          6: { punch: true },
+          12: { right: true },
+          18: { kick: true },
+          24: last,
+        }),
+        { gap: 90, stock },
+      );
+    expect(hug({ hitUp: true }, 3).stock).toBe(3);
+    expect(hug({ throw: true }, 3).stock).toBe(3);
+    expect(hug({ punch: true }, 2).mine).toContain(290);
+  });
+
+  it('spends FK stocks only at its casting flash, keeping them if interrupted', () => {
+    const start = () => {
+      const state = doraPlayer(300);
+      state.dora.stock = 3;
+      state.steps({}, 2);
+      state.steps({ command: 2 });
+      return state;
+    };
+    const { dora, steps } = start();
+    expect(dora.branch).toBe(356);
+    expect(dora.stock).toBe(3);
+    while (dora.age < 75) steps({});
+    steps({});
+    expect(dora.variables[14]).toBe(100);
+    expect(dora.stock).toBe(0);
+    steps({}, 300);
+    expect(dora.stock).toBe(0);
+
+    const interrupted = start();
+    interrupted.other.x = interrupted.dora.x + 50;
+    for (let t = 0; t < 20; t++)
+      interrupted.match.step({}, t === 0 ? { punch: true } : {});
+    expect(interrupted.dora.hp).toBeLessThan(600);
+    expect(interrupted.dora.stock).toBe(3);
+    expect(interrupted.dora.branch).not.toBe(356);
+    expect(byKey({ command: 2 }, { stock: 2 }).mine).toEqual([290, 'idle']);
+  });
+
+  it.each([296, 305, 327, 338])(
+    'cannot be hit during one-stock super %i',
+    (action) => {
+      const key = (
+        {
+          296: 'getterBeam',
+          305: 'musashi',
+          327: 'changeAttack',
+          338: 'blackRush',
+        } as const
+      )[action as 296 | 305 | 327 | 338];
+      const { match, dora, other, steps } = doraPlayer(90);
+      dora.stock = 1;
+      steps({}, 2);
+      steps({ [key]: true });
+      expect(dora.stock).toBe(0);
+      for (
+        let t = 0;
+        t < 800 && dora.action === 'script' && dora.branch !== 270;
+        t++
+      ) {
+        expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
+        other.x = dora.x + 50;
+        match.step({}, { punch: t % 60 === 0 });
+        expect(dora.hp).toBe(600);
+      }
+      // Pierce's shared landing recovery (270) ends casting and can be hit.
+      steps({}, 30);
+      expect(dora.action).toBe('idle');
+    },
+  );
+
+  it.each([90, 1000])(
+    'keeps Twin Hammer invincible through its cast (gap %i)',
+    (gap) => {
+      const { match, dora, steps } = doraPlayer(gap);
+      steps({}, 2);
+      steps({ crouch: true }, 6);
+      steps({ crouch: true, left: true }, 6);
+      steps({ left: true }, 6);
+      match.step({ punch: true }, { punch: true });
+      expect(dora.branch).toBe(252);
+      const entered = new Set();
+      for (let t = 0; t < 1000 && dora.action === 'script'; t++) {
+        entered.add(dora.branch);
+        expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
+        match.step({}, {});
+        expect(dora.hp).toBe(lifeOf('dora'));
+      }
+      expect(entered.has(254)).toBe(gap === 90);
+      expect(dora.action).toBe('idle');
+      expect(hurtboxes('idle', dora.age, 'dora').length).toBeGreaterThan(0);
+    },
+  );
+
+  it.each([250, 252, 254])(
+    'protects every Twin Hammer frame of action %i without losing its pushbox',
+    (action) => {
+      for (const frame of script(action, 'dora').frames)
+        expect(hurtboxes(action, frame.t, 'dora')).toEqual([]);
+      expect(pushboxes(action, 0, 'dora').length).toBeGreaterThan(0);
+    },
+  );
 
   it("pairs every victim action with Ryuko's", () => {
     const twins = CHARACTERS.dora.twins as Record<string, number>;
@@ -149,7 +296,7 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     });
   });
 
-  it('strikes with his four buttons, each two of the source six', () => {
+  it('punches and kicks standing, crouching and after a forward step', () => {
     expect(byKey({ punch: true })).toMatchObject({
       mine: [201, 'idle'],
       damage: 5,
@@ -157,14 +304,6 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(byKey({ kick: true })).toMatchObject({
       mine: [202, 'idle'],
       damage: 8,
-    });
-    expect(byKey({ hitUp: true })).toMatchObject({
-      mine: [203, 'idle'],
-      damage: 12,
-    });
-    expect(byKey({ dst: true })).toMatchObject({
-      mine: [204, 'idle'],
-      damage: 12,
     });
     expect(byKey({ punch: true, crouch: true })).toMatchObject({
       mine: [205, 'idle'],
@@ -174,15 +313,6 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       mine: [206, 'idle'],
       damage: 10,
     });
-    expect(byKey({ hitUp: true, crouch: true })).toMatchObject({
-      mine: [207, 'idle'],
-      damage: 15,
-    });
-    expect(byKey({ dst: true, crouch: true })).toMatchObject({
-      mine: [208, 'idle'],
-      damage: 12,
-    });
-    // → with LP or LK: SP1 6LP and SP2 6LK, dashing punches.
     expect(byKey({ punch: true, right: true })).toMatchObject({
       mine: [223, 'idle'],
       damage: 25,
@@ -191,27 +321,19 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       mine: [225, 'idle'],
       damage: 30,
     });
-    // LP's hit opens levels 22–50 (PC 2740), so LK, HP and HK cancel it, but
-    // not LP again.
     expect(
-      play(presses({ 0: { punch: true }, 8: { hitUp: true } })),
+      play(presses({ 0: { punch: true }, 8: { kick: true } })),
     ).toMatchObject({
-      mine: [201, 203, 'idle'],
-      damage: 17,
-    });
-    expect(
-      play(presses({ 0: { punch: true }, 8: { dst: true } })),
-    ).toMatchObject({
-      mine: [201, 204, 'idle'],
-      damage: 17,
+      mine: [201, 202, 'idle'],
+      damage: 13,
     });
     expect(
       play(presses({ 0: { punch: true }, 12: { punch: true } })).mine,
     ).toEqual([201, 'idle']);
   });
 
-  it('launches with ↘ HP, jumps after it on ↑, grabs with his chuck and dashes', () => {
-    const hitUp = { hitUp: true, right: true, crouch: true };
+  it('launches with K, jumps after it on ↑, grabs with his chuck and dashes', () => {
+    const hitUp = { hitUp: true };
     expect(byKey(hitUp)).toMatchObject({
       mine: [231, 232, 'idle'],
       damage: 15,
@@ -261,10 +383,10 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
           0: { jump: true },
           20: {},
           21: { jump: true },
-          40: { dst: true },
+          40: { kick: true },
         }),
       ).mine,
-    ).toEqual(['takeoff', 'jump', 11, 220, 'land', 'idle']);
+    ).toEqual(['takeoff', 'jump', 11, 214, 'land', 'idle']);
   });
 
   it('plays his keyed specials', () => {
@@ -299,17 +421,17 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     ];
     const first = (keys: Record<number, Input>) =>
       play(holding(keys)).mine.find((action) => typeof action === 'number');
-    // ↓↘→ HP: 機猫神空砲 HP.
-    expect(first({ 0: d, 6: df, 12: f, 18: { hitUp: true }, 19: {} })).toBe(
+    // ↓↘→ G: 機猫神空砲 HP.
+    expect(first({ 0: d, 6: df, 12: f, 18: { punch: true }, 19: {} })).toBe(
       260,
     );
-    // →↓↘ LP: 機猫神天翔 LP.
+    // →↓↘ G: 機猫神天翔 LP.
     expect(first({ 0: f, 6: d, 12: df, 18: { punch: true }, 19: {} })).toBe(
-      277,
+      278,
     );
-    // ↓ ↓ HK: 機猫神瞬移 HK.
-    expect(first({ 0: d, 6: {}, 12: d, 18: { dst: true }, 19: {} })).toBe(286);
-    // ↓↘→↓↘→ HP: 魔神空大砲.
+    // ↓ ↓ H: 機猫神瞬移 HK.
+    expect(first({ 0: d, 6: {}, 12: d, 18: { kick: true }, 19: {} })).toBe(286);
+    // ↓↘→↓↘→ G: 魔神空大砲.
     expect(
       first({
         0: d,
@@ -318,13 +440,46 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         18: d,
         24: df,
         30: f,
-        36: { hitUp: true },
+        36: { punch: true },
         37: {},
       }),
     ).toBe(296);
     // → → 60 ms apart: Dash F.
     expect(first({ 0: f, 6: {}, 12: f, 13: {} })).toBe(14);
   });
+
+  it.each([
+    ['cannon', ['d', 'df', 'f', 'd', 'df', 'f'], 'punch', 296],
+    ['gadgets', ['d', 'db', 'b', 'd', 'df', 'f'], 'punch', 305],
+    ['fists', ['d', 'db', 'b', 'd', 'db', 'b'], 'punch', 327],
+    ['pierce', ['d', 'df', 'f', 'd', 'db', 'b'], 'kick', 338],
+    ['FK', ['f', 'b', 'd', 'f'], 'kick', 356],
+  ] as const)(
+    'casts %s with its G/H motion ending, never J or K',
+    (_, motion, ending, action) => {
+      const directions: Record<string, Input> = {
+        d: { crouch: true },
+        df: { crouch: true, right: true },
+        f: { right: true },
+        db: { crouch: true, left: true },
+        b: { left: true },
+      };
+      const cast = (button: 'punch' | 'kick' | 'throw' | 'hitUp') => {
+        const { dora, steps } = doraPlayer(500);
+        dora.stock = 5;
+        steps({}, 2);
+        for (const direction of motion) steps(directions[direction], 6);
+        steps({ [button]: true });
+        return dora;
+      };
+      expect(cast(ending).branch).toBe(action);
+      for (const button of ['throw', 'hitUp'] as const) {
+        const f = cast(button);
+        expect(f.branch).not.toBe(action);
+        expect(f.stock).toBe(5);
+      }
+    },
+  );
 
   it('spends his stocks on his supers', () => {
     // His block's decay (+0x7ca8) takes 2% of each hit's damage per hit the
@@ -525,13 +680,13 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
   });
 
   it('plays his own CPU table in Vs. CPU', () => {
-    // 421's box 9870 down meets Ryuko's object 39, 9900 down, into its hit
-    // handler 421 + 28 (0x40f010 tests every box against objects' bodies).
+    // Authored inputs choose one G/H variant; the CPU still charges,
+    // teleports and completes its supers through the same command scan.
     for (const [seed, wanted] of [
-      [4, [283, 421, '421+28', 245, 284, 241, 252, 254, 296]],
-      [37, [286, 356, 327]],
-      [2, [305]],
-      [15, [204, 338]],
+      [4, [421, 245, 241, 285, 296]],
+      [37, [286, 305, 296]],
+      [2, [347, 348]],
+      [15, [338, 342, 347, 348]],
     ] as const) {
       const match = new Match('cpu', true, seed, ['ryuko', 'dora']);
       const dora = match.fighters[1];
@@ -630,22 +785,22 @@ describe("DoraEmon's story (authored)", () => {
   // Steps 5, 11, 13, 15, 19 and 21 give his KO to the last fighter whose box
   // met his (KO scorer 0); KO'd from FIGHT, before any has, nobody scores it.
   it('revives through KO RELOAD in a brawl when nobody has caught him, spending three stocks for 600 life', () => {
-    const result = lose(5, 4, (m) => m.fighters[0].hp === 600);
+    const result = lose(5, 4, (m) => m.fighters[0].hp >= 600);
     expect(result).toMatchObject({ g3: 0, atFight: 'idle', stock: 1, hp: 600 });
     const reload = result.path.indexOf('72');
     expect(reload).toBeGreaterThanOrEqual(0);
     expect(result.path.indexOf('74')).toBeGreaterThan(reload);
   });
 
-  it("draws a brawl when KO'd with fewer than three stocks before anyone has caught him", () => {
-    expect(lose(5, 0).winner).toBe('draw');
+  it("loses a brawl when KO'd with fewer than three stocks before anyone has caught him", () => {
+    expect(lose(5, 0).winner).toBe('opponent');
   });
 
-  it('loses a brawl once a fighter has caught him, who scores his KO', () => {
-    const result = lose(5, 4, undefined, true);
-    expect(result).toMatchObject({ winner: 'opponent', stock: 4 });
+  it('keeps a brawl running through KO RELOAD even after an enemy scores 100', () => {
+    const result = lose(5, 4, (m) => m.fighters[0].stock < 4, true);
+    expect(result).toMatchObject({ winner: null, stock: 1 });
     expect(result.path).toContain('72');
-    expect(result.path).not.toContain('74');
+    expect(result.path).toContain('74');
     expect(Math.max(...result.points.slice(1))).toBeGreaterThanOrEqual(100);
   });
 

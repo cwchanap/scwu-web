@@ -146,7 +146,33 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
       ...dora.commands,
       entries: dora.commands.entries.map((entry, i) => ({
         ...entry,
-        window: DORA_WINDOWS[i] ?? entry.window,
+        window: [30, 34, 35].includes(i)
+          ? 0
+          : (DORA_WINDOWS[i] ?? entry.window),
+        // One G/H ending per motion; the strong variant wins in table order.
+        steps:
+          i === 0
+            ? [0x3081, 0x3081, 0x3002, 0x3010, 0x2080] // G G → H G
+            : i < 24
+              ? entry.steps.map((step, k) =>
+                  k === entry.steps.length - 1
+                    ? (step & ~0x3f0) | (step & 0x180 ? 0x80 : 0x10)
+                    : step,
+                )
+              : ((
+                  {
+                    29: [0x2100], // J: throw
+                    30: [0x2080],
+                    31: [0x2020], // K: launcher
+                    32: [0x2012],
+                    33: [0x2082],
+                    34: [0x2080],
+                    35: [0x2010],
+                    36: [0x2080],
+                    37: [0x2010],
+                    38: [0xa200],
+                  } as Record<number, number[]>
+                )[i] ?? entry.steps),
       })),
     },
     rario: rario.commands,
@@ -163,18 +189,11 @@ const BUTTONS: Partial<Record<Control, number>> = {
   punch: 0x80,
   throw: 0x100,
 };
-// Authored: DoraEmon's attacks each take two of the source's six buttons
-// (A–F, bits 4–9, 0x414340), which no two keys press on one tick, so his
-// keys press both: G LP (C, D), H LK (A, B), K HP (D, E), J HK (B, C), O
-// his chuck (C, D, E) and E, held, EN (E, F).
+// Authored: DoraEmon uses the shared G/H/J/K layout and E to charge.
 const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {
   dora: {
-    punch: 0xc0,
-    kick: 0x30,
-    hitUp: 0x180,
-    dst: 0x60,
-    throw: 0x1c0,
-    ex: 0x300,
+    ...BUTTONS,
+    ex: 0x200,
   },
 };
 export const buttonsOf = (who: Who) => OWN_BUTTONS[who] ?? BUTTONS;

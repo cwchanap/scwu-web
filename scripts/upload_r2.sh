@@ -39,9 +39,9 @@ aws s3 sync public/assets "s3://$R2_BUCKET/" --endpoint-url "$endpoint" --only-s
 tarball=$(mktemp)
 fixtures=$(mktemp)
 trap 'rm -f "$tarball" "$fixtures"' EXIT
-COPYFILE_DISABLE=1 tar -czf "$fixtures" -C src/game/__fixtures__ .
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$fixtures" -C src/game/__fixtures__ .
 aws s3 cp "$fixtures" "s3://$R2_BUCKET/fixtures.tar.gz" --endpoint-url "$endpoint" \
   --cache-control no-cache
-COPYFILE_DISABLE=1 tar -czf "$tarball" -C src/game/generated .
+COPYFILE_DISABLE=1 tar --no-xattrs -czf "$tarball" -C src/game/generated .
 aws s3 cp "$tarball" "s3://$R2_BUCKET/generated.tar.gz" --endpoint-url "$endpoint" \
   --cache-control no-cache
