@@ -1207,9 +1207,10 @@ export interface Fighter {
   // +0xdfbb: a story's points, which KOs (knockOut) and a time-up
   // (storyResult) score; 100 ends the round (0x408ef1).
   points: number;
-  // Authored: the round controller saw this fighter at 0 life — a brawl's
-  // win counts a revived hostile once it has fallen, not while it stands
-  // again.
+  // Authored: this fighter has fallen to 0 life — knockOut marks it even
+  // when its lose action revives it before the run loop can read the 0; a
+  // brawl's win counts a revived hostile once it has fallen, not while it
+  // stands again.
   downed: boolean;
   // Priority (+4): the step and the draw take it at the tick's start. Each
   // contact and ops 0x07/0x14 set it about its plane's base (0x41f130), and
@@ -2385,6 +2386,11 @@ export class Match {
   // slot's +0xf to that slot's +0x12; and that slot's KO bonus (bits 7–8)
   // gives its life and power (+0x10, +0x11) to the 1P (1) or the striker (2).
   private knockOut(f: Fighter) {
+    // The fall counts from the KO: a lose action that restores life on its
+    // first step (DoraEmon's KO RELOAD takes him to 1, PC 833; ALPHA's KO
+    // Boss, PC 1037) is never seen at 0 by the run loop, which keeps its
+    // check for lives emptied outside this routine.
+    f.downed = true;
     this.queue(f, 'down');
     const { battle } = this;
     if (!battle) return;
@@ -5068,6 +5074,8 @@ export class Match {
     // A hostile that has fallen counts for the brawl even after it rises:
     // ZAKU and PAC-HELO get back up about 5 s after a KO (global 4 = 70,
     // ZAKU also 50), so all-dead-at-once barely happens in those brawls.
+    // knockOut marks the fall at the KO; this catches lives emptied without
+    // it.
     for (const f of this.fighters) f.downed ||= !f.hp;
     const over = this.battle
       ? !one.hp ||
