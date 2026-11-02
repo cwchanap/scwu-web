@@ -208,7 +208,6 @@
       dora: {
         punch: 'HP',
         kick: 'LK',
-        hitUp: 'HK',
         throw: 'Chuck',
         ex: 'EN',
         iori: 'Charge',
