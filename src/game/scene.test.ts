@@ -288,6 +288,24 @@ it('opens a story demo once its records and art finish loading', async () => {
   expect(view.loading).toBe(false);
 });
 
+it('starts a menu reset over a finished select, not the screen it replays', () => {
+  const { scene, view, artIn } = boot();
+  artIn();
+  // SHIN-Z's story select confirmed: his opening demo starts loading while
+  // the finished screen stays.
+  const select = new CharacterSelect(undefined, true);
+  view.select = select;
+  select.done = ['shinz', 'shinz'];
+  stepSelect(view);
+  expect(view.loading).toBe(true);
+  // Vs. CPU picked in the Menu: the demo load drops and the finished select
+  // goes with it, so closing the Menu can't replay the story pick.
+  scene.reset('cpu');
+  expect(view.select).toBeNull();
+  expect(view.loading).toBe(false);
+  expect(scene.match.mode).toBe('cpu');
+});
+
 it('reports music on by default and follows setMusic', () => {
   const { scene, view, statuses } = boot();
   (view.report as () => void)();

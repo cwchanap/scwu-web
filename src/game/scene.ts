@@ -582,8 +582,11 @@ export class TrainingScene extends Phaser.Scene {
   // Only the last match asked for starts.
   private whenReady(match: Match, then: () => void) {
     this.wanted = match;
-    // A match start likewise supersedes a demo load still in flight.
+    // A match start likewise supersedes a demo load still in flight, and a
+    // screen that already finished: its pick must not replay once a dialog
+    // closes. An unfinished screen keeps its say.
     this.demoRequest = undefined;
+    if (this.select?.done) this.leaveScreen();
     const players = new Set([
       ...match.fighters.map((f) => f.who),
       ...(match.teams?.flat() ?? []),
