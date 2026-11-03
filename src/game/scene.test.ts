@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import { Match } from './match';
@@ -17,6 +17,10 @@ vi.mock('phaser', () => ({
 }));
 
 import { TrainingScene } from './scene';
+
+// Tests share globals between files (isolate: false), so every stubbed one
+// is restored after each test.
+afterEach(() => vi.unstubAllGlobals());
 
 // A TrainingScene mid-match (no screen) with the systems a Phaser boot
 // injects stubbed; `load.once(COMPLETE)` captures the callback so a test
@@ -74,7 +78,8 @@ const boot = () => {
   };
 };
 
-// The Escape keydown, and one screen step through the scene's dispatcher.
+// The Escape and R keydowns, and one screen step through the scene's
+// dispatcher.
 const esc = (view: { [key: string]: unknown }) =>
   (view.keydown as (e: unknown) => void)({
     code: 'Escape',
@@ -82,10 +87,17 @@ const esc = (view: { [key: string]: unknown }) =>
     target: {},
     preventDefault: () => {},
   });
+const r = (view: { [key: string]: unknown }) =>
+  (view.keydown as (e: unknown) => void)({
+    code: 'KeyR',
+    repeat: false,
+    target: {},
+    preventDefault: () => {},
+  });
 const stepSelect = (view: { [key: string]: unknown }) =>
   (view.stepSelect as (input: object) => void)({});
 
-it('keeps the pause a match was under when Settings changes the fighter', () => {
+it('keeps the pause a match was under when the menu changes the fighter', () => {
   const { scene, artIn } = boot();
   artIn();
   scene.togglePause();
@@ -97,7 +109,7 @@ it('keeps the pause a match was under when Settings changes the fighter', () => 
   expect(scene.paused).toBe(true);
 });
 
-it('keeps the pause for a fighter whose art is still loading when Settings closes', () => {
+it('keeps the pause for a fighter whose art is still loading when the menu closes', () => {
   const { scene, view, finishLoad } = boot();
   scene.togglePause();
   scene.setModal(true);
@@ -109,7 +121,7 @@ it('keeps the pause for a fighter whose art is still loading when Settings close
   expect(scene.paused).toBe(true);
 });
 
-it('leaves an unpaused match unpaused across a Settings change', () => {
+it('leaves an unpaused match unpaused across a menu change', () => {
   const { scene, artIn } = boot();
   artIn();
   scene.setModal(true);
@@ -118,7 +130,7 @@ it('leaves an unpaused match unpaused across a Settings change', () => {
   expect(scene.paused).toBe(false);
 });
 
-it('restores the pause when Settings closes without changing anything', () => {
+it('restores the pause when the menu closes without changing anything', () => {
   const { scene } = boot();
   scene.togglePause();
   scene.setModal(true);
@@ -126,7 +138,7 @@ it('restores the pause when Settings closes without changing anything', () => {
   expect(scene.paused).toBe(true);
 });
 
-it('lets a toolbar reset unpause, as before', () => {
+it('lets a menu reset unpause, as before', () => {
   const { scene, artIn } = boot();
   artIn();
   scene.togglePause();
@@ -152,7 +164,7 @@ it('keeps a pause taken while the dialog is up', () => {
   expect(scene.paused).toBe(true);
 });
 
-it('drops a Settings reset still loading when the character select opens', () => {
+it('drops a menu reset still loading when the character select opens', () => {
   const { scene, view, finishLoad } = boot();
   scene.togglePause();
   scene.setModal(true);
@@ -176,7 +188,7 @@ it('keeps a pause taken while a reset is still loading', () => {
   expect(scene.paused).toBe(true);
 });
 
-it('keeps a resume pressed while a Settings reset is still loading', () => {
+it('keeps a resume pressed while a menu reset is still loading', () => {
   const { scene, finishLoad } = boot();
   scene.togglePause();
   scene.setModal(true);
@@ -286,6 +298,85 @@ it('opens a story demo once its records and art finish loading', async () => {
   finishLoad();
   expect(view.select).toBeInstanceOf(StoryDemo);
   expect(view.loading).toBe(false);
+});
+
+it('keeps the finished select up until the match it chose begins', () => {
+  const { scene, view, finishLoad } = boot();
+  const select = new CharacterSelect();
+  view.select = select;
+  select.done = ['kiki', 'zoma'];
+  stepSelect(view);
+  // The pair's art loads while the finished screen stays; dropping it
+  // early would leave the old match's frozen frame up through the load.
+  expect(view.select).toBe(select);
+  expect(view.loading).toBe(true);
+  finishLoad();
+  expect(view.select).toBeNull();
+  expect(scene.match.mode).toBe('practice');
+  expect(scene.match.fighters.map((f) => f.who)).toEqual(['kiki', 'zoma']);
+});
+
+it('returns to the title on R while a lost story’s continue loads', async () => {
+  vi.stubGlobal('HTMLElement', class {});
+  const { view, finishLoad } = boot();
+  // A story battle lost: matchOver's Continue screen is still loading with
+  // no screen up yet.
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', { ...first.battle, flags: 1 }, 0);
+  (view.matchOver as () => void)();
+  expect(view.loading).toBe(true);
+  // R must not replay the finished battle; the title is the way back.
+  r(view);
+  expect(view.select).toBeInstanceOf(Title);
+  await vi.dynamicImportSettled();
+  await new Promise((resolve) => setTimeout(resolve));
+  finishLoad();
+  expect(view.select).toBeInstanceOf(Title);
+});
+
+it('starts free practice on a stage picked over a finished story, not the battle left', () => {
+  const { scene, view, artIn } = boot();
+  artIn();
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', first.battle, 0);
+  // The battle was left for the select screen; the session is over, so a
+  // Menu pick can't restart it.
+  scene.openSelect();
+  scene.setStage('park');
+  expect(scene.match.mode).toBe('practice');
+  expect(scene.match.battle).toBeNull();
+});
+
+it('drops a playing story demo once a menu pick’s match begins', async () => {
+  const { scene, view, completes, finishLoad } = boot();
+  const select = new CharacterSelect(undefined, true);
+  view.select = select;
+  select.done = ['shinz', 'shinz'];
+  stepSelect(view);
+  await vi.waitFor(() => expect(completes).toHaveLength(1));
+  finishLoad();
+  expect(view.select).toBeInstanceOf(StoryDemo);
+  // Vs. CPU in the Menu: the demo stays through the load, then goes with
+  // the match start so the story runner can't replace it after.
+  scene.reset('cpu');
+  expect(view.select).toBeInstanceOf(StoryDemo);
+  expect(view.loading).toBe(true);
+  finishLoad();
+  expect(view.select).toBeNull();
+  expect(scene.match.mode).toBe('cpu');
+});
+
+it('reports the requested match’s mode while it loads', () => {
+  const { scene, statuses } = boot();
+  scene.reset('cpu');
+  expect(statuses.at(-1)?.mode).toBe('cpu');
+  expect(scene.match.mode).toBe('practice');
 });
 
 it('starts a menu reset over a finished select, not the screen it replays', () => {
