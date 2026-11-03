@@ -54,19 +54,17 @@ export interface GameStatus {
   hp: [number, number];
   life: [number, number];
   seconds: number;
-  hits: number;
-  damage: number;
   action: string;
   winner: Match['winner'];
   matchWinner: Match['winner'];
-  resultReady: boolean;
   error: string;
   // On the title or the character select screen, and the pair it last chose.
   selecting: boolean;
   fighters: [Who, Who];
   // In a story battle.
   story: boolean;
-  // The match's mode: TEAM VS's is always Vs. CPU.
+  // The running — or still loading — match's mode: TEAM VS's is always
+  // Vs. CPU.
   mode: Mode;
   // The scene's music toggle.
   music: boolean;
@@ -77,12 +75,9 @@ export const initialStatus: GameStatus = {
   hp: [LIFE, LIFE],
   life: [LIFE, LIFE],
   seconds: Infinity,
-  hits: 0,
-  damage: 0,
   action: 'idle',
   winner: null,
   matchWinner: null,
-  resultReady: false,
   error: '',
   selecting: true,
   fighters: ['ryuko', 'zoma'],
@@ -188,7 +183,7 @@ export class TrainingScene extends Phaser.Scene {
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
   paused = false;
-  // The settings dialog's own hold on the game: App sets and clears it rather
+  // The menu dialog's own hold on the game: App sets and clears it rather
   // than toggling the pause state, so a screen's or a reset's unpause can't
   // let a tick through while it is open.
   private modal = false;
@@ -231,8 +226,6 @@ export class TrainingScene extends Phaser.Scene {
   private music = true;
   private cue?: { index: number; filename: string; loop: boolean };
   private track?: Phaser.Sound.BaseSound;
-  // The character select screen (select.ts) the game opens on, and returns
-  // to from the toolbar, before the match it chooses.
   // The title, which the game opens on, then the select screen, or story
   // mode's demos and continue screen.
   private select: Title | CharacterSelect | StoryDemo | Continue | null =
@@ -352,7 +345,9 @@ export class TrainingScene extends Phaser.Scene {
         this.open(
           new CharacterSelect(undefined, this.select.story, this.select.team),
         );
-      else if (this.select) this.openTitle();
+      // A screen loading is one for R's purposes: returning to the title is
+      // the only move left — a reset would replay the battle it just left.
+      else if (this.select || this.demoRequest) this.openTitle();
       else this.reset(this.match.mode);
   };
   private keyup = (e: KeyboardEvent) => {
@@ -487,11 +482,9 @@ export class TrainingScene extends Phaser.Scene {
     this.teams = select.team ? select.teams : null;
     this.palettes = battlePalettes(select.palettes);
     // Authored: the pair plays in the mode the match it replaces was in —
-    // except a story battle's, whose session ended once a screen opened
-    // past it, so the picks start in free practice rather than restarting
-    // the battle they left.
-    const mode = this.match.mode === 'story' ? 'practice' : this.match.mode;
-    this.reset(this.teams ? 'cpu' : mode, true);
+    // a story battle's resolves to free practice inside reset, the session
+    // having ended once a screen opened past it.
+    this.reset(this.teams ? 'cpu' : this.match.mode);
   }
 
   private leaveScreen() {
@@ -522,10 +515,7 @@ export class TrainingScene extends Phaser.Scene {
       this.globals,
     );
     const wasPaused = this.paused;
-    this.whenReady(match, () => {
-      this.leaveScreen();
-      this.begin(match, this.paused && !wasPaused);
-    });
+    this.whenReady(match, () => this.begin(match, this.paused && !wasPaused));
   }
 
   // A won Vs. match returns to the select screen (state 902 spawns object
@@ -582,11 +572,13 @@ export class TrainingScene extends Phaser.Scene {
   // Only the last match asked for starts.
   private whenReady(match: Match, then: () => void) {
     this.wanted = match;
-    // A match start likewise supersedes a demo load still in flight, and a
-    // screen that already finished: its pick must not replay once a dialog
-    // closes. An unfinished screen keeps its say.
+    // A match start likewise supersedes a demo load still in flight. The
+    // screen stays until the match begins — dropping it early would leave
+    // the previous match's frozen frame up through the load — then leaves
+    // for it, done or not: a menu pick supersedes a screen mid-choice, and
+    // a finished one must go with it so a dialog closing can't replay its
+    // pick.
     this.demoRequest = undefined;
-    if (this.select?.done) this.leaveScreen();
     const players = new Set([
       ...match.fighters.map((f) => f.who),
       ...(match.teams?.flat() ?? []),
@@ -597,6 +589,7 @@ export class TrainingScene extends Phaser.Scene {
       if (this.wanted !== match) return;
       this.loading = false;
       this.unloadPlayers(players);
+      this.leaveScreen();
       then();
     };
     const { stage } = match;
@@ -610,6 +603,9 @@ export class TrainingScene extends Phaser.Scene {
     for (const who of missing) this.loadPlayer(who, true);
     this.load.once(Phaser.Loader.Events.COMPLETE, start);
     this.load.start();
+    // The request just changed; a pick mid-load reads its mode, not the
+    // match it replaces.
+    this.report();
   }
   // A player's images and sounds: all of them, or its select screens'. The
   // loader skips those already in.
@@ -719,12 +715,14 @@ export class TrainingScene extends Phaser.Scene {
     for (const image of STAGES[stage].images)
       this.load.image(`${stage}-${image.index}`, BASE + image.filename);
   }
-  // `leave` closes the screen that chose the match once it starts.
-  reset(mode: Mode, leave = false) {
-    // A story battle starts over.
+  reset(mode: Mode) {
+    // A story battle starts over — while it is live. Authored: the session
+    // ends once a screen, or a screen's load, sits past it, so 'story' then
+    // resolves to free practice rather than restarting the battle left.
     if (mode === 'story') {
-      if (this.match.battle) this.startBattle(this.match.battle);
-      return;
+      if (this.match.battle && !this.select && !this.demoRequest)
+        return this.startBattle(this.match.battle);
+      mode = 'practice';
     }
     // Vs. CPU rounds open with the recovered walk-in; practice starts at once.
     // Authored: free practice and the CPU match no select screen chose keep
@@ -749,23 +747,22 @@ export class TrainingScene extends Phaser.Scene {
             undefined,
             vs ? this.globals : undefined,
           );
-    // A reset the settings dialog asked for keeps the pause it finds when
-    // the load ends — a resume pressed while it runs stands; the toolbar's
-    // and a screen's start unpaused.
+    // A reset the menu dialog asked for keeps the pause it finds when the
+    // load ends — a resume pressed while it runs stands; the menu's and a
+    // screen's start unpaused.
     const keep = this.modal;
     // A pause taken while the match loads (a window blur) is kept too.
     const wasPaused = this.paused;
-    this.whenReady(match, () => {
-      if (leave) this.leaveScreen();
-      this.begin(match, keep ? this.paused : this.paused && !wasPaused);
-    });
+    this.whenReady(match, () =>
+      this.begin(match, keep ? this.paused : this.paused && !wasPaused),
+    );
   }
   private begin(match: Match, paused = false) {
     this.match = match;
     this.roundPalettes();
     this.match.practice = { ...this.practice };
-    // A match the toolbar restarts behind a screen leaves its sounds playing.
-    if (!this.select) this.sound.stopAll();
+    // A match starting clears every sound the screen or the old match left.
+    this.sound.stopAll();
     this.cue = undefined;
     this.shake = { x: still(), y: still() };
     this.quake = this.match.quake;
@@ -1349,8 +1346,6 @@ export class TrainingScene extends Phaser.Scene {
       hp: [a.hp, b.hp],
       life: [lifeOf(a.who), lifeOf(b.who)],
       seconds: this.match.seconds,
-      hits: a.hits,
-      damage: a.damage,
       // Zoma's moves are source actions, named by number.
       action:
         a.action === 'script'
@@ -1358,12 +1353,13 @@ export class TrainingScene extends Phaser.Scene {
           : a.action.replace(/([A-Z])/g, ' $1'),
       winner: this.match.winner,
       matchWinner: over ? this.match.matchWinner : null,
-      resultReady: over,
       error: this.error,
       selecting: !!this.select,
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
-      mode: this.match.mode,
+      // The requested match's mode while it loads, so a pick mid-load
+      // compares against what is coming, not the match it replaces.
+      mode: this.wanted?.mode ?? this.match.mode,
       music: this.music,
     };
     const serialized = JSON.stringify(status);

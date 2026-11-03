@@ -25,29 +25,28 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(menu).toBeEnabled();
 
   const health = page.locator('[aria-label="Match health"]');
-  // Through the title menu to a battle: a button opens the menu, down picks
-  // VS single, a button chooses. Both select cursors rest on Ryuko, so two
-  // button presses pick Ryuko vs Ryuko — already loaded, so the battle starts
-  // in about a second. The screens draw no DOM, so the presses are spaced by
-  // a few ticks each and the third covers a press that lands before the
-  // cursors arm.
-  await page.waitForTimeout(200);
-  await page.keyboard.press('g');
-  await page.waitForTimeout(300);
-  await page.keyboard.press('s');
-  await page.waitForTimeout(300);
-  await page.keyboard.press('g');
-  await page.waitForTimeout(300);
-  for (let i = 0; i < 3; i++) {
-    await page.keyboard.press('g');
-    await page.waitForTimeout(250);
-  }
-  // The battle's life meters announce it: Zoma's 490 becomes a second
-  // Ryuko's 510. begin() clears the held keys, so the direction goes down
-  // only now — a held key walks her, taking the action off 'idle'; the
-  // menu's modal then freezes it mid-walk, so an R that reached the window
-  // handler would show a reset ('walk' → 'idle').
-  await expect(health).toContainText('510 510', { timeout: 15_000 });
+  // Through the title menu to a battle: a button skips T2 to its menu, down
+  // picks VS single, a button chooses, and both select cursors rest on
+  // Ryuko, so two more buttons start Ryuko vs Ryuko. The screens draw no
+  // DOM to wait on, and presses landing on one 10 ms tick collapse, so the
+  // run is retried from a reload — which also reseats the menu cursor —
+  // until the battle's life meters announce it: Zoma's 490 becomes a
+  // second Ryuko's 510.
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+  // begin() clears the held keys, so the direction goes down only now — a
+  // held key walks her, taking the action off 'idle'; the menu's modal then
+  // freezes it mid-walk, so an R that reached the window handler would show
+  // a reset ('walk' → 'idle').
   await page.keyboard.down('d');
   await expect(health).toContainText(/Action: (back)?walk/);
 
@@ -55,8 +54,8 @@ test('boots into a ready arena', async ({ page }) => {
   await page.keyboard.up('d');
   const dialog = page.getByRole('dialog', { name: 'Menu' });
   await expect(dialog).toBeVisible();
-  // Tailwind's preflight zeroes the margin the UA centers a modal dialog
-  // with; m-auto restores it at desktop and mobile sizes.
+  // m-auto centers the modal at desktop and mobile sizes rather than
+  // trusting the UA margin, which a base reset would zero.
   const centered = async () => {
     const box = (await dialog.boundingBox())!;
     const { width, height } = page.viewportSize()!;

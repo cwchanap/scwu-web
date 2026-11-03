@@ -1,9 +1,9 @@
 // Ports of the title (0x4080a0), the character select screen (object type
 // 10, 0x406fc0) as VS single (mode 1), VS multi (2) and story mode (0) run
 // it, a story's demos (type 16, 0x406c10) and the continue screen (13,
-// 0x4084f0): their demos (T1 and T2, CHAR SELECT, TEAM VS, the story's,
-// CONTINUE), the KGT cursors and each hovered player's select face, run from
-// their raw records.
+// 0x4084f0): their demos (T2 — T1's intro is skipped (authored) — CHAR
+// SELECT, TEAM VS, the story's, CONTINUE), the KGT cursors and each hovered
+// player's select face, run from their raw records.
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import type { Color } from './animations';
@@ -12,7 +12,6 @@ import { rand } from './standing';
 import type { Frame } from './standing';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
-import t1 from './generated/t1.json';
 import t2 from './generated/t2.json';
 
 type Records = number[][];
@@ -24,7 +23,7 @@ export interface Demo {
   flags: number;
   duration: number;
 }
-const DEMOS: Record<'select' | 't1' | 't2', Demo> = { select, t1, t2 };
+const DEMOS: Record<'select' | 't2', Demo> = { select, t2 };
 // A story's demos load as they play (scene.ts), each its own container.
 export type SelectContainer =
   keyof typeof DEMOS | `demo${number}` | 'kgt' | Who;
@@ -627,17 +626,14 @@ let place = 0;
 
 // The title (0x4080a0) by its state (+0x152): 0 loads T1, 1 plays it, 2 loads
 // T2, 3 waits for a press, 4 sets up the menu and 5 runs it. Authored: the
-// port opens on T2, skipping T1's states 0 and 1.
+// port opens on T2, skipping T1's states 0 and 1, and its countdown back to
+// T1 (+0x15e) with them — the menu just waits for a pick.
 export class Title extends Screen {
   state = 2;
   // The menu's modes, by MODES' index.
   items: number[] = [];
   // The mode chosen (0x470058).
   done: (typeof MODES)[number] | null = null;
-  // T2's countdown back to T1 (+0x15e).
-  private countdown = 0;
-  // The loaded demo's ticks left (0x424f08).
-  private left = 0;
   private cursor: SelectObject | null = null;
   // A menu move or choice waits for every key to be let go (+8).
   private latch = false;
@@ -656,15 +652,13 @@ export class Title extends Screen {
     switch (this.state) {
       case 2:
         // T1's action 2 zeroed globals 0–15 (op 0x1f set records); skipping the
-        // intro keeps its clear at T2's start, restart included (authored).
+        // intro keeps its clear at T2's start (authored).
         this.globals.fill(0, 0, 16);
-        this.left = this.load('t2').duration;
-        this.countdown = this.left;
+        this.load('t2');
         this.state = TITLE.flags & 0x40 ? 3 : 4;
         return;
       case 3:
         if (pressed) this.state = 4;
-        else if (this.countdown && --this.countdown === 0) this.restart();
         return;
       case 4:
         this.items = [4, 8, 0x10].flatMap((bit, mode) =>
@@ -686,14 +680,6 @@ export class Title extends Screen {
     } else if (pressed & BUTTONS && !this.latch)
       this.done = MODES[this.items[place]];
     [this.cursor!.x, this.cursor!.y] = TITLE.items[this.items[place]];
-    // T2 lasts until a press, so no countdown returns the menu to T1.
-    if (this.countdown && --this.countdown === 0) this.restart();
-    if (now) this.countdown = this.left;
-  }
-
-  private restart() {
-    for (const o of this.objects) o.alive = false;
-    this.state = 2;
   }
 }
 

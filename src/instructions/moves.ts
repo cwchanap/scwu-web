@@ -153,7 +153,7 @@ export const FACES: Record<Who, string> = {
 };
 
 // The rules every page shares, rendered ahead of the fighter's own sections:
-// the select screen's keys, the settings modal's options and the global keys.
+// the select screen's keys, the menu dialog's options and the global keys.
 export const SHARED: FighterGuide['sections'] = [
   {
     title: 'How to play',
@@ -164,13 +164,13 @@ export const SHARED: FighterGuide['sections'] = [
         name: 'Character select',
         input:
           '<kbd>A</kbd><kbd>D</kbd><kbd>W</kbd><kbd>S</kbd><span class="sep">+</span>any attack',
-        desc: "The game opens on the original's select screen. A direction held repeats after half a second; any attack key chooses the 1P fighter, then the same keys pick the opponent. A GATE LOCK cell can't be chosen, though DoraEmon's can. A won Vs. CPU match returns here, and Character select in Settings opens it again.",
+        desc: "VS on the title's menu opens the original's select screen. A direction held repeats after half a second; any attack key chooses the 1P fighter, then the same keys pick the opponent. A GATE LOCK cell can't be chosen, though DoraEmon's can. A won Vs. CPU match returns here, and Character select in the Menu opens it again.",
         cost: 0,
       },
       {
-        name: 'Settings',
-        input: 'gear button',
-        desc: 'The fighter, opponent and stage pickers and the mode switch each take effect at once, starting a fresh match. Free practice has no timer; its partner can stand, guard high, low or in the air, attack in range, jump in or play as the original CPU. <b>Max stock</b> refills your supers while you stand idle, <b>Low health</b> keeps you just under 30% for desperation moves. Vs. CPU is the original CPU playing the opponent’s own moves and supers.',
+        name: 'Menu',
+        input: 'Menu button',
+        desc: 'The fighter, opponent and stage pickers and the Opponent mode select each take effect at once, starting a fresh match. Free practice has no timer; its partner can stand, guard high, low or in the air, attack in range, jump in or play as the original CPU. <b>Max stock</b> refills your supers while you stand idle, <b>Low health</b> keeps you just under 30% for desperation moves. Vs. CPU is the original CPU playing the opponent’s own moves and supers.',
         cost: 0,
       },
       {

@@ -47,7 +47,7 @@
     airGuard: 'Air guard',
     attack: 'Attack',
     jumpIn: 'Jump in',
-    cpu: 'Original CPU',
+    cpu: 'CPU partner',
   };
   let status = $state<GameStatus>({
     ready: false,
@@ -55,12 +55,9 @@
     hp: [510, 490],
     life: [510, 490],
     seconds: Infinity,
-    hits: 0,
-    damage: 0,
     action: 'idle',
     winner: null,
     matchWinner: null,
-    resultReady: false,
     error: '',
     selecting: true,
     fighters: ['ryuko', 'zoma'],
@@ -68,7 +65,7 @@
     mode: 'practice',
     music: true,
   });
-  let settingsOpen = $state(false);
+  let menuOpen = $state(false);
   let dialog: HTMLDialogElement;
   const asset = ASSET_BASE;
   const touchControls: { control: Control; label: string; symbol: string }[] = [
@@ -259,9 +256,9 @@
     };
   });
 
-  // Every setter calls this; keep focus inside the open settings modal.
+  // Every setter calls this; keep focus inside the open menu dialog.
   function focusArena() {
-    if (settingsOpen) return;
+    if (menuOpen) return;
     (session?.game.canvas ?? host).focus({ preventScroll: true });
   }
   // Restart the match in the picked mode — 'practice' or 'cpu' is all
@@ -283,6 +280,12 @@
   // 'story' while a story battle runs.
   const opponentChoice = $derived(
     opponentChoiceOf(status.mode, practice.partner),
+  );
+  const pairDisabled = $derived(
+    !status.ready || status.selecting || status.story,
+  );
+  const optionsDisabled = $derived(
+    !status.ready || opponentChoice === 'vsCpu' || opponentChoice === 'story',
   );
   function setOpponentChoice(value: string) {
     const partner = DUMMY_BEHAVIORS.find((b) => b === value);
@@ -309,16 +312,16 @@
     session?.scene.togglePause();
     focusArena();
   }
-  function openSettings() {
+  function openMenu() {
     // The scene holds the modal's freeze, so a reset's unpause can't slip a
     // tick through and a select screen after a match freezes too.
     session?.scene.setModal(true);
-    settingsOpen = true;
+    menuOpen = true;
     dialog.showModal();
   }
   // close fires on every path (Close button, Character select, native Esc).
-  function settingsClosed() {
-    settingsOpen = false;
+  function menuClosed() {
+    menuOpen = false;
     session?.scene.setModal(false);
     focusArena();
   }
@@ -393,7 +396,7 @@
             <h2>Loading SCWU…</h2>
             <p>Opening {stageLabels[stage]}.</p>
           </div>
-        {:else if status.paused && !settingsOpen}
+        {:else if status.paused && !menuOpen}
           <!-- status.paused includes the modal's freeze; the open dialog
                covers the overlay's unclickable Resume button. -->
           <div class="pause-overlay" aria-live="polite">
@@ -412,7 +415,7 @@
           class="absolute top-2 right-2 z-10 flex items-center gap-1.5 border border-[#8a6a2f] bg-[#141a20e6] px-3 py-2 font-bold italic text-[#ffd24a] hover:bg-[#241a0c] disabled:opacity-40"
           aria-haspopup="dialog"
           disabled={!status.ready}
-          onclick={openSettings}
+          onclick={openMenu}
         >
           <svg
             width="14"
@@ -471,7 +474,7 @@
     aria-label="Menu"
     tabindex="-1"
     onkeydown={(event) => event.stopPropagation()}
-    onclose={settingsClosed}
+    onclose={menuClosed}
   >
     <div>
       <div class="flex items-baseline justify-between">
@@ -501,11 +504,7 @@
         {/if}
         <optgroup label="Practice partner">
           {#each DUMMY_BEHAVIORS as behavior (behavior)}
-            <option value={behavior}
-              >{behavior === 'cpu'
-                ? 'CPU partner'
-                : partnerLabels[behavior]}</option
-            >
+            <option value={behavior}>{partnerLabels[behavior]}</option>
           {/each}
         </optgroup>
         <optgroup label="Match">
@@ -522,7 +521,7 @@
         <select
           class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
           value={fighter}
-          disabled={!status.ready || status.selecting || status.story}
+          disabled={pairDisabled}
           onchange={(event) => setFighter(event.currentTarget.value as Who)}
         >
           {#each ROSTER as { id, name } (id)}
@@ -538,7 +537,7 @@
         <select
           class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
           value={opponent}
-          disabled={!status.ready || status.selecting || status.story}
+          disabled={pairDisabled}
           onchange={(event) => setOpponent(event.currentTarget.value as Who)}
         >
           {#each ROSTER as { id, name } (id)}
@@ -582,9 +581,7 @@
           type="checkbox"
           class="size-4 accent-[#ffd24a] disabled:opacity-40"
           checked={practice.maxStock}
-          disabled={!status.ready ||
-            opponentChoice === 'vsCpu' ||
-            opponentChoice === 'story'}
+          disabled={optionsDisabled}
           onchange={(event) =>
             setPractice({ maxStock: event.currentTarget.checked })}
         />
@@ -595,9 +592,7 @@
           type="checkbox"
           class="size-4 accent-[#ffd24a] disabled:opacity-40"
           checked={practice.lowHealth}
-          disabled={!status.ready ||
-            opponentChoice === 'vsCpu' ||
-            opponentChoice === 'story'}
+          disabled={optionsDisabled}
           onchange={(event) =>
             setPractice({ lowHealth: event.currentTarget.checked })}
         />
@@ -623,7 +618,7 @@
         rel="noopener">Controls guide</a
       >
       <button
-        class="rounded-[2px] border-0 bg-linear-to-b from-[#ffd24a] to-[#e8a91f] px-4 py-1.5 text-[12px] font-black italic text-[#241a0c]"
+        class="rounded-[2px] border-0 bg-linear-to-b from-[#ffd24a] to-[#e8a91f] px-4 py-1.5 text-[12px] font-black italic text-[#241a0c] hover:from-[#ffe08a] hover:to-[#f2b93a] active:from-[#c88d17] active:to-[#a87610]"
         onclick={() => dialog.close()}>Close</button
       >
     </div>

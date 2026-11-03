@@ -1,4 +1,9 @@
-@import 'tailwindcss';
+/* Preflight is left out: the page's own element rules stand in for its
+   reset, which unbolds the overlay headings and re-sizes the touch buttons.
+   The layer order is declared up front so utilities still beat base. */
+@layer theme, base, utilities;
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
 
 :root {
   font-family: Arial, sans-serif;
@@ -151,6 +156,11 @@ body {
 .primary-button:hover:not(:disabled) {
   background: #d6edfc;
 }
+/* Unlayered class rules beat the layered base's :hover and :active, so the
+   buttons that override its look need their own feedback to match it. */
+.primary-button:active:not(:disabled) {
+  background: #18232d;
+}
 .touch-controls {
   display: none;
   position: fixed;
@@ -183,10 +193,11 @@ body {
   border-color: #5e839e;
   color: #c2eaff;
 }
-.touch-controls .super-control {
-  background: #3d3020;
-  border-color: #a4834f;
-  color: #ffe2a8;
+.touch-controls button:hover:not(:disabled) {
+  background: #35424f;
+}
+.touch-controls button:active:not(:disabled) {
+  background: #18232d;
 }
 .menu-dialog::backdrop {
   background: #05070ae6;
