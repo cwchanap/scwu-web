@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import { Match } from './match';
-import { CharacterSelect, StoryDemo, Title } from './select';
+import { CharacterSelect, Continue, StoryDemo, Title } from './select';
 import type { GameStatus } from './scene';
 import { Story } from './story';
 
@@ -395,6 +395,55 @@ it('starts a menu reset over a finished select, not the screen it replays', () =
   expect(view.select).toBeNull();
   expect(view.loading).toBe(false);
   expect(scene.match.mode).toBe('cpu');
+});
+
+it('reports free practice once a finished story is left behind', () => {
+  vi.stubGlobal('HTMLElement', class {});
+  const { scene, view, statuses } = boot();
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', first.battle, 0);
+  // The battle kept under a screen that ends the session reports the mode
+  // a reset resolves 'story' to, not the finished match's own.
+  scene.openSelect();
+  expect(statuses.at(-1)?.mode).toBe('practice');
+  esc(view);
+  expect(view.select).toBeInstanceOf(Title);
+  expect(statuses.at(-1)?.mode).toBe('practice');
+});
+
+it('keeps reporting story on the story’s own screens and while a battle loads', () => {
+  const { scene, view, statuses } = boot();
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', first.battle, 0);
+  // The story's 1P select steps back into the runner: session alive.
+  view.select = new CharacterSelect(undefined, true);
+  (view.report as () => void)();
+  expect(statuses.at(-1)?.mode).toBe('story');
+  // A story match loading behind any screen reports its own mode.
+  scene.openSelect();
+  view.wanted = Match.story('ryuko', first.battle, 0);
+  (view.report as () => void)();
+  expect(statuses.at(-1)?.mode).toBe('story');
+});
+
+it('keeps reporting story while a lost battle’s continue screen is up', async () => {
+  const { view, statuses, completes, finishLoad } = boot();
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', { ...first.battle, flags: 1 }, 0);
+  (view.matchOver as () => void)();
+  await vi.waitFor(() => expect(completes).toHaveLength(1));
+  finishLoad();
+  expect(view.select).toBeInstanceOf(Continue);
+  expect(statuses.at(-1)?.mode).toBe('story');
 });
 
 it('reports music on by default and follows setMusic', () => {

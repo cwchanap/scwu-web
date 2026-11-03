@@ -1335,6 +1335,17 @@ export class TrainingScene extends Phaser.Scene {
     }
   }
 
+  // The screen up is the story's own — its 1P select, a demo or the
+  // continue screen — which steps back into the runner, so the session a
+  // finished battle left is still alive. Any other ends it.
+  private storyScreen() {
+    return (
+      this.select instanceof StoryDemo ||
+      this.select instanceof Continue ||
+      (this.select instanceof CharacterSelect && this.select.story)
+    );
+  }
+
   private report() {
     const [a] = this.match.fighters;
     const b = this.match.rival ?? this.match.fighters[1] ?? a;
@@ -1358,8 +1369,14 @@ export class TrainingScene extends Phaser.Scene {
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
       // The requested match's mode while it loads, so a pick mid-load
-      // compares against what is coming, not the match it replaces.
-      mode: this.wanted?.mode ?? this.match.mode,
+      // compares against what is coming, not the match it replaces. A
+      // finished story battle kept under a screen that ends its session
+      // reports the free practice a reset resolves 'story' to.
+      mode:
+        this.wanted?.mode ??
+        (this.match.mode === 'story' && this.select && !this.storyScreen()
+          ? 'practice'
+          : this.match.mode),
       music: this.music,
     };
     const serialized = JSON.stringify(status);

@@ -170,7 +170,7 @@ export const SHARED: FighterGuide['sections'] = [
       {
         name: 'Menu',
         input: 'Menu button',
-        desc: 'The fighter, opponent and stage pickers and the Opponent mode select each take effect at once, starting a fresh match. Free practice has no timer; its partner can stand, guard high, low or in the air, attack in range, jump in or play as the original CPU. <b>Max stock</b> refills your supers while you stand idle, <b>Low health</b> keeps you just under 30% for desperation moves. Vs. CPU is the original CPU playing the opponent’s own moves and supers.',
+        desc: 'The fighter, opponent and stage pickers and the Opponent mode select each take effect at once, starting a fresh match. A practice partner picked during free practice changes the running match instead. Free practice has no timer; its partner can stand, guard high, low or in the air, attack in range, jump in or play as the original CPU. <b>Max stock</b> refills your supers while you stand idle, <b>Low health</b> keeps you just under 30% for desperation moves. Vs. CPU is the original CPU playing the opponent’s own moves and supers.',
         cost: 0,
       },
       {
