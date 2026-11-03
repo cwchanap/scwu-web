@@ -379,6 +379,43 @@ it('reports the requested match’s mode while it loads', () => {
   expect(scene.match.mode).toBe('practice');
 });
 
+it('keeps the requested mode when a pick lands mid-load', () => {
+  const { scene, view, finishLoad } = boot();
+  scene.reset('cpu');
+  expect(view.loading).toBe(true);
+  // A quick follow-up joins the pending Vs. CPU — the practice match it
+  // replaces would drop the request back to practice.
+  scene.setStage('park');
+  finishLoad();
+  expect(scene.match.mode).toBe('cpu');
+  expect(scene.match.stage).toBe('park');
+});
+
+it('keeps the requested mode when a fighter pick lands mid-load', () => {
+  const { scene, finishLoad } = boot();
+  scene.reset('cpu');
+  scene.setFighter('kiki');
+  finishLoad();
+  expect(scene.match.mode).toBe('cpu');
+  expect(scene.match.fighters.map((f) => f.who)).toEqual(['kiki', 'zoma']);
+});
+
+it('leaves the next story battle alone on R while it loads', () => {
+  vi.stubGlobal('HTMLElement', class {});
+  const { view, completes } = boot();
+  const story = new Story('ryuko');
+  const first = story.next();
+  if (first.kind !== 'battle') throw new Error('expected a battle');
+  view.story = story;
+  view.match = Match.story('ryuko', first.battle, 0);
+  // Its successor is mid-load: replaying the finished battle would skip it.
+  const pending = Match.story('ryuko', { ...first.battle }, 0);
+  view.wanted = pending;
+  r(view);
+  expect(view.wanted).toBe(pending);
+  expect(completes).toHaveLength(0);
+});
+
 it('starts a menu reset over a finished select, not the screen it replays', () => {
   const { scene, view, artIn } = boot();
   artIn();

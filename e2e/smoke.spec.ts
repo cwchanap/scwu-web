@@ -91,5 +91,12 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(page.locator('.arena canvas')).toBeFocused();
   await page.keyboard.press('p');
   await expect(resume).toBeVisible();
+
+  // The state-sensitive keyboard checks done, a Vs. CPU pick must drive
+  // scene.reset('cpu') — the select then reports the CPU match's mode.
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  await opponent.selectOption('vsCpu');
+  await expect(opponent).toHaveValue('vsCpu');
   expect(errors).toEqual([]);
 });

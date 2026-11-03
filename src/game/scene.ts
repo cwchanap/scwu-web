@@ -348,7 +348,7 @@ export class TrainingScene extends Phaser.Scene {
       // A screen loading is one for R's purposes: returning to the title is
       // the only move left — a reset would replay the battle it just left.
       else if (this.select || this.demoRequest) this.openTitle();
-      else this.reset(this.match.mode);
+      else this.reset(this.requestedMode());
   };
   private keyup = (e: KeyboardEvent) => {
     this.held.delete(e.code);
@@ -484,7 +484,7 @@ export class TrainingScene extends Phaser.Scene {
     // Authored: the pair plays in the mode the match it replaces was in —
     // a story battle's resolves to free practice inside reset, the session
     // having ended once a screen opened past it.
-    this.reset(this.teams ? 'cpu' : this.match.mode);
+    this.reset(this.teams ? 'cpu' : this.requestedMode());
   }
 
   private leaveScreen() {
@@ -698,29 +698,43 @@ export class TrainingScene extends Phaser.Scene {
     this.fighter = who;
     this.chosen = false;
     this.teams = null;
-    this.reset(this.match.mode);
+    this.reset(this.requestedMode());
   }
   setOpponent(who: Who) {
     this.opponent = who;
     this.chosen = false;
     this.teams = null;
-    this.reset(this.match.mode);
+    this.reset(this.requestedMode());
   }
   // A stage's images load when it is first picked (whenReady).
   setStage(stage: Stage) {
     this.stage = stage;
-    this.reset(this.match.mode);
+    this.reset(this.requestedMode());
   }
   private loadStage(stage: Stage) {
     for (const image of STAGES[stage].images)
       this.load.image(`${stage}-${image.index}`, BASE + image.filename);
+  }
+  // The match a change joins is the one last asked for while it loads,
+  // not the match it replaces — report()'s mode for picks (its 'story'
+  // rules stay in reset, which replays a battle only while it is live).
+  private requestedMode(): Mode {
+    return this.wanted?.mode ?? this.match.mode;
   }
   reset(mode: Mode) {
     // A story battle starts over — while it is live. Authored: the session
     // ends once a screen, or a screen's load, sits past it, so 'story' then
     // resolves to free practice rather than restarting the battle left.
     if (mode === 'story') {
-      if (this.match.battle && !this.select && !this.demoRequest)
+      // The next battle already loading is the session going on: there is
+      // nothing to restart, and the finished one must not replay over it.
+      if (this.wanted !== this.match && this.wanted?.mode === 'story') return;
+      if (
+        this.match.battle &&
+        this.wanted === this.match &&
+        !this.select &&
+        !this.demoRequest
+      )
         return this.startBattle(this.match.battle);
       mode = 'practice';
     }
