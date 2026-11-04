@@ -40,9 +40,11 @@ export default defineConfig({
             // Every fighter's export lands in the one bundle (82 MB), but a
             // Worker serves no file over 25 MiB: cut the data into ~15 MiB
             // chunks.
+            // assets-version.json is tiny, but assetBase.ts reads it on the
+            // Instructions page too: in a data chunk it would pull ~12 MiB in.
             {
               name: 'data',
-              test: /game\/generated\/.*\.json/,
+              test: /game\/generated\/(?!assets-version\.json).*\.json/,
               maxSize: 15 * 1024 * 1024,
             },
           ],

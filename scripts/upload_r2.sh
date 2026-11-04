@@ -7,11 +7,14 @@
 #          AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=...
 #   scripts/upload_r2.sh
 #
-# Re-running syncs the art and audio that changed and deletes keys the export
-# no longer writes (the two tarballs are exempt); the tarballs are rebuilt and
-# copied every run. All go up with `Cache-Control: no-cache` so the bucket's
-# custom domain revalidates instead of serving a stale copy of an overwritten
-# key from Cloudflare's cache.
+# The files the game loads (the packs, the stage music and the DOM's art: the
+# `files` of src/game/generated/assets-version.json) go under the export's
+# version, `<version>/`, with `Cache-Control: public, max-age=31536000,
+# immutable`. A new export is a new prefix, and nothing is deleted, so a
+# deployed build or an open tab keeps the version it was built with. Old
+# versions and the legacy root-level objects are pruned by hand (README). The
+# two tarballs stay at the bucket root with `no-cache`; generated.tar.gz goes up
+# last.
 set -euo pipefail
 : "${R2_ACCOUNT_ID:?set R2_ACCOUNT_ID}" "${R2_BUCKET:?set R2_BUCKET}"
 
@@ -22,20 +25,22 @@ export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
 export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
 
-# The art and audio go to the bucket root: ASSET_BASE points there. --delete
-# unpublishes files the export dropped (export_images unlinks stale PNGs), and
-# the excludes keep that delete away from the tarballs, which the same
-# bucket root holds until the cps below recreate them. Finder's .DS_Store stays
-# out of the public bucket; an excluded key is also exempt from --delete, so
-# remove one already there with `aws s3 rm`.
-aws s3 sync public/assets "s3://$R2_BUCKET/" --endpoint-url "$endpoint" --only-show-errors \
-  --cache-control no-cache --delete --exclude generated.tar.gz --exclude fixtures.tar.gz \
-  --exclude '*.DS_Store'
+# The version and the published files come from the export's manifest, not
+# from a scan of the source: the same list the tests and the bucket use.
+manifest=src/game/generated/assets-version.json
+version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$manifest")
+includes=()
+while IFS= read -r file; do includes+=(--include "$file"); done < <(
+  python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))["files"]))' "$manifest")
+
+# Only the listed files: exclude everything, then include each one. No --delete.
+aws s3 sync public/assets "s3://$R2_BUCKET/$version/" --endpoint-url "$endpoint" --only-show-errors \
+  --cache-control "public, max-age=31536000, immutable" --exclude '*' "${includes[@]}"
 
 # The generated JSON is the Cloudflare build's input (build.sh) and the
-# fixtures are the unit tests' (CI: .github/scripts/fetch-generated.sh),
-# since scwu-web-handoff/ is not in git. Upload generated last: once it
-# exists, the art and the fixtures are already there.
+# fixtures are the unit tests' (CI: .github/scripts/fetch-generated.sh), since
+# scwu-web-handoff/ is not in git. Upload generated last: once it exists, the
+# art and the fixtures are already there.
 tarball=$(mktemp)
 fixtures=$(mktemp)
 trap 'rm -f "$tarball" "$fixtures"' EXIT

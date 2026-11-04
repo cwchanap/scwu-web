@@ -7,6 +7,7 @@ Original containers and executables never enter the public directory.
 import hashlib
 import json
 from pathlib import Path
+import re
 import struct
 import sys
 import zlib
@@ -4889,6 +4890,37 @@ def export_demo(key, name, sha256, out):
                                                sounds=sounds, flags=flags, duration=duration))
 
 
+def dom_art():
+    """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon, the
+    Instructions sources' select and gauge art, and moves.ts's guide art and nameplates. The literal paths
+    are the one source, so this scans the same text."""
+    sources = [ROOT / "src/App.svelte", *sorted((ROOT / "src/instructions").glob("*.svelte")),
+               ROOT / "src/instructions/moves.ts"]
+    return sorted({name for source in sources for name in re.findall(r"[a-z0-9]+/[0-9]+\.png", source.read_text(encoding="utf8"))})
+
+
+def published_files():
+    """The keys under PUBLIC that the bucket serves under the version, sorted: the packs, each stage's music
+    cues (playMusic fetches those one by one, not from a pack) and dom_art(). A listed file that is missing fails."""
+    stages = json.loads((GENERATED / "stages.json").read_text(encoding="utf8"))
+    packs = [f"packs/{path.name}" for path in (PUBLIC / "packs").glob("*.bin")]
+    music = [sound["filename"] for stage in stages.values() for sound in stage["sounds"]]
+    files = sorted({*packs, *music, *dom_art()})
+    missing = [name for name in files if not (PUBLIC / name).is_file()]
+    if missing:
+        sys.exit(f"Published files missing from public/assets; refusing to export: {', '.join(missing)}")
+    return files
+
+
+def assets_version(files):
+    """The first 16 hex digits of one sha256 over each published key, then its bytes."""
+    digest = hashlib.sha256()
+    for name in files:
+        digest.update(name.encode("utf8"))
+        digest.update((PUBLIC / name).read_bytes())
+    return digest.hexdigest()[:16]
+
+
 # Mirrors packs.ts's selectAssets (scene.ts's before): the images (op 0x0c) and sounds (op 0x03) that a
 # player's select programs (select.ts) show or play, within what the player exports. Boot holds them,
 # since the select screen uses them from the start; the rest of a player's files go to its fighter pack.
@@ -4931,16 +4963,21 @@ def export_packs():
     for path in packs.glob("*.bin"):
         if path.stem not in out:
             path.unlink()
+    # The bucket's version prefix: bun run upload:r2 publishes these files under it (upload_r2.sh).
+    files = published_files()
+    write_json(GENERATED / "assets-version.json", dict(version=assets_version(files), files=files))
 
 
 def inputs():
-    """What the export reads: this script, and the handoff's files by name, size and time."""
+    """What the export reads: this script, the handoff's files by name, size and time, and the DOM's art paths."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
     digest.update((ROOT / "art/dora/name.png").read_bytes())
     for path in sorted(RESEARCH.rglob("*")):
         if path.is_file():
             stat = path.stat()
             digest.update(f"{path.relative_to(RESEARCH)}\0{stat.st_size}\0{stat.st_mtime_ns}\0".encode("utf8"))
+    for name in dom_art():
+        digest.update(f"{name}\0".encode("utf8"))
     return digest.hexdigest()
 
 
