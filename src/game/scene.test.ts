@@ -4,16 +4,13 @@ import type { Who } from './characters';
 import { Match } from './match';
 import { CharacterSelect, Continue, StoryDemo, Title } from './select';
 import type { GameStatus } from './scene';
+import { PackFile } from './packLoader';
 import { Story } from './story';
 
-// scene.ts imports Phaser at runtime, which a browser-only module; the pause
-// and reset paths driven here touch only these three of its surfaces.
-vi.mock('phaser', () => ({
-  default: {
-    Scene: class {},
-    GameObjects: { Image: class {} },
-    Loader: { Events: { COMPLETE: 'complete' } },
-  },
+// scene.ts imports Phaser at runtime, which a browser-only module; phaserStub.ts
+// holds the surfaces the pause, reset and pack paths driven here touch.
+vi.mock('phaser', async () => ({
+  default: (await import('./phaserStub')).default,
 }));
 
 import { TrainingScene } from './scene';
@@ -37,6 +34,8 @@ const boot = () => {
     [key: string]: unknown;
   };
   const completes: (() => void)[] = [];
+  // The packs a match queued (loadPlayer), in order.
+  const files: PackFile[] = [];
   let cached = false;
   Object.assign(view, {
     sound: {
@@ -48,6 +47,7 @@ const boot = () => {
     load: {
       image: () => {},
       audio: () => {},
+      addFile: (file: PackFile) => files.push(file),
       on: () => {},
       once: (_event: string, done: () => void) => void completes.push(done),
       start: () => {},
@@ -67,6 +67,7 @@ const boot = () => {
     view,
     statuses,
     completes,
+    files,
     // Every player's art already in, so a match change starts at once.
     artIn: () => {
       cached = true;
@@ -496,4 +497,18 @@ it('reports music while a screen is open', () => {
   scene.openSelect();
   scene.setMusic(false);
   expect(statuses.at(-1)?.music).toBe(false);
+});
+
+it('a fighter evicted by unloadPlayers is queued as a pack again', () => {
+  const { scene, view, files, finishLoad } = boot();
+  scene.setFighter('kiki');
+  finishLoad();
+  // Ryuko's match starts without Kiki, so its start drops her (unloadPlayers).
+  scene.setFighter('ryuko');
+  finishLoad();
+  expect(view.players.has('kiki')).toBe(false);
+  // Kiki's next match queues her pack again.
+  scene.setFighter('kiki');
+  expect(files.at(-1)).toBeInstanceOf(PackFile);
+  expect(files.at(-1)?.key).toBe('fighter-kiki');
 });
