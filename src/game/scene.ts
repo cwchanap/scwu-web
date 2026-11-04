@@ -3,6 +3,7 @@ import { ASSET_BASE as BASE } from './assetBase';
 import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import { selectAssets } from './packs';
+import { PackFile } from './packLoader';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -594,12 +595,28 @@ export class TrainingScene extends Phaser.Scene {
   private loadPlayer(who: Who, all: boolean) {
     const { images, sounds } = CHARACTERS[who];
     const select = selectAssets[who];
-    for (const image of images)
-      if (all || select.images.has(image.index))
-        this.load.image(`${who}-${image.index}`, BASE + image.filename);
-    for (const sound of sounds)
-      if (all || select.sounds.has(sound.index))
-        this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
+    if (!all) {
+      for (const image of images)
+        if (select.images.has(image.index))
+          this.load.image(`${who}-${image.index}`, BASE + image.filename);
+      for (const sound of sounds)
+        if (select.sounds.has(sound.index))
+          this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
+      return;
+    }
+    // The rest, which the select screens' files don't hold, come as one pack.
+    const restImages = images.filter(
+      (image) => !select.images.has(image.index),
+    );
+    const restSounds = sounds.filter(
+      (sound) => !select.sounds.has(sound.index),
+    );
+    if (!restImages.length && !restSounds.length) return;
+    // Resident once its first entry is in.
+    const resident = restImages.length
+      ? () => this.textures.exists(`${who}-${restImages[0].index}`)
+      : () => this.cache.audio.exists(`${who}-sound-${restSounds[0].index}`);
+    this.load.addFile(new PackFile(this.load, `fighter-${who}`, resident));
   }
   private unloadPlayers(keep: Set<Who>) {
     const textures = new Set<string>();
