@@ -899,6 +899,18 @@ def write_json(path, value):
     write_if_changed(path, (json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf8"))
 
 
+def write_pack(path, images, sounds):
+    """A pack packs.ts reads: a u32 header length, the JSON table of each key's [offset, length] in
+    the payload (images, then sounds), then the payload. Keys are sorted, so the bytes are deterministic."""
+    table, payload = {"images": {}, "sounds": {}}, bytearray()
+    for kind, entries in (("images", images), ("sounds", sounds)):
+        for key in sorted(entries):
+            table[kind][key] = [len(payload), len(entries[key])]
+            payload += entries[key]
+    header = json.dumps(table, separators=(",", ":")).encode("utf8")
+    write_if_changed(path, struct.pack("<I", len(header)) + header + bytes(payload))
+
+
 def counter_records(p, index):
     """The PCs of the op 0x1f records on variables 2 and 4 that open one of
     Giant's or ERUS's reactions, before its first display (PCs 723, 744,
@@ -4419,6 +4431,7 @@ def main():
     write_json(FIXTURES / "idle-oracle.json", cases)
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
+    export_packs()
     print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon, {counts['rario']} RARIO and {counts['training']} TRAINING images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
@@ -4876,6 +4889,50 @@ def export_demo(key, name, sha256, out):
                                                sounds=sounds, flags=flags, duration=duration))
 
 
+# Mirrors packs.ts's selectAssets (scene.ts's before): the images (op 0x0c) and sounds (op 0x03) that a
+# player's select programs (select.ts) show or play, within what the player exports. Boot holds them,
+# since the select screen uses them from the start; the rest of a player's files go to its fighter pack.
+def export_packs():
+    def load(name):
+        return json.loads((GENERATED / name).read_text(encoding="utf8"))
+
+    def files(entries, prefix):
+        return {f"{prefix}-{e['index']}": (PUBLIC / e["filename"]).read_bytes() for e in entries}
+
+    ui, select, t2 = load("ui.json"), load("select.json"), load("t2.json")
+    boot_images = {"text": (PUBLIC / "text.png").read_bytes(), **files(ui["images"], "ui"),
+                   **files(select["images"], "select"), **files(t2["images"], "t2")}
+    boot_sounds = {**files(ui["sounds"], "kgt-sound"), **files(select["sounds"], "select-sound"),
+                   **files(t2["sounds"], "t2-sound")}
+    out = {}
+    for who in ["ryuko", *FIGHTERS]:
+        data = load("assets.json" if who == "ryuko" else f"{who}.json")
+        records = [bytes(r) for actions in data["select"]["actions"].values() for r in actions]
+        shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c}
+        played = {u16(r, 2) for r in records if r[0] == 0x03}
+        boot_images.update(files([e for e in data["images"] if e["index"] in shown], who))
+        boot_sounds.update(files([e for e in data["sounds"] if e["index"] in played], f"{who}-sound"))
+        rest = (files([e for e in data["images"] if e["index"] not in shown], who),
+                files([e for e in data["sounds"] if e["index"] not in played], f"{who}-sound"))
+        if any(rest):
+            out[f"fighter-{who}"] = rest
+    out["boot"] = (boot_images, boot_sounds)
+    for stage, data in load("stages.json").items():
+        out[f"stage-{stage}"] = (files(data["images"], stage), {})
+    for path in sorted((GENERATED / "demos").glob("*.json")):
+        n, demo = path.stem, load(f"demos/{path.name}")
+        content = (files(demo["images"], f"demo{n}"), files(demo["sounds"], f"demo{n}-sound"))
+        if any(content):
+            out[f"demo-{n}"] = content
+    packs = PUBLIC / "packs"
+    packs.mkdir(exist_ok=True)
+    for name, (images, sounds) in out.items():
+        write_pack(packs / f"{name}.bin", images, sounds)
+    for path in packs.glob("*.bin"):
+        if path.stem not in out:
+            path.unlink()
+
+
 def inputs():
     """What the export reads: this script, and the handoff's files by name, size and time."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
@@ -4899,7 +4956,8 @@ if __name__ == "__main__":
     # Its outputs stand while nothing it reads has changed since the last export.
     stamp = GENERATED / ".inputs"
     key = inputs()
-    if stamp.exists() and stamp.read_text() == key and all(any(d.iterdir()) for d in (PUBLIC, FIXTURES)):
+    # A missing or empty directory, the packs' included, exports again.
+    if stamp.exists() and stamp.read_text() == key and all(d.is_dir() and any(d.iterdir()) for d in (PUBLIC, FIXTURES, PUBLIC / "packs")):
         print("Assets are up to date.")
     else:
         stamp.unlink(missing_ok=True)
