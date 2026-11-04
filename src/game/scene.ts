@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { ASSET_BASE as BASE } from './assetBase';
 import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
+import { selectAssets } from './packs';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -99,25 +100,6 @@ const STORY_DEMOS = import.meta.glob<StoryDemoData>(
 // Authored: a story demo's sounds of five seconds or more are its tracks,
 // which play only with Music ticked, as the stages' and the title's do.
 const TRACK_SECONDS = 5;
-// The images and sounds each player's select-screen programs show and play
-// (ops 0x0c and 0x03, select.ts), which load at start and stay; the rest of
-// a player's load with the matches that seat it (whenReady).
-const selectAssets = Object.fromEntries(
-  (Object.keys(CHARACTERS) as Who[]).map((who) => {
-    const records = Object.values(
-      CHARACTERS[who].select.actions as Record<string, number[][]>,
-    ).flat();
-    const used = (op: number, read: (r: number[]) => number) =>
-      new Set(records.filter((r) => r[0] === op).map(read));
-    return [
-      who,
-      {
-        images: used(0x0c, (r) => (r[3] | (r[4] << 8)) & 8191),
-        sounds: used(0x03, (r) => r[2] | (r[3] << 8)),
-      },
-    ];
-  }),
-) as Record<Who, { images: Set<number>; sounds: Set<number> }>;
 // Objects draw by priority, then slot (hud.ts `depthOf`): the slots below
 // `setup`, round setup's stage objects, before the HUD, later ones after it.
 // The depth carries the slot, as a reused sprite keeps a stale place in
