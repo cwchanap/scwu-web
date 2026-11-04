@@ -1,8 +1,9 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { CHARACTERS } from './characters';
+import { CHARACTERS, STAGES } from './characters';
 import type { Who } from './characters';
 import { Match } from './match';
 import { CharacterSelect, Continue, StoryDemo, Title } from './select';
+import type { Demo } from './select';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { Story } from './story';
@@ -45,7 +46,7 @@ const boot = () => {
       removeByKey: () => {},
     },
     load: {
-      image: () => {},
+      // Stage music is the one individual file left (playMusic).
       audio: () => {},
       addFile: (file: PackFile) => files.push(file),
       on: () => {},
@@ -511,4 +512,30 @@ it('a fighter evicted by unloadPlayers is queued as a pack again', () => {
   scene.setFighter('kiki');
   expect(files.at(-1)).toBeInstanceOf(PackFile);
   expect(files.at(-1)?.key).toBe('fighter-kiki');
+});
+
+it("the first match queues the boot stage's pack as already resident", () => {
+  const { scene, view, files } = boot();
+  // preload loaded the boot stage's art (court), so its first texture is in.
+  const first = `court-${STAGES.court.images[0].index}`;
+  (view.textures as { exists(key: string): boolean }).exists = (key) =>
+    key === first;
+  scene.reset('practice');
+  const pack = files.find((file) => file.key === 'stage-court');
+  expect(pack).toBeInstanceOf(PackFile);
+  expect(pack?.hasCacheConflict()).toBe(true);
+});
+
+it('a demo with no files queues no pack and still opens', async () => {
+  const { view, files, completes, finishLoad } = boot();
+  // Demo 29 exports no images or sounds.
+  (view.openDemo as (index: number, make: (demo: Demo) => StoryDemo) => void)(
+    29,
+    (demo) => new StoryDemo(29, demo),
+  );
+  await vi.waitFor(() => expect(completes).toHaveLength(1));
+  expect(files).toHaveLength(0);
+  finishLoad();
+  expect(view.select).toBeInstanceOf(StoryDemo);
+  expect(view.loading).toBe(false);
 });

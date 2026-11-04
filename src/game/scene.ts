@@ -246,19 +246,11 @@ export class TrainingScene extends Phaser.Scene {
 
   preload() {
     this.loadStage(this.stage);
-    for (const who of Object.keys(CHARACTERS) as Who[])
-      this.loadPlayer(who, false);
-    for (const image of ui.images)
-      this.load.image(`ui-${image.index}`, BASE + image.filename);
-    this.load.image('text', BASE + 'text.png');
-    for (const [demo, { images, sounds }] of Object.entries(DEMOS)) {
-      for (const image of images)
-        this.load.image(`${demo}-${image.index}`, BASE + image.filename);
-      for (const sound of sounds)
-        this.load.audio(`${demo}-sound-${sound.index}`, BASE + sound.filename);
-    }
-    for (const sound of ui.sounds)
-      this.load.audio(`kgt-sound-${sound.index}`, BASE + sound.filename);
+    // The boot pack: the UI, the title and select screens' art and sounds, and
+    // each fighter's select-screen images.
+    this.load.addFile(
+      new PackFile(this.load, 'boot', () => this.textures.exists('text')),
+    );
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
       this.report();
@@ -530,14 +522,20 @@ export class TrainingScene extends Phaser.Scene {
     void STORY_DEMOS[`./generated/demos/${index}.json`]().then((demo) => {
       if (this.demoRequest !== request) return;
       const prefix = `demo${index}`;
-      for (const image of demo.images) {
+      for (const image of demo.images)
         selectSizes.set(`${prefix}-${image.index}`, image);
-        this.load.image(`${prefix}-${image.index}`, BASE + image.filename);
-      }
-      for (const sound of demo.sounds) {
-        const key = `${prefix}-sound-${sound.index}`;
-        if (sound.seconds >= TRACK_SECONDS) this.demoTracks.add(key);
-        this.load.audio(key, BASE + sound.filename);
+      for (const sound of demo.sounds)
+        if (sound.seconds >= TRACK_SECONDS)
+          this.demoTracks.add(`${prefix}-sound-${sound.index}`);
+      // Its images and sounds come as one pack, none for a demo with neither.
+      if (demo.images.length || demo.sounds.length) {
+        const resident = demo.images.length
+          ? () => this.textures.exists(`${prefix}-${demo.images[0].index}`)
+          : () =>
+              this.cache.audio.exists(
+                `${prefix}-sound-${demo.sounds[0].index}`,
+              );
+        this.load.addFile(new PackFile(this.load, `demo-${index}`, resident));
       }
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {
         if (this.demoRequest !== request) return;
@@ -576,34 +574,21 @@ export class TrainingScene extends Phaser.Scene {
       then();
     };
     const { stage } = match;
-    if (
-      !missing.length &&
-      this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`)
-    )
-      return start();
+    if (!missing.length && this.stageLoaded(stage)) return start();
     this.loading = true;
     this.loadStage(stage);
-    for (const who of missing) this.loadPlayer(who, true);
+    for (const who of missing) this.loadPlayer(who);
     this.load.once(Phaser.Loader.Events.COMPLETE, start);
     this.load.start();
     // The request just changed; a pick mid-load reads its mode, not the
     // match it replaces.
     this.report();
   }
-  // A player's images and sounds: all of them, or its select screens'. The
-  // loader skips those already in.
-  private loadPlayer(who: Who, all: boolean) {
+  // A player's images and sounds its select screens don't show, as one pack;
+  // the select screens' own are in the boot pack, which preload loads.
+  private loadPlayer(who: Who) {
     const { images, sounds } = CHARACTERS[who];
     const select = selectAssets[who];
-    if (!all) {
-      for (const image of images)
-        if (select.images.has(image.index))
-          this.load.image(`${who}-${image.index}`, BASE + image.filename);
-      for (const sound of sounds)
-        if (select.sounds.has(sound.index))
-          this.load.audio(`${who}-sound-${sound.index}`, BASE + sound.filename);
-      return;
-    }
     // The rest, which the select screens' files don't hold, come as one pack.
     const restImages = images.filter(
       (image) => !select.images.has(image.index),
@@ -710,9 +695,14 @@ export class TrainingScene extends Phaser.Scene {
     this.stage = stage;
     this.reset(this.requestedMode());
   }
+  // A stage's images come as one pack, resident once its first image is in.
   private loadStage(stage: Stage) {
-    for (const image of STAGES[stage].images)
-      this.load.image(`${stage}-${image.index}`, BASE + image.filename);
+    this.load.addFile(
+      new PackFile(this.load, `stage-${stage}`, () => this.stageLoaded(stage)),
+    );
+  }
+  private stageLoaded(stage: Stage) {
+    return this.textures.exists(`${stage}-${STAGES[stage].images[0].index}`);
   }
   // The match a change joins is the one last asked for while it loads,
   // not the match it replaces — report()'s mode for picks (its 'story'
