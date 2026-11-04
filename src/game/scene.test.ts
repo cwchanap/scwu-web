@@ -1,12 +1,15 @@
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, expect, it, vi } from 'vitest';
 import { CHARACTERS, STAGES } from './characters';
-import type { Who } from './characters';
+import type { Stage, Who } from './characters';
 import { Match } from './match';
+import { parsePack } from './packs';
 import { CharacterSelect, Continue, StoryDemo, Title } from './select';
 import type { Demo } from './select';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { Story } from './story';
+import { itWithArt } from './testing';
 
 // scene.ts imports Phaser at runtime, which a browser-only module; phaserStub.ts
 // holds the surfaces the pause, reset and pack paths driven here touch.
@@ -35,7 +38,7 @@ const boot = () => {
     [key: string]: unknown;
   };
   const completes: (() => void)[] = [];
-  // The packs a match queued (loadPlayer), in order.
+  // The packs the scene queued (boot, stage, fighter and demo), in order.
   const files: PackFile[] = [];
   let cached = false;
   Object.assign(view, {
@@ -538,4 +541,75 @@ it('a demo with no files queues no pack and still opens', async () => {
   finishLoad();
   expect(view.select).toBeInstanceOf(StoryDemo);
   expect(view.loading).toBe(false);
+});
+
+// The packs on disk, by name (the .bin files, as packs.test.ts reads them).
+const PACKS = new URL('../../public/assets/packs/', import.meta.url);
+const packNames = () =>
+  readdirSync(PACKS)
+    .filter((name) => name.endsWith('.bin'))
+    .map((name) => name.slice(0, -'.bin'.length));
+// A pack's cache keys, its images and sounds, read from its own header.
+const packKeys = (name: string) => {
+  const pack = parsePack(
+    new Uint8Array(readFileSync(new URL(`${name}.bin`, PACKS))).buffer,
+  );
+  return [...Object.keys(pack.images), ...Object.keys(pack.sounds)];
+};
+// Each generated demo's data, to know which demos have a pack.
+const demos = import.meta.glob<{
+  default: { images: unknown[]; sounds: unknown[] };
+}>('./generated/demos/*.json', { eager: true });
+
+itWithArt(
+  'queues every pack on disk, and each pack resident only once its own keys are cached',
+  async () => {
+    const { view, files } = boot();
+    // The cache holds boot's keys, then each pack's as it is added.
+    const cached = new Set(packKeys('boot'));
+    (view.textures as { exists(key: string): boolean }).exists = (key) =>
+      cached.has(key);
+    const audio = (view.cache as { audio: { exists(key: string): boolean } })
+      .audio;
+    audio.exists = (key) => cached.has(key);
+    for (const who of Object.keys(CHARACTERS) as Who[])
+      (view.loadPlayer as (who: Who) => void)(who);
+    for (const stage of Object.keys(STAGES) as Stage[])
+      (view.loadStage as (stage: Stage) => void)(stage);
+    // Each demo's file lands before the next, since a newer openDemo
+    // supersedes a pending one.
+    for (const [path, { default: demo }] of Object.entries(demos)) {
+      if (!demo.images.length && !demo.sounds.length) continue;
+      const n = Number(path.replace(/^.*\/|\.json$/g, ''));
+      (
+        view.openDemo as (
+          index: number,
+          make: (demo: Demo) => StoryDemo,
+        ) => void
+      )(n, (d) => new StoryDemo(n, d));
+      await vi.waitFor(() => expect(files.at(-1)?.key).toBe(`demo-${n}`));
+    }
+    expect(files.map((file) => file.key).sort()).toEqual(
+      packNames()
+        .filter((name) => name !== 'boot')
+        .sort(),
+    );
+    for (const file of files) {
+      expect(file.hasCacheConflict(), file.key).toBe(false);
+      for (const key of packKeys(file.key)) cached.add(key);
+      expect(file.hasCacheConflict(), file.key).toBe(true);
+    }
+  },
+);
+
+it('preload queues the stage pack, then boot, and boot is resident once its text is in', () => {
+  const { scene, view, files } = boot();
+  scene.preload();
+  const stage = view.stage as Stage;
+  expect(files.map((file) => file.key)).toEqual([`stage-${stage}`, 'boot']);
+  const bootFile = files.find((file) => file.key === 'boot');
+  expect(bootFile?.hasCacheConflict()).toBe(false);
+  (view.textures as { exists(key: string): boolean }).exists = (key) =>
+    key === 'text';
+  expect(bootFile?.hasCacheConflict()).toBe(true);
 });

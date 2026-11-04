@@ -87,6 +87,9 @@ describe('pack files', () => {
 // exported JSON and files they were built from.
 type Entry = { index: number; filename: string };
 const PACKS = new URL('../../public/assets/packs/', import.meta.url);
+// The pack files in PACKS; a Finder .DS_Store is not one of them.
+const packFiles = () =>
+  readdirSync(PACKS).filter((name) => name.endsWith('.bin'));
 const ASSETS = new URL('../../public/assets/', import.meta.url);
 const fighters = Object.keys(CHARACTERS) as Who[];
 const demos = import.meta.glob<{
@@ -134,7 +137,7 @@ describe('exported packs', () => {
       ...(Object.keys(STAGES) as Stage[]).map((stage) => `stage-${stage}.bin`),
       ...demoList.filter(hasAny).map((demo) => `demo-${demo.n}.bin`),
     ];
-    const found = existsSync(PACKS) ? readdirSync(PACKS) : [];
+    const found = existsSync(PACKS) ? packFiles() : [];
     expect(found.sort(), 'run bun run assets to write the packs').toEqual(
       expected.sort(),
     );
@@ -216,7 +219,7 @@ describe('exported packs', () => {
   });
 
   itWithArt('no key is in two packs', () => {
-    const keys = readdirSync(PACKS).flatMap((name) => {
+    const keys = packFiles().flatMap((name) => {
       const pack = readPack(name);
       return [...Object.keys(pack.images), ...Object.keys(pack.sounds)];
     });

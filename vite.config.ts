@@ -56,8 +56,9 @@ export default defineConfig({
     include: ['src/**/*.test.ts'],
     environment: 'node',
     // Each file imports every fighter's export (44 MB of JSON); sharing a
-    // worker's modules across files saves importing it again for each. No
-    // test changes module state.
+    // worker's modules across files saves importing it again for each. Only
+    // assetBase.test.ts changes module state, and it resets the registry
+    // after each test.
     isolate: false,
     // The tests are deterministic simulations, so a slow one means a busy
     // machine, not a hang (the minute of every stage's objects takes 30 s
