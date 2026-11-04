@@ -10,6 +10,17 @@ const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
 const stripTypeImports = (text: string) =>
   text.replace(/^\s*import type [^;]+;/gm, '');
+// The art paths the DOM names: the same scan as export_assets.py's dom_art().
+const domNamed = () =>
+  [
+    here + '../App.svelte',
+    ...readdirSync(here)
+      .filter((name) => name.endsWith('.svelte'))
+      .map((name) => here + name),
+    here + 'moves.ts',
+  ].flatMap(
+    (file) => readFileSync(file, 'utf8').match(/[a-z0-9]+\/[0-9]+\.png/g) ?? [],
+  );
 
 describe('instructions page', () => {
   it('orders the grid over every fighter, GATE LOCK cells null', () => {
@@ -58,21 +69,35 @@ describe('instructions page', () => {
     }
   });
 
-  itWithArt('gives every fighter real art and a plate or text fallback', () => {
-    for (const entry of ROSTER) {
-      const guide = GUIDES_DATA[entry.id];
-      expect(guide, entry.id).toBeTruthy();
-      expect(statSync(`public/assets/${guide.art}`).isFile(), entry.id).toBe(
-        true,
-      );
-      if (guide.nameplate !== '') {
-        expect(
-          statSync(`public/assets/${guide.nameplate}`).isFile(),
-          entry.id,
-        ).toBe(true);
+  itWithArt(
+    'gives every fighter real art and a plate or text fallback, and covers every art file the DOM names',
+    () => {
+      for (const entry of ROSTER) {
+        const guide = GUIDES_DATA[entry.id];
+        expect(guide, entry.id).toBeTruthy();
+        expect(statSync(`public/assets/${guide.art}`).isFile(), entry.id).toBe(
+          true,
+        );
+        if (guide.nameplate !== '') {
+          expect(
+            statSync(`public/assets/${guide.nameplate}`).isFile(),
+            entry.id,
+          ).toBe(true);
+        }
       }
-    }
-  });
+      // The DOM loads these by path under ASSET_BASE, so the export must
+      // publish each one under the version (assets-version.json's files).
+      const published: string[] = JSON.parse(
+        readFileSync(here + '../game/generated/assets-version.json', 'utf8'),
+      ).files;
+      const named = domNamed();
+      expect(named.length).toBeGreaterThan(0);
+      for (const name of named) {
+        expect(published, name).toContain(name);
+        expect(statSync(`public/assets/${name}`).isFile(), name).toBe(true);
+      }
+    },
+  );
 
   it("uses each fighter's in-game name lettering as the header plate", () => {
     // The *name action the Vs. intro shows: a looping, facing-independent
