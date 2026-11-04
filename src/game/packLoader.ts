@@ -46,8 +46,9 @@ export class PackFile extends Phaser.Loader.File {
     let decoded: Decoded;
     try {
       decoded = await this.decode(urls);
-    } catch {
+    } catch (error) {
       revoke(urls);
+      console.error(error);
       // onProcessError alone never emits loaderror (File.js), which the
       // scene's overlay listens for.
       this.loader.emit(Phaser.Loader.Events.FILE_LOAD_ERROR, this);

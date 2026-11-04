@@ -4993,8 +4993,8 @@ if __name__ == "__main__":
     # Its outputs stand while nothing it reads has changed since the last export.
     stamp = GENERATED / ".inputs"
     key = inputs()
-    # A missing or empty directory, the packs' included, exports again.
-    if stamp.exists() and stamp.read_text() == key and all(d.is_dir() and any(d.iterdir()) for d in (PUBLIC, FIXTURES, PUBLIC / "packs")):
+    # A missing or empty directory, the packs' included, or a missing manifest, exports again.
+    if stamp.exists() and stamp.read_text() == key and all(d.is_dir() and any(d.iterdir()) for d in (PUBLIC, FIXTURES, PUBLIC / "packs")) and (GENERATED / "assets-version.json").is_file():
         print("Assets are up to date.")
     else:
         stamp.unlink(missing_ok=True)

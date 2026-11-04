@@ -70,7 +70,7 @@ describe('instructions page', () => {
   });
 
   itWithArt(
-    'gives every fighter real art and a plate or text fallback, and covers every art file the DOM names',
+    'gives every fighter real art and a plate or text fallback, and every art file the DOM names is on disk',
     () => {
       for (const entry of ROSTER) {
         const guide = GUIDES_DATA[entry.id];
@@ -85,19 +85,27 @@ describe('instructions page', () => {
           ).toBe(true);
         }
       }
-      // The DOM loads these by path under ASSET_BASE, so the export must
-      // publish each one under the version (assets-version.json's files).
-      const published: string[] = JSON.parse(
-        readFileSync(here + '../game/generated/assets-version.json', 'utf8'),
-      ).files;
       const named = domNamed();
       expect(named.length).toBeGreaterThan(0);
       for (const name of named) {
-        expect(published, name).toContain(name);
         expect(statSync(`public/assets/${name}`).isFile(), name).toBe(true);
       }
     },
   );
+
+  // The DOM loads these by path under ASSET_BASE, so the export must publish
+  // each one under the version (assets-version.json's files). Plain, not
+  // itWithArt: CI runs this with the sources and the manifest, and no art.
+  it('publishes every art file the DOM names (on a miss, run bun run assets && bun run upload:r2)', () => {
+    const published: string[] = JSON.parse(
+      readFileSync(here + '../game/generated/assets-version.json', 'utf8'),
+    ).files;
+    const named = domNamed();
+    expect(named.length).toBeGreaterThan(0);
+    for (const name of named) {
+      expect(published, name).toContain(name);
+    }
+  });
 
   it("uses each fighter's in-game name lettering as the header plate", () => {
     // The *name action the Vs. intro shows: a looping, facing-independent

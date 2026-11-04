@@ -43,7 +43,10 @@ beforeEach(() => {
     revokeObjectURL: vi.fn(),
   });
 });
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 // A pack from its entries, laid out as write_pack writes it (export_assets.py).
 const pack = (
@@ -221,10 +224,14 @@ describe('PackFile', () => {
   });
 
   it('a corrupt pack raises loaderror then errors the file', async () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     const fake = loader();
     // Shorter than its length prefix.
     const file = fileWith(fake, new Uint8Array([9, 9]).buffer);
     await file.onProcess();
+    expect(logged).toHaveBeenCalledWith(
+      new Error('pack is shorter than its length prefix'),
+    );
     expect(fake.emit).toHaveBeenCalledOnce();
     expect(fake.emit).toHaveBeenCalledWith(
       Phaser.Loader.Events.FILE_LOAD_ERROR,
@@ -236,6 +243,7 @@ describe('PackFile', () => {
   });
 
   it('an image that fails to decode, or a sound that is rejected, raises loaderror', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     outcomes = ['error'];
     const badImage = loader();
     const imageFile = fileWith(badImage, pack({ 'fighter-yinan-1': [1] }));
@@ -267,6 +275,8 @@ describe('PackFile', () => {
   });
 
   it('revokes every image blob URL', async () => {
+    // The failing case below logs its error.
+    vi.spyOn(console, 'error').mockImplementation(() => {});
     const images = { 'fighter-yinan-1': [1], 'fighter-yinan-2': [2] };
     await fileWith(loader(), pack(images)).onProcess();
     expect(blobs).toHaveLength(2);

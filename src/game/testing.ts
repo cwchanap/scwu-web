@@ -11,7 +11,8 @@ import type { Effect, Fighter, Input } from './match';
 // For the tests that read the exported PNGs and WAVs in public/assets/. They
 // check what `bun run assets` wrote, so they run where it ran (`bun run
 // validate`, the pre-commit hook). GitHub Actions has only the generated JSON:
-// the art lives in R2 (28,000 files), so they skip when CI is set.
+// the art is published to R2 (the export has about 28,000 files), so they skip
+// when CI is set.
 export const itWithArt = it.skipIf(!!process.env.CI);
 
 export const RYUKO = {
