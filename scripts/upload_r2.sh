@@ -33,6 +33,23 @@ includes=()
 while IFS= read -r file; do includes+=(--include "$file"); done < <(
   python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))["files"]))' "$manifest")
 
+# The version must still describe the bytes on disk: an export that stopped
+# after rewriting packs but before writing the manifest would otherwise put
+# files the version doesn't cover under an immutable prefix. Refuse to upload.
+actual=$(python3 - "$manifest" <<'PY'
+import hashlib, json, sys
+digest = hashlib.sha256()
+for name in json.load(open(sys.argv[1]))["files"]:
+    digest.update(name.encode("utf8"))
+    digest.update(open(f"public/assets/{name}", "rb").read())
+print(digest.hexdigest()[:16])
+PY
+)
+if [ "$actual" != "$version" ]; then
+  echo "public/assets does not hash to $version; rerun bun run assets before uploading" >&2
+  exit 1
+fi
+
 # Only the listed files: exclude everything, then include each one. No --delete.
 aws s3 sync public/assets "s3://$R2_BUCKET/$version/" --endpoint-url "$endpoint" --only-show-errors \
   --cache-control "public, max-age=31536000, immutable" --exclude '*' "${includes[@]}"

@@ -17,9 +17,14 @@ export function parsePack(buffer: ArrayBuffer): Pack {
   const headerEnd = 4 + new DataView(buffer).getUint32(0, true);
   if (headerEnd > buffer.byteLength)
     throw new Error('pack header runs past the file');
-  const { images, sounds }: Omit<Pack, 'payload'> = JSON.parse(
+  const header = JSON.parse(
     new TextDecoder().decode(new Uint8Array(buffer, 4, headerEnd - 4)),
   );
+  const isTable = (table: unknown) =>
+    typeof table === 'object' && table !== null && !Array.isArray(table);
+  if (!isTable(header?.images) || !isTable(header?.sounds))
+    throw new Error('pack header lacks its images or sounds table');
+  const { images, sounds }: Omit<Pack, 'payload'> = header;
   const payload = new Uint8Array(buffer, headerEnd);
   for (const [key, [offset, length]] of [
     ...Object.entries(images),
