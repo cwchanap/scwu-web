@@ -74,6 +74,14 @@ describe('pack files', () => {
     expect(() => parsePack(new ArrayBuffer(3))).toThrow(/length prefix/);
   });
 
+  it('parsePack rejects a header whose tables are arrays', () => {
+    const bytes = assemble(
+      { images: [[0, 1]], sounds: {} },
+      new Uint8Array([1]),
+    );
+    expect(() => parsePack(bytes)).toThrow(/images or sounds table/);
+  });
+
   it("selectAssets lists Ryuko's select images and sounds", () => {
     const indexes = new Set(CHARACTERS.ryuko.images.map((i) => i.index));
     expect(selectAssets.ryuko.images.size).toBeGreaterThan(0);
