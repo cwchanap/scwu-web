@@ -75,11 +75,28 @@ describe('pack files', () => {
   });
 
   it('parsePack rejects a header whose tables are arrays', () => {
-    const bytes = assemble(
+    for (const header of [
       { images: [[0, 1]], sounds: {} },
-      new Uint8Array([1]),
+      { images: {}, sounds: [[0, 1]] },
+    ]) {
+      const bytes = assemble(header, new Uint8Array([1]));
+      expect(() => parsePack(bytes)).toThrow(/images or sounds table/);
+    }
+  });
+
+  it('parsePack rejects a header with a missing table or none at all', () => {
+    for (const header of [{ images: {} }, { sounds: {} }, null]) {
+      const bytes = assemble(header, new Uint8Array([1]));
+      expect(() => parsePack(bytes)).toThrow(/images or sounds table/);
+    }
+  });
+
+  it('parsePack rejects an entry that is not an [offset, length] pair', () => {
+    const bytes = assemble(
+      { images: { 'ryuko-1': 5 }, sounds: {} },
+      new Uint8Array([1, 2, 3, 4, 5]),
     );
-    expect(() => parsePack(bytes)).toThrow(/images or sounds table/);
+    expect(() => parsePack(bytes)).toThrow(/lies outside the payload/);
   });
 
   it("selectAssets lists Ryuko's select images and sounds", () => {

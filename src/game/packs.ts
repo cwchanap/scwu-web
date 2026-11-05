@@ -26,10 +26,11 @@ export function parsePack(buffer: ArrayBuffer): Pack {
     throw new Error('pack header lacks its images or sounds table');
   const { images, sounds }: Omit<Pack, 'payload'> = header;
   const payload = new Uint8Array(buffer, headerEnd);
-  for (const [key, [offset, length]] of [
+  for (const [key, range] of [
     ...Object.entries(images),
     ...Object.entries(sounds),
   ]) {
+    const [offset, length] = Array.isArray(range) ? range : [NaN, NaN];
     if (
       !Number.isSafeInteger(offset) ||
       !Number.isSafeInteger(length) ||
