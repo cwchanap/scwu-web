@@ -4989,12 +4989,26 @@ def exporter():
     return digest.hexdigest()
 
 
+def up_to_date(stamp, key):
+    """Whether the last export's outputs still stand: the inputs stamp matches, the fixtures are in
+    place, and the manifest parses with every published file still hashing to the version it names.
+    A drifted file or a manifest that will not parse exports again rather than trust stale output."""
+    if not stamp.exists() or stamp.read_text() != key:
+        return False
+    if not FIXTURES.is_dir() or not any(FIXTURES.iterdir()):
+        return False
+    try:
+        manifest = json.loads((GENERATED / "assets-version.json").read_text(encoding="utf8"))
+        return assets_version(manifest["files"]) == manifest["version"]
+    except Exception:
+        return False
+
+
 if __name__ == "__main__":
     # Its outputs stand while nothing it reads has changed since the last export.
     stamp = GENERATED / ".inputs"
     key = inputs()
-    # A missing or empty directory, the packs' included, or a missing manifest, exports again.
-    if stamp.exists() and stamp.read_text() == key and all(d.is_dir() and any(d.iterdir()) for d in (PUBLIC, FIXTURES, PUBLIC / "packs")) and (GENERATED / "assets-version.json").is_file() and all((PUBLIC / name).is_file() for name in json.loads((GENERATED / "assets-version.json").read_text(encoding="utf8"))["files"]):
+    if up_to_date(stamp, key):
         print("Assets are up to date.")
     else:
         stamp.unlink(missing_ok=True)

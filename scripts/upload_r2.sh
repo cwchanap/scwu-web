@@ -25,26 +25,48 @@ export AWS_REQUEST_CHECKSUM_CALCULATION=when_required
 export AWS_RESPONSE_CHECKSUM_VALIDATION=when_required
 endpoint="https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com"
 
+# An export that did not finish leaves no .inputs (export_assets.py removes it
+# before writing and restores it after): the generated JSON could already be
+# new while the packs and the manifest are still old.
+if [ ! -f src/game/generated/.inputs ]; then
+  echo "src/game/generated/.inputs is missing; the last export did not finish — rerun bun run assets" >&2
+  exit 1
+fi
+
 # The version and the published files come from the export's manifest, not
-# from a scan of the source: the same list the tests and the bucket use.
+# from a scan of the source: the same list the tests and the bucket use. One
+# pass prints the version, then the keys rehashed as assets_version() in
+# export_assets.py computes them (keep the two in step), then the keys.
 manifest=src/game/generated/assets-version.json
-version=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["version"])' "$manifest")
+if ! published=$(python3 - "$manifest" <<'PY'
+import hashlib, json, sys
+manifest = json.load(open(sys.argv[1]))
+digest = hashlib.sha256()
+missing = []
+for name in manifest["files"]:
+    digest.update(name.encode("utf8"))
+    try:
+        digest.update(open(f"public/assets/{name}", "rb").read())
+    except OSError:
+        missing.append(name)
+print(manifest["version"])
+print(digest.hexdigest()[:16])
+print("\n".join(manifest["files"]))
+if missing:
+    sys.exit("published files missing from public/assets: " + ", ".join(missing))
+PY
+); then
+  echo "rerun bun run assets before uploading" >&2
+  exit 1
+fi
+version=$(head -n1 <<<"$published")
+actual=$(sed -n 2p <<<"$published")
 includes=()
-while IFS= read -r file; do includes+=(--include "$file"); done < <(
-  python3 -c 'import json, sys; print("\n".join(json.load(open(sys.argv[1]))["files"]))' "$manifest")
+while IFS= read -r file; do includes+=(--include "$file"); done < <(tail -n +3 <<<"$published")
 
 # The version must still describe the bytes on disk: an export that stopped
 # after rewriting packs but before writing the manifest would otherwise put
 # files the version doesn't cover under an immutable prefix. Refuse to upload.
-actual=$(python3 - "$manifest" <<'PY'
-import hashlib, json, sys
-digest = hashlib.sha256()
-for name in json.load(open(sys.argv[1]))["files"]:
-    digest.update(name.encode("utf8"))
-    digest.update(open(f"public/assets/{name}", "rb").read())
-print(digest.hexdigest()[:16])
-PY
-)
 if [ "$actual" != "$version" ]; then
   echo "public/assets does not hash to $version; rerun bun run assets before uploading" >&2
   exit 1
