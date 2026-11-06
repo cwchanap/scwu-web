@@ -254,6 +254,9 @@ unannounced test.
   https://developers.cloudflare.com/workers/static-assets/routing/advanced/html-handling/
 - Cloudflare Worker script routing:
   https://developers.cloudflare.com/workers/static-assets/routing/worker-script/
+- Cloudflare Preview variables/secrets:
+  https://developers.cloudflare.com/workers/previews/configuration/
+- Cloudflare Preview D1 binding and migration isolation:
+  https://developers.cloudflare.com/workers/previews/resources/
 - Google's server-side ID-token validation:
   https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
-
