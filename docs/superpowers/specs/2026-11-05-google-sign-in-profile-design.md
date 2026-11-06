@@ -18,7 +18,9 @@ identity. Sign-in and sign-out live entirely on the profile page.
 - Do not load Google Identity Services (GIS) in the game bundle.
 - If the public Google client ID is absent at build time, hide the Menu's
   Profile row entirely. Existing local development and CI stay usable.
-- Do not change Phaser, match rules, asset export, controls or game state.
+- Do not change Phaser, match rules, controls or game state. A narrow
+  exporter source-scan adjustment is permitted only to keep shared-page
+  artwork published; do not change the asset formats.
 - HPA-771 owns Achievements (including the `#achievements` route, progress
   summary, storage, and menu count); HPA-767 owns Cheats. Neither is built here.
 
@@ -40,15 +42,17 @@ identity. Sign-in and sign-out live entirely on the profile page.
 3. **Google ID token exchange rather than a general OAuth framework.**
    Load GIS on the profile page only. Its browser callback sends the
    `credential` ID token to the same-origin Worker. Verify it using
-   Google's published JWKS (a small maintained JWT library such as
-   `jose`, not custom signature verification). Require a valid Google
-   signature, issuer, audience, expiry and nonempty `sub`. Never use
-   email as an account key and never persist the Google ID token.
+   Google's published JWKS and `jose`, not custom verification. Pin
+   `RS256`; require audience, expiry, a nonempty `sub` and either valid
+   issuer (`accounts.google.com` or `https://accounts.google.com`).
+   Use the verified `name`, else `given_name`, else `"Player"` as the
+   display name; never use email as an account key or persist the token.
 4. **Stateless session rather than a sessions table.** After a valid Google
    token, the Worker upserts the user in D1 and sets its own signed,
    expiring cookie. The session carries the Google `sub`, not a Google
-   token. The Worker verifies the cookie on every `/api/me` call and
-   reads current user details from D1. Sign-out deletes the cookie.
+   token. Use `jose` HS256 with a Worker-only secret of at least 32
+   UTF-8 bytes; the Worker verifies the cookie on every `/api/me`
+   call and reads user details from D1. Sign-out deletes the cookie.
    No custom identity sync or refresh-token flow.
 
 These choices reuse the site's current patterns and leave just one account
@@ -65,8 +69,9 @@ identity for later achievement storage.
   the current tab. It does not sign the player in or out.
 - Read `GET /api/me` with the shared client module when the Menu opens.
   Reopening after visiting the other tab updates its identity. Render
-  "Not signed in" while logged out or if the request fails; don't
-  poll or introduce cross-tab synchronization.
+  "Not signed in" while logged out or if the request fails (network
+  error, non-2xx or invalid/non-JSON body); don't poll or introduce
+  cross-tab synchronization.
 - Without the build-time client ID, render no row and make no auth API
   requests from the game.
 
@@ -102,14 +107,15 @@ All routes are same-origin and return JSON with `Cache-Control: no-store`.
 | `GET /api/me` | Signed cookie (optional) | `200 { "user": ProfileUser | null }`; missing, invalid or expired sessions return `null` |
 
 `ProfileUser` is `{ name: string, avatarUrl: string | null,
-createdAt: string }`. Keep the account's opaque Google subject on the
-server; the achievements API will identify the caller by the verified
-session, not by a client-supplied user ID.
+createdAt: string }`; `createdAt` is an **ISO 8601 UTC** string
+(e.g. `2026-11-06T05:53:34Z`) to avoid browser-local SQLite date parsing.
+Keep the Google subject on the server; HPA-771 identifies the caller by
+the verified session, never by a client-provided account ID.
 
 Cookie: `scwu_session` with `HttpOnly`, `SameSite=Lax`, `Path=/`,
 `Secure` on HTTPS, and a short fixed expiry (proposed: seven days).
-Use an HMAC-signed JWT or equivalent signed payload with `sub` and
-expiry; signing and verification use a Worker-only `SESSION_SECRET`.
+Use a `jose` HS256 JWT with `sub` and expiry; signing and verification
+require a Worker-only `SESSION_SECRET` of at least 32 UTF-8 bytes.
 Signing out clears this browser's cookie; server-side revocation of
 previously copied cookies is out of scope.
 
@@ -122,50 +128,125 @@ CREATE TABLE IF NOT EXISTS users (
   google_sub TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
   avatar_url TEXT,
-  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 ```
 
 Upsert by verified Google `sub`, updating name/avatar on repeat
-sign-in and preserving `created_at` for "Playing since".
+sign-in and preserving UTC `created_at` for "Playing since".
 No email, password, achievements, sessions or separate internal user
 ID tables are needed in this ticket.
 
-## Configuration and release
+## Configuration, preview isolation and local development
 
-- `wrangler.jsonc`: point `main` at the Worker entry and add a D1
-  binding (`DB`) once the owner has created the database; retain
-  `assets.directory = "./dist"` and existing preview configuration.
-  The Worker handles `/api/*`; static files still take the asset path.
-  Do not hardcode a fake D1 database ID.
-- Public Google web client ID is configured in **both** Vite build
-  (`VITE_GOOGLE_CLIENT_ID`, for UI/GIS) and Worker runtime
-  (`GOOGLE_CLIENT_ID`, for JWT audience). They must match.
-  `SESSION_SECRET` is a Worker secret, never a Vite variable.
-- The owner creates the OAuth web client with localhost, production and
-  relevant preview JavaScript origins, D1, and the secret before enabling
-  auth on a deployed environment. Add exact setup/migration commands to
-  `README.md` as part of implementation, including local D1 testing.
-- Keep the original assets/R2 and Workers Builds path unchanged. With no
-  Google client ID, the public profile entry remains harmless and the
-  game does not expose the Profile row.
+**Public client ID is committed config, not a dashboard runtime variable.**
+Once the owner creates the real OAuth web client, commit its non-secret
+ID to `wrangler.jsonc` in both `vars.GOOGLE_CLIENT_ID` (production)
+and `previews.vars.GOOGLE_CLIENT_ID`; keep them equal. Wrangler deploys
+override dashboard-set plaintext runtime vars unless `keep_vars` is
+enabled, which this project does not use. The same public ID must be
+provided separately as `VITE_GOOGLE_CLIENT_ID` to the production
+and Preview **builds** so Vite can gate the Menu and initialize GIS.
+Do not commit a placeholder or invented client ID.
+
+- Add `main: "src/worker/index.ts"` alongside the existing static
+  `assets.directory = "./dist"`; the normal asset-first routing
+  serves `/profile` and invokes the Worker on unmatched `/api/*`.
+  Do not use an SPA fallback or add a routing service.
+- Bind production `DB` under top-level `d1_databases` to the real
+  `scwu-web` D1 database, and Preview `DB` under
+  `previews.d1_databases` to a **separate, shared**
+  `scwu-web-preview` database. This avoids preview writes to
+  production rows. Real database IDs are committed after provisioning.
+  A tiny `wrangler.preview-migrations.jsonc` with a top-level
+  binding to that same preview DB allows Wrangler's migration command
+  to target it safely.
+- `SESSION_SECRET` is never committed. Set it as a Worker secret
+  separately for production and Preview (or use Cloudflare's
+  Previews Base secret for future previews). Both environments require
+  the same *name*, not the same secret value.
+- **Fail explicitly when unconfigured.** Every `/api/*` request
+  first checks `DB`, `GOOGLE_CLIENT_ID`, and a
+  `SESSION_SECRET` at least 32 UTF-8 bytes long. If absent or
+  invalid, respond with HTTP 500 and JSON
+  `{ "error": "missing SESSION_SECRET" }` (or the corresponding
+  binding/variable name), not an unsigned/empty-key session. The
+  Menu's `getMe()` degrades to signed-out. After proper setup,
+  an unauthenticated `GET /api/me` returns
+  `{ "user": null }`.
+- **Phase-zero setup:** before relying on the first integrated
+  Preview, the owner registers the exact production origin, the
+  branch's stable Preview alias, and the local
+  `http://127.0.0.1:5173` origin with Google; creates both D1
+  databases; applies the migration to both; sets the Worker secrets
+  and Vite build variables. Google origin changes can take time to
+  propagate. The per-deployment Preview URLs change each push and
+  must **not** be used for GIS sign-in.
+- Local development uses `vite.config.ts`'s
+  `server.proxy['/api'] = 'http://127.0.0.1:8787'` and two
+  processes: `bun run dev` and
+  `bunx wrangler dev --port 8787` (create an empty `dist/`
+  first if required by the static asset config). Apply
+  `bunx wrangler d1 migrations apply DB --local`.
+  Put the local `SESSION_SECRET` in gitignored `.dev.vars`.
+  Avoid `@cloudflare/vite-plugin` and its different output path.
+- Keep the original R2 asset publication and Workers Builds path.
+  `README.md` records owner setup, migration commands, local
+  development and Preview secrets/variables.
+
+## Shared page styling and asset publication
+
+The guide's colors, fonts, backdrop, `.back` and `.panel`
+styles currently live inside `Instructions.svelte`; importing that
+component would pull in unrelated fighter/move data. Move only the
+generic page styles to `src/instructions/page.css` imported by both
+entry points, and the shared backdrop asset-property setup and
+close-or-return handler to `src/instructions/page.ts`. Keep the
+guide's fighter-specific styles where they are.
+
+`scripts/export_assets.py:dom_art()` currently scans
+`App.svelte`, `src/instructions/*.svelte` and
+`src/instructions/moves.ts`. When moving the `select/15.png`
+string to `page.ts` and adding the profile page, extend the scan
+to `page.ts` and `src/profile/*.svelte` (and any profile TS files
+that name source-art paths). Verify the versioned `published_files()`
+still includes `select/15.png` and any new DOM art, preventing
+production-only 404s. Updating `export_assets.py` changes the
+build fingerprint: publish its new generated tarball/assets **before**
+pushing the exporter change, but only with the owner's permission to
+write to the R2 bucket. Never perform a production R2 upload as an
+unannounced test.
 
 ## Validation and boundaries
 
-- Unit tests: valid/invalid issuer, audience, expiry and signature;
-  malformed credentials; signed/expired/tampered cookies; signed-out
-  response; D1 upsert preserving "Playing since"; shared client results.
-  Mock JWKS/D1; no real Google token or production account needed in CI.
-- E2E: without credentials, the Menu lacks Profile and the game works;
-  with configured staging credentials, the profile opens in a new tab,
-  sign-in survives reload, Menu shows the refreshed avatar/name, and
-  sign-out restores signed-out state.
-- Completion gates: `bun run validate`, `bun run build`, and
-  `bun run e2e` pass after the implementation, plus a real preview
-  smoke test after owner setup. The docs-only draft cannot claim them.
-- Explicit non-goals: providers besides Google, edit/delete account,
+- Worker unit tests run the **actual D1 SQL** against Node's
+  `node:sqlite` through a tiny `prepare().bind().first()/run()`
+  adapter; migrations and repeat upserts preserve `created_at`.
+  Pin a Node version with `node:sqlite` in test environments.
+- Test Google JWTs via dependency injection: `handle(request, env,
+  keys)` accepts a JWKS verifier or local `jose` key set; never
+  stub global `fetch` because Vitest uses `isolate: false`.
+  Exercise valid tokens (including both issuers), expired/tampered
+  tokens, wrong issuer/audience, missing `sub`, display-name
+  fallback, signed/expired/tampered cookies, and failed config.
+- Test the shared API client in Node with **injected fetch**:
+  `getMe()` returns `null` on network errors, non-2xx
+  responses and unexpected HTML/non-JSON bodies. No Svelte
+  component-test dependency is needed; `src/menu.ts` pure
+  helpers and browser smoke tests cover the Menu branch.
+- E2E without credentials checks both that the Menu hides Profile
+  and that `/profile.html` renders "Sign-in unavailable" without
+  page errors. With owner-configured Preview, manually smoke-test
+  Google sign-in, persisted cookie, game identity refresh,
+  sign-out, `/profile`, `/api/me` and Preview D1 isolation.
+- `bun run validate`, `bun run build`, and
+  `bun run e2e` must pass after implementation. The three
+  GitHub Actions jobs **skip draft PRs**; checks must run
+  locally until the PR is marked ready. The docs-only draft
+  cannot claim verification.
+- Non-goals: providers besides Google, edit/delete account,
   profile stats, achievements, global auth stores, token refresh,
-  elaborate CSRF/session-revocation hardening, and any game change.
+  elaborate CSRF/session revocation, and gameplay changes.
 
 ## References
 
@@ -175,3 +256,4 @@ ID tables are needed in this ticket.
   https://developers.cloudflare.com/workers/static-assets/routing/worker-script/
 - Google's server-side ID-token validation:
   https://developers.google.com/identity/gsi/web/guides/verify-google-id-token
+
