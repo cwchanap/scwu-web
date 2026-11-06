@@ -81,14 +81,16 @@ integration test successful before these inputs are provisioned.
 mkdir -p dist
 bunx wrangler d1 migrations apply DB --local
 bunx wrangler dev --port 8787
-# in another terminal
-bun run dev
+# in another terminal (omit client ID for unconfigured mode)
+VITE_GOOGLE_CLIENT_ID=<public-id> bun run dev
 ```
 
 Put local `SESSION_SECRET` in `.dev.vars`; add it to
 `.gitignore`. The public Google client ID comes from committed
 Wrangler vars / Vite `VITE_GOOGLE_CLIENT_ID`; do not paste it
-into a secrets store. `bun run dev` continues to work with
+into a secrets store. Vite does not inherit Wrangler's
+runtime vars; supply its public build-time ID separately.
+`bun run dev` continues to work with
 no credentials (Profile Menu row hidden).
 Avoid `@cloudflare/vite-plugin`: the repository's `dist/`,
 `build.sh` and e2e layout are already established.
@@ -100,9 +102,8 @@ Avoid `@cloudflare/vite-plugin`: the repository's `dist/`,
 `src/worker/index.ts`,
 `src/worker/auth.ts`,
 `src/worker/auth.test.ts`,
-`profile.html`,
-`src/profile/main.ts` (a minimal "Sign-in unavailable"
-page can be replaced in Phase 2),
+`profile.html` (a minimal static "Sign-in unavailable"
+page, upgraded to Svelte in Phase 2),
 and (after real Preview ID is known)
 `wrangler.preview-migrations.jsonc`.
 
@@ -163,7 +164,7 @@ and (after real Preview ID is known)
   cookie tampering/expiry, D1 upsert preserving
   `created_at`, missing config returning 500, sign-out,
   and unauthenticated `GET /api/me`.
-- [ ] Add the third Vite HTML input and minimal mounted Svelte
+- [ ] Add the third Vite HTML input and a temporary static
   profile shell now so `/profile` exists on the first
   Preview API deployment. Add the Vite dev proxy here.
 
@@ -186,12 +187,12 @@ prove D1 or Google origin configuration.
 
 **Create:** `src/auth/api.ts`,
 `src/auth/api.test.ts`,
-`src/profile/Profile.svelte`,
+`src/profile/main.ts`, `src/profile/Profile.svelte`,
 `src/instructions/page.css`, `src/instructions/page.ts`.
 
 **Modify:** `src/instructions/main.ts`,
 `src/instructions/Instructions.svelte`,
-`src/profile/main.ts`,
+`profile.html`,
 `scripts/export_assets.py` (narrow `dom_art()` scan only).
 
 - [ ] Move only generic guide fonts, colors, body
