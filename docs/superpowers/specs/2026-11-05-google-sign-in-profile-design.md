@@ -184,11 +184,13 @@ Do not commit a placeholder or invented client ID.
   must **not** be used for GIS sign-in.
 - Local development uses `vite.config.ts`'s
   `server.proxy['/api'] = 'http://127.0.0.1:8787'` and two
-  processes: `bun run dev` and
+  processes: `VITE_GOOGLE_CLIENT_ID=<public-id> bun run dev` and
   `bunx wrangler dev --port 8787` (create an empty `dist/`
   first if required by the static asset config). Apply
   `bunx wrangler d1 migrations apply DB --local`.
   Put the local `SESSION_SECRET` in gitignored `.dev.vars`.
+  Wrangler's runtime vars do not populate the separate Vite
+  process; omit the public Vite variable when unconfigured.
   Avoid `@cloudflare/vite-plugin` and its different output path.
 - Keep the original R2 asset publication and Workers Builds path.
   `README.md` records owner setup, migration commands, local
