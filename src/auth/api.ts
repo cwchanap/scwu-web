@@ -11,10 +11,25 @@ export type FetchLike = (
 
 const browserFetch: FetchLike = (input, init) => fetch(input, init);
 
-const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+const ISO_UTC = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
 
-const isIsoUtc = (value: string) =>
-  ISO_UTC.test(value) && !Number.isNaN(Date.parse(value));
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+
+const isIsoUtc = (value: string) => {
+  const match = ISO_UTC.exec(value);
+  if (match === null) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+  const days = month === 2 && leap ? 29 : (DAYS_IN_MONTH[month - 1] ?? 0);
+  return (
+    Number(match[3]) >= 1 &&
+    Number(match[3]) <= days &&
+    Number(match[4]) <= 23 &&
+    Number(match[5]) <= 59 &&
+    Number(match[6]) <= 59
+  );
+};
 
 const userOf = (body: unknown): ProfileUser | null => {
   if (typeof body !== 'object' || body === null) return null;

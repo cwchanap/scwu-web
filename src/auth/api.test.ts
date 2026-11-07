@@ -102,6 +102,22 @@ describe('getMe', () => {
       { user: { ...USER, createdAt: '2026-13-40T99:99:99Z' } },
     ],
     ['a date-only createdAt', { user: { ...USER, createdAt: '2026-11-06' } }],
+    [
+      'a non-leap February 29 createdAt',
+      { user: { ...USER, createdAt: '2026-02-29T05:53:34Z' } },
+    ],
+    [
+      'a February 30 createdAt',
+      { user: { ...USER, createdAt: '2026-02-30T05:53:34Z' } },
+    ],
+    [
+      'an April 31 createdAt',
+      { user: { ...USER, createdAt: '2026-04-31T05:53:34Z' } },
+    ],
+    [
+      'a century February 29 createdAt',
+      { user: { ...USER, createdAt: '2100-02-29T05:53:34Z' } },
+    ],
   ])('returns null on %s', async (_label, body) => {
     const { fetchImpl } = stubFetch(() => jsonResponse(body));
     expect(await getMe(fetchImpl)).toBeNull();
@@ -112,6 +128,15 @@ describe('getMe', () => {
     const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
     expect(await getMe(fetchImpl)).toEqual(user);
   });
+
+  it.each(['2028-02-29T05:53:34Z', '2000-02-29T00:00:00Z'])(
+    'accepts the leap day %s',
+    async (createdAt) => {
+      const user = { ...USER, createdAt };
+      const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
+      expect(await getMe(fetchImpl)).toEqual(user);
+    },
+  );
 });
 
 describe('signInGoogle', () => {
