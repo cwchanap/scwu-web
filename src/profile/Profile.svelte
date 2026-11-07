@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getMe, signInGoogle, signOut, type ProfileUser } from '../auth/api';
+  import { readMe, signInGoogle, signOut, type ProfileUser } from '../auth/api';
   import { back } from '../instructions/page';
 
   interface GoogleIdentity {
@@ -31,27 +31,62 @@
   let loaded = $state(false);
   let exchangeFailed = $state(false);
   let signOutFailed = $state(false);
+  let refreshFailed = $state(false);
+  let pending = $state(false);
   let gisReady = $state(false);
   let gisFailed = $state(false);
   let gisButton = $state<HTMLDivElement>();
 
+  let reads = 0;
   const refresh = async () => {
-    me = await getMe();
+    const mine = ++reads;
+    const result = await readMe();
+    if (mine !== reads) return;
     loaded = true;
+    if (result.ok) {
+      me = result.user;
+      refreshFailed = false;
+    } else {
+      refreshFailed = true;
+    }
   };
 
   const exchange = async (response: { credential?: string }) => {
-    if (!response.credential) return;
-    exchangeFailed = (await signInGoogle(response.credential)) === null;
-    await refresh();
+    if (!response.credential || pending) return;
+    pending = true;
+    try {
+      const user = await signInGoogle(response.credential);
+      ++reads;
+      loaded = true;
+      if (user === null) {
+        exchangeFailed = true;
+      } else {
+        exchangeFailed = false;
+        signOutFailed = false;
+        refreshFailed = false;
+        me = user;
+        void refresh();
+      }
+    } finally {
+      pending = false;
+    }
   };
 
   const leave = async () => {
-    if (await signOut()) {
-      signOutFailed = false;
-      await refresh();
-    } else {
-      signOutFailed = true;
+    if (pending || !me) return;
+    pending = true;
+    try {
+      if (await signOut()) {
+        signOutFailed = false;
+        refreshFailed = false;
+        ++reads;
+        me = null;
+        void refresh();
+      } else {
+        signOutFailed = true;
+      }
+    } finally {
+      pending = false;
     }
   };
 
@@ -133,7 +168,9 @@
       {#if !clientId}
         <p class="unavailable">Sign-in unavailable</p>
       {:else if me}
-        <button class="signout" type="button" onclick={leave}>Sign out</button>
+        <button class="signout" type="button" onclick={leave} disabled={pending}
+          >Sign out</button
+        >
         {#if signOutFailed}
           <p class="failed">Sign-out failed — try again.</p>
         {/if}
@@ -146,6 +183,9 @@
         {/if}
       {:else}
         <p class="unavailable">Checking sign-in…</p>
+      {/if}
+      {#if refreshFailed}
+        <p class="failed">Couldn't refresh your sign-in — try again.</p>
       {/if}
     </div>
     <nav class="pagenav" aria-label="Profile">

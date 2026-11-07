@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-e2e-configured/
 .DS_Store
 .husky/_/
 scwu-web-handoff/
@@ -16,6 +17,6 @@ __pycache__/
 .superpowers/
 .wrangler/
 .env
-.dev.vars
+.dev.vars*
 playwright-report/
 test-results/

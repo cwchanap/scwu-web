@@ -9,6 +9,7 @@ export default ts.config(
   {
     ignores: [
       'dist/**',
+      'dist-e2e-configured/**',
       'node_modules/**',
       'scwu-web-handoff/**',
       '**/generated/**',

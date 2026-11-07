@@ -144,6 +144,15 @@ function scwuSession(res: Response): string {
   return pair;
 }
 
+const seedSub1 = (db: DatabaseSync) => {
+  db.prepare(
+    "INSERT INTO users (google_sub, display_name, created_at) VALUES ('sub-1', 'Ryuko', '2026-11-06T05:53:34Z')",
+  ).run();
+};
+
+const meWithCookie = (env: Env, cookie: string) =>
+  handle(get('/api/me', { headers: { cookie } }), env, keys);
+
 describe('POST /api/auth/google', () => {
   async function signIn(
     credential: string,
@@ -340,46 +349,45 @@ describe('GET /api/me', () => {
   });
 
   it('returns {user:null} for a tampered cookie', async () => {
-    const { env } = testEnv();
-    const res = await handle(
-      get('/api/me', {
-        headers: {
-          cookie: `scwu_session=${tampered(await sessionToken('sub-1'))}`,
-        },
-      }),
-      env,
-      keys,
-    );
+    const { env, db } = testEnv();
+    seedSub1(db);
+    const token = await sessionToken('sub-1');
+    const valid = await meWithCookie(env, `scwu_session=${token}`);
+    expect((await valid.json()).user.name).toBe('Ryuko');
+    const res = await meWithCookie(env, `scwu_session=${tampered(token)}`);
     expect(await res.json()).toEqual({ user: null });
   });
 
   it('returns {user:null} for an expired cookie', async () => {
-    const { env } = testEnv();
-    const res = await handle(
-      get('/api/me', {
-        headers: {
-          cookie: `scwu_session=${await sessionToken('sub-1', Math.floor(Date.now() / 1000) - 60)}`,
-        },
-      }),
+    const { env, db } = testEnv();
+    seedSub1(db);
+    const valid = await meWithCookie(
       env,
-      keys,
+      `scwu_session=${await sessionToken('sub-1')}`,
+    );
+    expect((await valid.json()).user.name).toBe('Ryuko');
+    const res = await meWithCookie(
+      env,
+      `scwu_session=${await sessionToken('sub-1', Math.floor(Date.now() / 1000) - 60)}`,
     );
     expect(await res.json()).toEqual({ user: null });
   });
 
   it('returns {user:null} for a cookie signed with a different secret', async () => {
-    const { env } = testEnv();
+    const { env, db } = testEnv();
+    seedSub1(db);
+    const valid = await meWithCookie(
+      env,
+      `scwu_session=${await sessionToken('sub-1')}`,
+    );
+    expect((await valid.json()).user.name).toBe('Ryuko');
     const foreign = await new SignJWT({})
       .setProtectedHeader({ alg: 'HS256' })
       .setSubject('sub-1')
       .setIssuedAt()
       .setExpirationTime('7d')
       .sign(new TextEncoder().encode('some-other-secret-with-32-plus-bytes'));
-    const res = await handle(
-      get('/api/me', { headers: { cookie: `scwu_session=${foreign}` } }),
-      env,
-      keys,
-    );
+    const res = await meWithCookie(env, `scwu_session=${foreign}`);
     expect(await res.json()).toEqual({ user: null });
   });
 
