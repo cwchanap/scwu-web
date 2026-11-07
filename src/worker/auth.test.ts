@@ -22,8 +22,6 @@ const ORIGIN = 'https://scwu-web.test';
 const MIGRATION = new URL('../../migrations/0001_users.sql', import.meta.url)
   .pathname;
 
-// The worker's narrow D1 surface over node:sqlite, so the tests run the real
-// migration and upsert SQL rather than a stubbed database.
 function sqliteD1(): D1Database & { db: DatabaseSync } {
   const db = new DatabaseSync(':memory:');
   db.exec(readFileSync(MIGRATION, 'utf8'));
@@ -91,7 +89,6 @@ beforeAll(async () => {
   keys = createLocalJWKSet({ keys: [jwk] });
 });
 
-// A Google ID token as GIS would deliver it, signed by the local test key.
 async function googleToken(
   claims: {
     iss?: string;
@@ -118,8 +115,6 @@ async function googleToken(
   return jwt.sign(privateKey);
 }
 
-// Flip a middle signature character; the final character's low bits are
-// padding, so changing it would not tamper the decoded signature.
 function tampered(jwt: string): string {
   const parts = jwt.split('.');
   const sig = parts[2];
@@ -466,7 +461,6 @@ describe('configuration guard', () => {
       expect(res.status).toBe(500);
       expect(await res.json()).toEqual({ error: 'invalid SESSION_SECRET' });
     }
-    // Multibyte characters count by UTF-8 byte length, not characters.
     const multibyte = testEnv({ SESSION_SECRET: 'あ'.repeat(10) });
     const res = await handle(get('/api/me'), multibyte.env, keys);
     expect(res.status).toBe(500);
