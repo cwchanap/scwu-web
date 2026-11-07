@@ -1,9 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { USER, json } from './stubs';
 
-// Runs only in the 'configured' project, whose build carries the throwaway
-// VITE_GOOGLE_CLIENT_ID; the game's art loads normally (R2 in CI, dist/assets
-// locally) and only the auth endpoints are stubbed.
 test('configured menu reads /api/me on each open', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
