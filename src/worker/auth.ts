@@ -70,7 +70,8 @@ export async function handle(
       return await me(request, configured);
     }
     return json({ error: 'not found' }, 404);
-  } catch {
+  } catch (error) {
+    console.error('Unhandled auth error:', error);
     return json({ error: 'internal error' }, 500);
   }
 }

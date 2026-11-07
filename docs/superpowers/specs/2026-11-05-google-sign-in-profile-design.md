@@ -1,6 +1,6 @@
 # HPA-768 — Google sign-in and profile page — design
 
-**Status:** proposed; implementation has not started.
+**Status:** implemented; in review.
 **Ticket:** https://linear.app/cwchanap/issue/HPA-768/google-sign-in-and-profile-page
 **Follow-up:** HPA-771 (Achievements) builds on this account/session API.
 **Delivery:** one draft PR for HPA-768, expanded to include the implementation before it is marked ready.
@@ -100,11 +100,11 @@ for its backdrop, not fighter data, move tables or Phaser.
 
 All routes are same-origin and return JSON with `Cache-Control: no-store`.
 
-| Request                  | Input                                | Output                                                                                |
-| ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------- |
-| `POST /api/auth/google`  | `{ "credential": "<GIS ID token>" }` | `200 { "user": ProfileUser }` and a signed session cookie; `401` for an invalid token |
-| `POST /api/auth/signout` | No body required                     | `200 { "user": null }` and an expired cookie                                          |
-| `GET /api/me`            | Signed cookie (optional)             | `200 { "user": ProfileUser                                                            | null }`; missing, invalid or expired sessions return `null` |
+| Request                  | Input                                | Output                                                                                    |
+| ------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------- |
+| `POST /api/auth/google`  | `{ "credential": "<GIS ID token>" }` | `200 { "user": ProfileUser }` and a signed session cookie; `401` for an invalid token     |
+| `POST /api/auth/signout` | No body required                     | `200 { "user": null }` and an expired cookie                                              |
+| `GET /api/me`            | Signed cookie (optional)             | `200 { "user": ProfileUser \| null }`; missing, invalid or expired sessions return `null` |
 
 `ProfileUser` is `{ name: string, avatarUrl: string | null,
 createdAt: string }`; `createdAt` is an **ISO 8601 UTC** string
