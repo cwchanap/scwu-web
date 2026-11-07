@@ -4892,10 +4892,11 @@ def export_demo(key, name, sha256, out):
 
 def dom_art():
     """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon, the
-    Instructions sources' select and gauge art, and moves.ts's guide art and nameplates. The literal paths
-    are the one source, so this scans the same text."""
+    Instructions sources' select and gauge art, moves.ts's guide art and nameplates, and the shared page.ts
+    backdrop the profile page reuses. The literal paths are the one source, so this scans the same text."""
     sources = [ROOT / "src/App.svelte", *sorted((ROOT / "src/instructions").glob("*.svelte")),
-               ROOT / "src/instructions/moves.ts"]
+               ROOT / "src/instructions/moves.ts", ROOT / "src/instructions/page.ts",
+               *sorted((ROOT / "src/profile").glob("*.svelte")), *sorted((ROOT / "src/profile").glob("*.ts"))]
     return sorted({name for source in sources for name in re.findall(r"[a-z0-9]+/[0-9]+\.png", source.read_text(encoding="utf8"))})
 
 

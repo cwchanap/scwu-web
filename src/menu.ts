@@ -1,3 +1,4 @@
+import type { ProfileUser } from './auth/api';
 import type { DummyBehavior } from './game/dummy';
 import type { Mode } from './game/match';
 
@@ -16,3 +17,18 @@ export const resetModeOf = (value: string, mode: Mode): Mode | null =>
     : mode === 'practice' || value === 'story'
       ? null
       : 'practice';
+
+export const profileConfigured = (clientId: string | undefined): boolean =>
+  !!clientId;
+
+export const identityRefresher = (
+  read: () => Promise<ProfileUser | null>,
+  apply: (user: ProfileUser | null) => void,
+): (() => Promise<void>) => {
+  let begun = 0;
+  return async () => {
+    const mine = ++begun;
+    const user = await read();
+    if (mine === begun) apply(user);
+  };
+};

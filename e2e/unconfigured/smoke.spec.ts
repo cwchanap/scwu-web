@@ -100,3 +100,55 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(opponent).toHaveValue('vsCpu');
   expect(errors).toEqual([]);
 });
+
+test('profile shows sign-in unavailable when unconfigured', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/profile.html');
+  await expect(page.getByText('Not signed in')).toBeVisible();
+  await expect(page.getByText('Sign-in unavailable').first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('guide keeps the shared backdrop and back link', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/instructions.html');
+  await expect(page.getByRole('link', { name: /Back to game/ })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundImage),
+    )
+    .toContain('select/15.png');
+  expect(errors).toEqual([]);
+});
+
+test('unconfigured menu has no profile row and makes no /api/me request', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let meCalls = 0;
+  await page.route('**/api/me', (route) => {
+    meCalls += 1;
+    return route.continue();
+  });
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  expect(meCalls).toBe(0);
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Profile ↗' })).toHaveCount(0);
+  await expect(dialog.getByText('Not signed in')).toHaveCount(0);
+  expect(meCalls).toBe(0);
+  expect(errors).toEqual([]);
+});

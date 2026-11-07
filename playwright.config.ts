@@ -12,11 +12,45 @@ export default defineConfig({
   reporter: process.env.CI
     ? [['github'], ['html', { open: 'never' }]]
     : [['list']],
-  use: { baseURL: 'http://127.0.0.1:4173', trace: 'retain-on-failure' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  use: { trace: 'retain-on-failure' },
+  projects: [
+    {
+      name: 'unconfigured',
+      testMatch: 'unconfigured/*.spec.ts',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://127.0.0.1:4173' },
+    },
+    {
+      name: 'configured',
+      testMatch: 'configured/*.spec.ts',
+      use: {
+        ...devices['Desktop Chrome'],
+        baseURL: 'http://127.0.0.1:4173',
+        storageState: {
+          cookies: [
+            {
+              name: 'e2e_configured',
+              value: '1',
+              domain: '127.0.0.1',
+              path: '/',
+              expires: -1,
+              httpOnly: false,
+              secure: false,
+              sameSite: 'Lax',
+            },
+          ],
+          origins: [],
+        },
+      },
+    },
+  ],
   webServer: {
-    command: 'bunx vite preview --host 127.0.0.1 --port 4173 --strictPort',
+    command:
+      'bunx vite build --outDir dist-e2e-configured && bun scripts/preview-e2e.ts',
     url: 'http://127.0.0.1:4173',
+    timeout: 300_000,
     reuseExistingServer: !process.env.CI,
+    env: {
+      VITE_GOOGLE_CLIENT_ID: 'e2e-throwaway.apps.googleusercontent.com',
+    },
   },
 });

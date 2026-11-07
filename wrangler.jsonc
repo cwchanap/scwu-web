@@ -1,11 +1,33 @@
 {
-  // Static site only: the built app in dist/. The art and audio (about 28,000
+  // The built app is in dist/. The art and audio (about 28,000
   // files in the export) are over Worker assets' 20,000-file limit; they are
   // published to R2 by the owner's choice, see README.
   "name": "scwu-web",
+  "main": "src/worker/index.ts",
   "compatibility_date": "2026-10-31",
   "assets": { "directory": "./dist" },
+  "vars": {
+    "GOOGLE_CLIENT_ID": "333977657035-uheqs86h090sn6om923ucv6hg2vui6ok.apps.googleusercontent.com",
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "scwu-web",
+      "database_id": "89b581e0-b9e3-4afe-a159-aefb2be4dd82",
+    },
+  ],
   // Required by `wrangler preview` (Workers Builds on non-production branches).
-  // Previews don't inherit production settings; this one needs none.
-  "previews": {},
+  // Previews don't inherit production settings and currently share the same DB.
+  "previews": {
+    "vars": {
+      "GOOGLE_CLIENT_ID": "333977657035-uheqs86h090sn6om923ucv6hg2vui6ok.apps.googleusercontent.com",
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "scwu-web",
+        "database_id": "89b581e0-b9e3-4afe-a159-aefb2be4dd82",
+      },
+    ],
+  },
 }
