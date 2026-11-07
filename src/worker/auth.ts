@@ -5,8 +5,6 @@ import {
   type JWTVerifyGetKey,
 } from 'jose';
 
-// The narrow slice of the D1 binding the worker needs; the real binding
-// satisfies it structurally.
 export interface D1PreparedStatement {
   bind(...values: unknown[]): D1PreparedStatement;
   first<T = Record<string, unknown>>(colName?: string): Promise<T | null>;
@@ -23,7 +21,6 @@ export interface Env {
   SESSION_SECRET?: string;
 }
 
-// Env past the configuration guard: every binding and variable is present.
 type Configured = Required<Env>;
 
 interface UserRow {
@@ -130,8 +127,6 @@ async function signInWithGoogle(
     return json({ error: 'invalid token' }, 401);
   }
 
-  // Upsert on the verified subject only: the ID token itself and the email
-  // claim are never stored or used as an account key.
   await env.DB.prepare(
     'INSERT INTO users (google_sub, display_name, avatar_url) VALUES (?, ?, ?) ' +
       'ON CONFLICT (google_sub) DO UPDATE SET ' +
