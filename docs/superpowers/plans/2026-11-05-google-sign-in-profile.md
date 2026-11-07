@@ -2,7 +2,7 @@
 
 **Ticket:** https://linear.app/cwchanap/issue/HPA-768/google-sign-in-and-profile-page
 **Design:** `docs/superpowers/specs/2026-11-05-google-sign-in-profile-design.md`
-**Status:** design/plan only. The PR is not an implemented feature.
+**Status:** in review. Implementation (Worker, D1 schema, profile page, Menu integration, and tests) is present for review.
 
 ## One-PR delivery and scope
 
