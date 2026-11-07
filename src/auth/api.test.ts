@@ -87,9 +87,30 @@ describe('getMe', () => {
     ['a non-string name', { user: { ...USER, name: 7 } }],
     ['a non-string createdAt', { user: { ...USER, createdAt: null } }],
     ['a non-string avatarUrl', { user: { ...USER, avatarUrl: 3 } }],
+    ['a non-date createdAt', { user: { ...USER, createdAt: 'not-a-date' } }],
+    ['an empty createdAt', { user: { ...USER, createdAt: '' } }],
+    [
+      'a non-UTC offset createdAt',
+      { user: { ...USER, createdAt: '2026-11-06T07:53:34+02:00' } },
+    ],
+    [
+      'a space-separated createdAt',
+      { user: { ...USER, createdAt: '2026-11-06 05:53:34' } },
+    ],
+    [
+      'an out-of-range createdAt',
+      { user: { ...USER, createdAt: '2026-13-40T99:99:99Z' } },
+    ],
+    ['a date-only createdAt', { user: { ...USER, createdAt: '2026-11-06' } }],
   ])('returns null on %s', async (_label, body) => {
     const { fetchImpl } = stubFetch(() => jsonResponse(body));
     expect(await getMe(fetchImpl)).toBeNull();
+  });
+
+  it('accepts a fractional-seconds UTC timestamp', async () => {
+    const user = { ...USER, createdAt: '2026-11-06T05:53:34.123Z' };
+    const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
+    expect(await getMe(fetchImpl)).toEqual(user);
   });
 });
 
