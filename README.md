@@ -71,7 +71,7 @@ Google sign-in and the `/profile` page are implemented but inert: the owner-prov
 Owner setup — every `<placeholder>` is a real value the owner supplies; commit real IDs, never invented ones:
 
 1. **Google OAuth Web client.** In Google Cloud Console, create an OAuth **Web** client and register exact JavaScript origins — no wildcards:
-   - the production origin (the `scwu-web` Worker's public hostname),
+   - the production origin, `https://scwu.hapadona.com` (the `scwu-web` Worker's public site is `https://scwu.hapadona.com/`),
    - the branch's stable Preview alias, `https://jack65786656-hpa-768-google-sign-in-and-profile-page-scwu-web.cwchanap.workers.dev` — stable aliases follow `<branch>-<worker>.<subdomain>.workers.dev`; confirm the value the dashboard reports for the branch before registering,
    - `http://127.0.0.1:5173` for local `bun run dev` (use the port Vite actually prints).
 

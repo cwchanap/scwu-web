@@ -31,44 +31,57 @@ const isIsoUtc = (value: string) => {
   );
 };
 
-const userOf = (body: unknown): ProfileUser | null => {
-  if (typeof body !== 'object' || body === null) return null;
+export interface MeResult {
+  ok: boolean;
+  user: ProfileUser | null;
+}
+
+const parseMe = (body: unknown): MeResult => {
+  if (typeof body !== 'object' || body === null)
+    return { ok: false, user: null };
   const { user } = body as { user?: unknown };
-  if (typeof user !== 'object' || user === null) return null;
+  if (user === null) return { ok: true, user: null };
+  if (typeof user !== 'object') return { ok: false, user: null };
   const { name, avatarUrl, createdAt } = user as Record<string, unknown>;
-  if (typeof name !== 'string') return null;
-  if (typeof createdAt !== 'string' || !isIsoUtc(createdAt)) return null;
-  if (avatarUrl !== null && typeof avatarUrl !== 'string') return null;
-  return { name, avatarUrl, createdAt };
+  if (typeof name !== 'string') return { ok: false, user: null };
+  if (typeof createdAt !== 'string' || !isIsoUtc(createdAt))
+    return { ok: false, user: null };
+  if (avatarUrl !== null && typeof avatarUrl !== 'string')
+    return { ok: false, user: null };
+  return { ok: true, user: { name, avatarUrl, createdAt } };
 };
 
 const request = async (
   path: string,
   init: RequestInit,
   fetchImpl: FetchLike,
-): Promise<ProfileUser | null> => {
+): Promise<MeResult> => {
   try {
     const response = await fetchImpl(path, {
       credentials: 'same-origin',
       ...init,
     });
-    if (!response.ok) return null;
-    return userOf(await response.json());
+    if (!response.ok) return { ok: false, user: null };
+    return parseMe(await response.json());
   } catch {
-    return null;
+    return { ok: false, user: null };
   }
 };
+
+export const readMe = (
+  fetchImpl: FetchLike = browserFetch,
+): Promise<MeResult> => request('/api/me', { cache: 'no-store' }, fetchImpl);
 
 export const getMe = (
   fetchImpl: FetchLike = browserFetch,
 ): Promise<ProfileUser | null> =>
-  request('/api/me', { cache: 'no-store' }, fetchImpl);
+  readMe(fetchImpl).then((result) => (result.ok ? result.user : null));
 
-export const signInGoogle = (
+export const signInGoogle = async (
   credential: string,
   fetchImpl: FetchLike = browserFetch,
-): Promise<ProfileUser | null> =>
-  request(
+): Promise<ProfileUser | null> => {
+  const result = await request(
     '/api/auth/google',
     {
       method: 'POST',
@@ -77,6 +90,8 @@ export const signInGoogle = (
     },
     fetchImpl,
   );
+  return result.ok ? result.user : null;
+};
 
 export const signOut = async (
   fetchImpl: FetchLike = browserFetch,
