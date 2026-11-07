@@ -18,6 +18,10 @@ const domNamed = () =>
       .filter((name) => name.endsWith('.svelte'))
       .map((name) => here + name),
     here + 'moves.ts',
+    here + 'page.ts',
+    ...readdirSync(here + '../profile')
+      .filter((name) => /\.(svelte|ts)$/.test(name))
+      .map((name) => here + '../profile/' + name),
   ].flatMap(
     (file) => readFileSync(file, 'utf8').match(/[a-z0-9]+\/[0-9]+\.png/g) ?? [],
   );
@@ -102,6 +106,7 @@ describe('instructions page', () => {
     ).files;
     const named = domNamed();
     expect(named.length).toBeGreaterThan(0);
+    expect(named).toContain('select/15.png');
     for (const name of named) {
       expect(published, name).toContain(name);
     }
@@ -179,6 +184,23 @@ describe('instructions page', () => {
     }
     expect(readFileSync(here + '../../instructions.html', 'utf8')).toContain(
       'src/instructions/main.ts',
+    );
+  });
+
+  it('keeps the profile page off the game data and Phaser too', () => {
+    const profile = here + '../profile/';
+    const sources = readdirSync(profile).filter((name) =>
+      /\.(ts|svelte)$/.test(name),
+    );
+    expect(sources.length).toBeGreaterThan(0);
+    for (const name of sources) {
+      expect(
+        stripTypeImports(readFileSync(profile + name, 'utf8')),
+        name,
+      ).not.toMatch(/from '(?![^']*game\/assetBase')[^']*(game\/|\bphaser\b)/);
+    }
+    expect(readFileSync(here + '../../profile.html', 'utf8')).toContain(
+      'src/profile/main.ts',
     );
   });
 
