@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { getMe, type ProfileUser } from './auth/api';
   import { ASSET_BASE } from './game/assetBase';
   import { buttonsOf, KEYS, usesButton } from './game/commands';
   import type { Control, Mode, PracticeOptions } from './game/match';
@@ -8,7 +9,12 @@
   import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
   import { ROSTER } from './instructions/fighters';
-  import { opponentChoiceOf, resetModeOf } from './menu';
+  import {
+    identityRefresher,
+    opponentChoiceOf,
+    profileConfigured,
+    resetModeOf,
+  } from './menu';
 
   let host: HTMLDivElement;
   let session: ReturnType<typeof createGame> | undefined;
@@ -66,6 +72,13 @@
     music: true,
   });
   let menuOpen = $state(false);
+  let me = $state<ProfileUser | null>(null);
+  const profileRow = profileConfigured(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+  const refreshIdentity = profileRow
+    ? identityRefresher(getMe, (user) => {
+        me = user;
+      })
+    : null;
   let dialog: HTMLDialogElement;
   const asset = ASSET_BASE;
   const touchControls: { control: Control; label: string; symbol: string }[] = [
@@ -318,6 +331,7 @@
     session?.scene.setModal(true);
     menuOpen = true;
     dialog.showModal();
+    void refreshIdentity?.();
   }
   // close fires on every path (Close button, Character select, native Esc).
   function menuClosed() {
@@ -488,6 +502,29 @@
         class="mt-2 h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
       ></div>
     </div>
+    {#if profileRow}
+      <div class="flex items-center justify-between gap-3">
+        <div class="flex min-w-0 items-center gap-2">
+          {#if me?.avatarUrl}
+            <img
+              class="size-6 shrink-0 rounded-full object-cover"
+              src={me.avatarUrl}
+              alt=""
+              referrerpolicy="no-referrer"
+            />
+          {/if}
+          <span class="truncate font-bold italic"
+            >{me ? me.name : 'Not signed in'}</span
+          >
+        </div>
+        <a
+          class="shrink-0 text-[11px] italic text-[#ffd24a] hover:text-[#ffe08a]"
+          href="profile.html"
+          target="_blank"
+          rel="noopener">Profile ↗</a
+        >
+      </div>
+    {/if}
     <label class="block"
       ><span
         class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
