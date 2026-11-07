@@ -54,9 +54,75 @@ The Workers build refuses to build a commit whose `scripts/export_assets.py` doe
 
 Builds of other branches (Worker Previews) do not inherit production settings. In the Worker's **Settings** → **Build**, add the same `VITE_ASSET_BASE` to the Previews build variables and set the Preview command to `npx wrangler preview` (`wrangler` is not a project dependency, so `bun run wrangler preview` fails the way `bun run deploy` does). `wrangler.jsonc` carries the empty `previews` block that command requires.
 
+## Sign-in and profile
+
+Google sign-in and the `/profile` page are implemented but inert: the owner-provisioned values below are deliberately uncommitted, so nothing about sign-in is functional yet and no real IDs, origins or secrets appear in this repo. `profile.html` mounts `src/profile/` (the Menu's Profile ↗ link opens it in a new tab); the Worker entry `src/worker/` (`main` in `wrangler.jsonc`) answers only `/api/*` and every other unmatched path gets a plain 404 — `POST /api/auth/google` verifies a Google Identity Services credential against Google's published JWKS with `jose` (RS256 only, the configured client ID as audience, either `accounts.google.com` issuer form, `sub` and `exp` required), upserts the `users` row keyed by the Google `sub`, and sets `scwu_session`, an HS256 `jose` JWT cookie with `HttpOnly`, `SameSite=Lax`, `Path=/`, `Secure` on HTTPS and a seven-day expiry; `POST /api/auth/signout` clears it; `GET /api/me` reads it. `migrations/0001_users.sql` is the only migration. Until setup completes, every `/api/*` request fails loudly — `500 {"error":"missing DB"}`, `"missing GOOGLE_CLIENT_ID"`, `"missing SESSION_SECRET"` or `"invalid SESSION_SECRET"` (under 32 UTF-8 bytes) — instead of issuing an unsigned or weak cookie; the profile page renders "Sign-in unavailable" and makes no requests, and the Menu keeps the Profile row hidden and never calls `/api` because `VITE_GOOGLE_CLIENT_ID` is unset. The game itself needs none of this.
+
+Owner setup — every `<placeholder>` is a real value the owner supplies; commit real IDs, never invented ones:
+
+1. **Google OAuth Web client.** In Google Cloud Console, create an OAuth **Web** client and register exact JavaScript origins — no wildcards:
+   - the production origin (the `scwu-web` Worker's public hostname),
+   - the branch's stable Preview alias, `https://jack65786656-hpa-768-google-sign-in-and-profile-page-scwu-web.cwchanap.workers.dev` — stable aliases follow `<branch>-<worker>.<subdomain>.workers.dev`; confirm the value the dashboard reports for the branch before registering,
+   - `http://127.0.0.1:5173` for local `bun run dev` (use the port Vite actually prints).
+
+   Never register a per-deployment Preview URL such as `https://a415e97d-scwu-web.cwchanap.workers.dev` — it changes on every push, so GIS sign-in would break on the next deploy. Google's origin changes can take minutes or hours to propagate.
+
+2. **Two real D1 databases.** Create `scwu-web` (production) and `scwu-web-preview` (one database shared by every Preview deployment, so Preview sign-ins never write production rows), then commit their real IDs — `wrangler.jsonc` intentionally ships none today:
+
+   ```jsonc
+   "vars": { "GOOGLE_CLIENT_ID": "<real OAuth web client ID>" },
+   "d1_databases": [
+     {
+       "binding": "DB",
+       "database_name": "scwu-web",
+       "database_id": "<production database ID>",
+     },
+   ],
+   "previews": {
+     "vars": { "GOOGLE_CLIENT_ID": "<real OAuth web client ID>" },
+     "d1_databases": [
+       {
+         "binding": "DB",
+         "database_name": "scwu-web-preview",
+         "database_id": "<preview database ID — different from production>",
+       },
+     ],
+   },
+   ```
+
+3. **One public client ID, two delivery paths.** `vars.GOOGLE_CLIENT_ID` (production) and `previews.vars.GOOGLE_CLIENT_ID` (Preview) are committed plaintext runtime vars — the audience the Worker verifies each Google token against; keep the two equal. `wrangler deploy` overwrites dashboard-set plaintext vars (this project does not use `keep_vars`), so setting them only in the dashboard loses them on the next deploy. `VITE_GOOGLE_CLIENT_ID` is a separate **build** variable — set it in the Worker's production and Previews build variables, and pass it to `bun run dev` locally — which Vite inlines into the bundle so the Menu's Profile row and the profile page's GIS button appear only when configured. It is a public identifier, not a secret: never store it with `wrangler secret put`, and never commit a placeholder ID.
+
+4. **`SESSION_SECRET` per environment.** A Worker secret of at least 32 UTF-8 bytes (`openssl rand -base64 48` is fine), set separately for production (`bunx wrangler secret put SESSION_SECRET`, or the dashboard's Worker secrets) and for Previews (the Worker's Preview secrets, or a Previews Base secret covering future branches). The value may differ per environment; the name must not. Never commit it. Locally it goes in the gitignored `.dev.vars` file (`SESSION_SECRET=...`, plus `GOOGLE_CLIENT_ID=...` if step 2's `vars` has not landed yet); Vite's `server.fs.deny` already refuses to serve `.dev.vars*` and `.env*`.
+
+5. **`wrangler.preview-migrations.jsonc`.** A new file the owner creates once the preview database exists, so the migration command can target it without touching production — a top-level `DB` binding to the **same** database ID as `previews.d1_databases`:
+
+   ```jsonc
+   {
+     "name": "scwu-web",
+     "d1_databases": [
+       {
+         "binding": "DB",
+         "database_name": "scwu-web-preview",
+         "database_id": "<preview database ID — same as previews.d1_databases>",
+       },
+     ],
+   }
+   ```
+
+6. **Apply `migrations/0001_users.sql` to three distinct targets — never interchangeably:**
+   - local development: `bunx wrangler d1 migrations apply DB --local` (the `.wrangler/` SQLite that `wrangler dev` uses),
+   - Preview, remote: `bunx wrangler d1 migrations apply DB --remote --config wrangler.preview-migrations.jsonc` — `DB` resolves through that file, so it can only reach `scwu-web-preview`,
+   - production, remote: `bunx wrangler d1 migrations apply DB --remote` — only after step 2's real `d1_databases` binding is committed; this is the one command that writes to production users.
+
+   The two remote commands differ only by `--config`; confirm which config file stands in front of `DB` before running either.
+
+Local development is two processes, since `vite.config.ts` proxies `/api` to `127.0.0.1:8787`: start `bunx wrangler dev --port 8787` in one terminal (it needs `dist/` to exist — run `bun run build` once or `mkdir -p dist` — and reads `.dev.vars` and the committed `vars`), and in another `VITE_GOOGLE_CLIENT_ID=<public-id> bun run dev`. Omit the variable for the unconfigured mode, which needs no second process at all. The proxy preserves the browser's `Host`, so the Worker's same-origin check on the mutation routes still passes, and `wrangler dev` binds `DB` to its local SQLite once the `--local` migration has run. Wrangler's vars do not reach the separate Vite process — supply the public build-time ID there explicitly.
+
+Two gates remain before this branch can rely on any of it. The shared-page move changed `scripts/export_assets.py` (`dom_art()` now scans `src/instructions/page.ts` and `src/profile/` for the backdrop), so the fingerprint check described in Deploy to Cloudflare applies: `bun run upload:r2` must run — with the owner's authorization — before the branch is pushed, or the Workers build and CI's fetch step fail on the `.exporter` fingerprint. And all three GitHub Actions jobs skip draft pull requests, so until the PR is marked ready for review the only verification is local `bun run validate`, `bun run build` and `bun run e2e` — a Cloudflare Preview deploy is not one of the Actions jobs. Real Google sign-in, the Menu's identity row, `/api/me` against a Preview and its D1 isolation from production stay unverified until the owner completes this setup; this section does not claim they work.
+
 ## CI
 
-GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint** (Prettier, ESLint, `svelte-check`, `vite build`), **Run Unit Tests** (Vitest) and **Playwright Tests** (`e2e/`, against the production build). Dependabot (`.github/dependabot.yml`) opens weekly grouped PRs for Bun and Actions updates.
+GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint** (Prettier, ESLint, `svelte-check`, `vite build`), **Run Unit Tests** (Vitest) and **Playwright Tests** (`e2e/`, against the production build). All three jobs are skipped while a pull request is a draft, so local runs are the only verification until it is marked ready. Dependabot (`.github/dependabot.yml`) opens weekly grouped PRs for Bun and Actions updates.
 
 GitHub's runners have no `scwu-web-handoff/`, so `.github/scripts/fetch-generated.sh` downloads `generated.tar.gz` and `fixtures.tar.gz` from the R2 bucket instead, and refuses data whose `.exporter` fingerprint does not match the commit's `scripts/export_assets.py`. Set the repository variable `VITE_ASSET_BASE` to the bucket's public URL (Settings → Secrets and variables → Actions → Variables). After changing `export_assets.py`, run `bun run assets && bun run upload:r2` before pushing, or CI fails on the fingerprint. Locally, `bun run build && bun run e2e` runs the browser test.
 
