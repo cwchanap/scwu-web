@@ -100,11 +100,11 @@ for its backdrop, not fighter data, move tables or Phaser.
 
 All routes are same-origin and return JSON with `Cache-Control: no-store`.
 
-| Request | Input | Output |
-| --- | --- | --- |
-| `POST /api/auth/google` | `{ "credential": "<GIS ID token>" }` | `200 { "user": ProfileUser }` and a signed session cookie; `401` for an invalid token |
-| `POST /api/auth/signout` | No body required | `200 { "user": null }` and an expired cookie |
-| `GET /api/me` | Signed cookie (optional) | `200 { "user": ProfileUser | null }`; missing, invalid or expired sessions return `null` |
+| Request                  | Input                                | Output                                                                                |
+| ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------- |
+| `POST /api/auth/google`  | `{ "credential": "<GIS ID token>" }` | `200 { "user": ProfileUser }` and a signed session cookie; `401` for an invalid token |
+| `POST /api/auth/signout` | No body required                     | `200 { "user": null }` and an expired cookie                                          |
+| `GET /api/me`            | Signed cookie (optional)             | `200 { "user": ProfileUser                                                            | null }`; missing, invalid or expired sessions return `null` |
 
 `ProfileUser` is `{ name: string, avatarUrl: string | null,
 createdAt: string }`; `createdAt` is an **ISO 8601 UTC** string
@@ -164,7 +164,7 @@ Do not commit a placeholder or invented client ID.
 - `SESSION_SECRET` is never committed. Set it as a Worker secret
   separately for production and Preview (or use Cloudflare's
   Previews Base secret for future previews). Both environments require
-  the same *name*, not the same secret value.
+  the same _name_, not the same secret value.
 - **Fail explicitly when unconfigured.** Every `/api/*` request
   first checks `DB`, `GOOGLE_CLIENT_ID`, and a
   `SESSION_SECRET` at least 32 UTF-8 bytes long. If absent or
@@ -226,7 +226,7 @@ unannounced test.
   adapter; migrations and repeat upserts preserve `created_at`.
   Pin a Node version with `node:sqlite` in test environments.
 - Test Google JWTs via dependency injection: `handle(request, env,
-  keys)` accepts a JWKS verifier or local `jose` key set; never
+keys)` accepts a JWKS verifier or local `jose` key set; never
   stub global `fetch` because Vitest uses `isolate: false`.
   Exercise valid tokens (including both issuers), expired/tampered
   tokens, wrong issuer/audience, missing `sub`, display-name
