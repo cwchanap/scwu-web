@@ -28,7 +28,14 @@ export default defineConfig({
   // The code imports them only by default.
   json: { stringify: true, namedExports: false },
   server: {
-    fs: { deny: ['**/scwu-web-handoff/**', '**/.git/**', '**/.env*'] },
+    fs: {
+      deny: [
+        '**/scwu-web-handoff/**',
+        '**/.git/**',
+        '**/.env*',
+        '**/.dev.vars*',
+      ],
+    },
     proxy: { '/api': 'http://127.0.0.1:8787' },
   },
   build: {
