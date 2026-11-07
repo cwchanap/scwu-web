@@ -30,6 +30,7 @@
   let me = $state<ProfileUser | null>(null);
   let loaded = $state(false);
   let exchangeFailed = $state(false);
+  let signOutFailed = $state(false);
   let gisReady = $state(false);
   let gisFailed = $state(false);
   let gisButton = $state<HTMLDivElement>();
@@ -46,8 +47,12 @@
   };
 
   const leave = async () => {
-    await signOut();
-    await refresh();
+    if (await signOut()) {
+      signOutFailed = false;
+      await refresh();
+    } else {
+      signOutFailed = true;
+    }
   };
 
   const loadGis = () =>
@@ -129,6 +134,9 @@
         <p class="unavailable">Sign-in unavailable</p>
       {:else if me}
         <button class="signout" type="button" onclick={leave}>Sign out</button>
+        {#if signOutFailed}
+          <p class="failed">Sign-out failed — try again.</p>
+        {/if}
       {:else if loaded}
         <div class="gis" bind:this={gisButton}></div>
         {#if gisFailed}
