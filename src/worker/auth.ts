@@ -55,18 +55,24 @@ export async function handle(
 ): Promise<Response> {
   const unconfigured = configError(env);
   if (unconfigured) return unconfigured;
-  const configured = env as Configured;
-  const { pathname } = new URL(request.url);
-  if (pathname === '/api/auth/google' && request.method === 'POST') {
-    return signInWithGoogle(request, configured, keys);
+  try {
+    const configured = env as Configured;
+    const { pathname } = new URL(request.url);
+    if (pathname === '/api/auth/google' && request.method === 'POST') {
+      if (!isSameOrigin(request)) return json({ error: 'forbidden' }, 403);
+      return await signInWithGoogle(request, configured, keys);
+    }
+    if (pathname === '/api/auth/signout' && request.method === 'POST') {
+      if (!isSameOrigin(request)) return json({ error: 'forbidden' }, 403);
+      return signOut(request);
+    }
+    if (pathname === '/api/me' && request.method === 'GET') {
+      return await me(request, configured);
+    }
+    return json({ error: 'not found' }, 404);
+  } catch {
+    return json({ error: 'internal error' }, 500);
   }
-  if (pathname === '/api/auth/signout' && request.method === 'POST') {
-    return signOut(request);
-  }
-  if (pathname === '/api/me' && request.method === 'GET') {
-    return me(request, configured);
-  }
-  return json({ error: 'not found' }, 404);
 }
 
 function configError(env: Env): Response | null {
@@ -91,11 +97,28 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+function isSameOrigin(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (origin === null) return true;
+  try {
+    return new URL(origin).origin === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}
+
 async function signInWithGoogle(
   request: Request,
   env: Configured,
   keys: JWTVerifyGetKey,
 ): Promise<Response> {
+  const contentType = request.headers.get('content-type');
+  if (
+    contentType === null ||
+    contentType.split(';', 1)[0].trim().toLowerCase() !== 'application/json'
+  ) {
+    return json({ error: 'unsupported content type' }, 415);
+  }
   const body = await request
     .json()
     .then((parsed: unknown) => parsed)

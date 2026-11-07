@@ -70,9 +70,9 @@ function testEnv(overrides: Partial<Env> = {}): {
 const postJson = (path: string, body?: unknown, init?: RequestInit) =>
   new Request(ORIGIN + path, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: body === undefined ? null : JSON.stringify(body),
     ...init,
+    headers: { 'content-type': 'application/json', ...init?.headers },
+    body: body === undefined ? null : JSON.stringify(body),
   });
 
 const get = (path: string, init?: RequestInit) =>
@@ -268,6 +268,7 @@ describe('POST /api/auth/google', () => {
       postJson('/api/auth/google', { credential: 42 }),
       new Request(`${ORIGIN}/api/auth/google`, {
         method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: 'not json',
       }),
     ]) {
@@ -411,6 +412,217 @@ describe('POST /api/auth/signout', () => {
     expect(cookie).toContain('Path=/');
     expect(cookie).toContain('Secure');
     expect(cookie).toContain('Max-Age=0');
+  });
+});
+
+describe('same-origin and content-type enforcement', () => {
+  it('rejects a sign-in carrying a foreign Origin', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson(
+        '/api/auth/google',
+        { credential: await googleToken() },
+        { headers: { origin: 'https://attacker.example' } },
+      ),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(403);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(await res.json()).toEqual({ error: 'forbidden' });
+  });
+
+  it('rejects a sign-in whose Origin differs only by port', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      new Request('http://127.0.0.1:8787/api/auth/google', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'http://127.0.0.1:5173',
+        },
+        body: JSON.stringify({ credential: await googleToken() }),
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(403);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('rejects a sign-in with an opaque Origin', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson(
+        '/api/auth/google',
+        { credential: await googleToken() },
+        { headers: { origin: 'null' } },
+      ),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('accepts a same-origin sign-in', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson(
+        '/api/auth/google',
+        { credential: await googleToken() },
+        { headers: { origin: ORIGIN } },
+      ),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('set-cookie')).toContain('scwu_session=');
+  });
+
+  it.each([
+    'text/plain',
+    'application/x-www-form-urlencoded',
+    'multipart/form-data; boundary=x',
+  ])('rejects a sign-in sent with content-type %s', async (type) => {
+    const { env } = testEnv();
+    const res = await handle(
+      new Request(`${ORIGIN}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'content-type': type, origin: ORIGIN },
+        body: JSON.stringify({ credential: await googleToken() }),
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(415);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(await res.json()).toEqual({ error: 'unsupported content type' });
+  });
+
+  it('rejects a sign-in without a content-type', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      new Request(`${ORIGIN}/api/auth/google`, {
+        method: 'POST',
+        body: JSON.stringify({ credential: await googleToken() }),
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(415);
+    expect(res.headers.get('set-cookie')).toBeNull();
+  });
+
+  it('rejects a cross-origin sign-out', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson('/api/auth/signout', undefined, {
+        headers: { origin: 'https://attacker.example' },
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(403);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(await res.json()).toEqual({ error: 'forbidden' });
+  });
+
+  it('allows mutation clients that send no Origin header', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson('/api/auth/google', { credential: await googleToken() }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('API failure handling', () => {
+  function rejectingD1(): D1Database {
+    const statement: D1PreparedStatement = {
+      bind: () => statement,
+      first: () => Promise.reject(new Error('no such table: users')),
+      run: () => Promise.reject(new Error('no such table: users')),
+    };
+    return { prepare: () => statement };
+  }
+
+  function throwingD1(): D1Database {
+    return {
+      prepare() {
+        throw new Error('d1 binding exploded');
+      },
+    };
+  }
+
+  it('returns a JSON 500 when sign-in D1 operations reject', async () => {
+    const env: Env = {
+      DB: rejectingD1(),
+      GOOGLE_CLIENT_ID: CLIENT_ID,
+      SESSION_SECRET,
+    };
+    const res = await handle(
+      postJson('/api/auth/google', { credential: await googleToken() }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(500);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(res.headers.get('content-type')).toContain('application/json');
+    expect(await res.json()).toEqual({ error: 'internal error' });
+  });
+
+  it('returns a JSON 500 when /api/me D1 operations reject', async () => {
+    const env: Env = {
+      DB: rejectingD1(),
+      GOOGLE_CLIENT_ID: CLIENT_ID,
+      SESSION_SECRET,
+    };
+    const res = await handle(
+      get('/api/me', {
+        headers: { cookie: `scwu_session=${await sessionToken('sub-1')}` },
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(500);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+    expect(await res.json()).toEqual({ error: 'internal error' });
+  });
+
+  it('returns a JSON 500 when prepare() throws synchronously', async () => {
+    const env: Env = {
+      DB: throwingD1(),
+      GOOGLE_CLIENT_ID: CLIENT_ID,
+      SESSION_SECRET,
+    };
+    const res = await handle(
+      postJson('/api/auth/google', { credential: await googleToken() }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'internal error' });
+  });
+
+  it('the worker entry returns the JSON 500 rather than rejecting', async () => {
+    const env: Env = {
+      DB: rejectingD1(),
+      GOOGLE_CLIENT_ID: CLIENT_ID,
+      SESSION_SECRET,
+    };
+    const res = await worker.fetch(
+      get('/api/me', {
+        headers: { cookie: `scwu_session=${await sessionToken('sub-1')}` },
+      }),
+      env,
+    );
+    expect(res.status).toBe(500);
+    expect(res.headers.get('cache-control')).toBe('no-store');
   });
 });
 
