@@ -16,5 +16,6 @@ __pycache__/
 .superpowers/
 .wrangler/
 .env
+.dev.vars
 playwright-report/
 test-results/

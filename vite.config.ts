@@ -29,10 +29,16 @@ export default defineConfig({
   json: { stringify: true, namedExports: false },
   server: {
     fs: { deny: ['**/scwu-web-handoff/**', '**/.git/**', '**/.env*'] },
+    // The auth API is the local Worker: `bunx wrangler dev --port 8787`.
+    proxy: { '/api': 'http://127.0.0.1:8787' },
   },
   build: {
     rolldownOptions: {
-      input: { main: 'index.html', instructions: 'instructions.html' },
+      input: {
+        main: 'index.html',
+        instructions: 'instructions.html',
+        profile: 'profile.html',
+      },
       output: {
         codeSplitting: {
           groups: [
