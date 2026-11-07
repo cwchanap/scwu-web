@@ -100,3 +100,27 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(opponent).toHaveValue('vsCpu');
   expect(errors).toEqual([]);
 });
+
+test('profile shows sign-in unavailable when unconfigured', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/profile.html');
+  await expect(page.getByText('Sign-in unavailable').first()).toBeVisible();
+  await expect(page.getByText('Not signed in')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('guide keeps the shared backdrop and back link', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/instructions.html');
+  await expect(page.getByRole('link', { name: /Back to game/ })).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(() => getComputedStyle(document.body).backgroundImage),
+    )
+    .toContain('select/15.png');
+  expect(errors).toEqual([]);
+});
