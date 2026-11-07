@@ -41,10 +41,6 @@ test('failed sign-out keeps the identity and offers a retry', async ({
   expect(errors).toEqual([]);
 });
 
-// The exchange already returned the user and set the session cookie, so a
-// profile read that then fails (offline, 5xx, junk body) must not show the
-// player as signed out: keep the exchanged identity and say the refresh
-// failed.
 test('a failed refresh after a successful sign-in keeps the exchanged identity', async ({
   page,
 }) => {
@@ -75,8 +71,6 @@ test('a failed refresh after a successful sign-in keeps the exchanged identity',
   await expect(signIn).toBeVisible();
   await expect.poll(() => meCalls).toBe(1);
 
-  // A second click while the exchange is in flight must not resend it; give
-  // any unguarded duplicate a beat to arrive before releasing the response.
   await signIn.click();
   await signIn.click();
   await page.waitForTimeout(500);
@@ -91,9 +85,6 @@ test('a failed refresh after a successful sign-in keeps the exchanged identity',
   expect(errors).toEqual([]);
 });
 
-// A read issued before a mutation must never overwrite the state a later
-// mutation established: the delayed signed-out /api/me answer that lands
-// after a new sign-in is stale and gets dropped.
 test('a delayed read cannot overwrite a newer sign-in', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
@@ -131,20 +122,16 @@ test('a delayed read cannot overwrite a newer sign-in', async ({ page }) => {
   await expect(signOut).toBeVisible();
   await expect(page.getByText('Ryuko').first()).toBeVisible();
 
-  // While the POST is in flight the control stays disabled: a second click
-  // cannot start a competing mutation.
   await signOut.click();
   await expect(signOut).toBeDisabled();
   releaseSignout();
   await expect(page.getByText('Not signed in')).toBeVisible();
 
-  // The post-sign-out read (call 2) is still held; sign in before it lands.
   await page.getByRole('button', { name: 'Sign in with Google' }).click();
   await answerMe(3, USER);
   await expect(page.getByText('Ryuko').first()).toBeVisible();
   await expect(signOut).toBeVisible();
 
-  // The stale signed-out read lands last and must not displace the identity.
   await answerMe(2, null);
   await expect(page.getByText('Ryuko').first()).toBeVisible();
   await expect(signOut).toBeVisible();

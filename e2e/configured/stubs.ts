@@ -12,8 +12,6 @@ export const json = (body: unknown, status = 200) => ({
   body: JSON.stringify(body),
 });
 
-// The specs never contact the network: anything off the loopback origin
-// aborts, so a missed stub fails the test instead of leaking a request.
 export const offlineGuard = (page: Page) =>
   page.route('**/*', (route) => {
     const { hostname } = new URL(route.request().url());
@@ -22,9 +20,6 @@ export const offlineGuard = (page: Page) =>
       : route.abort();
   });
 
-// A local stand-in for the GIS client: initialize() stores the page's
-// credential callback, and renderButton() mounts a plain button whose click
-// delivers a fake ID token through it, exactly like the real widget.
 const GIS_STUB = `window.google = {
   accounts: {
     id: {
