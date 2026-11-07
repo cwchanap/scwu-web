@@ -107,7 +107,12 @@ test('profile shows sign-in unavailable when unconfigured', async ({
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/profile.html');
-  await expect(page.getByText('Sign-in unavailable').first()).toBeVisible();
+  const unavailable = page.getByText('Sign-in unavailable').first();
+  const configured = await unavailable
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => false)
+    .catch(() => true);
+  test.skip(configured, 'served build is configured');
   await expect(page.getByText('Not signed in')).toBeVisible();
   expect(errors).toEqual([]);
 });
@@ -122,5 +127,116 @@ test('guide keeps the shared backdrop and back link', async ({ page }) => {
       page.evaluate(() => getComputedStyle(document.body).backgroundImage),
     )
     .toContain('select/15.png');
+  expect(errors).toEqual([]);
+});
+
+test('unconfigured menu has no profile row and makes no /api/me request', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let meCalls = 0;
+  await page.route('**/api/me', (route) => {
+    meCalls += 1;
+    return route.continue();
+  });
+  await page.goto('/profile.html');
+  const unconfigured = await page
+    .getByText('Sign-in unavailable')
+    .first()
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  test.skip(!unconfigured, 'served build is configured');
+
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  expect(meCalls).toBe(0);
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('link', { name: 'Profile ↗' })).toHaveCount(0);
+  await expect(dialog.getByText('Not signed in')).toHaveCount(0);
+  expect(meCalls).toBe(0);
+  expect(errors).toEqual([]);
+});
+
+test('configured menu reads /api/me on each open', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let user: unknown = {
+    name: 'Ryuko',
+    avatarUrl: '/avatar.png',
+    createdAt: '2026-11-06T05:53:34Z',
+  };
+  let meCalls = 0;
+  let gisCalls = 0;
+  await page.route('**/api/me', (route) => {
+    meCalls += 1;
+    return route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ user }),
+    });
+  });
+  await page.route('**/avatar.png', (route) =>
+    route.fulfill({
+      contentType: 'image/png',
+      body: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    }),
+  );
+  await page.route('https://accounts.google.com/**', (route) => {
+    gisCalls += 1;
+    return route.abort();
+  });
+  await page.goto('/profile.html');
+  const unconfigured = await page
+    .getByText('Sign-in unavailable')
+    .first()
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  test.skip(unconfigured, 'served build is unconfigured');
+  meCalls = 0;
+  gisCalls = 0;
+
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  expect(meCalls).toBe(0);
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  const profile = dialog.getByRole('link', { name: 'Profile ↗' });
+  await expect(profile).toBeVisible();
+  await expect(profile).toHaveAttribute('href', 'profile.html');
+  await expect(profile).toHaveAttribute('target', '_blank');
+  await expect(profile).toHaveAttribute('rel', 'noopener');
+  const row = profile.locator('..');
+  await expect(row).toContainText('Ryuko');
+  await expect(row.locator('img')).toHaveAttribute('src', /avatar\.png$/);
+  await expect.poll(() => meCalls).toBe(1);
+
+  user = null;
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  await expect(row).toContainText('Not signed in');
+  await expect(row.locator('img')).toHaveCount(0);
+  await expect.poll(() => meCalls).toBe(2);
+  expect(gisCalls).toBe(0);
   expect(errors).toEqual([]);
 });
