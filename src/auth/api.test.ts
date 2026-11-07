@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   getMe,
+  readMe,
   signInGoogle,
   signOut,
   type FetchLike,
@@ -137,6 +138,67 @@ describe('getMe', () => {
       expect(await getMe(fetchImpl)).toEqual(user);
     },
   );
+});
+
+describe('readMe', () => {
+  it('reports ok with the signed-in user', async () => {
+    const { fetchImpl } = stubFetch(() => jsonResponse({ user: USER }));
+    expect(await readMe(fetchImpl)).toEqual({ ok: true, user: USER });
+  });
+
+  it('reports ok with null for an authoritative signed-out body', async () => {
+    const { fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
+    expect(await readMe(fetchImpl)).toEqual({ ok: true, user: null });
+  });
+
+  it('requests /api/me as a credentialed same-origin GET', async () => {
+    const { calls, fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
+    await readMe(fetchImpl);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].input).toBe('/api/me');
+    expect(calls[0].init?.method ?? 'GET').toBe('GET');
+    expect(calls[0].init?.credentials).toBe('same-origin');
+  });
+
+  it('fails on a network error', async () => {
+    expect(await readMe(rejectingFetch(new TypeError('fetch failed')))).toEqual(
+      { ok: false, user: null },
+    );
+  });
+
+  it.each([401, 403, 404, 500])(
+    'fails on a non-2xx response (%i)',
+    async (status) => {
+      const { fetchImpl } = stubFetch(() =>
+        jsonResponse({ error: 'missing DB' }, status),
+      );
+      expect(await readMe(fetchImpl)).toEqual({ ok: false, user: null });
+    },
+  );
+
+  it("fails on Vite's HTML fallback body", async () => {
+    const { fetchImpl } = stubFetch(
+      () =>
+        new Response('<!doctype html><html></html>', {
+          headers: { 'content-type': 'text/html' },
+        }),
+    );
+    expect(await readMe(fetchImpl)).toEqual({ ok: false, user: null });
+  });
+
+  it.each([
+    ['a JSON error body', { error: 'missing DB' }],
+    ['a JSON array', []],
+    ['a JSON string', '"signed in"'],
+    ['a missing user', {}],
+    ['a non-object user', { user: 42 }],
+    ['a non-string name', { user: { ...USER, name: 7 } }],
+    ['a non-string createdAt', { user: { ...USER, createdAt: null } }],
+    ['a non-date createdAt', { user: { ...USER, createdAt: 'not-a-date' } }],
+  ])('fails on %s rather than reporting signed out', async (_label, body) => {
+    const { fetchImpl } = stubFetch(() => jsonResponse(body));
+    expect(await readMe(fetchImpl)).toEqual({ ok: false, user: null });
+  });
 });
 
 describe('signInGoogle', () => {
