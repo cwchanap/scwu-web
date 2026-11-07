@@ -101,8 +101,6 @@ test('boots into a ready arena', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
-// The 'unconfigured' project always serves a build without
-// VITE_GOOGLE_CLIENT_ID, so the unavailable state is asserted, not sniffed.
 test('profile shows sign-in unavailable when unconfigured', async ({
   page,
 }) => {
