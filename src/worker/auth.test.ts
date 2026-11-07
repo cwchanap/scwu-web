@@ -223,6 +223,19 @@ describe('POST /api/auth/google', () => {
     expect(res.status).toBe(401);
   });
 
+  it('rejects a token without an expiration claim', async () => {
+    const { env } = testEnv();
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(CLIENT_ID)
+      .setSubject('sub-1')
+      .setIssuedAt()
+      .sign(privateKey);
+    const { res } = await signIn(token, env);
+    expect(res.status).toBe(401);
+  });
+
   it('rejects a tampered token', async () => {
     const { env } = testEnv();
     const { res } = await signIn(tampered(await googleToken()), env);
