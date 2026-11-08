@@ -1,4 +1,4 @@
-import type { ProfileUser } from './auth/api';
+import type { MeResult, ProfileUser } from './auth/api';
 import type { DummyBehavior } from './game/dummy';
 import type { Mode } from './game/match';
 
@@ -20,6 +20,23 @@ export const resetModeOf = (value: string, mode: Mode): Mode | null =>
 
 export const profileConfigured = (clientId: string | undefined): boolean =>
   !!clientId;
+
+export interface MenuIdentity {
+  user: ProfileUser | null;
+  loaded: boolean;
+  failed: boolean;
+}
+
+// The Menu's identity moves only on an authoritative /api/me answer: a
+// failed read keeps the last verified user instead of signing it out, and
+// flags the row so an unanswered check never poses as signed out.
+export const applyMe = (
+  identity: MenuIdentity,
+  result: MeResult,
+): MenuIdentity =>
+  result.ok
+    ? { user: result.user, loaded: true, failed: false }
+    : { ...identity, loaded: true, failed: true };
 
 export interface IdentityRefresher {
   (): Promise<void>;

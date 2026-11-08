@@ -5,11 +5,12 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   let user: unknown = { ...USER, avatarUrl: '/avatar.png' };
+  let meStatus = 200;
   let meCalls = 0;
   let gisCalls = 0;
   await page.route('**/api/me', (route) => {
     meCalls += 1;
-    return route.fulfill(json({ user }));
+    return route.fulfill(json({ user }, meStatus));
   });
   await page.route('**/avatar.png', (route) =>
     route.fulfill({
@@ -46,6 +47,16 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
   await expect(row.locator('img')).toHaveAttribute('src', /avatar\.png$/);
   await expect.poll(() => meCalls).toBe(1);
 
+  // A failed read keeps the verified identity rather than signing it out.
+  meStatus = 503;
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  await expect(row).toContainText('Ryuko');
+  await expect.poll(() => meCalls).toBe(2);
+
+  meStatus = 200;
   user = null;
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toBeHidden();
@@ -53,7 +64,7 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
   await expect(dialog).toBeVisible();
   await expect(row).toContainText('Not signed in');
   await expect(row.locator('img')).toHaveCount(0);
-  await expect.poll(() => meCalls).toBe(2);
+  await expect.poll(() => meCalls).toBe(3);
   expect(gisCalls).toBe(0);
   expect(errors).toEqual([]);
 });

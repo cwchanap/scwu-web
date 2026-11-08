@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getMe, type ProfileUser } from './auth/api';
+  import { readMe } from './auth/api';
   import { ASSET_BASE } from './game/assetBase';
   import { buttonsOf, KEYS, usesButton } from './game/commands';
   import type { Control, Mode, PracticeOptions } from './game/match';
@@ -10,10 +10,12 @@
   import type { GameStatus, createGame } from './game/scene';
   import { ROSTER } from './instructions/fighters';
   import {
+    applyMe,
     identityRefresher,
     opponentChoiceOf,
     profileConfigured,
     resetModeOf,
+    type MenuIdentity,
   } from './menu';
 
   let host: HTMLDivElement;
@@ -72,23 +74,25 @@
     music: true,
   });
   let menuOpen = $state(false);
-  let me = $state<ProfileUser | null>(null);
+  let identity = $state<MenuIdentity>({
+    user: null,
+    loaded: false,
+    failed: false,
+  });
   let mePending = $state(false);
-  let meLoaded = $state(false);
   const profileRow = profileConfigured(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   const refreshIdentity = profileRow
     ? identityRefresher(
         async () => {
           mePending = true;
           try {
-            return await getMe();
+            return await readMe();
           } finally {
             mePending = false;
           }
         },
-        (user) => {
-          me = user;
-          meLoaded = true;
+        (result) => {
+          identity = applyMe(identity, result);
         },
       )
     : null;
@@ -521,16 +525,22 @@
           class="flex min-w-0 items-center gap-2"
           class:opacity-60={mePending}
         >
-          {#if me?.avatarUrl}
+          {#if identity.user?.avatarUrl}
             <img
               class="size-6 shrink-0 rounded-full object-cover [image-rendering:auto]"
-              src={me.avatarUrl}
+              src={identity.user.avatarUrl}
               alt=""
               referrerpolicy="no-referrer"
             />
           {/if}
           <span class="truncate font-bold italic"
-            >{!meLoaded ? 'Checking…' : me ? me.name : 'Not signed in'}</span
+            >{!identity.loaded
+              ? 'Checking…'
+              : identity.user
+                ? identity.user.name
+                : identity.failed
+                  ? "Couldn't check sign-in"
+                  : 'Not signed in'}</span
           >
         </div>
         <a
