@@ -16,7 +16,7 @@ bun run test                # Vitest. NOT `bun test`, which runs Bun's own runne
 bunx vitest run src/game/match.test.ts          # single file
 bunx vitest run src/game/match.test.ts -t "Hit Up"  # single test by name
 bun run check               # svelte-check + tsc --noEmit
-bun run e2e                 # Playwright smoke test (e2e/) against dist/; `bun run build` first. CI: .github/workflows/, fed by R2 (README, "CI")
+bun run e2e                 # Playwright (e2e/) against dist/ and a separately built configured bundle; `bun run build` first. CI: .github/workflows/, fed by R2 (README, "CI")
 bun run lint                # ESLint
 bun run format              # Prettier write (format:check to verify)
 bun run validate            # assets + format:check + lint + check + test (the pre-commit hook runs this)
@@ -36,7 +36,11 @@ bun run upload:r2           # sync the files assets-version.json lists to the R2
 - All three outputs are gitignored and regenerated. To add a pose or animation, add a `name: sourceActionIndex` entry to Ryuko's `actions` dict in `main()` (or the fighter's `FIGHTERS` entry), then reference it through `animations.ts`. To play a source action's own events, add it to that export's flatten queue (spawned objects, including every object a clip spawns, slot-2/3 handlers, op `0x0b` calls and the targets of op `0x16`/`0x1f`/`0x20` branches follow automatically; flattened displays carry their op `0x04`/`0x0e`/`0x1f`/`0x25` events like clip displays) and decode any new opcode in `decode_event`; `flatten` inlines op `0x09` calls and follows op `0x0a` jumps.
 - Do not commit original assets. The one place they are published is the public R2 bucket the Cloudflare deploy reads (the owner's choice; README, "Deploy to Cloudflare"). Cloudflare's git build has no handoff, so `scripts/upload_r2.sh` also uploads `generated/` (with `assets-version.json`) as a tarball for `scripts/build.sh` to fetch. Art and audio URLs come from `ASSET_BASE` (`src/game/assetBase.ts`, set by `VITE_ASSET_BASE`, with the version appended), never a hardcoded `/assets/`.
 
-## Architecture (`src/game/`)
+## Architecture
+
+- `src/worker/` handles the auth API and D1; `src/auth/` validates and coordinates client identity requests; `src/profile/` renders the separate profile page. `wrangler.jsonc` binds production D1; Preview has no DB until isolated setup is complete.
+
+## Game architecture (`src/game/`)
 
 Simulation and rendering are separate, and the simulation is deterministic:
 

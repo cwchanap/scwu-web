@@ -59,7 +59,10 @@ export async function handle(
   keys: JWTVerifyGetKey = googleKeys(),
 ): Promise<Response> {
   const unconfigured = configError(env);
-  if (unconfigured) return unconfigured;
+  if (unconfigured) {
+    console.error(`Auth configuration error: ${unconfigured}`);
+    return json({ error: unconfigured }, 500);
+  }
   try {
     const configured = env as Configured;
     const { pathname } = new URL(request.url);
@@ -81,14 +84,12 @@ export async function handle(
   }
 }
 
-function configError(env: Env): Response | null {
-  if (!env.DB) return json({ error: 'missing DB' }, 500);
-  if (!env.GOOGLE_CLIENT_ID)
-    return json({ error: 'missing GOOGLE_CLIENT_ID' }, 500);
-  if (!env.SESSION_SECRET)
-    return json({ error: 'missing SESSION_SECRET' }, 500);
+function configError(env: Env): string | null {
+  if (!env.DB) return 'missing DB';
+  if (!env.GOOGLE_CLIENT_ID) return 'missing GOOGLE_CLIENT_ID';
+  if (!env.SESSION_SECRET) return 'missing SESSION_SECRET';
   if (new TextEncoder().encode(env.SESSION_SECRET).length < 32) {
-    return json({ error: 'invalid SESSION_SECRET' }, 500);
+    return 'invalid SESSION_SECRET';
   }
   return null;
 }
@@ -151,15 +152,14 @@ async function signInWithGoogle(
     avatarUrl = stringClaim(payload.picture) ?? null;
   } catch (error) {
     const isTokenError =
-      error instanceof errors.JWTClaimValidationFailed ||
-      error instanceof errors.JWTExpired ||
-      error instanceof errors.JWTInvalid ||
-      error instanceof errors.JWSSignatureVerificationFailed ||
-      error instanceof errors.JWKSNoMatchingKey ||
-      error instanceof errors.JOSEAlgNotAllowed ||
-      error instanceof errors.JWSInvalid;
+      error instanceof errors.JOSEError &&
+      error.code !== errors.JOSEError.code &&
+      !(error instanceof errors.JWKSTimeout) &&
+      !(error instanceof errors.JWKSInvalid) &&
+      !(error instanceof errors.JWKInvalid);
 
     if (isTokenError) {
+      console.warn('Google sign-in rejected: invalid token');
       return json({ error: 'invalid token' }, 401);
     }
     console.error('Google token verification failed upstream:', error);
@@ -174,7 +174,10 @@ async function signInWithGoogle(
     .bind(sub, name, avatarUrl)
     .run();
   const row = await env.DB.prepare(SELECT_USER_SQL).bind(sub).first<UserRow>();
-  if (!row) return json({ error: 'user write failed' }, 500);
+  if (!row) {
+    console.error('Google sign-in failed: user write failed');
+    return json({ error: 'user write failed' }, 500);
+  }
 
   const session = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })

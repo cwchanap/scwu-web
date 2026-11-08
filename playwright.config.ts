@@ -1,8 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Drives the production build in dist/, so run `bun run build` first. Built
-// with VITE_ASSET_BASE set, the art and audio come from the R2 bucket; unset,
-// from dist/assets (what `bun run build` exports locally).
+// Run `bun run build` first; the server also builds a configured profile bundle.
+// Art comes from VITE_ASSET_BASE when set, or dist/assets otherwise.
 export default defineConfig({
   testDir: 'e2e',
   // Booting loads the fighters' data and art, over the network from R2 in CI.

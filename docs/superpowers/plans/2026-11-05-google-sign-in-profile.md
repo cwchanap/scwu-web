@@ -19,8 +19,9 @@ new Worker service, sessions table or front-end auth framework.
 - `instructions.html`, `src/instructions/main.ts` and
   `Instructions.svelte` establish Vite's separate Svelte page and
   select-screen look. Their styles are currently component-local.
-- `vite.config.ts` has exactly two Vite HTML entries;
-  `wrangler.jsonc` currently serves `dist/` with no `main` or D1.
+- `vite.config.ts` has three HTML entries, including the profile;
+  `wrangler.jsonc` serves `dist/` and binds the Worker to D1. Preview
+  currently has no D1 binding pending a separate database.
 - `scripts/export_assets.py:dom_art()` finds the versioned R2 art
   published for DOM usage by scanning only specific Svelte/TS sources;
   moving `select/15.png` to a shared helper without updating that
@@ -244,7 +245,7 @@ prove D1 or Google origin configuration.
 
 **Modify:** `src/App.svelte`,
 `src/menu.ts` and focused pure tests if useful,
-`e2e/smoke.spec.ts`.
+`e2e/unconfigured/smoke.spec.ts` and `e2e/configured/profile.spec.ts`.
 
 - [ ] Insert the Profile row at the top of the existing
       Menu **only when** `VITE_GOOGLE_CLIENT_ID` is

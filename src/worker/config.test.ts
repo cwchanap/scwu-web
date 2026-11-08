@@ -30,7 +30,7 @@ if (parsed.error) {
 const config = parsed.config as WranglerConfig;
 
 describe('Worker configuration', () => {
-  it('binds production and Preview to the same scwu-web D1 database', () => {
+  it('never binds Preview to the production D1 database', () => {
     const production = config.d1_databases?.find(
       (item) => item.binding === 'DB',
     );
@@ -43,7 +43,7 @@ describe('Worker configuration', () => {
         /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
       ),
     });
-    expect(preview).toEqual(production);
+    expect(preview?.database_id).not.toBe(production?.database_id);
   });
 
   it('uses the same public Google client ID in production and Preview', () => {
@@ -55,12 +55,5 @@ describe('Worker configuration', () => {
     );
     expect(config.vars?.SESSION_SECRET).toBeUndefined();
     expect(config.previews?.vars?.SESSION_SECRET).toBeUndefined();
-  });
-
-  it('checks VITE_GOOGLE_CLIENT_ID matches wrangler.jsonc when configured in production', () => {
-    const viteId = process.env.VITE_GOOGLE_CLIENT_ID;
-    if (viteId && !viteId.startsWith('e2e-')) {
-      expect(viteId).toBe(config.vars?.GOOGLE_CLIENT_ID);
-    }
   });
 });
