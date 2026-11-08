@@ -41,15 +41,10 @@
   const refresh = identityRefresher(readMe, (result) => {
     loaded = true;
     if (result.ok) {
-      if (result.user !== null) {
-        me = result.user;
-        refreshFailed = false;
-      } else if (me !== null) {
-        refreshFailed = true;
-      } else {
-        me = null;
-        refreshFailed = false;
-      }
+      // An authoritative signed-out response (the cookie never stuck, or the
+      // session expired) clears the profile; only failed reads keep it.
+      refreshFailed = me !== null && result.user === null;
+      me = result.user;
     } else {
       refreshFailed = true;
     }
