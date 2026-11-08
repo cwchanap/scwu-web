@@ -1,6 +1,6 @@
 import { serve } from 'bun';
 import { existsSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 
 const distUnconfiguredDir = resolve(
   import.meta.dir,
@@ -31,7 +31,7 @@ const server = serve({
 
     const safePath = resolve(rootDir, '.' + reqPath);
     const isContained =
-      safePath === rootDir || safePath.startsWith(rootDir + '/');
+      safePath === rootDir || safePath.startsWith(rootDir + sep);
     if (!isContained) {
       return new Response('Forbidden', { status: 403 });
     }
