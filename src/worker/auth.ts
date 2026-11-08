@@ -40,6 +40,8 @@ const SESSION_COOKIE = 'scwu_session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
 const SESSION_ISSUER = 'scwu-web';
 const SESSION_AUDIENCE = 'scwu-web';
+const MAX_BODY_BYTES = 16 * 1024;
+const TOO_LARGE: unique symbol = Symbol('too-large');
 const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
 const SELECT_USER_SQL =
   'SELECT display_name, avatar_url, created_at FROM users WHERE google_sub = ?';
@@ -114,6 +116,36 @@ function isSameOrigin(request: Request): boolean {
   }
 }
 
+async function readJson(request: Request, maxBytes: number): Promise<unknown> {
+  const contentLength = Number(request.headers.get('content-length'));
+  if (contentLength > maxBytes) return TOO_LARGE;
+  if (request.body === null) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return TOO_LARGE;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes));
+  } catch {
+    return null;
+  }
+}
+
 async function signInWithGoogle(
   request: Request,
   env: Configured,
@@ -126,7 +158,8 @@ async function signInWithGoogle(
   ) {
     return json({ error: 'unsupported content type' }, 415);
   }
-  const body = await request.json().catch(() => null);
+  const body = await readJson(request, MAX_BODY_BYTES);
+  if (body === TOO_LARGE) return json({ error: 'payload too large' }, 413);
   const credential =
     body !== null &&
     typeof body === 'object' &&
