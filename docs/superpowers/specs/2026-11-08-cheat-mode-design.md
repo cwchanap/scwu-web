@@ -1,105 +1,101 @@
 # HPA-767 — Cheat mode in the Menu — design
 
-**Status:** planning only; implementation not started.
+**Status:** design in review; implementation not started.
 **Linear:** https://linear.app/cwchanap/issue/HPA-767/cheat-mode-in-the-menu
-**Delivery:** one draft PR, extended with all code and tests before marking ready.
-**Related:** HPA-771 consumes the cheated-run flag; HPA-768 Profile and HPA-770 BR CHAOS are separate work.
+**Delivery:** one draft PR for design, implementation and verification.
+**Review update:** 2026-11-08 — addressed the two design reviews on PR #14.
+**Related:** HPA-771 Achievements consumes the cheated-run flag. HPA-768 Profile, HPA-770 BR CHAOS and HPA-769 achievement art are separate tasks.
 
-## Goal
+## Goal and user contract
 
-Add an opt-in Cheats section to the existing arcade Menu. Settings live on this device, change only subsequent battles, and work in practice, Vs. CPU, TEAM VS, story, and future BR CHAOS through the same `Match` entry points. A cheated run is recognizable by the later Achievements feature.
+Provide an opt-in Cheats section in the existing arcade Menu, with settings stored only in the browser. Rules apply **from the next match or battle**, not to an active battle; a CHEAT tag identifies battles that actually started with cheats on. Extend the existing Phaser-free `Match` model instead of adding a generic modifiers system.
 
-Do not build a gameplay modifiers framework, cloud sync, an account dependency, or new art. Prefer the existing `Match` option pattern (`PracticeOptions`), `TrainingScene` as the scene owner, and the current Svelte dialog.
-
-## User-facing contract
-
-| Menu setting | Default | Allowed value | Effective behavior when Cheat mode is on |
+| Setting | Default | Range | Effective behavior when Cheat mode is enabled |
 | --- | --- | --- | --- |
-| Cheat mode | Off | On / Off | Enables all authored modifiers for the next battle |
-| Player HP | ×1 | ×0.5–×5 | Scale 1P's maximum and initial HP |
-| Player EN limit | 3 | Integer 1–6 | Override 1P's stock cap, including fighters whose native cap differs |
-| Unlimited EN | Off | On / Off | Start at the configured 1P stock cap and do not spend stocks; the cap still controls move eligibility |
-| Enemy HP | ×1 | ×0.1–×5 | Scale initial/max HP for every CPU fighter hostile to 1P |
-| Player damage | ×1 | ×0.5–×10 | Scale damage 1P deals to hostile targets, including chip and scripted opponent damage |
+| Cheat mode | Off | On / Off | Master switch; enabling it marks a started battle as cheated, even with neutral multipliers |
+| Player HP | ×1 | ×0.5–×5 | Multiply 1P's maximum and starting life |
+| Player EN limit | 3 | Integer 1–6 | Override 1P's native stock cap |
+| Unlimited EN | Off | On / Off | Refill 1P's stock to the configured cap on every active simulation tick |
+| Enemy HP | ×1 | ×0.1–×5 | Multiply maximum and starting life of every fighter hostile to 1P |
+| Player damage | ×1 | ×0.5–×10 | Multiply positive outgoing attack damage from 1P to hostile targets |
 
-- Under the Cheat mode switch, display **“Changes apply from the next match or battle.”**
-- Keep the five controls in the existing `src/App.svelte` Menu. Label the stock setting **“Player EN limit”** to distinguish it from the existing practice-only **“Max stock”** checkbox.
-- Show the settings when cheats are off, but keep them disabled until Cheat mode is on; persist each value, even while off.
-- Use simple numeric inputs: multiplier step 0.1, EN limit step 1, with the bounds above. Render labels and chosen values without a separate settings page.
-- Keep the existing arcade colors, keyboard containment, native `<dialog>`, and profile row from HPA-768.
-- No changes to 2P-controlled fighters or friendly CPUs; `Enemy HP` is based on hostility to seat 0, not “every fighter after index 0.” Passive practice dummies do not count as hostile CPU opponents; a CPU practice partner does.
+- The five settings appear beneath the **Cheat mode** switch in `src/App.svelte`, with labels and current values, a clear separator from practice options, and **“Changes apply from the next match or battle.”** Keep controls disabled while the master switch is off, but retain their values.
+- **Player EN limit** must not be confused with the existing live, practice-only **Max stock** checkbox.
+- Reuse the Menu's native `<dialog>`, arcade styling, keyboard containment and Profile row. Use simple bounded number controls (multiplier increments of 0.1, EN increments of 1).
+- Persist the whole options object under a single key (`scwu.cheats`) in `localStorage`. Absent storage, malformed JSON, invalid or non-finite numbers, and storage-denied browsers fall back to safe defaults. Use a pure parse/normalize helper; no migrations, sync or account API.
+- Works in practice, Vs. CPU, TEAM VS and story; future BR CHAOS battles must use the same entry point. In this game 1P is the only human-controlled fighter, so **enemy HP includes passive practice dummies**: the target rule is `Match.hostile(0, i)`, not `practice.partner === 'cpu'`. Story allies are not hostile and remain unscaled.
 
-Settings are saved to one browser `localStorage` key (`scwu.cheats`). Default values apply if storage is absent, inaccessible, malformed, or contains invalid fields. Read/normalize via a small pure helper, clamp finite numeric values, accept booleans only for switches, and write on changes. No migration/versioning mechanism or server API is needed. Loading saved settings must happen before the first displayed playable match, not only after the user opens the Menu.
+## Minimal architecture
 
-## Chosen architecture and boundaries
+### Pure options and battle-start snapshot
 
-### Small shared options model
+Create `src/game/cheats.ts` for `CheatOptions`, `DEFAULT_CHEATS` and `readCheats(raw)`. Do not introduce a runtime Phaser or browser dependency in this module.
 
-Create `src/game/cheats.ts` containing `CheatOptions`, `DEFAULT_CHEATS`, and a pure normalization/parse helper. The UI owns browser storage calls; the model must never touch `window` or `localStorage`. Pass **one copied snapshot** of those options into each newly constructed `Match` (a trailing optional argument on the constructor and factory methods is sufficient). Do not place runtime Svelte state or Phaser objects in `Match`.
+`TrainingScene` owns **pending** settings (updated by `setCheats(next)`); `Match` owns a copied, effective `match.cheats` snapshot. The only activation path is **`TrainingScene.begin(match)`**, immediately before gameplay starts, beside today's practice-option assignment:
 
-`TrainingScene` holds two distinct concepts:
+1. `App.svelte` reads saved settings in `onMount` and, as soon as `createGame(host,onStatus)` synchronously returns its scene, calls `session.scene.setCheats(saved)`. It also writes settings on later changes. **No third `createGame` argument** and no extra constructor/factory parameters.
+2. The scene may build a candidate `Match` in `reset` or `startBattle` while textures load. Only the accepted candidate reaches `begin`; there it calls `match.useCheats(this.pendingCheats)` once and captures a copy. A Menu change during a load applies to that battle **if the battle has not begun yet**; changes after `begin` only affect the next battle.
+3. `Match.useCheats` configures fighter max HP/stock for all existing seats, including story reinforcements that have not entered. `nextRound` re-applies those **same effective settings**, never newer pending settings, when TEAM VS or ordinary rounds replace fighters. The placeholder `Match` on the initial title screen is not playable and needs no special setup.
+4. Superseded `whenReady` loads already abort before `begin`, so they cannot activate a snapshot or mark a run cheated. Keep existing load-handling behavior; no new stale-load framework.
 
-1. `pendingCheats`: latest Menu values; changing these does **not** mutate `this.match`.
-2. The effective, read-only `match.cheats`: values captured when the next match/battle is requested, also when a stage/fighter selection forces a reset.
+`PracticeOptions` remains live and practice-only, independent from the frozen cheat snapshot. Disable cheats to get exact native behavior.
 
-For a newly loaded game, seed the first `TrainingScene` / initial `Match` from settings supplied to `createGame` by the UI. For later resets and story transitions, always capture the pending values when constructing the replacement `Match`, before potentially asynchronous `whenReady` asset loads. Superseded loads must not mark a run cheated.
+### HP, life thresholds and HUD consistency
 
-`PracticeOptions` stays separate: its switches are live, practice-only behaviors. When both practice Max stock and cheat EN limit are enabled, preserve the opponent's existing practice refill and honor the 1P cheat stock cap; never let practice refill exceed the 1P limit.
+Add `Fighter.maxHp` with default `lifeOf(who)`. At `useCheats`, set each fighter's maximum to `Math.max(1, Math.round(lifeOf(who) * multiplier))` and start at that maximum. Use the 1P multiplier for seat 0; use the Enemy HP multiplier for every `this.hostile(0, i)` with `i > 0`; do not modify non-hostile allies. Reapply to newly created round/member fighters, and do not reset HP when a waiting reinforcement merely becomes visible.
 
-### Health: one maximum per fighter
+Replace generic `lifeOf(f.who)` reads with `f.maxHp` for `gainLife`'s cap, `perMille`, `Match.roundEnd`'s perfect-round check, `hud.ts`'s `healthCrop` caller, `scene.ts`'s world life bars, and `GameStatus.life` (the accessible UI also consumes it). Keep character source data immutable.
 
-Today `lifeOf(who)` is read directly by `fighter()` initialization, `gainLife`, `perMille`, `Match.roundEnd`'s perfect check, `hud.ts`'s `healthCrop`, `scene.ts`'s world life bars, and `GameStatus.life`. Simply multiplying starting `hp` would cause inconsistent bars, over-heal behavior and false perfects.
+**One proportional life-threshold rule is required.** Source-script thresholds are expressed in the character's unmodified/native life units; when health is scaled, their percentages must follow. Use one small helper for the comparisons:
 
-Add a per-instance `Fighter.maxHp`, initialized to `lifeOf(who)` for normal fighters. While constructing each fighter or round entrant, set it to `Math.max(1, Math.round(lifeOf(who) * multiplier))` and start full. Apply `playerHpMultiplier` only to fighter index 0; apply `enemyHpMultiplier` only to CPU-controlled enemies hostile to 1P. This must also work for story reinforcements and TEAM VS member replacement, not just the first two fighters.
+`lifeMark(f, mark) = mark <= 0 || mark === 1 ? mark : Math.max(1, Math.trunc(mark * f.maxHp / lifeOf(f.who)))`
 
-Route the generic max-life consumers to `f.maxHp`: healing caps, percentage / life bars, accessible `GameStatus.life`, and perfect-round detection. The general 30%-of-maximum desperation rule should follow `maxHp`; leave hard-coded source-script `life` opcode comparisons unchanged rather than rewriting recovered fighter data. Existing non-cheat results remain identical.
+- Scale `loseLife`'s native `desperationOf(who)` damage-reduction threshold with `lifeMark`.
+- Compare the `runEvent` `life` opcode and `resultEvents` `life` checks against `lifeMark(f, event.value)` rather than unscaled source literals.
+- In `arrive`, compare `slot.below` against `lifeMark(watchedFighter, slot.below)`; an empty watched seat keeps its existing zero-life semantics.
+- Practice **Low health** clamps 1P to `lifeMark(f, desperationOf(f.who)) - 1`, not to an unscaled 30% threshold.
 
-### EN stocks
+Positive percentages are proportional; zero/negative sentinel thresholds are untouched. Preserve a literal **1 HP** sentinel as **exactly 1 HP** (e.g., OBJ TO SHIN HP0's absolute one-HP behavior), rather than silently turning “hold at 1” into “hold at 5” when max HP is ×5. This narrow exception keeps source-script survival logic intact. With Cheats off, `maxHp === lifeOf(who)` and these comparisons remain equivalent to native rules. Record the authored proportional reinterpretation explicitly in `docs/evidence.md` and test extreme multipliers (including Enemy HP ×0.1).
 
-The native `stocksOf(who)` cap currently appears in `addPower`, `runEvent`'s `stock` opcode, and the practice Max stock refill. Introduce one effective-stock-cap helper for the 1P, using `playerEnLimit` when cheats are enabled and the fighter's existing `stocksOf` otherwise. Keep other fighters' caps native.
+### EN, damage and per-tick behavior
 
-All stock accumulation, spending and refill paths must respect that helper. For `unlimitedEn`, start/restart the 1P at its chosen cap and prevent stock deductions; normal move requirements are still checked against that cap. No negative stocks or values above six, including when carrying stocks to the next round or swapping a TEAM VS member. The existing `STOCK_OFFSETS` only has digits for 0–6; do not add a seventh value, image or art task.
+Add `Fighter.maxStock`, initialized to `stocksOf(who)`; set **only 1P's** to `playerEnLimit` when Cheats are enabled. Replace native cap reads for dynamic fighters in `addPower(f, amount)`, scripted `stock` operations and the practice Max stock refill with `f.maxStock`. This avoids passing `Match` through the existing free `addPower` helper. The current `STOCK_OFFSETS` supports 0–6; no new texture or stock image is needed.
 
-### Outgoing damage
+Implement **Unlimited EN** using the existing per-tick refill shape: when Cheats and Unlimited EN are enabled, at the active `step()` refill point, set `fighters[0].stock = fighters[0].maxStock` and `fighters[0].power = 0`. Do not intercept every source-script stock deduction or prime stock in constructors. An expenditure within a tick may still occur; the next active tick restores stock, preserving normal move eligibility and source logic. Cover round/team transitions and check that no rendered stock index exceeds six.
 
-Keep source-derived hitbox, chip, combo and reaction behavior. At the point of *applying* damage to a hostile victim, multiply positive attack damage originating from 1P by `playerDamageMultiplier`, rounding to a whole HP (minimum 1 when original damage is positive, 0 stays 0). Cover:
+For damage, keep source hitboxes, chip, reactions and the defender's reduction. Use one small helper to scale only positive **1P-originated damage to hostile opponents** (round whole, minimum 1 when the unmodified hit is positive), before `loseLife`. The three needed routes are `hitTest` (melee, projectile, blocked chip), `runEvent` `power` on another fighter, and the striker-attributed `gonMiss` path. Do not scale self-damage, self-HP costs, healing, or another fighter's attacks.
 
-- fighter attacks and owned effect/projectile hitboxes through `Match.hitTest`;
-- scripted `power` events that deal life loss to another fighter;
-- victim-scripted attacks attributed to an actual 1P striker (for example the `gonMiss` branch).
+### Cheated run and status contract
 
-Do not scale 1P's own costs/self-damage, healing, opponents' damage, or source script literals. Leave the defender's usual reduction / desperation rule in place after the authored attack multiplier. Verify a blocked hit and a projectile in tests so only scaling the normal melee path cannot pass.
+Add `GameStatus.cheated: boolean` for the future HPA-771 Achievements consumer. A run is one practice/Vs. CPU match, a TEAM VS match with all rounds, or an entire story/BR route with multiple battles.
 
-### Current battle, run cheating, and HUD
+- `TrainingScene.runCheated` ORs the effective `match.cheats.enabled` **only when `begin(match)` starts that battle**; it stays true across later clean battles, demos, Continue screens, and the final return to the title screen.
+- Reset on a **new non-story match** in `begin`, or when a **new story route** is selected (the `select.story` branch of `stepSelect`). Do **not** clear on `openTitle`: the completed route's result must remain readable by a later Achievements consumer. A fresh run resets before its first battle.
+- Render a small **CHEAT** text label in `createHud` only during a battle with **effective `match.cheats.enabled`**. It is independent of the pending Menu switch; turning that switch off in mid-battle cannot hide this match's tag or remove the run's mark.
+- Do not add `GameStatus.cheatActive` — nothing needs it. An enabled switch marks the battle cheated even if all numeric values are neutral. HPA-771's unlock/persistence logic is out of scope.
 
-The **CHEAT** indicator reflects the effective `match.cheats.enabled`, not pending values. Render it as a small text label in the existing Phaser HUD (`createHud`), visible during the battle only, without generating an image or changing recovered art.
+## Touchpoints and verification
 
-Add `GameStatus.cheated: boolean` as a forward-compatible contract for HPA-771. A *run* means one practice or Vs. CPU match, one TEAM VS match (possibly multiple rounds/fighters), or one complete story / BR route comprising multiple battles. Track `runCheated` in `TrainingScene` and OR it with `match.cheats.enabled` only when `begin(match)` actually starts a battle. It remains true across the rest of that route, including intervening demos, continue screens and later clean battles. Starting a new match or route resets it before recording the first battle. Returning to title and abandoning the route clears it; status reporting while showing a result must retain the mark for a future achievement consumer.
+- `src/game/cheats.ts` and tests — pure options and defaults.
+- `src/game/match.ts` and `match.test.ts` — `useCheats`, `Fighter.maxHp` / `maxStock`, `lifeMark`, three attack-damage routes, per-tick refill.
+- `src/game/scene.ts` and `scene.test.ts` — scene-owned pending options, `begin`, route marker, `GameStatus.life`/`cheated`, world bars.
+- `src/App.svelte`, `src/menu.ts`, `src/menu.test.ts` — Menu controls, browser persistence, original Profile/practice behavior.
+- `src/game/hud.ts` and `hud.test.ts` — health crop, stock range and CHEAT tag.
+- `e2e/configured/menu.spec.ts` and `e2e/unconfigured/smoke.spec.ts` — Menu/persistence smoke.
+- `docs/gameplay.md` and `docs/evidence.md` — clearly label every new cheat rule and threshold scaling **authored**, not recovered.
 
-Separate `GameStatus.cheatActive` (optional, if needed for UI/debug) from `cheated`: switching the Menu off mid-battle cannot erase the current HUD tag or a run's recorded history. An enabled switch counts as cheated even if every multiplier is ×1. HPA-771 will suppress unlocks based on `GameStatus.cheated`; achievement persistence and unlock logic are **not** part of this ticket.
+Acceptance cases:
 
-## Implementation touchpoints (verified on main)
+1. Cheats off or storage absent: preserve native combat values for all fighters, including native stock caps 1/2/3/5/6, native result thresholds and story timing.
+2. 1P Ryuko at Player HP ×2 starts at 1,020/1,020; healing caps, life displays, perfect check and the 30% threshold follow the scaled maximum. Practice Low health clamps to just below its scaled threshold.
+3. Enemy HP ×0.1 scales a passive practice dummy and a hostile story CPU/reinforcement, but not a story ally; no instant “below 30%” behavior merely from scaling the enemy's maximum. A literal one-HP script guard still tests 1.
+4. EN cap 1 and cap 6 display valid 0–6 images, practice Max stock respects the cap, and Unlimited EN refills each active tick without exceeding it.
+5. Player damage ×2 applies to melee/projectiles/chip and scripted opponent damage, but not to 1P self-damage or healing.
+6. Changing pending cheats before `begin` (including during load) affects that starting match; after `begin`, the battle stays unchanged. A superseded candidate never starts a battle.
+7. A cheated story route remains marked on the title/result screen even if subsequent battles are clean; a new route or new standalone match resets. The CHEAT tag reflects only the current battle's effective snapshot.
+8. Stored settings survive reload on the device, while old run state does not. No backend, account or art work is added.
+9. Before this PR is marked ready, run and report `bun run validate`, `bun run build`, `bun run e2e` plus focused playtests in practice, Vs. CPU, TEAM VS and story. Draft PR CI is skipped; a Cloudflare preview build alone is not test evidence.
 
-- `src/App.svelte`, `src/menu.ts`, `src/menu.test.ts` — Menu state, controls, storage.
-- `src/game/scene.ts`, `src/game/scene.test.ts` — `createGame`, `TrainingScene`, factory/reset/begin transitions, `GameStatus` and `onStatus`.
-- `src/game/match.ts`, `src/game/match.test.ts` — `PracticeOptions` pattern, fighter health, `addPower` / `stock` event, scripted and hitbox damage, round/team/story construction.
-- `src/game/hud.ts`, `src/game/hud.test.ts` — stock image limit, health crop, new CHEAT label.
-- `docs/gameplay.md` and `docs/evidence.md` — document the new behavior as **authored** (not a recovered SCWU rule).
+## Out of scope
 
-## Acceptance and verification
-
-1. With storage empty or Cheats off, baseline HP, EN, damage, perfect checks and match flow remain unchanged for every character (including those with native 1/2/5/6 stocks).
-2. Ryuko with Player HP ×2 starts with 1,020/1,020; heals stop at 1,020; health bar, accessibility meter and perfect check use 1,020.
-3. Enemy HP ×0.1 affects hostile CPU enemies, including a later story reinforcement, but not a story ally. Player damage ×2 affects body hitboxes, projectiles, chip and scripted damage, but does not double self-harm.
-4. EN limits 1 and 6 render valid stock digits; unlimited EN cannot spend or overflow; practice Max stock does not override the cheat cap.
-5. Changing settings mid-battle changes neither its numeric rules nor its HUD indicator; the next battle uses the changed snapshot.
-6. A story/BR route that started any battle with cheats on remains marked cheated even after cheats are switched off for later battles. A fresh match or route gets a fresh flag. Stale asset loads do not poison it.
-7. Reload restores Menu values on the same device but does not restore an old run, and no identity or network API is accessed.
-8. Add deterministic Vitest coverage for options, matching math and scene transitions; Playwright smoke checks toggles, persistence and the pending-settings hint. Complete `bun run validate`, `bun run build` and `bun run e2e` before moving this PR out of draft. The GitHub Actions workflows skip drafts, so local results must be recorded honestly.
-
-## Deliberately out of scope
-
-- HPA-771 achievements, icon art (HPA-769), HPA-768 profile/account UI and server storage.
-- Cheat presets, codes, per-CPU editing, 2P cheats, live stat edits, alternative combat systems, or a reusable effect pipeline.
-- Implementing BR CHAOS (HPA-770); its future battles must use the same scene-to-Match snapshot and run marker.
-- New PNGs, sound effects, database changes, compatibility migrations, or unnecessary defensive infrastructure.
+HPA-768 Profile, HPA-771 achievement unlocks, HPA-769 icons, HPA-770 mode/gameplay implementation, 2P cheats, per-CPU controls, presets, cheat codes, a modifiers framework, cross-device sync, extra server/database work, compatibility migrations, and generated images or sounds.
