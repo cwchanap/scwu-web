@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
 
-// Run `bun run build` first; the server also builds a configured profile bundle.
-// Art comes from VITE_ASSET_BASE when set, or dist/assets otherwise.
+// The server builds its own unconfigured and configured bundles first; the
+// game's data and art must already be exported (`bun run assets`). Art comes
+// from VITE_ASSET_BASE when set, or the bundled assets otherwise.
 export default defineConfig({
   testDir: 'e2e',
   // Booting loads the fighters' data and art, over the network from R2 in CI.
@@ -43,9 +44,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'bun scripts/build-configured.ts && bun scripts/preview-e2e.ts',
+    command: 'bun scripts/build-e2e.ts && bun scripts/preview-e2e.ts',
     url: 'http://127.0.0.1:4173',
     timeout: 300_000,
-    reuseExistingServer: !process.env.CI,
+    // Reusing a foreign server on this port (e.g. `bun run preview`) would
+    // serve dist/ and silently skip the e2e builds; fail on the conflict.
+    reuseExistingServer: false,
   },
 });

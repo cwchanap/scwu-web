@@ -2,7 +2,11 @@ import { serve } from 'bun';
 import { existsSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-const distDir = resolve(import.meta.dir, '..', 'dist');
+const distUnconfiguredDir = resolve(
+  import.meta.dir,
+  '..',
+  'dist-e2e-unconfigured',
+);
 const distConfiguredDir = resolve(import.meta.dir, '..', 'dist-e2e-configured');
 
 const server = serve({
@@ -12,7 +16,7 @@ const server = serve({
     const url = new URL(req.url);
     const cookie = req.headers.get('cookie') || '';
     const isConfigured = cookie.includes('e2e_configured=1');
-    const rootDir = isConfigured ? distConfiguredDir : distDir;
+    const rootDir = isConfigured ? distConfiguredDir : distUnconfiguredDir;
 
     let reqPath: string;
     try {
