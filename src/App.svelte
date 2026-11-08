@@ -73,11 +73,24 @@
   });
   let menuOpen = $state(false);
   let me = $state<ProfileUser | null>(null);
+  let mePending = $state(false);
+  let meLoaded = $state(false);
   const profileRow = profileConfigured(import.meta.env.VITE_GOOGLE_CLIENT_ID);
   const refreshIdentity = profileRow
-    ? identityRefresher(getMe, (user) => {
-        me = user;
-      })
+    ? identityRefresher(
+        async () => {
+          mePending = true;
+          try {
+            return await getMe();
+          } finally {
+            mePending = false;
+          }
+        },
+        (user) => {
+          me = user;
+          meLoaded = true;
+        },
+      )
     : null;
   let dialog: HTMLDialogElement;
   const asset = ASSET_BASE;
@@ -504,17 +517,20 @@
     </div>
     {#if profileRow}
       <div class="flex items-center justify-between gap-3">
-        <div class="flex min-w-0 items-center gap-2">
+        <div
+          class="flex min-w-0 items-center gap-2"
+          class:opacity-60={mePending}
+        >
           {#if me?.avatarUrl}
             <img
-              class="size-6 shrink-0 rounded-full object-cover"
+              class="size-6 shrink-0 rounded-full object-cover [image-rendering:auto]"
               src={me.avatarUrl}
               alt=""
               referrerpolicy="no-referrer"
             />
           {/if}
           <span class="truncate font-bold italic"
-            >{me ? me.name : 'Not signed in'}</span
+            >{!meLoaded ? 'Checking…' : me ? me.name : 'Not signed in'}</span
           >
         </div>
         <a

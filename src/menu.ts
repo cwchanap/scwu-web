@@ -21,14 +21,27 @@ export const resetModeOf = (value: string, mode: Mode): Mode | null =>
 export const profileConfigured = (clientId: string | undefined): boolean =>
   !!clientId;
 
-export const identityRefresher = (
-  read: () => Promise<ProfileUser | null>,
-  apply: (user: ProfileUser | null) => void,
-): (() => Promise<void>) => {
+export interface IdentityRefresher {
+  (): Promise<void>;
+  invalidate(): void;
+}
+
+export const identityRefresher = <T = ProfileUser | null>(
+  read: () => Promise<T>,
+  apply: (result: T) => void,
+): IdentityRefresher => {
   let begun = 0;
-  return async () => {
-    const mine = ++begun;
-    const user = await read();
-    if (mine === begun) apply(user);
-  };
+  const fn: IdentityRefresher = Object.assign(
+    async () => {
+      const mine = ++begun;
+      const result = await read();
+      if (mine === begun) apply(result);
+    },
+    {
+      invalidate: () => {
+        ++begun;
+      },
+    },
+  );
+  return fn;
 };
