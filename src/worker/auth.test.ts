@@ -394,6 +394,57 @@ describe('POST /api/auth/google', () => {
     }
   });
 
+  it('rejects an oversized body without parsing it', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson('/api/auth/google', {
+        credential: 'x',
+        pad: Array.from({ length: 20_000 }, () => ({})),
+      }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(413);
+    expect(res.headers.get('set-cookie')).toBeNull();
+    expect(await res.json()).toEqual({ error: 'payload too large' });
+  });
+
+  it('rejects an oversized body that lies about its content-length', async () => {
+    const { env } = testEnv();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(
+          new TextEncoder().encode(
+            JSON.stringify({ credential: 'x'.repeat(17 * 1024) }),
+          ),
+        );
+        controller.close();
+      },
+    });
+    const res = await handle(
+      new Request(`${ORIGIN}/api/auth/google`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: stream,
+        duplex: 'half',
+      } as RequestInit),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(413);
+    expect(await res.json()).toEqual({ error: 'payload too large' });
+  });
+
+  it('still processes a body just under the limit', async () => {
+    const { env } = testEnv();
+    const res = await handle(
+      postJson('/api/auth/google', { credential: 'x'.repeat(16_000) }),
+      env,
+      keys,
+    );
+    expect(res.status).toBe(401);
+  });
+
   it('upserts on repeat sign-in and preserves created_at', async () => {
     const { env, db } = testEnv();
     await signIn(await googleToken({ name: 'First' }), env);
