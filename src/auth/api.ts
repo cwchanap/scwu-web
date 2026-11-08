@@ -14,6 +14,14 @@ const browserFetch: FetchLike = (input, init) => fetch(input, init);
 const isValidDate = (value: string): boolean =>
   value.length > 0 && !Number.isNaN(Date.parse(value));
 
+// SQLite's default timestamp shape ('YYYY-MM-DD HH:MM:SS') is UTC, but
+// Date parses the space-separated form as local time; make the zone explicit.
+const normalizeCreatedAt = (value: string): string =>
+  value.replace(
+    /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}(?:\.\d+)?)$/,
+    '$1T$2Z',
+  );
+
 export interface MeResult {
   ok: boolean;
   user: ProfileUser | null;
@@ -26,12 +34,13 @@ const parseMe = (body: unknown): MeResult => {
   if (user === null) return { ok: true, user: null };
   if (typeof user !== 'object') return { ok: false, user: null };
   const { name, avatarUrl, createdAt } = user as Record<string, unknown>;
-  if (typeof name !== 'string') return { ok: false, user: null };
-  if (typeof createdAt !== 'string' || !isValidDate(createdAt))
+  if (typeof name !== 'string' || typeof createdAt !== 'string')
     return { ok: false, user: null };
+  const at = normalizeCreatedAt(createdAt);
+  if (!isValidDate(at)) return { ok: false, user: null };
   if (avatarUrl !== null && typeof avatarUrl !== 'string')
     return { ok: false, user: null };
-  return { ok: true, user: { name, avatarUrl, createdAt } };
+  return { ok: true, user: { name, avatarUrl, createdAt: at } };
 };
 
 const request = async (

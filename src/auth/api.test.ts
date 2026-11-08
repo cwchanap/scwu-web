@@ -102,7 +102,6 @@ describe('getMe', () => {
   it.each([
     '2026-11-06T05:53:34.123Z',
     '2026-11-06T07:53:34+02:00',
-    '2026-11-06 05:53:34',
     '2028-02-29T05:53:34Z',
     '2000-02-29T00:00:00Z',
   ])('accepts valid date format %s', async (createdAt) => {
@@ -110,6 +109,19 @@ describe('getMe', () => {
     const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
     expect(await getMe(fetchImpl)).toEqual(user);
   });
+
+  it.each([
+    ['2026-11-06 05:53:34', '2026-11-06T05:53:34Z'],
+    ['2026-11-06 05:53:34.123', '2026-11-06T05:53:34.123Z'],
+  ])(
+    'normalizes SQLite UTC timestamp %s to ISO',
+    async (createdAt, expected) => {
+      const { fetchImpl } = stubFetch(() =>
+        jsonResponse({ user: { ...USER, createdAt } }),
+      );
+      expect(await getMe(fetchImpl)).toEqual({ ...USER, createdAt: expected });
+    },
+  );
 });
 
 describe('readMe', () => {
