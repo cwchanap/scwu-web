@@ -85,6 +85,35 @@ test('a failed refresh after a successful sign-in keeps the exchanged identity',
   expect(errors).toEqual([]);
 });
 
+test('an authoritative signed-out refresh clears the exchanged identity', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  // The exchange succeeds but the session cookie never sticks, so /api/me
+  // answers a signed-out body — not a failed read. The page must show the
+  // sign-in button again rather than a phantom profile.
+  await offlineGuard(page);
+  await page.route('**/api/me', (route) => route.fulfill(json({ user: null })));
+  await page.route('**/api/auth/google', (route) =>
+    route.fulfill(json({ user: USER })),
+  );
+  await stubGis(page);
+
+  await page.goto('/profile.html');
+  const signIn = page.getByRole('button', { name: 'Sign in with Google' });
+  await expect(signIn).toBeVisible();
+
+  await signIn.click();
+  await expect(page.getByText('Not signed in').first()).toBeVisible();
+  await expect(signIn).toBeVisible();
+  await expect(
+    page.getByText("Couldn't refresh your sign-in — try again."),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('a delayed read cannot overwrite a newer sign-in', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
