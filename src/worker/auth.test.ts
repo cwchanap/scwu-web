@@ -132,6 +132,8 @@ async function sessionToken(
 ): Promise<string> {
   return new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('scwu-web')
+    .setAudience('scwu-web')
     .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime(exp)
@@ -254,6 +256,19 @@ describe('POST /api/auth/google', () => {
       .sign(sessionKey);
     const { res } = await signIn(hs, env);
     expect(res.status).toBe(401);
+  });
+
+  it('returns 500 when Google JWKS or network verification fails upstream', async () => {
+    const { env } = testEnv();
+    const failingKeys: JWTVerifyGetKey = () => {
+      throw new Error('network down');
+    };
+    const req = postJson('/api/auth/google', {
+      credential: await googleToken(),
+    });
+    const res = await handle(req, env, failingKeys);
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'internal error' });
   });
 
   it.each([{ sub: '' }, { sub: null }])(
@@ -396,12 +411,40 @@ describe('GET /api/me', () => {
     expect((await valid.json()).user.name).toBe('Ryuko');
     const foreign = await new SignJWT({})
       .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('scwu-web')
+      .setAudience('scwu-web')
       .setSubject('sub-1')
       .setIssuedAt()
       .setExpirationTime('7d')
       .sign(new TextEncoder().encode('some-other-secret-with-32-plus-bytes'));
     const res = await meWithCookie(env, `scwu_session=${foreign}`);
     expect(await res.json()).toEqual({ user: null });
+  });
+
+  it('returns {user:null} for a cookie with wrong issuer or audience', async () => {
+    const { env, db } = testEnv();
+    seedSub1(db);
+    const badIssuer = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('other-issuer')
+      .setAudience('scwu-web')
+      .setSubject('sub-1')
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(sessionKey);
+    const resIssuer = await meWithCookie(env, `scwu_session=${badIssuer}`);
+    expect(await resIssuer.json()).toEqual({ user: null });
+
+    const badAudience = await new SignJWT({})
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuer('scwu-web')
+      .setAudience('other-audience')
+      .setSubject('sub-1')
+      .setIssuedAt()
+      .setExpirationTime('7d')
+      .sign(sessionKey);
+    const resAudience = await meWithCookie(env, `scwu_session=${badAudience}`);
+    expect(await resAudience.json()).toEqual({ user: null });
   });
 
   it('returns {user:null} when the session subject has no user row', async () => {

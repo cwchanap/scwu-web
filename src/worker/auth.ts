@@ -1,5 +1,6 @@
 import {
   createRemoteJWKSet,
+  errors,
   jwtVerify,
   SignJWT,
   type JWTVerifyGetKey,
@@ -37,7 +38,11 @@ interface ProfileUser {
 
 const SESSION_COOKIE = 'scwu_session';
 const SESSION_MAX_AGE = 7 * 24 * 60 * 60;
+const SESSION_ISSUER = 'scwu-web';
+const SESSION_AUDIENCE = 'scwu-web';
 const GOOGLE_ISSUERS = ['accounts.google.com', 'https://accounts.google.com'];
+const SELECT_USER_SQL =
+  'SELECT display_name, avatar_url, created_at FROM users WHERE google_sub = ?';
 
 let remoteKeys: JWTVerifyGetKey | undefined;
 
@@ -120,10 +125,7 @@ async function signInWithGoogle(
   ) {
     return json({ error: 'unsupported content type' }, 415);
   }
-  const body = await request
-    .json()
-    .then((parsed: unknown) => parsed)
-    .catch(() => null);
+  const body = await request.json().catch(() => null);
   const credential =
     body !== null &&
     typeof body === 'object' &&
@@ -147,8 +149,21 @@ async function signInWithGoogle(
     name =
       stringClaim(payload.name) ?? stringClaim(payload.given_name) ?? 'Player';
     avatarUrl = stringClaim(payload.picture) ?? null;
-  } catch {
-    return json({ error: 'invalid token' }, 401);
+  } catch (error) {
+    const isTokenError =
+      error instanceof errors.JWTClaimValidationFailed ||
+      error instanceof errors.JWTExpired ||
+      error instanceof errors.JWTInvalid ||
+      error instanceof errors.JWSSignatureVerificationFailed ||
+      error instanceof errors.JWKSNoMatchingKey ||
+      error instanceof errors.JOSEAlgNotAllowed ||
+      error instanceof errors.JWSInvalid;
+
+    if (isTokenError) {
+      return json({ error: 'invalid token' }, 401);
+    }
+    console.error('Google token verification failed upstream:', error);
+    return json({ error: 'internal error' }, 500);
   }
 
   await env.DB.prepare(
@@ -158,15 +173,13 @@ async function signInWithGoogle(
   )
     .bind(sub, name, avatarUrl)
     .run();
-  const row = await env.DB.prepare(
-    'SELECT display_name, avatar_url, created_at FROM users WHERE google_sub = ?',
-  )
-    .bind(sub)
-    .first<UserRow>();
+  const row = await env.DB.prepare(SELECT_USER_SQL).bind(sub).first<UserRow>();
   if (!row) return json({ error: 'user write failed' }, 500);
 
   const session = await new SignJWT({})
     .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer(SESSION_ISSUER)
+    .setAudience(SESSION_AUDIENCE)
     .setSubject(sub)
     .setIssuedAt()
     .setExpirationTime('7d')
@@ -182,11 +195,7 @@ async function signInWithGoogle(
 async function me(request: Request, env: Configured): Promise<Response> {
   const sub = await sessionSub(request, env);
   if (!sub) return json({ user: null });
-  const row = await env.DB.prepare(
-    'SELECT display_name, avatar_url, created_at FROM users WHERE google_sub = ?',
-  )
-    .bind(sub)
-    .first<UserRow>();
+  const row = await env.DB.prepare(SELECT_USER_SQL).bind(sub).first<UserRow>();
   return json({ user: row ? profileUser(row) : null });
 }
 
@@ -206,6 +215,8 @@ async function sessionSub(
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, sessionKey(env.SESSION_SECRET), {
+      issuer: SESSION_ISSUER,
+      audience: SESSION_AUDIENCE,
       algorithms: ['HS256'],
       requiredClaims: ['sub', 'exp'],
     });
