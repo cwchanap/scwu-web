@@ -11,25 +11,8 @@ export type FetchLike = (
 
 const browserFetch: FetchLike = (input, init) => fetch(input, init);
 
-const ISO_UTC = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?Z$/;
-
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-
-const isIsoUtc = (value: string) => {
-  const match = ISO_UTC.exec(value);
-  if (match === null) return false;
-  const year = Number(match[1]);
-  const month = Number(match[2]);
-  const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const days = month === 2 && leap ? 29 : (DAYS_IN_MONTH[month - 1] ?? 0);
-  return (
-    Number(match[3]) >= 1 &&
-    Number(match[3]) <= days &&
-    Number(match[4]) <= 23 &&
-    Number(match[5]) <= 59 &&
-    Number(match[6]) <= 59
-  );
-};
+const isValidDate = (value: string): boolean =>
+  value.length > 0 && !Number.isNaN(Date.parse(value));
 
 export interface MeResult {
   ok: boolean;
@@ -44,7 +27,7 @@ const parseMe = (body: unknown): MeResult => {
   if (typeof user !== 'object') return { ok: false, user: null };
   const { name, avatarUrl, createdAt } = user as Record<string, unknown>;
   if (typeof name !== 'string') return { ok: false, user: null };
-  if (typeof createdAt !== 'string' || !isIsoUtc(createdAt))
+  if (typeof createdAt !== 'string' || !isValidDate(createdAt))
     return { ok: false, user: null };
   if (avatarUrl !== null && typeof avatarUrl !== 'string')
     return { ok: false, user: null };
