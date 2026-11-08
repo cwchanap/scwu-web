@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-e2e-configured/
+dist-e2e-unconfigured/
 .DS_Store
 .husky/_/
 scwu-web-handoff/
