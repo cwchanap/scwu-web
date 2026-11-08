@@ -183,6 +183,13 @@ describe('readMe', () => {
     const { fetchImpl } = stubFetch(() => jsonResponse(body));
     expect(await readMe(fetchImpl)).toEqual({ ok: false, user: null });
   });
+
+  it('sends an abort signal so a stalled read times out', async () => {
+    const { calls, fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
+    await readMe(fetchImpl);
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+    expect(calls[0].init?.signal?.aborted).toBe(false);
+  });
 });
 
 describe('signInGoogle', () => {
@@ -244,5 +251,12 @@ describe('signOut', () => {
 
   it('reports failure on a network error', async () => {
     expect(await signOut(rejectingFetch(new Error('down')))).toBe(false);
+  });
+
+  it('sends an abort signal so a stalled sign-out times out', async () => {
+    const { calls, fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
+    await signOut(fetchImpl);
+    expect(calls[0].init?.signal).toBeInstanceOf(AbortSignal);
+    expect(calls[0].init?.signal?.aborted).toBe(false);
   });
 });

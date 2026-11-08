@@ -45,6 +45,7 @@
       // session expired) clears the profile; only failed reads keep it.
       refreshFailed = me !== null && result.user === null;
       me = result.user;
+      if (me !== null) exchangeFailed = false;
     } else {
       refreshFailed = true;
     }
@@ -59,6 +60,9 @@
       loaded = true;
       if (user === null) {
         exchangeFailed = true;
+        // A timed-out exchange may still have set the cookie; resync
+        // before letting the failure banner retry.
+        void refresh();
       } else {
         exchangeFailed = false;
         signOutFailed = false;
@@ -83,6 +87,9 @@
         void refresh();
       } else {
         signOutFailed = true;
+        // The request may have cleared the cookie before its response
+        // stalled; reconcile with the authoritative session state.
+        void refresh();
       }
     } finally {
       pending = false;
