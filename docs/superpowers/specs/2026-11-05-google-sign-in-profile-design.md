@@ -166,7 +166,9 @@ Do not commit a placeholder or invented client ID.
 - `SESSION_SECRET` is never committed. Set it as a Worker secret
   separately for production and Preview (or use Cloudflare's
   Previews Base secret for future previews). Both environments require
-  the same _name_, not the same secret value.
+  the same _name_ but independently generated values — a Preview
+  deployment can read its own secret, so a shared value would let it
+  forge production sessions.
 - **Fail explicitly when unconfigured.** Every `/api/*` request
   first checks `DB`, `GOOGLE_CLIENT_ID`, and a
   `SESSION_SECRET` at least 32 UTF-8 bytes long. If absent or

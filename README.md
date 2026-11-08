@@ -20,7 +20,7 @@ bun run check    # svelte-check + tsc
 bun run validate # assets, format, ESLint, types, Vitest (the pre-commit hook runs this)
 bun run build    # assets, types, production build
 bun run preview  # serve the production build
-bun run e2e      # Playwright smoke test against dist/ (build first)
+bun run e2e      # Playwright suites; the web server builds dedicated dist-e2e-* bundles (run assets first)
 ```
 
 `bun run assets` skips the export while its script, the handoff and the DOM-named art paths are unchanged and its output is intact; a half-finished or modified export re-runs. `bun install` installs Husky's pre-commit hook.
@@ -83,7 +83,7 @@ Owner setup:
 
 3. **One public client ID, two delivery paths.** `vars.GOOGLE_CLIENT_ID` (production) and `previews.vars.GOOGLE_CLIENT_ID` (Preview) are committed plaintext runtime vars — the audience the Worker verifies each Google token against; keep the two equal. `wrangler deploy` overwrites dashboard-set plaintext vars (this project does not use `keep_vars`), so setting them only in the dashboard loses them on the next deploy. `VITE_GOOGLE_CLIENT_ID` is a separate **build** variable — set it to the same public ID in the Worker's production and Previews build variables, and pass it to `bun run dev` locally — which Vite inlines into the bundle so the Menu's Profile row and the profile page's GIS button appear only when configured. It is a public identifier, not a secret: never store it with `wrangler secret put`.
 
-4. **`SESSION_SECRET` per environment.** A Worker secret of at least 32 UTF-8 bytes (`openssl rand -base64 48` is fine), set separately for production (`bunx wrangler secret put SESSION_SECRET`, or the dashboard's Worker secrets) and for Previews (the Worker's Preview secrets, or a Previews Base secret for new branches). Base-secret changes do not update existing Previews; set the secret on an existing Preview separately. The value may differ per environment; the name must not. Never commit it. Locally it goes in the gitignored `.dev.vars` file (`SESSION_SECRET=...`); Vite's `server.fs.deny` already refuses to serve `.dev.vars*` and `.env*`.
+4. **`SESSION_SECRET` per environment.** A Worker secret of at least 32 UTF-8 bytes (`openssl rand -base64 48` is fine), set separately for production (`bunx wrangler secret put SESSION_SECRET`, or the dashboard's Worker secrets) and for Previews (the Worker's Preview secrets, or a Previews Base secret for new branches). Base-secret changes do not update existing Previews; set the secret on an existing Preview separately. Each environment needs an independently generated value — a Preview deployment can read its own secret, so reusing production's would let it forge production sessions; only the name is shared. Never commit it. Locally it goes in the gitignored `.dev.vars` file (`SESSION_SECRET=...`); Vite's `server.fs.deny` already refuses to serve `.dev.vars*` and `.env*`.
 
 5. **Apply `migrations/0001_users.sql`.** Use `bunx wrangler d1 migrations apply DB --local` for local development and `bunx wrangler d1 migrations apply DB --remote` once for the production database. Create a separate migration configuration targeting the Preview database by its real ID and apply the same migration to it separately. The remote command changes production data: confirm the target and check any existing `users` table's schema before applying it. The migration creates the table if absent; it does not modify an existing table to match.
 
@@ -93,7 +93,7 @@ The fingerprint check described in Deploy to Cloudflare applies after changes to
 
 ## CI
 
-GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint**, **Run Unit Tests** and **Playwright Tests** (`e2e/`, against the production build). All three jobs are skipped while a pull request is a draft, so local runs are the only verification until it is marked ready. Dependabot opens weekly grouped PRs for Bun and Actions.
+GitHub Actions (`.github/workflows/`) runs on pushes to `main` and on ready-for-review pull requests: **Build and Lint**, **Run Unit Tests** and **Playwright Tests** (`e2e/`, against the dedicated configured and unconfigured `dist-e2e-*` bundles the web server builds — not the `dist/` build). All three jobs are skipped while a pull request is a draft, so local runs are the only verification until it is marked ready. Dependabot opens weekly grouped PRs for Bun and Actions.
 
 Runners have no handoff, so `.github/scripts/fetch-generated.sh` downloads `generated.tar.gz` and `fixtures.tar.gz` from the R2 bucket and refuses data whose `.exporter` fingerprint does not match `scripts/export_assets.py`. Set the repository variable `VITE_ASSET_BASE` to the bucket's public URL (Settings → Secrets and variables → Actions → Variables). After changing `export_assets.py`, run `bun run assets && bun run upload:r2` before pushing. Locally, `bun run build && bun run e2e` runs the browser test.
 
