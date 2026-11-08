@@ -11,6 +11,10 @@ export type FetchLike = (
 
 const browserFetch: FetchLike = (input, init) => fetch(input, init);
 
+// A stalled connection would otherwise leave the profile on
+// "Checking sign-in…" or an auth action pending forever.
+const REQUEST_TIMEOUT_MS = 10_000;
+
 const isValidDate = (value: string): boolean =>
   value.length > 0 && !Number.isNaN(Date.parse(value));
 
@@ -51,6 +55,7 @@ const request = async (
   try {
     const response = await fetchImpl(path, {
       credentials: 'same-origin',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       ...init,
     });
     if (!response.ok) return { ok: false, user: null };
@@ -92,6 +97,7 @@ export const signOut = async (
     const response = await fetchImpl('/api/auth/signout', {
       method: 'POST',
       credentials: 'same-origin',
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     return response.ok;
   } catch {
