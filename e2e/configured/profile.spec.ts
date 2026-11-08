@@ -132,8 +132,11 @@ test('a delayed read cannot overwrite a newer sign-in', async ({ page }) => {
   await expect(page.getByText('Ryuko').first()).toBeVisible();
   await expect(signOut).toBeVisible();
 
-  await answerMe(2, null);
+  const staleResponse = page.waitForResponse('**/api/me');
+  await answerMe(2, { ...USER, name: 'Stale identity' });
+  await staleResponse;
   await expect(page.getByText('Ryuko').first()).toBeVisible();
   await expect(signOut).toBeVisible();
+  await expect(page.getByText('Stale identity')).not.toBeVisible();
   expect(errors).toEqual([]);
 });

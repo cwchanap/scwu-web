@@ -27,7 +27,7 @@ bun run e2e      # Playwright smoke test against dist/ (build first)
 
 ## Deploy to Cloudflare
 
-The site is a static Worker (`wrangler.jsonc` serves `dist/`). The art and audio live in a public R2 bucket by the owner's choice, and the page loads them from `VITE_ASSET_BASE` (`src/game/assetBase.ts`; unset, from this site's own `/assets/`). Cloudflare's build has no `scwu-web-handoff/`, so `scripts/upload_r2.sh` also uploads `src/game/generated/` as `generated.tar.gz`, which `bun run build` (`scripts/build.sh`) downloads when `WORKERS_CI` is set.
+The Worker serves `dist/` and handles the sign-in API with a D1 binding (`wrangler.jsonc`). The art and audio live in a public R2 bucket by the owner's choice, and the page loads them from `VITE_ASSET_BASE` (`src/game/assetBase.ts`; unset, from this site's own `/assets/`). Cloudflare's build has no `scwu-web-handoff/`, so `scripts/upload_r2.sh` also uploads `src/game/generated/` as `generated.tar.gz`, which `bun run build` (`scripts/build.sh`) downloads when `WORKERS_CI` is set.
 
 One-time setup:
 
@@ -74,22 +74,22 @@ Owner setup:
 
 1. **Google OAuth Web client.** In Google Cloud Console, create an OAuth **Web** client and register exact JavaScript origins — no wildcards:
    - the production origin, `https://scwu.hapadona.com` (the `scwu-web` Worker's public site is `https://scwu.hapadona.com/`),
-   - the branch's stable Preview alias, `https://jack65786656-hpa-768-google-sign-in-and-profile-page-scwu-web.cwchanap.workers.dev`,
+   - each branch's stable Preview alias (Previews are public unless access controls are configured),
    - `http://127.0.0.1:5173` for local `bun run dev` (use the port Vite actually prints).
 
    Never register a per-deployment Preview URL such as `https://a415e97d-scwu-web.cwchanap.workers.dev` — it changes on every push, so GIS sign-in would break on the next deploy. Google's origin changes can take minutes or hours to propagate.
 
-2. **Shared D1 database.** Both `d1_databases` and `previews.d1_databases` bind `DB` to the existing `scwu-web` database. This is temporary: **Preview sign-ins read and write production user data**. Change the Preview binding to a separate database when isolation is needed.
+2. **Separate D1 databases.** Production binds `DB` to `scwu-web`. Preview currently has no `DB` binding, so its API returns `missing DB` until an isolated `scwu-web-preview` database is created, migrated, and bound under `previews.d1_databases`. Never bind Preview to production data.
 
 3. **One public client ID, two delivery paths.** `vars.GOOGLE_CLIENT_ID` (production) and `previews.vars.GOOGLE_CLIENT_ID` (Preview) are committed plaintext runtime vars — the audience the Worker verifies each Google token against; keep the two equal. `wrangler deploy` overwrites dashboard-set plaintext vars (this project does not use `keep_vars`), so setting them only in the dashboard loses them on the next deploy. `VITE_GOOGLE_CLIENT_ID` is a separate **build** variable — set it to the same public ID in the Worker's production and Previews build variables, and pass it to `bun run dev` locally — which Vite inlines into the bundle so the Menu's Profile row and the profile page's GIS button appear only when configured. It is a public identifier, not a secret: never store it with `wrangler secret put`.
 
 4. **`SESSION_SECRET` per environment.** A Worker secret of at least 32 UTF-8 bytes (`openssl rand -base64 48` is fine), set separately for production (`bunx wrangler secret put SESSION_SECRET`, or the dashboard's Worker secrets) and for Previews (the Worker's Preview secrets, or a Previews Base secret for new branches). Base-secret changes do not update existing Previews; set the secret on an existing Preview separately. The value may differ per environment; the name must not. Never commit it. Locally it goes in the gitignored `.dev.vars` file (`SESSION_SECRET=...`); Vite's `server.fs.deny` already refuses to serve `.dev.vars*` and `.env*`.
 
-5. **Apply `migrations/0001_users.sql`.** Use `bunx wrangler d1 migrations apply DB --local` for local development and `bunx wrangler d1 migrations apply DB --remote` once for the shared remote database. The remote command changes production data: confirm the target and check any existing `users` table's schema before applying it. The migration creates the table if absent; it does not modify an existing table to match.
+5. **Apply `migrations/0001_users.sql`.** Use `bunx wrangler d1 migrations apply DB --local` for local development and `bunx wrangler d1 migrations apply DB --remote` once for the production database. Create a separate migration configuration targeting the Preview database by its real ID and apply the same migration to it separately. The remote command changes production data: confirm the target and check any existing `users` table's schema before applying it. The migration creates the table if absent; it does not modify an existing table to match.
 
 Local development is two processes, since `vite.config.ts` proxies `/api` to `127.0.0.1:8787`: start `bunx wrangler dev --port 8787` in one terminal (it needs `dist/` to exist — run `bun run build` once or `mkdir -p dist` — and reads `.dev.vars` and the committed `vars`), and in another `VITE_GOOGLE_CLIENT_ID=<public-id> bun run dev`. Omit the variable for the unconfigured mode, which needs no second process at all. The proxy preserves the browser's `Host`, so the Worker's same-origin check on the mutation routes still passes, and `wrangler dev` binds `DB` to its local SQLite once the `--local` migration has run. Wrangler's vars do not reach the separate Vite process — supply the public build-time ID there explicitly.
 
-The fingerprint check described in Deploy to Cloudflare applies after changes to `scripts/export_assets.py`: `bun run upload:r2` must run — with the owner's authorization — before pushing the new exporter. All three GitHub Actions jobs skip draft pull requests, so until the PR is marked ready for review the only verification is local `bun run validate`, `bun run build` and `bun run e2e` — a Cloudflare Preview deploy is not one of the Actions jobs. Real Google sign-in, the Menu's identity row and `/api/me` against a Preview remain unverified until setup is complete.
+The fingerprint check described in Deploy to Cloudflare applies after changes to `scripts/export_assets.py`: `bun run upload:r2` must run — with the owner's authorization — before pushing the new exporter. A Cloudflare Preview deploy is not one of the Actions jobs. Verify real Google sign-in, the Menu identity row and `/api/me` against a Preview after setup is complete.
 
 ## CI
 

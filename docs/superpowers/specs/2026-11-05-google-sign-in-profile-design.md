@@ -106,6 +106,8 @@ All routes are same-origin and return JSON with `Cache-Control: no-store`.
 | `POST /api/auth/signout` | No body required                     | `200 { "user": null }` and an expired cookie                                              |
 | `GET /api/me`            | Signed cookie (optional)             | `200 { "user": ProfileUser \| null }`; missing, invalid or expired sessions return `null` |
 
+Invalid JSON or a missing credential returns `400`, cross-origin mutations return `403`, non-JSON sign-in requests return `415`, and unknown API routes return `404`. Missing configuration, database errors, and upstream verification failures return `500`.
+
 `ProfileUser` is `{ name: string, avatarUrl: string | null,
 createdAt: string }`; `createdAt` is an **ISO 8601 UTC** string
 (e.g. `2026-11-06T05:53:34Z`) to avoid browser-local SQLite date parsing.
@@ -154,7 +156,7 @@ Do not commit a placeholder or invented client ID.
   serves `/profile` and invokes the Worker on unmatched `/api/*`.
   Do not use an SPA fallback or add a routing service.
 - Bind production `DB` under top-level `d1_databases` to the real
-  `scwu-web` D1 database, and Preview `DB` under
+  `scwu-web` D1 database. Preview currently has no DB binding and returns `missing DB` until the owner configures Preview `DB` under
   `previews.d1_databases` to a **separate, shared**
   `scwu-web-preview` database. This avoids preview writes to
   production rows. Real database IDs are committed after provisioning.
@@ -244,8 +246,7 @@ keys)` accepts a JWKS verifier or local `jose` key set; never
 - `bun run validate`, `bun run build`, and
   `bun run e2e` must pass after implementation. The three
   GitHub Actions jobs **skip draft PRs**; checks must run
-  locally until the PR is marked ready. The docs-only draft
-  cannot claim verification.
+  locally until the PR is marked ready.
 - Non-goals: providers besides Google, edit/delete account,
   profile stats, achievements, global auth stores, token refresh,
   elaborate CSRF/session revocation, and gameplay changes.

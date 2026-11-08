@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import {
   createLocalJWKSet,
   exportJWK,
+  errors,
   generateKeyPair,
+  jwtVerify,
   SignJWT,
   type JWTVerifyGetKey,
 } from 'jose';
@@ -195,6 +197,9 @@ describe('POST /api/auth/google', () => {
       expect(cookie).toContain('Path=/');
       expect(cookie).toContain('Secure');
       expect(cookie).toContain('Max-Age=604800');
+      const token = cookie.split(';')[0].split('=')[1];
+      const { payload } = await jwtVerify(token, sessionKey);
+      expect(payload.exp! - payload.iat!).toBe(604800);
     },
   );
 
@@ -244,6 +249,63 @@ describe('POST /api/auth/google', () => {
     expect(res.status).toBe(401);
   });
 
+  it('rejects garbage, unknown key IDs, and wrong signers', async () => {
+    const { env } = testEnv();
+    const parts = (await googleToken()).split('.');
+    parts[0] = Buffer.from(
+      JSON.stringify({ alg: 'RS256', kid: 'unknown' }),
+    ).toString('base64url');
+    const wrongKey = await generateKeyPair('RS256');
+    const wrongSigner = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(CLIENT_ID)
+      .setSubject('sub-1')
+      .setExpirationTime('1h')
+      .sign(wrongKey.privateKey);
+    for (const token of ['garbage', parts.join('.'), wrongSigner]) {
+      expect((await signIn(token, env)).res.status).toBe(401);
+    }
+  });
+
+  it('rejects tokens without a key ID when multiple keys match', async () => {
+    const { env } = testEnv();
+    const second = await generateKeyPair('RS256');
+    const firstJwk = await exportJWK(
+      (await generateKeyPair('RS256')).publicKey,
+    );
+    const secondJwk = await exportJWK(second.publicKey);
+    const multiKeys = createLocalJWKSet({ keys: [firstJwk, secondJwk] });
+    const credential = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256' })
+      .setIssuer('https://accounts.google.com')
+      .setAudience(CLIENT_ID)
+      .setSubject('sub-1')
+      .setExpirationTime('1h')
+      .sign(privateKey);
+    const res = await handle(
+      postJson('/api/auth/google', { credential }),
+      env,
+      multiKeys,
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects unsupported critical headers', async () => {
+    const { env } = testEnv();
+    const parts = (await googleToken()).split('.');
+    parts[0] = Buffer.from(
+      JSON.stringify({
+        alg: 'RS256',
+        kid: 'test-key',
+        crit: ['unknown'],
+        unknown: true,
+      }),
+    ).toString('base64url');
+    const { res } = await signIn(parts.join('.'), env);
+    expect(res.status).toBe(401);
+  });
+
   it('rejects a non-RS256 token', async () => {
     const { env } = testEnv();
     const hs = await new SignJWT({})
@@ -269,6 +331,24 @@ describe('POST /api/auth/google', () => {
     const res = await handle(req, env, failingKeys);
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: 'internal error' });
+  });
+
+  it.each([
+    new errors.JWKSTimeout(),
+    new errors.JWKSInvalid('invalid set'),
+    new errors.JWKInvalid('invalid key'),
+    new errors.JOSEError('HTTP failure'),
+  ])('returns 500 for upstream key errors', async (error) => {
+    const { env } = testEnv();
+    const failingKeys: JWTVerifyGetKey = () => {
+      throw error;
+    };
+    const res = await handle(
+      postJson('/api/auth/google', { credential: await googleToken() }),
+      env,
+      failingKeys,
+    );
+    expect(res.status).toBe(500);
   });
 
   it.each([{ sub: '' }, { sub: null }])(

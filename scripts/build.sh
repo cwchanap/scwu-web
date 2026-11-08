@@ -6,6 +6,8 @@
 # Cloudflare dashboard. Anywhere else it exports, type-checks and builds.
 set -euo pipefail
 
+node "$(dirname "$0")/check-google-client-id.mjs"
+
 script_sha() {
   # The exporter fingerprint: script bytes, then the committed name PNG it reads.
   if command -v sha256sum >/dev/null 2>&1; then
@@ -29,20 +31,6 @@ if [ -n "${WORKERS_CI:-}" ]; then
 else
   bun run assets
   bun run check
-fi
-
-if [ -n "${VITE_GOOGLE_CLIENT_ID:-}" ]; then
-  python3 -c "
-import json, os, re, sys
-raw = open('wrangler.jsonc').read()
-cleaned = re.sub(r'//.*', '', raw)
-cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
-cfg = json.loads(cleaned)
-wrangler_id = cfg.get('vars', {}).get('GOOGLE_CLIENT_ID')
-vite_id = os.environ.get('VITE_GOOGLE_CLIENT_ID')
-if wrangler_id and vite_id and wrangler_id != vite_id:
-    sys.exit(f'VITE_GOOGLE_CLIENT_ID ({vite_id}) does not match wrangler.jsonc GOOGLE_CLIENT_ID ({wrangler_id})')
-"
 fi
 
 bunx vite build
