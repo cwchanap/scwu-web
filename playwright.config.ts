@@ -44,13 +44,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      'bunx vite build --outDir dist-e2e-configured && bun scripts/preview-e2e.ts',
+    command: 'bun scripts/build-configured.ts && bun scripts/preview-e2e.ts',
     url: 'http://127.0.0.1:4173',
     timeout: 300_000,
     reuseExistingServer: !process.env.CI,
-    env: {
-      VITE_GOOGLE_CLIENT_ID: 'e2e-throwaway.apps.googleusercontent.com',
-    },
   },
 });
