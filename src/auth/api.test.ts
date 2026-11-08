@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  getMe,
   readMe,
   signInGoogle,
   signOut,
@@ -33,96 +32,6 @@ const rejectingFetch =
   (error: Error): FetchLike =>
   () =>
     Promise.reject(error);
-
-describe('getMe', () => {
-  it('returns the signed-in user', async () => {
-    const { fetchImpl } = stubFetch(() => jsonResponse({ user: USER }));
-    expect(await getMe(fetchImpl)).toEqual(USER);
-  });
-
-  it('returns null for a signed-out body', async () => {
-    const { fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
-    expect(await getMe(fetchImpl)).toBeNull();
-  });
-
-  it('requests /api/me as a credentialed same-origin GET', async () => {
-    const { calls, fetchImpl } = stubFetch(() => jsonResponse({ user: null }));
-    await getMe(fetchImpl);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].input).toBe('/api/me');
-    expect(calls[0].init?.method ?? 'GET').toBe('GET');
-    expect(calls[0].init?.credentials).toBe('same-origin');
-  });
-
-  it('returns null on a network error', async () => {
-    expect(
-      await getMe(rejectingFetch(new TypeError('fetch failed'))),
-    ).toBeNull();
-  });
-
-  it.each([401, 403, 404, 500])(
-    'returns null on a non-2xx response (%i)',
-    async (status) => {
-      const { fetchImpl } = stubFetch(() =>
-        jsonResponse({ error: 'missing DB' }, status),
-      );
-      expect(await getMe(fetchImpl)).toBeNull();
-    },
-  );
-
-  it("returns null on Vite's HTML fallback body", async () => {
-    const { fetchImpl } = stubFetch(
-      () =>
-        new Response('<!doctype html><html></html>', {
-          headers: { 'content-type': 'text/html' },
-        }),
-    );
-    expect(await getMe(fetchImpl)).toBeNull();
-  });
-
-  it.each([
-    ['a JSON error body', { error: 'missing DB' }],
-    ['a JSON array', []],
-    ['a JSON string', '"signed in"'],
-    ['a non-object user', { user: 42 }],
-    ['a non-string name', { user: { ...USER, name: 7 } }],
-    ['a non-string createdAt', { user: { ...USER, createdAt: null } }],
-    ['a non-string avatarUrl', { user: { ...USER, avatarUrl: 3 } }],
-    ['a non-date createdAt', { user: { ...USER, createdAt: 'not-a-date' } }],
-    ['an empty createdAt', { user: { ...USER, createdAt: '' } }],
-    [
-      'an out-of-range createdAt',
-      { user: { ...USER, createdAt: '2026-13-40T99:99:99Z' } },
-    ],
-  ])('returns null on %s', async (_label, body) => {
-    const { fetchImpl } = stubFetch(() => jsonResponse(body));
-    expect(await getMe(fetchImpl)).toBeNull();
-  });
-
-  it.each([
-    '2026-11-06T05:53:34.123Z',
-    '2026-11-06T07:53:34+02:00',
-    '2028-02-29T05:53:34Z',
-    '2000-02-29T00:00:00Z',
-  ])('accepts valid date format %s', async (createdAt) => {
-    const user = { ...USER, createdAt };
-    const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
-    expect(await getMe(fetchImpl)).toEqual(user);
-  });
-
-  it.each([
-    ['2026-11-06 05:53:34', '2026-11-06T05:53:34Z'],
-    ['2026-11-06 05:53:34.123', '2026-11-06T05:53:34.123Z'],
-  ])(
-    'normalizes SQLite UTC timestamp %s to ISO',
-    async (createdAt, expected) => {
-      const { fetchImpl } = stubFetch(() =>
-        jsonResponse({ user: { ...USER, createdAt } }),
-      );
-      expect(await getMe(fetchImpl)).toEqual({ ...USER, createdAt: expected });
-    },
-  );
-});
 
 describe('readMe', () => {
   it('reports ok with the signed-in user', async () => {
@@ -177,12 +86,45 @@ describe('readMe', () => {
     ['a missing user', {}],
     ['a non-object user', { user: 42 }],
     ['a non-string name', { user: { ...USER, name: 7 } }],
+    ['a non-string avatarUrl', { user: { ...USER, avatarUrl: 3 } }],
     ['a non-string createdAt', { user: { ...USER, createdAt: null } }],
     ['a non-date createdAt', { user: { ...USER, createdAt: 'not-a-date' } }],
+    ['an empty createdAt', { user: { ...USER, createdAt: '' } }],
+    [
+      'an out-of-range createdAt',
+      { user: { ...USER, createdAt: '2026-13-40T99:99:99Z' } },
+    ],
   ])('fails on %s rather than reporting signed out', async (_label, body) => {
     const { fetchImpl } = stubFetch(() => jsonResponse(body));
     expect(await readMe(fetchImpl)).toEqual({ ok: false, user: null });
   });
+
+  it.each([
+    '2026-11-06T05:53:34.123Z',
+    '2026-11-06T07:53:34+02:00',
+    '2028-02-29T05:53:34Z',
+    '2000-02-29T00:00:00Z',
+  ])('accepts valid date format %s', async (createdAt) => {
+    const user = { ...USER, createdAt };
+    const { fetchImpl } = stubFetch(() => jsonResponse({ user }));
+    expect(await readMe(fetchImpl)).toEqual({ ok: true, user });
+  });
+
+  it.each([
+    ['2026-11-06 05:53:34', '2026-11-06T05:53:34Z'],
+    ['2026-11-06 05:53:34.123', '2026-11-06T05:53:34.123Z'],
+  ])(
+    'normalizes SQLite UTC timestamp %s to ISO',
+    async (createdAt, expected) => {
+      const { fetchImpl } = stubFetch(() =>
+        jsonResponse({ user: { ...USER, createdAt } }),
+      );
+      expect(await readMe(fetchImpl)).toEqual({
+        ok: true,
+        user: { ...USER, createdAt: expected },
+      });
+    },
+  );
 
   it('sends an abort signal so a stalled read times out', async () => {
     const { calls, fetchImpl } = stubFetch(() => jsonResponse({ user: null }));

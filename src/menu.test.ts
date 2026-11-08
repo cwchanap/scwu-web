@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { ProfileUser } from './auth/api';
 import {
+  applyMe,
   identityRefresher,
   opponentChoiceOf,
   profileConfigured,
   resetModeOf,
+  type MenuIdentity,
 } from './menu';
 
 describe('opponent select', () => {
@@ -29,6 +31,47 @@ describe('profileConfigured', () => {
     expect(profileConfigured('google-client-id')).toBe(true);
     expect(profileConfigured('')).toBe(false);
     expect(profileConfigured(undefined)).toBe(false);
+  });
+});
+
+describe('applyMe', () => {
+  const blank: MenuIdentity = { user: null, loaded: false, failed: false };
+  const user: ProfileUser = {
+    name: 'Ryuko',
+    avatarUrl: null,
+    createdAt: '2026-11-06T05:53:34Z',
+  };
+
+  it('loads the verified identity', () => {
+    expect(applyMe(blank, { ok: true, user })).toEqual({
+      user,
+      loaded: true,
+      failed: false,
+    });
+  });
+
+  it('keeps it through a failed read, then recovers on the next answer', () => {
+    const signedIn = applyMe(blank, { ok: true, user });
+    const failed = applyMe(signedIn, { ok: false, user: null });
+    expect(failed).toEqual({ user, loaded: true, failed: true });
+    expect(applyMe(failed, { ok: true, user })).toEqual(signedIn);
+  });
+
+  it('signs out only on an authoritative answer', () => {
+    const signedIn = applyMe(blank, { ok: true, user });
+    expect(applyMe(signedIn, { ok: true, user: null })).toEqual({
+      user: null,
+      loaded: true,
+      failed: false,
+    });
+  });
+
+  it('fails rather than posing as signed out before the first answer', () => {
+    expect(applyMe(blank, { ok: false, user: null })).toEqual({
+      user: null,
+      loaded: true,
+      failed: true,
+    });
   });
 });
 

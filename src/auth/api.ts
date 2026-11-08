@@ -69,11 +69,6 @@ export const readMe = (
   fetchImpl: FetchLike = browserFetch,
 ): Promise<MeResult> => request('/api/me', { cache: 'no-store' }, fetchImpl);
 
-export const getMe = (
-  fetchImpl: FetchLike = browserFetch,
-): Promise<ProfileUser | null> =>
-  readMe(fetchImpl).then((result) => (result.ok ? result.user : null));
-
 export const signInGoogle = async (
   credential: string,
   fetchImpl: FetchLike = browserFetch,
