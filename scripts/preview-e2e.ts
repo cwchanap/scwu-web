@@ -12,36 +12,30 @@ const server = serve({
     const url = new URL(req.url);
     const cookie = req.headers.get('cookie') || '';
     const isConfigured = cookie.includes('e2e_configured=1');
-    const primaryDir = isConfigured ? distConfiguredDir : distDir;
-    const secondaryDir = isConfigured ? distDir : distConfiguredDir;
+    const rootDir = isConfigured ? distConfiguredDir : distDir;
 
-    let reqPath = decodeURIComponent(url.pathname);
+    let reqPath: string;
+    try {
+      reqPath = decodeURIComponent(url.pathname);
+    } catch {
+      return new Response('Bad Request', { status: 400 });
+    }
+
     if (reqPath === '/' || reqPath === '') {
       reqPath = '/index.html';
     }
 
-    const safePrimaryPath = resolve(primaryDir, '.' + reqPath);
-    if (safePrimaryPath.startsWith(primaryDir) && existsSync(safePrimaryPath)) {
-      const stat = statSync(safePrimaryPath);
-      if (stat.isFile()) {
-        const file = Bun.file(safePrimaryPath);
-        return new Response(file, {
-          headers: {
-            'content-type': file.type,
-            'cache-control': 'no-cache',
-          },
-        });
-      }
+    const safePath = resolve(rootDir, '.' + reqPath);
+    const isContained =
+      safePath === rootDir || safePath.startsWith(rootDir + '/');
+    if (!isContained) {
+      return new Response('Forbidden', { status: 403 });
     }
 
-    const safeSecondaryPath = resolve(secondaryDir, '.' + reqPath);
-    if (
-      safeSecondaryPath.startsWith(secondaryDir) &&
-      existsSync(safeSecondaryPath)
-    ) {
-      const stat = statSync(safeSecondaryPath);
+    if (existsSync(safePath)) {
+      const stat = statSync(safePath);
       if (stat.isFile()) {
-        const file = Bun.file(safeSecondaryPath);
+        const file = Bun.file(safePath);
         return new Response(file, {
           headers: {
             'content-type': file.type,
