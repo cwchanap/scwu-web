@@ -30,4 +30,19 @@ else
   bun run assets
   bun run check
 fi
+
+if [ -n "${VITE_GOOGLE_CLIENT_ID:-}" ]; then
+  python3 -c "
+import json, os, re, sys
+raw = open('wrangler.jsonc').read()
+cleaned = re.sub(r'//.*', '', raw)
+cleaned = re.sub(r',\s*([\]}])', r'\1', cleaned)
+cfg = json.loads(cleaned)
+wrangler_id = cfg.get('vars', {}).get('GOOGLE_CLIENT_ID')
+vite_id = os.environ.get('VITE_GOOGLE_CLIENT_ID')
+if wrangler_id and vite_id and wrangler_id != vite_id:
+    sys.exit(f'VITE_GOOGLE_CLIENT_ID ({vite_id}) does not match wrangler.jsonc GOOGLE_CLIENT_ID ({wrangler_id})')
+"
+fi
+
 bunx vite build

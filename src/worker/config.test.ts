@@ -56,4 +56,11 @@ describe('Worker configuration', () => {
     expect(config.vars?.SESSION_SECRET).toBeUndefined();
     expect(config.previews?.vars?.SESSION_SECRET).toBeUndefined();
   });
+
+  it('checks VITE_GOOGLE_CLIENT_ID matches wrangler.jsonc when configured in production', () => {
+    const viteId = process.env.VITE_GOOGLE_CLIENT_ID;
+    if (viteId && !viteId.startsWith('e2e-')) {
+      expect(viteId).toBe(config.vars?.GOOGLE_CLIENT_ID);
+    }
+  });
 });
