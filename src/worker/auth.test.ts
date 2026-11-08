@@ -179,10 +179,12 @@ describe('POST /api/auth/google', () => {
     'accepts a valid token with issuer %s',
     async (iss) => {
       const { env } = testEnv();
+      const issuedBefore = Math.floor(Date.now() / 1000);
       const { res, body } = await signIn(
         await googleToken({ iss, name: 'Ryuko', picture: 'https://a/b.png' }),
         env,
       );
+      const issuedAfter = Math.floor(Date.now() / 1000);
       expect(res.status).toBe(200);
       expect(res.headers.get('cache-control')).toBe('no-store');
       expect(body.user.name).toBe('Ryuko');
@@ -199,7 +201,8 @@ describe('POST /api/auth/google', () => {
       expect(cookie).toContain('Max-Age=604800');
       const token = cookie.split(';')[0].split('=')[1];
       const { payload } = await jwtVerify(token, sessionKey);
-      expect(payload.exp! - payload.iat!).toBe(604800);
+      expect(payload.exp! - issuedAfter).toBeLessThanOrEqual(604800);
+      expect(payload.exp! - issuedBefore).toBeGreaterThanOrEqual(604800);
     },
   );
 
