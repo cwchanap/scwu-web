@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { readMe, signInGoogle, signOut, type ProfileUser } from '../auth/api';
+  import { identityRefresher } from '../menu';
   import { back } from '../instructions/page';
 
   interface GoogleIdentity {
@@ -37,26 +38,29 @@
   let gisFailed = $state(false);
   let gisButton = $state<HTMLDivElement>();
 
-  let reads = 0;
-  const refresh = async () => {
-    const mine = ++reads;
-    const result = await readMe();
-    if (mine !== reads) return;
+  const refresh = identityRefresher(readMe, (result) => {
     loaded = true;
     if (result.ok) {
-      me = result.user;
-      refreshFailed = false;
+      if (result.user !== null) {
+        me = result.user;
+        refreshFailed = false;
+      } else if (me !== null) {
+        refreshFailed = true;
+      } else {
+        me = null;
+        refreshFailed = false;
+      }
     } else {
       refreshFailed = true;
     }
-  };
+  });
 
   const exchange = async (response: { credential?: string }) => {
     if (!response.credential || pending) return;
     pending = true;
     try {
       const user = await signInGoogle(response.credential);
-      ++reads;
+      refresh.invalidate();
       loaded = true;
       if (user === null) {
         exchangeFailed = true;
@@ -79,7 +83,7 @@
       if (await signOut()) {
         signOutFailed = false;
         refreshFailed = false;
-        ++reads;
+        refresh.invalidate();
         me = null;
         void refresh();
       } else {
@@ -259,6 +263,7 @@
     border-radius: 50%;
     object-fit: cover;
     background: var(--navy-2);
+    image-rendering: auto;
   }
   .placeholder {
     display: grid;

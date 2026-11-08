@@ -83,4 +83,18 @@ describe('identityRefresher', () => {
     await stale;
     expect(applied).toEqual([user]);
   });
+
+  it('drops in-flight reads when invalidated', async () => {
+    const pending = deferred<ProfileUser | null>();
+    const applied: (ProfileUser | null)[] = [];
+    const refresh = identityRefresher(
+      () => pending.promise,
+      (next) => applied.push(next),
+    );
+    const read = refresh();
+    refresh.invalidate();
+    pending.resolve(user);
+    await read;
+    expect(applied).toEqual([]);
+  });
 });
