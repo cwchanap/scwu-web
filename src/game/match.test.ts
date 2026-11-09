@@ -17,7 +17,11 @@ import type { Effect, Fighter, Input } from './match';
 import type { DummyBehavior } from './dummy';
 import { CpuVM } from './cpu';
 import type { CpuEntry } from './cpu';
-import { FIGHT_TICK, ROUND_END_TICKS } from './hud';
+import { FIGHT_TICK, ROUND_END_TICKS, roundEndTick } from './hud';
+import { DEFAULT_CHEATS } from './cheats';
+import type { CheatOptions } from './cheats';
+import { scenarioOf } from './story';
+import type { Battle, Slot } from './story';
 import {
   animationDuration,
   animationFrame,
@@ -1377,6 +1381,300 @@ describe('practice partner', () => {
       match.step(input);
       expect(named(ryuko)).toBe(action);
     }
+  });
+});
+
+// Ryuko's first story battle lends its slots to the cheat-option tests.
+const STORY_FIRST = scenarioOf('ryuko')[0] as Battle;
+const storySlot = (fields: Partial<Slot> = {}): Slot => ({
+  ...STORY_FIRST.slots[0]!,
+  ...fields,
+});
+const storyBattle = (fields: Partial<Battle> = {}): Battle => ({
+  ...STORY_FIRST,
+  slots: [storySlot(), null, null, null, null, null, null],
+  ...fields,
+});
+// Plays a match to the fight's first tick.
+const toFight = (match: Match) => {
+  while (match.roundTicks <= match.fightTick) match.step();
+};
+// Ends a round by emptying `losers`' life, stepping into the next round.
+const finishRound = (match: Match, ...losers: number[]) => {
+  for (const i of losers) match.fighters[i].hp = 0;
+  const { round } = match;
+  for (let t = 0; t < 5000 && match.round === round; t++) match.step();
+};
+
+describe('cheat options (HPA-767)', () => {
+  const cheats = (fields: Partial<CheatOptions> = {}): CheatOptions => ({
+    ...DEFAULT_CHEATS,
+    ...fields,
+  });
+
+  it('keeps fighters native until the master switch is enabled', () => {
+    const match = new Match();
+    expect(match.cheats).toEqual(DEFAULT_CHEATS);
+    expect(match.fighters[0]).toMatchObject({
+      hp: LIFE,
+      maxHp: LIFE,
+      maxStock: 3,
+    });
+    // Values without the switch change nothing.
+    match.useCheats(
+      cheats({
+        playerHpMultiplier: 5,
+        enemyHpMultiplier: 0.1,
+        playerEnLimit: 6,
+      }),
+    );
+    for (const f of match.fighters)
+      expect(f).toMatchObject({ hp: LIFE, maxHp: LIFE, maxStock: 3 });
+    expect(match.cheats.enabled).toBe(false);
+  });
+
+  it("scales 1P's and every hostile's maximum, the passive partner included", () => {
+    const match = new Match();
+    match.useCheats(
+      cheats({
+        enabled: true,
+        playerHpMultiplier: 2,
+        playerEnLimit: 6,
+        enemyHpMultiplier: 0.1,
+      }),
+    );
+    const [player, dummy] = match.fighters;
+    expect(player).toMatchObject({ hp: 1020, maxHp: 1020, maxStock: 6 });
+    expect(dummy).toMatchObject({ hp: 51, maxHp: 51, maxStock: 3 });
+  });
+
+  it('copies the options defensively, once, before the first step', () => {
+    const match = new Match();
+    const options = cheats({ enabled: true, playerHpMultiplier: 2 });
+    match.useCheats(options);
+    options.playerHpMultiplier = 5;
+    match.step();
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    expect(match.cheats.playerHpMultiplier).toBe(2);
+    expect(match.fighters[0].maxHp).toBe(1020);
+  });
+
+  it('caps healing at the scaled maximum (0x40ea9f)', () => {
+    // TRAINING's K refills the opponent's life (PC 1633).
+    const match = new Match('practice', false, 3, ['training', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
+    const [training, ryuko] = match.fighters;
+    ryuko.x = training.x + 600;
+    ryuko.hp = 500;
+    match.step({ kick: true }, {});
+    expect([training.maxHp, ryuko.maxHp]).toEqual([500, 1020]);
+    expect(ryuko.hp).toBe(1020);
+  });
+
+  it('picks a time-up by percentage of the scaled maximum (0x408f68)', () => {
+    const match = new Match('cpu', false, 0, ['ryuko', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    const [one, two] = match.fighters;
+    // 510 of 1020 is 500‰; 490 of 510 is 960‰, so the opponent wins where
+    // the native maximum would call 510 a full life.
+    [one.hp, two.hp] = [510, 490];
+    match.ticks = 5999;
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('opponent');
+  });
+
+  it('judges a perfect round against the scaled maximum', () => {
+    const match = new Match('cpu', true, 0, ['ryuko', 'zoma']);
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    const [one] = match.fighters;
+    match.winner = 'player';
+    one.hp = one.maxHp;
+    expect(match.roundEnd).toBe(roundEndTick('player', true));
+    one.hp = one.maxHp - 1;
+    expect(match.roundEnd).toBe(roundEndTick('player', false));
+  });
+
+  it('holds practice Low health just under the scaled threshold', () => {
+    const match = new Match();
+    match.practice.lowHealth = true;
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    match.step();
+    // 30% of 1020 is 306; native life would hold 152.
+    expect(match.fighters[0].hp).toBe(305);
+  });
+
+  it("scales the enemy's desperation damage reduction with its maximum (0x40e7c0)", () => {
+    const punched = (hp: number) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+      match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 200;
+      pose(match, victim, 'idle', 12);
+      victim.hp = hp;
+      strike(match, f, RYUKO.punch);
+      ticks(match, 2);
+      return victim.hp;
+    };
+    // The scaled maximum is 51, so 30% is 15: above it punch 1's 10 lands
+    // whole, at it the loss shrinks to 60%.
+    expect(punched(16)).toBe(6);
+    expect(punched(15)).toBe(9);
+  });
+
+  it('scales a story CPU but no ally, seating by hostility', () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [storySlot(), storySlot({ flags: 0x201 }), storySlot()],
+      }),
+    );
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    const [one, enemy, ally, other] = match.fighters;
+    expect([one.maxHp, enemy.maxHp, ally.maxHp, other.maxHp]).toEqual([
+      510, 20, 200, 20,
+    ]);
+    expect([one.hp, enemy.hp, ally.hp, other.hp]).toEqual([510, 20, 200, 20]);
+  });
+
+  it("scales a watched slot's arrival mark to the watched fighter's maximum", () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot(),
+          storySlot({ flags: 4, watch: 1, below: 153 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    toFight(match);
+    const [, zaku, waiting] = match.fighters;
+    // ZAKU's scaled maximum is 20, so the mark is ⌊153 × 20 / 200⌋ = 15.
+    zaku.hp = 15;
+    match.step();
+    expect(waiting.present).toBe(false);
+    zaku.hp = 14;
+    match.step();
+    expect(waiting.present).toBe(true);
+  });
+
+  it('keeps an absent watched seat at zero life: a positive mark enters at once, a zero one never', () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot(),
+          storySlot({ flags: 4, watch: 6, below: 0 }),
+          storySlot({ flags: 4, watch: 6, below: 153 }),
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    match.step();
+    match.step();
+    // Seat 6 seats no one: (0 ≥ mark) holds the zero-mark slot back, while
+    // the positive mark enters at once, unscaled.
+    expect(match.fighters.map((f) => f.present)).toEqual([
+      true,
+      true,
+      false,
+      true,
+    ]);
+  });
+
+  it('scales the source life branches with the maximum (op 0x11)', () => {
+    // DST FAR's PC 3180 enters EVIL DST FAR at 153 of 510 or less.
+    for (const [hp, to] of [
+      [307, 'dstFar'],
+      [306, 'evilDstFar'],
+    ] as const) {
+      const match = new Match();
+      match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+      match.fighters[0].hp = hp;
+      match.step({ dst: true });
+      expect(named(match.fighters[0])).toBe(to);
+    }
+  });
+
+  it("scales a result timeline's life check (DEMO stand, op 0x11, PC 308)", () => {
+    const stands = (hp: number) => {
+      const match = new Match('practice', false, 0, ['sou', 'ryuko']);
+      match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+      const [sou, ryuko] = match.fighters;
+      // SOU's scaled maximum is 960, so his 144 mark is 288.
+      sou.hp = hp;
+      [ryuko.hp, ryuko.action] = [0, 'koLand'];
+      match.winner = 'player';
+      const shown: number[] = [];
+      // DEMO stand 3 animates slowly (359 to tick 29, 360 to 39, 361 from 40).
+      for (let t = 0; t < 45; t++) {
+        match.step();
+        const image = fighterPose(sou).image;
+        if (shown.at(-1) !== image) shown.push(image);
+      }
+      return shown.slice(0, 3);
+    };
+    // Tired DEMO stand 3 (359–361) at or below the mark, the plain win
+    // (115–117) above it.
+    expect(stands(288)).toEqual([359, 360, 361]);
+    expect(stands(289)).toEqual([115, 116, 117]);
+  });
+
+  it('keeps the source 1-HP guard at exactly 1 under any scaling (OBJ TO SHIN HP0, PC 2422)', () => {
+    const match = new Match('practice', false, 0, ['zmega', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const [zmega] = match.fighters;
+    zmega.hp = 10;
+    // OBJ TO SHIN HP0 (196) drains a life a pass and branches at 1.
+    spawn(match, 0, 196, { x: 480, y: 0 });
+    for (let t = 0; t < 400 && zmega.hp > 1; t++) match.step();
+    expect(zmega.hp).toBe(1);
+  });
+
+  it("configures TEAM VS's next members and caps 1P's carried stock", () => {
+    const match = Match.team(
+      [
+        ['ryuko', 'zoma'],
+        ['zaku', 'zaku'],
+      ],
+      'court',
+    );
+    match.useCheats(
+      cheats({
+        enabled: true,
+        playerHpMultiplier: 2,
+        playerEnLimit: 2,
+        enemyHpMultiplier: 0.1,
+      }),
+    );
+    toFight(match);
+    match.fighters[0].stock = 3;
+    finishRound(match, 0);
+    expect(match.round).toBe(2);
+    // Zoma takes 1P's seat with the scaled maximum and the EN cap; the new
+    // ZAKU the enemy multiplier, its stock native.
+    expect(match.fighters[0]).toMatchObject({
+      who: 'zoma',
+      hp: 980,
+      maxHp: 980,
+      maxStock: 2,
+      stock: 2,
+    });
+    expect(match.fighters[1]).toMatchObject({
+      who: 'zaku',
+      hp: 20,
+      maxHp: 20,
+      maxStock: 1,
+    });
   });
 });
 

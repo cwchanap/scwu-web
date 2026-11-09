@@ -58,6 +58,8 @@ import {
   scan,
 } from './commands';
 import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
+import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
+import type { CheatOptions } from './cheats';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
 import {
@@ -574,10 +576,18 @@ const ownPower = (key: ObjectKey, who: Who) =>
 // +0xdf09, life per mille (0x408f68); a story's waiting slot keeps its full
 // life over a maximum of 1 (0x4089a3, 0x411e4c).
 const perMille = (f: Fighter) =>
-  f.present ? Math.trunc((f.hp * 1000) / lifeOf(f.who)) : f.hp * 1000;
+  f.present ? Math.trunc((f.hp * 1000) / f.maxHp) : f.hp * 1000;
+
+// Authored (HPA-767): a source threshold written in native HP units — the
+// desperation mark, op 0x11's life values, a watched slot's mark — read
+// against the fighter's effective maximum instead: positive marks scale with
+// it, while the literal 1-HP sentinel and marks at or below 0 stay native.
+// With Cheats off (maxHp native) this is the identity.
+const lifeMark = (f: Fighter, mark: number) =>
+  mark > 1 ? Math.floor((mark * f.maxHp) / lifeOf(f.who)) : mark;
 
 function loseLife(f: Fighter, loss: number) {
-  if (loss && f.hp <= desperationOf(f.who))
+  if (loss && f.hp <= lifeMark(f, desperationOf(f.who)))
     loss = Math.max(1, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
   f.hp = Math.max(0, f.hp - loss);
   if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
@@ -586,10 +596,10 @@ function loseLife(f: Fighter, loss: number) {
   if (f.hp === 0) f.z = 0x3c;
   return loss;
 }
-// A gain, up to full life (0x40ea9f), takes from what the bar shows lost,
-// even one of 0.
+// A gain, up to full life (0x40ea9f) — the effective maximum — takes from
+// what the bar shows lost, even one of 0.
 function gainLife(f: Fighter, life: number) {
-  f.hp = Math.min(lifeOf(f.who), f.hp + life);
+  f.hp = Math.min(f.maxHp, f.hp + life);
   [f.lost, f.lostDelay] = [Math.max(0, f.lost - life), 20];
 }
 // 0x412522: each step a stop or a queued action doesn't skip counts the
@@ -1077,6 +1087,11 @@ export interface Fighter {
   vy: number;
   gravity: number;
   hp: number;
+  // Authored (HPA-767 cheats): the fighter's maximum life — `lifeOf(who)`
+  // natively, scaled by the effective cheat snapshot — and its stock cap,
+  // `stocksOf(who)` natively, 1P's `playerEnLimit` under cheats.
+  maxHp: number;
+  maxStock: number;
   // +0xdf25: life a loss took that a story's life bar still shows in red,
   // and +0xdf29, the steps before it drains (lifeBars).
   lost: number;
@@ -1501,6 +1516,8 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   vy: 0,
   gravity: 0.24,
   hp: lifeOf(who),
+  maxHp: lifeOf(who),
+  maxStock: stocksOf(who),
   lost: 0,
   lostDelay: 0,
   bar: { x, y: 0 },
@@ -1730,6 +1747,13 @@ export class Match {
     maxStock: false,
     lowHealth: false,
   };
+  // Authored (HPA-767): this battle's Cheats settings, a fresh snapshot
+  // `useCheats` installs before the first step. With `enabled` off every
+  // rule below stays native.
+  cheats: CheatOptions = { ...DEFAULT_CHEATS };
+  // Authored (HPA-767): set by the first `step`, which seals the snapshot —
+  // later `useCheats` calls cannot change a running battle.
+  private cheatsSealed = false;
   // Each player's CPU (+0xdf5d), player 2's in VS.
   cpus: (CpuVM | null)[];
   // A story's seat for each fighter (+0x156: the 1P 0, slot n's player n +
@@ -2020,7 +2044,14 @@ export class Match {
   // watched seat's life is below the mark, an empty seat's being 0.
   private arrive(f: Fighter, i: number) {
     const slot = this.waits[i]!;
-    if ((this.bySeat(slot.watch)?.hp ?? 0) >= slot.below) return;
+    // Authored (HPA-767): the watched seat's mark (below) scales with the
+    // watched fighter's maximum; a seat no one holds keeps life 0, so a
+    // positive mark enters at once and a zero one never (the source's
+    // 0 >= below).
+    const watched = this.bySeat(slot.watch);
+    const watchedHp = watched?.hp ?? 0;
+    const below = watched ? lifeMark(watched, slot.below) : slot.below;
+    if (watchedHp >= below) return;
     this.waits[i] = null;
     f.present = true;
     this.takeSeat(i);
@@ -2145,7 +2176,7 @@ export class Match {
     if (!this.calls) return ROUND_END_TICKS;
     if (this.battle) return storyEndTick(this.winner);
     const winner = this.fighters[this.winner === 'player' ? 0 : 1];
-    return roundEndTick(this.winner, winner.hp === lifeOf(winner.who));
+    return roundEndTick(this.winner, winner.hp === winner.maxHp);
   }
 
   // State 100 (0x408970) counts the round and sets it up again: the fighters
@@ -2175,6 +2206,13 @@ export class Match {
       f.stock = this.fighters[i].stock;
       f.power = this.fighters[i].power;
     });
+    // Authored (HPA-767): the next round seats under the same snapshot —
+    // fresh Menu values cannot reach a running match — and 1P's carried
+    // stock fits the EN cap; the enemy's stock carries as it was.
+    if (this.cheats.enabled) {
+      fighters.forEach((f, i) => this.cheatSeat(f, i));
+      fighters[0].stock = Math.min(fighters[0].stock, fighters[0].maxStock);
+    }
     this.fighters = fighters;
     this.round++;
     this.ticks = 0;
@@ -2236,6 +2274,37 @@ export class Match {
     this.history = seats.map(blankHistory);
     this.keyed = seats.map(() => false);
     this.spent = seats.map(() => -1);
+  }
+
+  // Authored (HPA-767): installs the Cheats menu's settings as this battle's
+  // snapshot — normalized into a fresh copy, and only before the first step;
+  // fresh values wait for the next battle. The scene calls this once per
+  // battle, before its first tick.
+  useCheats(options: CheatOptions) {
+    if (this.cheatsSealed) return;
+    this.cheats = normalizeCheats(options);
+    if (!this.cheats.enabled) return;
+    this.fighters.forEach((f, i) => this.cheatSeat(f, i));
+  }
+
+  // Authored (HPA-767): seats a fighter under the effective snapshot: the 1P
+  // by the Player HP multiplier and the EN limit, every hostile of the 1P
+  // (the passive practice partner included) by the Enemy HP multiplier —
+  // allies stay native — with life at the effective maximum. Freshly created
+  // fighters start native, so an enabled-off battle never passes here.
+  private cheatSeat(f: Fighter, i: number) {
+    if (!i) {
+      f.maxHp = Math.max(
+        1,
+        Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
+      );
+      f.maxStock = this.cheats.playerEnLimit;
+    } else if (this.hostile(0, i))
+      f.maxHp = Math.max(
+        1,
+        Math.round(lifeOf(f.who) * this.cheats.enemyHpMultiplier),
+      );
+    f.hp = f.maxHp;
   }
 
   // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
@@ -2604,7 +2673,12 @@ export class Match {
       // SOU's demo stand checks his life (op 0x11, PC 308) into DEMO stand 3
       // (31) at 144 or less, before its EX test: his win and draw call it.
       if (event.op === 'life') {
-        if (event.below ? f.hp > event.value : f.hp < event.value) continue;
+        if (
+          event.below
+            ? f.hp > lifeMark(f, event.value)
+            : f.hp < lifeMark(f, event.value)
+        )
+          continue;
         if (event.resume) f.resume = { clip: key, ...event.resume };
         if (this.enterResult(f, sourceKey(event.target, event.offset)))
           return true;
@@ -3429,7 +3503,9 @@ export class Match {
         if (
           ('clip' in actor || actor.action === 'script') &&
           event.target &&
-          (event.below ? self.hp <= event.value : self.hp >= event.value)
+          (event.below
+            ? self.hp <= lifeMark(self, event.value)
+            : self.hp >= lifeMark(self, event.value))
         )
           return this.branchTo(actor, sourceKey(event.target, event.offset));
         break;
@@ -4618,6 +4694,7 @@ export class Match {
   }
 
   step(player: Input = {}, opponent?: Input) {
+    this.cheatsSealed = true;
     if (this.resultReady) return;
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;
@@ -5001,12 +5078,12 @@ export class Match {
       // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
       // Spark, G Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300
       // enter their desperation forms only below it (op 0x11 at 153, 147,
-      // 150, 144, 165 and 141 or more; the rest at it or below).
-      if (this.practice.lowHealth)
-        this.fighters[0].hp = Math.min(
-          this.fighters[0].hp,
-          desperationOf(this.fighters[0].who) - 1,
-        );
+      // 150, 144, 165 and 141 or more; the rest at it or below). Authored
+      // (HPA-767): the mark scales with the effective maximum.
+      if (this.practice.lowHealth) {
+        const one = this.fighters[0];
+        one.hp = Math.min(one.hp, lifeMark(one, desperationOf(one.who)) - 1);
+      }
     }
     const inputs = this.fighters.map((_, i) =>
       i === 0 ? player : i === 1 ? (opponent ?? this.ai()) : {},
