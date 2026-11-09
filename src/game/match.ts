@@ -2286,9 +2286,9 @@ export class Match {
 
   // Authored (HPA-767): installs the Cheats menu's settings as this battle's
   // snapshot, exactly once: normalized and frozen into a fresh copy, and
-  // only ever the first call — which the scene makes before the battle's
-  // first tick — so a second call before then cannot disable an installed
-  // snapshot (fresh values wait for the next battle).
+  // only ever the first call, which the scene makes before the battle's
+  // first tick (step seals installation) — so no later call can seat or
+  // disable cheats mid-battle (fresh values wait for the next battle).
   useCheats(options: CheatOptions) {
     if (this.cheatsInstalled) return;
     this.cheatsInstalled = true;
@@ -4704,6 +4704,10 @@ export class Match {
   }
 
   step(player: Input = {}, opponent?: Input) {
+    // Authored (HPA-767): the first tick seals cheat installation — the
+    // snapshot must be in place before the battle runs, so a late first
+    // call cannot seat or reset anyone mid-battle.
+    this.cheatsInstalled = true;
     if (this.resultReady) return;
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;

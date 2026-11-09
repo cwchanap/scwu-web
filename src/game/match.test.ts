@@ -1477,6 +1477,18 @@ describe('cheat options (HPA-767)', () => {
     expect(match.fighters[0].maxHp).toBe(1020);
   });
 
+  it('ignores the first call made after stepping: installation closes at the first tick', () => {
+    const match = new Match();
+    match.step();
+    match.useCheats(
+      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+    );
+    // The battle already ran native; a late first call seats no one.
+    expect(match.cheats).toEqual(DEFAULT_CHEATS);
+    for (const f of match.fighters)
+      expect(f).toMatchObject({ hp: LIFE, maxHp: LIFE, maxStock: 3 });
+  });
+
   it('freezes the snapshot: a running battle cannot mutate or replace it', () => {
     const match = new Match();
     match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
