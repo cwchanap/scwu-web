@@ -10,14 +10,14 @@
 
 Provide an opt-in Cheats section in the existing arcade Menu, with settings stored only in the browser. Rules apply **from the next match or battle**, not to an active battle; a CHEAT tag identifies battles that actually started with cheats on. Extend the existing Phaser-free `Match` model instead of adding a generic modifiers system.
 
-| Setting | Default | Range | Effective behavior when Cheat mode is enabled |
-| --- | --- | --- | --- |
-| Cheat mode | Off | On / Off | Master switch; enabling it marks a started battle as cheated, even with neutral multipliers |
-| Player HP | ×1 | ×0.5–×5 | Multiply 1P's maximum and starting life |
-| Player EN limit | 3 | Integer 1–6 | Override 1P's native stock cap |
-| Unlimited EN | Off | On / Off | Refill 1P's stock to the configured cap on every active simulation tick |
-| Enemy HP | ×1 | ×0.1–×5 | Multiply maximum and starting life of every fighter hostile to 1P |
-| Player damage | ×1 | ×0.5–×10 | Multiply positive outgoing attack damage from 1P to hostile targets |
+| Setting         | Default | Range       | Effective behavior when Cheat mode is enabled                                               |
+| --------------- | ------- | ----------- | ------------------------------------------------------------------------------------------- |
+| Cheat mode      | Off     | On / Off    | Master switch; enabling it marks a started battle as cheated, even with neutral multipliers |
+| Player HP       | ×1      | ×0.5–×5     | Multiply 1P's maximum and starting life                                                     |
+| Player EN limit | 3       | Integer 1–6 | Override 1P's native stock cap                                                              |
+| Unlimited EN    | Off     | On / Off    | Refill 1P's stock to the configured cap on every active simulation tick                     |
+| Enemy HP        | ×1      | ×0.1–×5     | Multiply maximum and starting life of every fighter hostile to 1P                           |
+| Player damage   | ×1      | ×0.5–×10    | Multiply positive outgoing attack damage from 1P to hostile targets                         |
 
 - The five settings appear beneath the **Cheat mode** switch in `src/App.svelte`, with labels and current values, a clear separator from practice options, and **“Changes apply from the next match or battle.”** Keep controls disabled while the master switch is off, but retain their values.
 - **Player EN limit** must not be confused with the existing live, practice-only **Max stock** checkbox.
