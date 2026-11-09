@@ -580,11 +580,14 @@ const perMille = (f: Fighter) =>
 
 // Authored (HPA-767): a source threshold written in native HP units — the
 // desperation mark, op 0x11's life values, a watched slot's mark — read
-// against the fighter's effective maximum instead: positive marks scale with
-// it, while the literal 1-HP sentinel and marks at or below 0 stay native.
-// With Cheats off (maxHp native) this is the identity.
+// against the fighter's effective maximum instead: every mark but the
+// literal 1-HP sentinel and marks at or below 0 scales with it, floored at
+// 1, so a shrunken maximum never turns a positive mark into an unreachable
+// 0. With Cheats off (maxHp native) this is the identity.
 const lifeMark = (f: Fighter, mark: number) =>
-  mark > 1 ? Math.floor((mark * f.maxHp) / lifeOf(f.who)) : mark;
+  mark <= 0 || mark === 1
+    ? mark
+    : Math.max(1, Math.trunc((mark * f.maxHp) / lifeOf(f.who)));
 
 function loseLife(f: Fighter, loss: number) {
   if (loss && f.hp <= lifeMark(f, desperationOf(f.who)))
@@ -1747,13 +1750,18 @@ export class Match {
     maxStock: false,
     lowHealth: false,
   };
-  // Authored (HPA-767): this battle's Cheats settings, a fresh snapshot
-  // `useCheats` installs before the first step. With `enabled` off every
-  // rule below stays native.
-  cheats: CheatOptions = { ...DEFAULT_CHEATS };
-  // Authored (HPA-767): set by the first `step`, which seals the snapshot —
-  // later `useCheats` calls cannot change a running battle.
-  private cheatsSealed = false;
+  // Authored (HPA-767): this battle's Cheats settings, the frozen snapshot
+  // `useCheats` installs once, before the first step. With `enabled` off
+  // every rule below stays native; the getter exposes it without a setter,
+  // so a running battle cannot have its snapshot replaced or mutated.
+  private cheatsSnapshot: Readonly<CheatOptions> = Object.freeze({
+    ...DEFAULT_CHEATS,
+  });
+  private cheatsInstalled = false;
+
+  get cheats(): Readonly<CheatOptions> {
+    return this.cheatsSnapshot;
+  }
   // Each player's CPU (+0xdf5d), player 2's in VS.
   cpus: (CpuVM | null)[];
   // A story's seat for each fighter (+0x156: the 1P 0, slot n's player n +
@@ -2277,13 +2285,15 @@ export class Match {
   }
 
   // Authored (HPA-767): installs the Cheats menu's settings as this battle's
-  // snapshot — normalized into a fresh copy, and only before the first step;
-  // fresh values wait for the next battle. The scene calls this once per
-  // battle, before its first tick.
+  // snapshot, exactly once: normalized and frozen into a fresh copy, and
+  // only ever the first call — which the scene makes before the battle's
+  // first tick — so a second call before then cannot disable an installed
+  // snapshot (fresh values wait for the next battle).
   useCheats(options: CheatOptions) {
-    if (this.cheatsSealed) return;
-    this.cheats = normalizeCheats(options);
-    if (!this.cheats.enabled) return;
+    if (this.cheatsInstalled) return;
+    this.cheatsInstalled = true;
+    this.cheatsSnapshot = Object.freeze(normalizeCheats(options));
+    if (!this.cheatsSnapshot.enabled) return;
     this.fighters.forEach((f, i) => this.cheatSeat(f, i));
   }
 
@@ -4694,7 +4704,6 @@ export class Match {
   }
 
   step(player: Input = {}, opponent?: Input) {
-    this.cheatsSealed = true;
     if (this.resultReady) return;
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;

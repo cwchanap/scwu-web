@@ -1459,6 +1459,42 @@ describe('cheat options (HPA-767)', () => {
     expect(match.fighters[0].maxHp).toBe(1020);
   });
 
+  it('installs once: a second call before the first step changes nothing', () => {
+    const match = new Match();
+    match.useCheats(
+      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+    );
+    // A later disabled call must not undo the installed seating.
+    match.useCheats(cheats({ enabled: false }));
+    expect(match.cheats.enabled).toBe(true);
+    expect(match.cheats.playerHpMultiplier).toBe(2);
+    expect(match.fighters[0]).toMatchObject({
+      hp: 1020,
+      maxHp: 1020,
+      maxStock: 6,
+    });
+    match.step();
+    expect(match.fighters[0].maxHp).toBe(1020);
+  });
+
+  it('freezes the snapshot: a running battle cannot mutate or replace it', () => {
+    const match = new Match();
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    match.step();
+    // Neither the values nor the snapshot itself can be swapped mid-battle.
+    expect(
+      () => ((match.cheats as CheatOptions).playerHpMultiplier = 5),
+    ).toThrow();
+    expect(
+      () =>
+        ((match as { cheats: CheatOptions }).cheats = cheats({
+          playerHpMultiplier: 5,
+        })),
+    ).toThrow();
+    expect(match.cheats.playerHpMultiplier).toBe(2);
+    expect(match.fighters[0].maxHp).toBe(1020);
+  });
+
   it('caps healing at the scaled maximum (0x40ea9f)', () => {
     // TRAINING's K refills the opponent's life (PC 1633).
     const match = new Match('practice', false, 3, ['training', 'ryuko']);
@@ -1561,6 +1597,36 @@ describe('cheat options (HPA-767)', () => {
     zaku.hp = 14;
     match.step();
     expect(waiting.present).toBe(true);
+  });
+
+  it('floors a scaled mark at 1: a zero-HP watched fighter still reinforces', () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot(),
+          storySlot({ flags: 4, watch: 1, below: 2 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    toFight(match);
+    const [, zaku, waiting] = match.fighters;
+    // ZAKU's scaled maximum is 20 of native 200: the mark 2 scales to
+    // ⌊2 × 20 / 200⌋ = 0 but floors at 1, so only zero life passes below it.
+    zaku.hp = 1;
+    match.step();
+    expect(waiting.present).toBe(false);
+    zaku.hp = 0;
+    match.step();
+    expect(waiting.present).toBe(true);
+    // Entering runs only the opening script, which never resets life.
+    expect(waiting.hp).toBe(waiting.maxHp);
   });
 
   it('keeps an absent watched seat at zero life: a positive mark enters at once, a zero one never', () => {
