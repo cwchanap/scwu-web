@@ -1631,8 +1631,9 @@ function walkSpeed(who: Who, back: boolean) {
   return launch?.op === 'motion' ? launch.vx * SOURCE_VELOCITY_SCALE : 0;
 }
 
-// Routine 0x40e6f0 carries full gauges into stock, up to the fighter's cap,
-// and borrows stock back; none at the start (+0x7cc2).
+// Routine 0x40e6f0 carries full gauges into stock, up to the fighter's
+// cap (its effective `maxStock`, HPA-767), and borrows stock back; none at
+// the start (+0x7cc2).
 export function addPower(f: Fighter, amount: number) {
   f.power += amount;
   while (f.power < 0) {
@@ -1642,12 +1643,12 @@ export function addPower(f: Fighter, amount: number) {
       f.power += perStockOf(f.who);
     }
   }
-  while (f.power >= perStockOf(f.who) && f.stock < stocksOf(f.who)) {
+  while (f.power >= perStockOf(f.who) && f.stock < f.maxStock) {
     f.power -= perStockOf(f.who);
     f.stock++;
   }
-  if (f.stock >= stocksOf(f.who)) {
-    f.stock = stocksOf(f.who);
+  if (f.stock >= f.maxStock) {
+    f.stock = f.maxStock;
     f.power = 0;
   }
 }
@@ -2317,6 +2318,29 @@ export class Match {
     f.hp = f.maxHp;
   }
 
+  // Authored (HPA-767): the 1P's positive outgoing damage to a hostile
+  // victim under the snapshot's multiplier — whole HP, floored at 1.
+  // Everything else (an ally's or the opponent's strikes, the 1P's own
+  // self-damage, a heal) and a zero or negative strength passes through
+  // unchanged, so the multiplier never creates damage from nothing.
+  private outgoingDamage(
+    striker: Fighter | null | undefined,
+    victim: Fighter,
+    strength: number,
+  ) {
+    if (
+      !this.cheats.enabled ||
+      strength <= 0 ||
+      striker !== this.fighters[0] ||
+      !this.hostile(0, this.fighters.indexOf(victim))
+    )
+      return strength;
+    return Math.max(
+      1,
+      Math.round(strength * this.cheats.playerDamageMultiplier),
+    );
+  }
+
   // Where the camera object (0x40af30, state 3) aims: 320 source pixels up
   // and left of the fighters' midpoint, its floor at y 920.
   private aim() {
@@ -2873,7 +2897,10 @@ export class Match {
       if (event.t !== end) continue;
       if (event.op === 'test' && this.passes(f, f, event)) break;
       if (event.op !== 'power') continue;
-      const damage = loseLife(f, -event.selfLife);
+      const damage = loseLife(
+        f,
+        this.outgoingDamage(striker, f, -event.selfLife),
+      );
       if (striker) striker.damage += damage;
       addPower(f, event.selfPower);
       if (striker) addPower(striker, event.otherPower);
@@ -3462,7 +3489,10 @@ export class Match {
         }
         if (event.otherLife > 0) gainLife(other, event.otherLife);
         if (event.otherLife < 0) {
-          const damage = loseLife(other, -event.otherLife);
+          const damage = loseLife(
+            other,
+            this.outgoingDamage(self, other, -event.otherLife),
+          );
           self.hits++;
           self.damage += damage;
           if (other.hp === 0) this.knockOut(other);
@@ -3505,9 +3535,9 @@ export class Match {
           return this.branchTo(actor, sourceKey(event.target, event.offset));
         self.stock = Math.max(
           0,
-          Math.min(stocksOf(self.who), self.stock + event.add),
+          Math.min(self.maxStock, self.stock + event.add),
         );
-        if (self.stock === stocksOf(self.who)) self.power = 0;
+        if (self.stock === self.maxStock) self.power = 0;
         break;
       case 'life':
         if (
@@ -5082,10 +5112,19 @@ export class Match {
       return;
     }
     if (!this.winner && !this.picking) this.ticks++;
+    // Authored (HPA-767): Unlimited EN tops the 1P up to its effective cap
+    // every active tick, before the tick's inputs — the source's pays and
+    // deductions still run, so a spend within the tick stands until the
+    // next one refills it.
+    if (this.cheats.enabled && this.cheats.unlimitedEn) {
+      const one = this.fighters[0];
+      one.stock = one.maxStock;
+      one.power = 0;
+    }
     if (this.mode === 'practice') {
       for (const f of this.fighters)
         if (this.practice.maxStock && f.action === 'idle') {
-          f.stock = stocksOf(f.who);
+          f.stock = f.maxStock;
           f.power = 0;
         }
       // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
@@ -5279,7 +5318,11 @@ export class Match {
       }
       const body = source === f;
       if (damaging) target.hitStop = source.hitStop = 0;
-      const strength = boxDamage(box, taken, blocked, f.who, target.struck);
+      const strength = this.outgoingDamage(
+        f,
+        target,
+        boxDamage(box, taken, blocked, f.who, target.struck),
+      );
       const loss = loseLife(target, strength);
       if (!blocked && strength) target.struck++;
       f.damage += loss;
