@@ -3,6 +3,8 @@
   import { readMe } from './auth/api';
   import { ASSET_BASE } from './game/assetBase';
   import { buttonsOf, KEYS, usesButton } from './game/commands';
+  import { DEFAULT_CHEATS, normalizeCheats } from './game/cheats';
+  import type { CheatOptions } from './game/cheats';
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
   import { DUMMY_BEHAVIORS } from './game/dummy';
@@ -12,9 +14,11 @@
   import {
     applyMe,
     identityRefresher,
+    loadCheats,
     opponentChoiceOf,
     profileConfigured,
     resetModeOf,
+    saveCheats,
     type MenuIdentity,
   } from './menu';
 
@@ -25,6 +29,7 @@
     maxStock: false,
     lowHealth: false,
   });
+  let cheats = $state<CheatOptions>({ ...DEFAULT_CHEATS });
   let fighter = $state<Who>('ryuko');
   let opponent = $state<Who>('zoma');
   let stage = $state<Stage>('court');
@@ -72,6 +77,7 @@
     story: false,
     mode: 'practice',
     music: true,
+    cheated: false,
   });
   let menuOpen = $state(false);
   let identity = $state<MenuIdentity>({
@@ -263,14 +269,21 @@
         KEYS[fighter].some(([key]) => key === control);
 
   onMount(() => {
+    // The Cheats menu's saved settings (HPA-767): read here — a failed
+    // read opens the defaults — and handed to the scene as pending values
+    // the moment it exists; the initial title is not a played match.
+    const saved = loadCheats((key) => localStorage.getItem(key));
+    cheats = saved;
     let disposed = false;
     import('./game/scene')
       .then(({ createGame }) => {
-        if (!disposed)
+        if (!disposed) {
           session = createGame(host, (next) => {
             status = next;
             [fighter, opponent] = next.fighters;
           });
+          session.scene.setCheats(saved);
+        }
       })
       .catch((error: unknown) => {
         if (!disposed) status = { ...status, error: String(error) };
@@ -304,6 +317,14 @@
   function setPractice(changes: Partial<PracticeOptions>) {
     practice = { ...practice, ...changes };
     session?.scene.setPractice(practice);
+    focusArena();
+  }
+  // The Cheats menu's settings: normalized, kept in one saved object and
+  // pushed to the scene as pending values, which the next battle takes.
+  function setCheats(changes: Partial<CheatOptions>) {
+    cheats = normalizeCheats({ ...cheats, ...changes });
+    saveCheats((key, value) => localStorage.setItem(key, value), cheats);
+    session?.scene.setCheats(cheats);
     focusArena();
   }
   // The one Opponent select: its value comes from status.mode, which takes
@@ -661,6 +682,107 @@
         />
         Low health</label
       >
+    </div>
+    <div
+      class="h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
+    ></div>
+    <div class="flex flex-col gap-1.5">
+      <label class="flex items-center justify-between font-bold italic"
+        >Cheat mode
+        <input
+          type="checkbox"
+          class="size-4 accent-[#ffd24a]"
+          checked={cheats.enabled}
+          onchange={(event) =>
+            setCheats({ enabled: event.currentTarget.checked })}
+        /></label
+      >
+      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 font-bold">
+        <label class="flex items-center justify-between gap-1.5"
+          >Player HP
+          <span class="flex items-center gap-0.5 text-[#ffd24a]"
+            >×<input
+              type="number"
+              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
+              min="0.5"
+              max="5"
+              step="0.1"
+              value={cheats.playerHpMultiplier}
+              disabled={!cheats.enabled}
+              onchange={(event) =>
+                setCheats({
+                  playerHpMultiplier: event.currentTarget.valueAsNumber,
+                })}
+            /></span
+          ></label
+        >
+        <label class="flex items-center justify-between gap-1.5"
+          >Enemy HP
+          <span class="flex items-center gap-0.5 text-[#ffd24a]"
+            >×<input
+              type="number"
+              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
+              min="0.1"
+              max="5"
+              step="0.1"
+              value={cheats.enemyHpMultiplier}
+              disabled={!cheats.enabled}
+              onchange={(event) =>
+                setCheats({
+                  enemyHpMultiplier: event.currentTarget.valueAsNumber,
+                })}
+            /></span
+          ></label
+        >
+        <label class="flex items-center justify-between gap-1.5"
+          >Player damage
+          <span class="flex items-center gap-0.5 text-[#ffd24a]"
+            >×<input
+              type="number"
+              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
+              min="0.5"
+              max="10"
+              step="0.1"
+              value={cheats.playerDamageMultiplier}
+              disabled={!cheats.enabled}
+              onchange={(event) =>
+                setCheats({
+                  playerDamageMultiplier: event.currentTarget.valueAsNumber,
+                })}
+            /></span
+          ></label
+        >
+        <label class="flex items-center justify-between gap-1.5"
+          >Player EN limit
+          <span class="flex items-center gap-1 text-[#ffd24a]"
+            ><input
+              type="number"
+              class="w-9 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
+              min="1"
+              max="6"
+              step="1"
+              value={cheats.playerEnLimit}
+              disabled={!cheats.enabled}
+              onchange={(event) =>
+                setCheats({ playerEnLimit: event.currentTarget.valueAsNumber })}
+            />stocks</span
+          ></label
+        >
+        <label class="col-span-2 flex items-center gap-1.5"
+          ><input
+            type="checkbox"
+            class="size-4 accent-[#ffd24a] disabled:opacity-40"
+            checked={cheats.unlimitedEn}
+            disabled={!cheats.enabled}
+            onchange={(event) =>
+              setCheats({ unlimitedEn: event.currentTarget.checked })}
+          />
+          Unlimited EN</label
+        >
+      </div>
+      <p class="text-[10px] italic text-[#8a7a5a]">
+        Changes apply from the next match or battle.
+      </p>
     </div>
     <div
       class="h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"

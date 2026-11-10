@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { ASSET_BASE as BASE } from './assetBase';
-import { CHARACTERS, lifeOf, STAGES } from './characters';
+import { CHARACTERS, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
+import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
+import type { CheatOptions } from './cheats';
 import { selectAssets } from './packs';
 import { PackFile } from './packLoader';
 import ui from './generated/ui.json';
@@ -70,6 +72,9 @@ export interface GameStatus {
   mode: Mode;
   // The scene's music toggle.
   music: boolean;
+  // Whether any battle of the run — this match, or the story route so
+  // far — began with cheats on (authored, HPA-767; HPA-771 reads it).
+  cheated: boolean;
 }
 export const initialStatus: GameStatus = {
   ready: false,
@@ -86,6 +91,7 @@ export const initialStatus: GameStatus = {
   story: false,
   mode: 'practice',
   music: true,
+  cheated: false,
 };
 const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t2 };
@@ -165,6 +171,15 @@ export class TrainingScene extends Phaser.Scene {
   );
   // Kept across resets and mode changes; only free practice reads them.
   private practice: PracticeOptions = { ...this.match.practice };
+  // The Cheats menu's pending settings (authored, HPA-767): begin seats
+  // them as the next battle's one snapshot, so a live battle never sees a
+  // change — only the next battle does.
+  private pendingCheats: CheatOptions = { ...DEFAULT_CHEATS };
+  // Whether any battle of the current run began with cheats on: a
+  // non-story match resets it at its begin, a story route when it is
+  // picked — nothing else, so a finished route keeps its mark through the
+  // title and demos for HPA-771 to read there.
+  private runCheated = false;
   paused = false;
   // The menu dialog's own hold on the game: App sets and clears it rather
   // than toggling the pause state, so a screen's or a reset's unpause can't
@@ -447,6 +462,8 @@ export class TrainingScene extends Phaser.Scene {
         : this.openTitle();
     // The story's first step (0x4069b0), its counter reset by the title.
     if (select.story) {
+      // A story route picked starts a fresh run for its cheated mark.
+      this.runCheated = false;
       this.story = new Story(select.done[0]);
       this.storyHeld = [...select.drawn];
       this.teams = null;
@@ -678,6 +695,11 @@ export class TrainingScene extends Phaser.Scene {
     this.practice = { ...options };
     this.match.practice = { ...options };
   }
+  // The Menu's cheat settings only ever update the pending values; begin
+  // reads them once as the next battle's snapshot.
+  setCheats(options: CheatOptions) {
+    this.pendingCheats = normalizeCheats(options);
+  }
   setFighter(who: Who) {
     this.fighter = who;
     this.chosen = false;
@@ -764,6 +786,15 @@ export class TrainingScene extends Phaser.Scene {
     this.match = match;
     this.roundPalettes();
     this.match.practice = { ...this.practice };
+    // The battle's cheat snapshot installs here, before its first tick
+    // (match.ts useCheats): a change before this point applies to this
+    // battle — also one made while it loaded — and a later one waits for
+    // the next.
+    this.match.useCheats(this.pendingCheats);
+    // A non-story match is a run of its own; a story battle ORs into the
+    // route's mark, which the route's selection reset.
+    if (!match.battle) this.runCheated = false;
+    this.runCheated ||= this.match.cheats.enabled;
     // A match starting clears every sound the screen or the old match left.
     this.sound.stopAll();
     this.cue = undefined;
@@ -948,7 +979,7 @@ export class TrainingScene extends Phaser.Scene {
         digits.push({ key, digit: value % 10, x, y });
     };
     for (const f of this.match.lifeBars) {
-      const life = lifeOf(f.who);
+      const life = f.maxHp;
       const x = Math.trunc(f.bar.x / ART_SCALE) - 25;
       const y = Math.trunc((GROUND + f.bar.y) / ART_SCALE);
       const green = Math.trunc((f.hp * 50) / life);
@@ -1358,7 +1389,7 @@ export class TrainingScene extends Phaser.Scene {
       ready: this.ready,
       paused: this.frozen(),
       hp: [a.hp, b.hp],
-      life: [lifeOf(a.who), lifeOf(b.who)],
+      life: [a.maxHp, b.maxHp],
       seconds: this.match.seconds,
       // Zoma's moves are source actions, named by number.
       action:
@@ -1381,6 +1412,7 @@ export class TrainingScene extends Phaser.Scene {
           ? 'practice'
           : this.match.mode),
       music: this.music,
+      cheated: this.runCheated,
     };
     const serialized = JSON.stringify(status);
     if (serialized !== this.lastStatus) {

@@ -1,6 +1,37 @@
 import type { MeResult, ProfileUser } from './auth/api';
+import { DEFAULT_CHEATS, readCheats } from './game/cheats';
+import type { CheatOptions } from './game/cheats';
 import type { DummyBehavior } from './game/dummy';
 import type { Mode } from './game/match';
+
+// The Cheats menu's settings persist as one JSON object under this key,
+// on the device alone (authored, HPA-767).
+export const CHEATS_KEY = 'scwu.cheats';
+
+// Reads the saved cheats. A storage that throws (denied, full, sandboxed)
+// reads as never saved, so the Menu opens on the defaults.
+export const loadCheats = (
+  read: (key: string) => string | null,
+): CheatOptions => {
+  try {
+    return readCheats(read(CHEATS_KEY));
+  } catch {
+    return { ...DEFAULT_CHEATS };
+  }
+};
+
+// Saves the cheats. A failed write is swallowed: the setting stays usable
+// for this visit, just not restored on a reload.
+export const saveCheats = (
+  write: (key: string, value: string) => void,
+  cheats: CheatOptions,
+) => {
+  try {
+    write(CHEATS_KEY, JSON.stringify(cheats));
+  } catch {
+    // Nothing more can be done without storage.
+  }
+};
 
 // The consolidated Opponent select's values: each practice partner, plus
 // 'vsCpu' for a real CPU match and 'story' as a placeholder while a story
