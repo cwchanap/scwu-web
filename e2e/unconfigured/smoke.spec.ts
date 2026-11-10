@@ -75,6 +75,47 @@ test('boots into a ready arena', async ({ page }) => {
   // A partner pick while practice runs doesn't reset, keeping 'walk'.
   await opponent.selectOption('guard');
 
+  // The Cheats block (HPA-767) sits under the practice settings: a master
+  // switch, five values it keeps but disables while off, and the hint that
+  // nothing applies mid-battle.
+  const cheatSwitch = dialog.getByLabel('Cheat mode');
+  await expect(cheatSwitch).not.toBeChecked();
+  for (const name of [
+    'Player HP',
+    'Enemy HP',
+    'Player damage',
+    'Player EN limit',
+    'Unlimited EN',
+  ]) {
+    await expect(dialog.getByLabel(name)).toBeDisabled();
+  }
+  await expect(
+    dialog.getByText('Changes apply from the next match or battle.'),
+  ).toBeVisible();
+  // A switch flipped over a running battle changes nothing in it: turning
+  // cheats on and doubling Player HP leaves the live meter native — the
+  // next match's begin (below) is what seats them.
+  const player = page.getByLabel('Player health');
+  await expect(player).toHaveText('510');
+  await cheatSwitch.check();
+  const playerHp = dialog.getByLabel('Player HP');
+  await expect(playerHp).toBeEnabled();
+  await playerHp.fill('2');
+  await playerHp.blur();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
+    .toBe(
+      JSON.stringify({
+        enabled: true,
+        playerHpMultiplier: 2,
+        playerEnLimit: 3,
+        unlimitedEn: false,
+        enemyHpMultiplier: 1,
+        playerDamageMultiplier: 1,
+      }),
+    );
+  await expect(player).toHaveText('510');
+
   // Keys go to a button: the scene's keydown ignores INPUT/SELECT/TEXTAREA,
   // so a <button> is the target the dialog's stopPropagation alone shields
   // the window handler from. A leaked R resets the match; a leaked P or
@@ -98,6 +139,20 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(dialog).toBeVisible();
   await opponent.selectOption('vsCpu');
   await expect(opponent).toHaveValue('vsCpu');
+  // That pick starts a new match, whose begin installs the saved cheats:
+  // the doubled player maximum reports at once, before its intro ends.
+  await expect(player).toHaveText('1020', { timeout: 30_000 });
+
+  // The cheats outlive a reload — device storage, no auth or network help.
+  await page.reload();
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(failed).toBeHidden();
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  await expect(cheatSwitch).toBeChecked();
+  await expect(dialog.getByLabel('Player HP')).toHaveValue('2');
   expect(errors).toEqual([]);
 });
 
