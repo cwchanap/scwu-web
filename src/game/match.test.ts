@@ -1754,6 +1754,228 @@ describe('cheat options (HPA-767)', () => {
       maxStock: 1,
     });
   });
+
+  it("caps the 1P's gauge at the EN limit, native-1 and native-6 fighters alike", () => {
+    const cap = (who: Who, limit: number) => {
+      const match = new Match('practice', false, 0, [who, 'ryuko']);
+      match.useCheats(cheats({ enabled: true, playerEnLimit: limit }));
+      const f = match.fighters[0];
+      addPower(f, 650);
+      return f;
+    };
+    // ZAKU's native cap is 1, SHINZ's 6; both cap at the limit, the power
+    // past it discarded.
+    expect(cap('zaku', 6)).toMatchObject({
+      maxStock: 6,
+      stock: 6,
+      power: 0,
+    });
+    expect(cap('shinz', 1)).toMatchObject({
+      maxStock: 1,
+      stock: 1,
+      power: 0,
+    });
+  });
+
+  it('borrows back below the EN limit as the source does', () => {
+    const match = new Match();
+    match.useCheats(cheats({ enabled: true, playerEnLimit: 2 }));
+    const f = match.fighters[0];
+    addPower(f, 250);
+    expect(f).toMatchObject({ stock: 2, power: 0 });
+    addPower(f, -1);
+    expect(f).toMatchObject({ stock: 1, power: 99 });
+    addPower(f, -150);
+    expect(f).toMatchObject({ stock: 0, power: 49 });
+    addPower(f, -60);
+    expect(f).toMatchObject({ stock: 0, power: 0 });
+  });
+
+  it('keeps every hostile gauge capped natively', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
+    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    const zaku = match.fighters[1];
+    expect(zaku.maxStock).toBe(1);
+    addPower(zaku, 650);
+    expect(zaku).toMatchObject({ stock: 1, power: 0 });
+  });
+
+  it("refills the 1P to its cap every active tick, before the tick's inputs", () => {
+    const match = new Match();
+    match.useCheats(
+      cheats({ enabled: true, playerEnLimit: 3, unlimitedEn: true }),
+    );
+    const [one, dummy] = match.fighters;
+    [one.stock, one.power, dummy.stock] = [0, 37, 0];
+    match.step();
+    expect(one).toMatchObject({ stock: 3, power: 0 });
+    // The refill runs before the tick's inputs, so a spend within the tick
+    // stands (getterBeam pays its stock) and the next tick tops up again.
+    match.step({ getterBeam: true });
+    expect(one.stock).toBe(2);
+    match.step();
+    expect(one).toMatchObject({ stock: 3, power: 0 });
+    // Only the 1P: the partner keeps its own gauge.
+    expect(dummy.stock).toBe(0);
+  });
+
+  it('tops practice Max stock to the EN limit and the partner to its cap', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
+    match.practice.maxStock = true;
+    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    match.step();
+    expect(match.fighters[0].stock).toBe(6);
+    expect(match.fighters[1].stock).toBe(1);
+  });
+
+  it("carries the team's 1P into the next round at the cap, refilling every tick", () => {
+    const match = Match.team(
+      [
+        ['ryuko', 'zoma'],
+        ['zaku', 'zaku'],
+      ],
+      'court',
+    );
+    match.useCheats(
+      cheats({ enabled: true, playerEnLimit: 2, unlimitedEn: true }),
+    );
+    toFight(match);
+    expect(match.fighters[0]).toMatchObject({ stock: 2, power: 0 });
+    finishRound(match, 0);
+    expect(match.round).toBe(2);
+    toFight(match);
+    match.step();
+    // The new member carries at most the cap and the refill holds it there,
+    // so the HUD never sees a stock outside 0–6.
+    const one = match.fighters[0];
+    expect(one).toMatchObject({ who: 'zoma', maxStock: 2 });
+    expect(one.stock).toBeGreaterThanOrEqual(0);
+    expect(one.stock).toBeLessThanOrEqual(6);
+    expect(one.stock).toBe(2);
+  });
+
+  // Punch 1 (strength 10) or IORI's first stage (chip 3 through a guard) on
+  // an idle victim 200 ahead, under `options`; returns the life it lost.
+  const struckLoss = (
+    options: CheatOptions,
+    defense: Input = {},
+    move: 'punch' | 'iori' = 'punch',
+  ) => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    match.useCheats(options);
+    const [f, victim] = match.fighters;
+    victim.x = f.x + 200;
+    pose(match, victim, 'idle', 12);
+    if (move === 'punch') strike(match, f, RYUKO.punch);
+    else pose(match, f, move, 20);
+    ticks(match, 2, {}, defense);
+    return LIFE - victim.hp;
+  };
+
+  it("multiplies the 1P's hit damage and chip, never creating either", () => {
+    const x2 = cheats({ enabled: true, playerDamageMultiplier: 2 });
+    expect(struckLoss(x2)).toBe(20);
+    expect(
+      struckLoss(cheats({ enabled: true, playerDamageMultiplier: 0.5 })),
+    ).toBe(5);
+    // A blocked punch 1 (kind 3) carries no strength to scale.
+    expect(struckLoss(x2, { guard: true })).toBe(0);
+    // IORI's box chips 3 (20% of 15); ×2 rounds 6, ×0.5 rounds 2.
+    expect(struckLoss(x2, { guard: true }, 'iori')).toBe(6);
+    expect(
+      struckLoss(
+        cheats({ enabled: true, playerDamageMultiplier: 0.5 }),
+        {
+          guard: true,
+        },
+        'iori',
+      ),
+    ).toBe(2);
+  });
+
+  it("multiplies the 1P's projectile damage", () => {
+    // A DST missile (218, damage 22) over the victim's idle body.
+    const missileLoss = (options: CheatOptions) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+      match.useCheats(options);
+      const [f, victim] = match.fighters;
+      victim.x = f.x + 200;
+      pose(match, victim, 'idle', 12);
+      spawn(match, 0, RYUKO.dstMissile, { x: victim.x, y: victim.y });
+      ticks(match, 3);
+      return LIFE - victim.hp;
+    };
+    // The switch alone (multiplier 1) stays native.
+    const native = missileLoss(cheats({ enabled: true }));
+    expect(native).toBe(22);
+    expect(
+      missileLoss(cheats({ enabled: true, playerDamageMultiplier: 2 })),
+    ).toBe(2 * native);
+  });
+
+  it("multiplies scripted outgoing life takes, never the 1P's own or a heal", () => {
+    // P-HP (139) takes 100 from the opponent at any range (op 0x15,
+    // PC 1629).
+    const match = new Match('practice', false, 0, ['training', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerDamageMultiplier: 2 }));
+    const [training, ryuko] = match.fighters;
+    ryuko.x = training.x + 600;
+    for (let t = 0; t < 60 && ryuko.hp === ryuko.maxHp; t++)
+      match.step(t ? {} : { punch: true });
+    expect(ryuko.hp).toBe(LIFE - 200);
+    // K+HP (140) refills the opponent (PC 1633): a gain never passes the
+    // multiplier.
+    const heal = new Match('practice', false, 0, ['training', 'ryuko']);
+    heal.useCheats(cheats({ enabled: true, playerDamageMultiplier: 2 }));
+    const [, other] = heal.fighters;
+    other.x = heal.fighters[0].x + 600;
+    other.hp = 50;
+    for (let t = 0; t < 60 && other.hp !== other.maxHp; t++)
+      heal.step(t ? {} : { kick: true });
+    expect(other.hp).toBe(510);
+  });
+
+  it("leaves the 1P's own scripted take native (TRAINING 89, op 0x15)", () => {
+    const run = (mult: number) => {
+      const match = new Match('practice', false, 0, ['training', 'ryuko']);
+      match.useCheats(cheats({ enabled: true, playerDamageMultiplier: mult }));
+      const [training, ryuko] = match.fighters;
+      ryuko.x = training.x + 600;
+      // Action 89's op 0x15 takes 29 of his own life on its first tick.
+      enter(match, training, 89);
+      match.step({}, {});
+      return training.hp;
+    };
+    expect(run(1)).toBe(471);
+    // The self route never passes the multiplier.
+    expect(run(2)).toBe(471);
+    expect(run(0.5)).toBe(471);
+  });
+
+  it("leaves the opponent's strikes native", () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerDamageMultiplier: 2 }));
+    const [one, two] = match.fighters;
+    one.x = two.x - 200;
+    pose(match, one, 'idle', 12);
+    strike(match, two, RYUKO.punch);
+    ticks(match, 2, {}, {});
+    expect(one.hp).toBe(LIFE - 10);
+  });
+
+  it("multiplies GON MISS's take with a 1P striker (PC 1874)", () => {
+    const match = new Match('practice', false, 0, ['chung', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerDamageMultiplier: 2 }));
+    const [, ryuko] = match.fighters;
+    ryuko.y = -200;
+    (match as unknown as { queue(f: Fighter, a: 'gonMiss'): void }).queue(
+      ryuko,
+      'gonMiss',
+    );
+    for (let t = 0; t < 3000 && ryuko.action !== 'launchAway'; t++)
+      match.step({}, {});
+    expect(ryuko.hp).toBe(LIFE - 80);
+  });
 });
 
 describe('recovered attack boxes', () => {
