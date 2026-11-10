@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
+import type Phaser from 'phaser';
+import { DEFAULT_CHEATS } from './cheats';
 import { itWithArt } from './testing';
 import ui from './generated/ui.json';
 import {
+  createHud,
   faceImage,
   gaugeCrop,
   gaugeImage,
@@ -17,6 +20,114 @@ import {
   healthCrop,
 } from './hud';
 import { Match } from './match';
+
+// A stand-in Phaser scene for createHud: every image and text records the
+// texture, crop and visibility the HUD sets on it. `lifeBars`, `stocks`
+// and `tag` follow createHud's construction order (hud.ts).
+const hudScene = () => {
+  const sprite = () => {
+    const s = {
+      texture: '',
+      visible: true,
+      crop: { x: 0, width: 0 },
+      setTexture(texture: string) {
+        this.texture = texture;
+        return this;
+      },
+      setVisible(visible: boolean) {
+        this.visible = visible;
+        return this;
+      },
+      setCrop(x: number, _y: number, width: number) {
+        this.crop = { x, width };
+        return this;
+      },
+      setX: () => s,
+      setPosition: () => s,
+      setScrollFactor: () => s,
+      setOrigin: () => s,
+      setScale: () => s,
+      setDepth: () => s,
+      setAlpha: () => s,
+      setBlendMode: () => s,
+      setFlipX: () => s,
+    };
+    return s;
+  };
+  const images: ReturnType<typeof sprite>[] = [];
+  const texts: ReturnType<typeof sprite>[] = [];
+  const scene = {
+    add: {
+      image: () => {
+        const s = sprite();
+        images.push(s);
+        return s;
+      },
+      text: () => {
+        const s = sprite();
+        texts.push(s);
+        return s;
+      },
+    },
+  };
+  return {
+    as: scene as unknown as Phaser.Scene,
+    // createHud's own layout: the life bars (6th/7th image) and the stock
+    // counters (23rd/24th).
+    lifeBars: () => [images[5], images[6]],
+    stocks: () => [images[22], images[23]],
+    tag: () => texts[0],
+  };
+};
+
+it('shows the CHEAT tag only for a battle whose effective cheats are on', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const native = new Match('cpu', true);
+  update(native);
+  expect(hud.tag().visible).toBe(false);
+  const cheated = new Match('cpu', true);
+  cheated.useCheats({ ...DEFAULT_CHEATS, enabled: true });
+  update(cheated);
+  expect(hud.tag().visible).toBe(true);
+  update(native);
+  expect(hud.tag().visible).toBe(false);
+});
+
+it('crops the HUD life bar by the battle’s effective maximum', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const cheated = new Match('cpu', true);
+  cheated.useCheats({
+    ...DEFAULT_CHEATS,
+    enabled: true,
+    playerHpMultiplier: 2,
+    enemyHpMultiplier: 0.5,
+  });
+  update(cheated);
+  // Both bars full at their scaled maxima: 1020/1020 and 245/245.
+  expect(hud.lifeBars().map((bar) => bar.crop)).toEqual([
+    { x: 0, width: 254 },
+    { x: 0, width: 254 },
+  ]);
+  // Half life shows half the bar against the doubled maximum, not none.
+  cheated.fighters[0].hp = 510;
+  update(cheated);
+  expect(hud.lifeBars()[0].crop).toEqual({ x: 127, width: 127 });
+});
+
+it('draws the stock count from the source’s 0–6 images (ui 17–23)', () => {
+  for (const index of [17, 18, 19, 20, 21, 22, 23])
+    expect(ui.images.some((image) => image.index === index)).toBe(true);
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  for (let stock = 0; stock <= 6; stock++) {
+    match.fighters[0].stock = stock;
+    update(match);
+    expect(hud.stocks()[0].texture).toBe(`ui-${17 + stock}`);
+  }
+});
 
 it('plays the recovered KO displays through the squash-out before showing rematch', () => {
   expect(KO_TICKS).toBe(166);

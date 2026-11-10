@@ -1,14 +1,18 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type Phaser from 'phaser';
 import { CHARACTERS, STAGES } from './characters';
 import type { Stage, Who } from './characters';
+import { DEFAULT_CHEATS } from './cheats';
+import type { CheatOptions } from './cheats';
 import { Match } from './match';
 import { parsePack } from './packs';
 import { CharacterSelect, Continue, StoryDemo, Title } from './select';
 import type { Demo } from './select';
+import { scenarioOf, Story } from './story';
+import type { Battle } from './story';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
-import { Story } from './story';
 import { itWithArt } from './testing';
 
 // scene.ts imports Phaser at runtime, which a browser-only module; phaserStub.ts
@@ -58,6 +62,7 @@ const boot = () => {
     },
     textures: {
       exists: () => cached,
+      get: () => ({ has: () => true, add: () => {} }),
       getTextureKeys: () => [] as string[],
       remove: () => {},
     },
@@ -612,4 +617,171 @@ it('preload queues the stage pack, then boot, and boot is resident once its text
   (view.textures as { exists(key: string): boolean }).exists = (key) =>
     key === 'text';
   expect(bootFile?.hasCacheConflict()).toBe(true);
+});
+
+// HPA-767's cheats in the scene: the pending values, the begin snapshot and
+// the run's cheated mark.
+describe('cheats (HPA-767)', () => {
+  const cheats = (fields: Partial<CheatOptions> = {}): CheatOptions => ({
+    ...DEFAULT_CHEATS,
+    ...fields,
+  });
+
+  it('seats the pending cheats as the battle’s snapshot at begin only', () => {
+    const { scene, artIn } = boot();
+    artIn();
+    scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    // The match a reset replaces stays native until its begin.
+    expect(scene.match.cheats.enabled).toBe(false);
+    expect(scene.match.fighters[0].maxHp).toBe(510);
+    scene.reset('practice');
+    expect(scene.match.cheats.enabled).toBe(true);
+    expect(scene.match.fighters[0].maxHp).toBe(1020);
+    expect(scene.match.fighters[0].hp).toBe(1020);
+    expect(scene.match.fighters[1].maxHp).toBe(490);
+    // A switch flipped after begin cannot change the begun battle.
+    scene.setCheats(cheats());
+    expect(scene.match.cheats.enabled).toBe(true);
+    expect(scene.match.fighters[0].maxHp).toBe(1020);
+  });
+
+  it('applies a switch changed during a pending load to the upcoming battle', () => {
+    const { scene, finishLoad } = boot();
+    scene.reset('practice');
+    scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 3 }));
+    finishLoad();
+    expect(scene.match.cheats.playerHpMultiplier).toBe(3);
+    expect(scene.match.fighters[0].maxHp).toBe(1530);
+  });
+
+  it('marks a cheated run and resets it on a new non-story match', () => {
+    const { scene, artIn, statuses } = boot();
+    artIn();
+    scene.setCheats(cheats({ enabled: true }));
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    // A clean match afterwards starts a fresh, unmarked run.
+    scene.setCheats(cheats());
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(false);
+  });
+
+  it('ORs every story battle into the run mark and keeps it through the title', () => {
+    const { scene, view, artIn, statuses } = boot();
+    artIn();
+    const story = new Story('ryuko');
+    const battles: Battle[] = [];
+    for (
+      let next = story.next(510, 0);
+      battles.length < 2;
+      next = story.next(510, 0)
+    ) {
+      if (next.kind === 'battle') battles.push(next.battle);
+      else if (next.kind === 'title') throw new Error('route ended early');
+    }
+    // A cheated battle marks the route...
+    scene.setCheats(cheats({ enabled: true }));
+    (view.begin as (match: Match) => void)(Match.story('ryuko', battles[0], 0));
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    // ...and a later clean battle does not clear the mark.
+    scene.setCheats(cheats());
+    (view.begin as (match: Match) => void)(Match.story('ryuko', battles[1], 0));
+    expect(scene.match.cheats.enabled).toBe(false);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    // The title keeps the finished route's mark for HPA-771 to read.
+    (view.openTitle as () => void)();
+    expect(view.select).toBeInstanceOf(Title);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+  });
+
+  it('resets the run mark when a story route is picked', () => {
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats(cheats({ enabled: true }));
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    // Picking a story route starts a fresh run, clean while cheats are off.
+    scene.setCheats(cheats());
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = ['ryuko', 'ryuko'];
+    stepSelect(view);
+    finishLoad();
+    expect(scene.match.mode).toBe('story');
+    expect(statuses.at(-1)?.cheated).toBe(false);
+  });
+
+  it('reports life and hp at the effective maximum', () => {
+    const { scene, artIn, statuses } = boot();
+    artIn();
+    scene.setCheats(
+      cheats({ enabled: true, playerHpMultiplier: 2, enemyHpMultiplier: 0.5 }),
+    );
+    scene.reset('practice');
+    expect(statuses.at(-1)?.hp).toEqual([1020, 245]);
+    expect(statuses.at(-1)?.life).toEqual([1020, 245]);
+  });
+
+  it('divides the world life bars by the effective maximum', () => {
+    const { view, artIn } = boot();
+    artIn();
+    // A graphics recorder for drawLifeBars, and an anything-image for the
+    // digit pool it grows.
+    const drawn: {
+      color: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }[] = [];
+    let color = 0;
+    const graphics = {
+      clear: () => {},
+      fillStyle: (next: number) => (color = next),
+      fillRect: (x: number, y: number, w: number, h: number) =>
+        void drawn.push({ color, x, y, w, h }),
+      setScrollFactor: () => graphics,
+      setDepth: () => graphics,
+    };
+    const anySprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    view.add = { graphics: () => graphics, image: () => anySprite };
+    // Ryuko's first story battle, its slot-0 seat (fighters[1]: the 1P's
+    // own slot is null) given a life bar.
+    const first = scenarioOf('ryuko')[0] as Battle;
+    const match = Match.story(
+      'ryuko',
+      {
+        ...first,
+        slots: [
+          { ...first.slots[0]!, flags: 1 },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      },
+      0,
+    );
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    while (!match.lifeBars.length) match.step();
+    const bar = match.lifeBars[0];
+    bar.hp = 50;
+    view.match = match;
+    (view.drawLifeBars as () => void)();
+    const backing = drawn.find((r) => r.color === 0 && r.h === 15)!;
+    const green = drawn.find((r) => r.color === 0x00ff00)!;
+    // The green row is 25 of the bar's 50 source pixels — half life against
+    // the halved maximum, where the native maximum would fill all 50
+    // (1.5× art scale, ±1px for the two rounded edges).
+    expect(green.h).toBe(12);
+    expect(backing.w - green.w).toBeGreaterThanOrEqual(37);
+    expect(backing.w - green.w).toBeLessThanOrEqual(38);
+  });
 });

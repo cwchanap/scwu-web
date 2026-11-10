@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { ProfileUser } from './auth/api';
+import { DEFAULT_CHEATS } from './game/cheats';
+import type { CheatOptions } from './game/cheats';
 import {
   applyMe,
+  CHEATS_KEY,
   identityRefresher,
+  loadCheats,
   opponentChoiceOf,
   profileConfigured,
   resetModeOf,
+  saveCheats,
   type MenuIdentity,
 } from './menu';
 
@@ -72,6 +77,59 @@ describe('applyMe', () => {
       loaded: true,
       failed: true,
     });
+  });
+});
+
+describe('cheats storage', () => {
+  const saved: CheatOptions = {
+    enabled: true,
+    playerHpMultiplier: 2,
+    playerEnLimit: 6,
+    unlimitedEn: true,
+    enemyHpMultiplier: 0.1,
+    playerDamageMultiplier: 10,
+  };
+
+  it('reads the saved settings as one JSON object under one key', () => {
+    const keys: string[] = [];
+    expect(
+      loadCheats((key) => {
+        keys.push(key);
+        return JSON.stringify(saved);
+      }),
+    ).toEqual(saved);
+    expect(keys).toEqual([CHEATS_KEY]);
+  });
+
+  it('reads the defaults for absent or malformed storage', () => {
+    expect(loadCheats(() => null)).toEqual(DEFAULT_CHEATS);
+    expect(loadCheats(() => '')).toEqual(DEFAULT_CHEATS);
+    expect(loadCheats(() => 'not json')).toEqual(DEFAULT_CHEATS);
+  });
+
+  it('reads the defaults when the storage throws', () => {
+    expect(
+      loadCheats(() => {
+        throw new Error('denied');
+      }),
+    ).toEqual(DEFAULT_CHEATS);
+  });
+
+  it('saves the whole object, and a reload restores it', () => {
+    const writes: [string, string][] = [];
+    saveCheats((key, value) => void writes.push([key, value]), saved);
+    expect(writes).toEqual([[CHEATS_KEY, JSON.stringify(saved)]]);
+    let stored: string | null = null;
+    saveCheats((_key, value) => (stored = value), saved);
+    expect(loadCheats(() => stored)).toEqual(saved);
+  });
+
+  it('swallows a failed write, leaving the setting usable', () => {
+    expect(() =>
+      saveCheats(() => {
+        throw new Error('quota exceeded');
+      }, saved),
+    ).not.toThrow();
   });
 });
 

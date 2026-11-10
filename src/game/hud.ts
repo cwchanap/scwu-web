@@ -1,5 +1,5 @@
 import type Phaser from 'phaser';
-import { lifeOf, perStockOf } from './characters';
+import { perStockOf } from './characters';
 import type { Who } from './characters';
 import { LIFE, ROUNDS_TO_WIN } from './match';
 import type { Match } from './match';
@@ -409,6 +409,22 @@ export function createHud(
   const shown = [0, 1, 2, 3].map(() =>
     image(97, 0, 0).setDepth(110).setVisible(false),
   );
+  // Authored (HPA-767): a small CHEAT tag under the timer, shown only for
+  // a battle whose effective snapshot has cheats on — the Menu's pending
+  // switch cannot hide a begun battle's tag.
+  const cheatTag = scene.add
+    .text(320 * scale, 44 * scale, 'CHEAT', {
+      fontFamily: 'monospace',
+      fontSize: '15px',
+      fontStyle: 'italic bold',
+      color: '#ffd24a',
+      stroke: '#7a2d00',
+      strokeThickness: 3,
+    })
+    .setOrigin(0.5)
+    .setScrollFactor(0)
+    .setDepth(screenDepth(0x19))
+    .setVisible(false);
 
   return (match: Match) => {
     // In a story the 2P side shows the enemy, and nothing while there is
@@ -425,7 +441,7 @@ export function createHud(
           part.setVisible(false);
         return;
       }
-      const bar = healthCrop(f.hp, index === 1, lifeOf(f.who));
+      const bar = healthCrop(f.hp, index === 1, f.maxHp);
       life[index].setCrop(bar.x, 0, bar.width, 14).setVisible(bar.width > 0);
       const crop = gaugeCrop(f.power, perStockOf(f.who));
       gauges[index]
@@ -453,6 +469,7 @@ export function createHud(
     const dim = [0, -5, -10, -15, -20, -15, -10, -5][
       Math.floor(match.ticks / 10) % 8
     ];
+    cheatTag.setVisible(match.cheats.enabled);
     strips.forEach((strip, index) =>
       strip.setTexture(tint(`ui-${40 + index}`, { r: dim, g: dim, b: dim })),
     );
