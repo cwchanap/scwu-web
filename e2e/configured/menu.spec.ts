@@ -68,3 +68,102 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
   expect(gisCalls).toBe(0);
   expect(errors).toEqual([]);
 });
+
+test('cheats settings live in the menu, persist and leave identity alone', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  let meCalls = 0;
+  await page.route('**/api/me', (route) => {
+    meCalls += 1;
+    return route.fulfill(json({ user: USER }));
+  });
+
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+
+  // The Cheats block (HPA-767): a master switch, five values it keeps but
+  // disables while off, and the hint that nothing applies mid-battle.
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  const cheatSwitch = dialog.getByLabel('Cheat mode');
+  await expect(cheatSwitch).toBeVisible();
+  await expect(cheatSwitch).not.toBeChecked();
+  for (const name of [
+    'Player HP',
+    'Enemy HP',
+    'Player damage',
+    'Player EN limit',
+    'Unlimited EN',
+  ]) {
+    await expect(dialog.getByLabel(name)).toBeDisabled();
+  }
+  await expect(
+    dialog.getByText('Changes apply from the next match or battle.'),
+  ).toBeVisible();
+
+  await cheatSwitch.check();
+  for (const name of [
+    'Player HP',
+    'Enemy HP',
+    'Player damage',
+    'Player EN limit',
+    'Unlimited EN',
+  ]) {
+    await expect(dialog.getByLabel(name)).toBeEnabled();
+  }
+  const enemyHp = dialog.getByLabel('Enemy HP');
+  await enemyHp.fill('0.5');
+  await enemyHp.blur();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
+    .toBe(
+      JSON.stringify({
+        enabled: true,
+        playerHpMultiplier: 1,
+        playerEnLimit: 3,
+        unlimitedEn: false,
+        enemyHpMultiplier: 0.5,
+        playerDamageMultiplier: 1,
+      }),
+    );
+
+  // Keys stay contained to the dialog: a leaked Escape would pause, an R
+  // reset; the close still behaves and nothing errors.
+  await dialog.getByRole('button', { name: 'Close' }).focus();
+  await page.keyboard.press('r');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+
+  // The Profile row reads /api/me as before, untouched by the new block.
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  const profile = dialog.getByRole('link', { name: 'Profile ↗' });
+  const row = profile.locator('..');
+  await expect(row).toContainText('Ryuko');
+  await expect.poll(() => meCalls).toBe(2);
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
+
+  // A reload restores the saved cheats; the identity still reads the same.
+  await page.reload();
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  await menu.click();
+  await expect(dialog).toBeVisible();
+  await expect(cheatSwitch).toBeChecked();
+  await expect(dialog.getByLabel('Enemy HP')).toHaveValue('0.5');
+  await expect(row).toContainText('Ryuko');
+  await expect.poll(() => meCalls).toBe(3);
+  expect(errors).toEqual([]);
+});
