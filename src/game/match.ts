@@ -3478,16 +3478,27 @@ export class Match {
         // own first: a double KO. TRAINING's K refills the opponent's life
         // (PC 1633), his P takes 100 (PC 1629) and his chuck KOs himself
         // (PC 1662).
-        if (event.selfLife > 0) gainLife(self, event.selfLife);
+        // Authored (HPA-767): a scripted transfer on one's own life is a
+        // native amount — the TEAM VS carryover's 102/204/306 (46 + 5,
+        // 47 + 5, 48 + 4) among them — so both sides of it scale with the
+        // actor's effective maximum as lifeMark does: the carryover lands
+        // at its bucket's share of the bar, a scripted self-KO stays a KO
+        // at any maximum, and a balanced pair keeps its net (ALPHA's
+        // 450/449 KO Boss revival, his 2-and-2 drain passes). A transfer
+        // onto the met player keeps the damage routes: its takes run
+        // outgoingDamage (×Player damage), its gains scale with the
+        // receiver — TRAINING's K's 1000, a refill either way.
+        if (event.selfLife > 0) gainLife(self, lifeMark(self, event.selfLife));
         if (event.selfLife < 0) {
-          loseLife(self, -event.selfLife);
+          loseLife(self, lifeMark(self, -event.selfLife));
           if (self.hp === 0) this.knockOut(self);
         }
         if (!other) {
           addPower(self, event.selfPower);
           break;
         }
-        if (event.otherLife > 0) gainLife(other, event.otherLife);
+        if (event.otherLife > 0)
+          gainLife(other, lifeMark(other, event.otherLife));
         if (event.otherLife < 0) {
           const damage = loseLife(
             other,

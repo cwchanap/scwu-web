@@ -104,6 +104,53 @@ describe('recovered idle interpreter', () => {
     expect(() => new StandingVM(program).tick()).toThrow();
   });
 
+  it("scales op 0x11's life mark by the fighter's effective maximum (HPA-767)", () => {
+    // SIN's stance tires at 165 of 550 (PC 16). A record like his between
+    // two displays: the mark scales as lifeMark does — the exact 1-HP
+    // sentinel and nonpositive marks stay native — so a scaled fighter
+    // tires at the same share of its bar. lifeScale 1 is the identity.
+    const tired = (life: number, lifeScale: number, mark = 165) => {
+      const vm = new StandingVM({
+        start: 0,
+        end: 3,
+        records: [
+          [
+            17,
+            0,
+            1,
+            0,
+            2,
+            1,
+            mark & 255,
+            mark >> 8,
+            ...Array<number>(8).fill(0),
+          ],
+          [12, 1, 0, 10, 0, ...Array<number>(11).fill(0)],
+          [12, 1, 0, 20, 0, ...Array<number>(11).fill(0)],
+        ],
+      });
+      vm.life = life;
+      vm.lifeScale = lifeScale;
+      vm.tick();
+      return vm.frame!.image;
+    };
+    expect(tired(165, 1)).toBe(20);
+    expect(tired(166, 1)).toBe(10);
+    // ×0.1 of 550 (55): the mark reads 16 — a full bar stays fresh, and
+    // 16 of 55 tires as 165 of 550 does.
+    expect(tired(55, 0.1)).toBe(10);
+    expect(tired(16, 0.1)).toBe(20);
+    expect(tired(17, 0.1)).toBe(10);
+    // ×5 (2750): the mark reads 825.
+    expect(tired(825, 5)).toBe(20);
+    expect(tired(826, 5)).toBe(10);
+    // The exact-1 sentinel stays literal under any scaling, and a
+    // nonpositive mark never moves.
+    expect(tired(1, 5, 1)).toBe(20);
+    expect(tired(2, 5, 1)).toBe(10);
+    expect(tired(0, 0.1, 0)).toBe(20);
+  });
+
   it('honors indefinite display and validates speed/data boundaries', () => {
     const program = {
       start: 0,
