@@ -2523,7 +2523,7 @@ export class Match {
     if (!bonus) return;
     // The life, a signed byte (0x40e984), goes through the life routine
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
-    // 0, but every story's is 10 to 100: a gain. Authored (HPA-767): like
+    // 0, but every paid story bonus is 30 to 100: a gain. Authored (HPA-767): like
     // any scripted gain it reads as its share of the taker's bar.
     gainLife(bonus, lifeMark(bonus, slot.life));
     addPower(bonus, slot.power);
