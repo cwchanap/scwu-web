@@ -1982,13 +1982,22 @@ export class Match {
   // buttons — ponytail: guessed from seats (global 10 = 10, every hostile
   // ZAKU or PAC-HELO), not a stance or state flag the battle leaves.
   private get brawlEnemies() {
-    if (!this.battle) return null;
     const [one] = this.fighters;
     const enemies = this.fighters.filter((_, i) => one.enemies & (1 << i));
-    const choosingMode =
-      this.globals[10] === 10 &&
-      enemies.every((f) => f.who === 'zaku' || f.who === 'pachelo');
-    return enemies.length > 1 && !choosingMode ? enemies : null;
+    return enemies.length > 1 && !this.choosingMode ? enemies : null;
+  }
+
+  // The same detection, read wherever the non-combat selector matters: it
+  // encodes its route as native otherLife subtractions off the 1P, so the
+  // 1P's life keeps native units there (cheatSeat).
+  private get choosingMode() {
+    if (!this.battle || this.globals[10] !== 10) return false;
+    const [one] = this.fighters;
+    const enemies = this.fighters.filter((_, i) => one.enemies & (1 << i));
+    return (
+      enemies.length > 1 &&
+      enemies.every((f) => f.who === 'zaku' || f.who === 'pachelo')
+    );
   }
 
   // State 300 in a story (0x409062). At a time-up, seat 1 scores the step's
@@ -2305,10 +2314,14 @@ export class Match {
   // fighters start native, so an enabled-off battle never passes here.
   private cheatSeat(f: Fighter, i: number) {
     if (!i) {
-      f.maxHp = Math.max(
-        1,
-        Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
-      );
+      // The mode-select battle encodes its route in native units off the
+      // 1P's life (choosingMode), so its 1P keeps native life: reading the
+      // scaled bar KOs it at strong shrinks and misroutes every choice.
+      if (!this.choosingMode)
+        f.maxHp = Math.max(
+          1,
+          Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
+        );
       f.maxStock = this.cheats.playerEnLimit;
     } else if (this.hostile(0, i))
       f.maxHp = Math.max(
@@ -2510,8 +2523,9 @@ export class Match {
     if (!bonus) return;
     // The life, a signed byte (0x40e984), goes through the life routine
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
-    // 0, but every story's is 30 to 100: a gain.
-    gainLife(bonus, slot.life);
+    // 0, but every story's is 10 to 100: a gain. Authored (HPA-767): like
+    // any scripted gain it reads as its share of the taker's bar.
+    gainLife(bonus, lifeMark(bonus, slot.life));
     addPower(bonus, slot.power);
   }
 

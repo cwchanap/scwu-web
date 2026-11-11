@@ -106,10 +106,17 @@ describe('recovered idle interpreter', () => {
 
   it("scales op 0x11's life mark by the fighter's effective maximum (HPA-767)", () => {
     // SIN's stance tires at 165 of 550 (PC 16). A record like his between
-    // two displays: the mark scales as lifeMark does — the exact 1-HP
-    // sentinel and nonpositive marks stay native — so a scaled fighter
-    // tires at the same share of its bar. lifeScale 1 is the identity.
-    const tired = (life: number, lifeScale: number, mark = 165) => {
+    // two displays: the mark scales exactly as lifeMark does — the native
+    // value times the effective maximum over the native one, truncated —
+    // with the exact 1-HP sentinel and nonpositive marks native, so a
+    // scaled fighter tires at the same share of its bar. A native maximum
+    // is the identity.
+    const tired = (
+      life: number,
+      lifeMax: number,
+      lifeNative: number,
+      mark = 165,
+    ) => {
       const vm = new StandingVM({
         start: 0,
         end: 3,
@@ -130,25 +137,30 @@ describe('recovered idle interpreter', () => {
         ],
       });
       vm.life = life;
-      vm.lifeScale = lifeScale;
+      vm.lifeMax = lifeMax;
+      vm.lifeNative = lifeNative;
       vm.tick();
       return vm.frame!.image;
     };
-    expect(tired(165, 1)).toBe(20);
-    expect(tired(166, 1)).toBe(10);
+    expect(tired(165, 550, 550)).toBe(20);
+    expect(tired(166, 550, 550)).toBe(10);
     // ×0.1 of 550 (55): the mark reads 16 — a full bar stays fresh, and
     // 16 of 55 tires as 165 of 550 does.
-    expect(tired(55, 0.1)).toBe(10);
-    expect(tired(16, 0.1)).toBe(20);
-    expect(tired(17, 0.1)).toBe(10);
+    expect(tired(55, 55, 550)).toBe(10);
+    expect(tired(16, 55, 550)).toBe(20);
+    expect(tired(17, 55, 550)).toBe(10);
     // ×5 (2750): the mark reads 825.
-    expect(tired(825, 5)).toBe(20);
-    expect(tired(826, 5)).toBe(10);
+    expect(tired(825, 2750, 550)).toBe(20);
+    expect(tired(826, 2750, 550)).toBe(10);
+    // ×1.4 (770) rounds on the integer product, as lifeMark does: the
+    // mark reads 231 — 165 × 1.4 as a floating ratio truncates to 230.
+    expect(tired(231, 770, 550)).toBe(20);
+    expect(tired(232, 770, 550)).toBe(10);
     // The exact-1 sentinel stays literal under any scaling, and a
     // nonpositive mark never moves.
-    expect(tired(1, 5, 1)).toBe(20);
-    expect(tired(2, 5, 1)).toBe(10);
-    expect(tired(0, 0.1, 0)).toBe(20);
+    expect(tired(1, 2750, 550, 1)).toBe(20);
+    expect(tired(2, 2750, 550, 1)).toBe(10);
+    expect(tired(0, 55, 550, 0)).toBe(20);
   });
 
   it('honors indefinite display and validates speed/data boundaries', () => {

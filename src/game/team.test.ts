@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_CHEATS } from './cheats';
 import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
 import { firstStrike, LIFE, Match } from './match';
@@ -438,6 +439,34 @@ describe('story battles', () => {
     }
   });
 
+  it("scales the slot's KO bonus with the taker's effective maximum (HPA-767)", () => {
+    // The bonus is the fallen slot's `life` (30–100 in the shipped stories),
+    // a transfer like any scripted gain: it reads as its share of the
+    // taker's bar — 50 of 510 at ×5 reads 250 of 2550 — and stays native
+    // without cheats.
+    const bonus = (playerHpMultiplier: number) => {
+      const match = Match.story(
+        'ryuko',
+        battle({
+          slots: [slot({ flags: 0x80, life: 50, power: 10 }), slot(), null],
+        }),
+      );
+      match.useCheats({
+        ...DEFAULT_CHEATS,
+        enabled: true,
+        playerHpMultiplier,
+      });
+      fight(match);
+      const [ryuko, zaku] = match.fighters;
+      ryuko.hp = 100;
+      ryuko.stock = 0;
+      knockOut(match, zaku, ryuko);
+      return ryuko.hp;
+    };
+    expect(bonus(5)).toBe(350);
+    expect(bonus(0.5)).toBe(125);
+  });
+
   it("pays a KO again for each hit that takes life from a KO'd player, but not for one without damage (0x40f747)", () => {
     for (const damage of [10, 0]) {
       const match = Match.story(
@@ -670,6 +699,70 @@ describe('story battles', () => {
       ['1+16', '1+15', 11, 162, 47],
       ['1+16', '1+15', 11, 161, 62],
     ]);
+  });
+
+  it('reads the mode-select routes native with cheats on, at ×0.5 and ×2 (HPA-767)', () => {
+    // The route encodes as native otherLife subtractions off the 1P (the
+    // Chii signs' 80/83 scripts: −100/−347 and −346/−348), so the
+    // non-combat selector keeps native life at any Player HP — reading it
+    // scaled KOs the 1P at ×0.5 on Hard, BR Zero and BR Another and
+    // misroutes every pick at ×2. The signs themselves scale with Enemy
+    // HP, and the battle is still cheated: the snapshot stays enabled.
+    const STANCE = /^1\+(1[56]|3[2367])$/;
+    const mode = (picks: Who[], playerHp: number) => {
+      const match = Match.story(
+        'ryuko',
+        FIRST,
+        0,
+        undefined,
+        left({ 2: 50, 3: 10, 10: 10 }),
+      );
+      match.useCheats({
+        ...DEFAULT_CHEATS,
+        enabled: true,
+        playerHpMultiplier: playerHp,
+        enemyHpMultiplier: 2,
+      });
+      expect(match.fighters[0]).toMatchObject({ hp: LIFE, maxHp: LIFE });
+      expect(match.fighters[1].maxHp).toBe(400);
+      for (let t = 0; t < 10; t++) match.step();
+      for (let t = 0; !match.resultReady && t < 5000; t++) {
+        const [one, ...rest] = match.fighters;
+        const pick = picks[rest.filter((f) => f.present && !f.hp).length];
+        const target = rest.find(
+          (f) => f.who === pick && f.hp && STANCE.test(`${f.branch}`),
+        );
+        const dx = target ? target.x - one.x : 0;
+        match.step(
+          !target || match.winner
+            ? {}
+            : Math.abs(dx) > 90
+              ? { [dx < 0 ? 'left' : 'right']: true }
+              : { punch: t % 20 === 0 },
+        );
+      }
+      const story = new Story('ryuko');
+      story.next();
+      story.next(match.fighters[0].hp);
+      return [match.fighters[0].hp, story.step];
+    };
+    for (const playerHp of [0.5, 2]) {
+      expect(
+        (
+          [
+            ['zaku', 'zaku'],
+            ['zaku', 'pachelo'],
+            ['pachelo', 'zaku'],
+            ['pachelo', 'pachelo'],
+          ] as Who[][]
+        ).map((picks) => mode(picks, playerHp)),
+      ).toEqual([
+        [409, 4],
+        [163, 21],
+        [162, 47],
+        [161, 62],
+      ]);
+    }
   });
 
   it("makes the 1P's HUD face, where SWW's sets variable 12 above global 3 = 1", () => {

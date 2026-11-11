@@ -5,7 +5,7 @@ import { CHARACTERS, STAGES } from './characters';
 import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { Match } from './match';
+import { Match, LIFE } from './match';
 import { parsePack } from './packs';
 import { CharacterSelect, Continue, StoryDemo, Title } from './select';
 import type { Demo } from './select';
@@ -837,16 +837,21 @@ describe('cheats (HPA-767)', () => {
     expect(await route(2, 500)).toEqual(native(250));
   });
 
-  it('gives the idle interpreter the seat’s life in scaled units and its mark scale', () => {
+  it('gives the idle interpreter the seat’s life and both maxima in scaled units', () => {
     const { scene, view, artIn } = boot();
     artIn();
     scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
     scene.reset('practice');
     // begin seated the fighters before their idle programs started, so
     // SIN-style op 0x11 marks (standing.ts) read the scaled life against
-    // the scaled mark.
-    const [vm] = view.idle as { life: number; lifeScale: number }[];
+    // the scaled maximum over the native one.
+    const [vm] = view.idle as {
+      life: number;
+      lifeMax: number;
+      lifeNative: number;
+    }[];
     expect(vm.life).toBe(1020);
-    expect(vm.lifeScale).toBe(2);
+    expect(vm.lifeMax).toBe(1020);
+    expect(vm.lifeNative).toBe(LIFE);
   });
 });
