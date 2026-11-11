@@ -1761,17 +1761,24 @@ describe('cheat options (HPA-767)', () => {
     // takes 2245 off a 450 bar and ALPHA dies inside his own revival — so
     // both sides of a scripted transfer on one's own life read the same
     // scale, and the pair keeps its net.
-    const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 5 }));
-    const [ryuko, alpha] = match.fighters;
-    alpha.hp = 1;
-    alpha.stock = 1;
-    alpha.x = ryuko.x + 100;
-    for (let t = 0; t < 700; t++)
-      match.step(t === 3 ? { punch: true } : {}, {});
+    const revival = (enemyHpMultiplier: number) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
+      match.useCheats(cheats({ enabled: true, enemyHpMultiplier }));
+      const [ryuko, alpha] = match.fighters;
+      alpha.hp = 1;
+      alpha.stock = 1;
+      alpha.x = ryuko.x + 100;
+      for (let t = 0; t < 700; t++)
+        match.step(t === 3 ? { punch: true } : {}, {});
+      return alpha;
+    };
     // He stands through the revival and KO Boss Down drains him back to a
-    // full bar — native 500 of 500 reads as 2500 of 2500 here.
-    expect(alpha.hp).toBe(alpha.maxHp);
+    // full bar — native 500 of 500 reads as 2500 of 2500 at ×5, and ×0.1's
+    // 1-a-pass drain (2 native below its 1-HP floor) climbs to 50 of 50
+    // just as the native 2-a-pass climbs to 500 of 500.
+    expect(revival(5).hp).toBe(2500);
+    expect(revival(1).hp).toBe(500);
+    expect(revival(0.1).hp).toBe(50);
   });
 
   it("scales the TEAM VS winner's carried life with its effective maximum", () => {
