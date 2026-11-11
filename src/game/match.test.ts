@@ -1755,6 +1755,68 @@ describe('cheat options (HPA-767)', () => {
     });
   });
 
+  it("keeps ALPHA's KO Boss revival balanced under scaling (84, PCs 1037–1038)", () => {
+    // The revival gains 450 and takes 449 back off the 0 bar, and KO Boss
+    // Down's drain passes gain 2 and take 2: with only the take scaled, ×5
+    // takes 2245 off a 450 bar and ALPHA dies inside his own revival — so
+    // both sides of a scripted transfer on one's own life read the same
+    // scale, and the pair keeps its net.
+    const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 5 }));
+    const [ryuko, alpha] = match.fighters;
+    alpha.hp = 1;
+    alpha.stock = 1;
+    alpha.x = ryuko.x + 100;
+    for (let t = 0; t < 700; t++)
+      match.step(t === 3 ? { punch: true } : {}, {});
+    // He stands through the revival and KO Boss Down drains him back to a
+    // full bar — native 500 of 500 reads as 2500 of 2500 here.
+    expect(alpha.hp).toBe(alpha.maxHp);
+  });
+
+  it("scales the TEAM VS winner's carried life with its effective maximum", () => {
+    // Team VS 1P/2P's checker reads the winner's life against the 408/306/204
+    // marks — already lifeMark-scaled — and the next round's start takes
+    // 102/204/306 of it (46 + 5, 47 + 5, 48 + 4): the take scales with the
+    // same maximum, so a returning winner lands at its bucket's share of
+    // the bar. At ×0.1 the native 102 would KO it at once; at ×5 it would
+    // take too little.
+    const carries = (
+      fields: Partial<CheatOptions>,
+      life: number,
+      loser: number,
+    ) => {
+      const match = Match.team(
+        [
+          ['ryuko', 'zoma', 'kiki'],
+          ['ryuko', 'amiro', 'anmc'],
+        ],
+        'court',
+      );
+      match.useCheats(cheats({ enabled: true, ...fields }));
+      toFight(match);
+      match.fighters[1 - loser].hp = life;
+      match.fighters[loser].hp = 0;
+      while (match.round === 1) match.step();
+      const winner = () => match.fighters[1 - loser];
+      // Far enough into round 2 for the checker's take to have run; the
+      // minimum catches a take that KOs the winner on the way.
+      let lowest = Infinity;
+      for (let t = 0; t < 12; t++) {
+        match.step();
+        lowest = Math.min(lowest, winner().hp);
+      }
+      return [winner().hp, lowest];
+    };
+    // 1P ×5 (full 2550): a win at 2000 — native 400, the second fifth —
+    // comes back at 2040, the native 102 scaled to 510.
+    expect(carries({ playerHpMultiplier: 5 }, 2000, 1)).toEqual([2040, 2040]);
+    // The enemy ×0.1 (full 51): a win at 39 — native 390 — comes back at
+    // 41, the native 102 scaled to 10 off the full bar, alive where the
+    // native take KOs it at once.
+    expect(carries({ enemyHpMultiplier: 0.1 }, 39, 0)).toEqual([41, 41]);
+  });
+
   it("caps the 1P's gauge at the EN limit, native-1 and native-6 fighters alike", () => {
     const cap = (who: Who, limit: number) => {
       const match = new Match('practice', false, 0, [who, 'ryuko']);

@@ -84,6 +84,10 @@ export class StandingVM {
   variables: Record<number, number> = {};
   // The fighter's life (+0xdf05) for op 0x11, which the scene sets each tick.
   life?: number;
+  // Authored (HPA-767): the fighter's effective maximum over its native
+  // life, which op 0x11's marks scale by — the scene sets it with `life`.
+  // 1 keeps every mark native.
+  lifeScale = 1;
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
   // Op 0x03 cues (0x4132c8) since the scene last played them: GIGI's idle
@@ -257,8 +261,16 @@ export class StandingVM {
         // (PC 16), checked again each pass of his stance (PC 20).
         if (this.life === undefined)
           throw new Error(`Op 0x11 at PC ${pc} needs the fighter's life`);
+        // Authored (HPA-767): the mark is native life, so it scales with
+        // the effective maximum as lifeMark does — every mark but the exact
+        // 1-HP sentinel and nonpositive ones, floored at 1 — reading the
+        // scaled `life` against the same share of the bar.
         const value = u16(r, 6);
-        if (r[5] & 1 ? this.life <= value : this.life >= value && u16(r, 2)) {
+        const mark =
+          value <= 0 || value === 1
+            ? value
+            : Math.max(1, Math.trunc(value * this.lifeScale));
+        if (r[5] & 1 ? this.life <= mark : this.life >= mark && u16(r, 2)) {
           this.target(u16(r, 2), r[4]);
           continue;
         }

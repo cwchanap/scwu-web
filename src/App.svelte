@@ -327,6 +327,22 @@
     session?.scene.setCheats(cheats);
     focusArena();
   }
+  // A clamped entry that lands on the value already held leaves the raw
+  // out-of-range text in the field (Svelte sees no change to re-apply), so
+  // each numeric field rewrites itself from the normalized value.
+  function cheatNumber(
+    field:
+      | 'playerHpMultiplier'
+      | 'enemyHpMultiplier'
+      | 'playerDamageMultiplier'
+      | 'playerEnLimit',
+  ) {
+    return (event: Event) => {
+      const input = event.currentTarget as HTMLInputElement;
+      setCheats({ [field]: input.valueAsNumber });
+      input.value = String(cheats[field]);
+    };
+  }
   // The one Opponent select: its value comes from status.mode, which takes
   // 'story' while a story battle runs.
   const opponentChoice = $derived(
@@ -709,10 +725,7 @@
               step="0.1"
               value={cheats.playerHpMultiplier}
               disabled={!cheats.enabled}
-              onchange={(event) =>
-                setCheats({
-                  playerHpMultiplier: event.currentTarget.valueAsNumber,
-                })}
+              onchange={cheatNumber('playerHpMultiplier')}
             /></span
           ></label
         >
@@ -727,10 +740,7 @@
               step="0.1"
               value={cheats.enemyHpMultiplier}
               disabled={!cheats.enabled}
-              onchange={(event) =>
-                setCheats({
-                  enemyHpMultiplier: event.currentTarget.valueAsNumber,
-                })}
+              onchange={cheatNumber('enemyHpMultiplier')}
             /></span
           ></label
         >
@@ -745,10 +755,7 @@
               step="0.1"
               value={cheats.playerDamageMultiplier}
               disabled={!cheats.enabled}
-              onchange={(event) =>
-                setCheats({
-                  playerDamageMultiplier: event.currentTarget.valueAsNumber,
-                })}
+              onchange={cheatNumber('playerDamageMultiplier')}
             /></span
           ></label
         >
@@ -763,8 +770,7 @@
               step="1"
               value={cheats.playerEnLimit}
               disabled={!cheats.enabled}
-              onchange={(event) =>
-                setCheats({ playerEnLimit: event.currentTarget.valueAsNumber })}
+              onchange={cheatNumber('playerEnLimit')}
             />stocks</span
           ></label
         >

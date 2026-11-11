@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ASSET_BASE as BASE } from './assetBase';
-import { CHARACTERS, STAGES } from './characters';
+import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
 import type { CheatOptions } from './cheats';
@@ -145,12 +145,14 @@ const keyMap: Record<string, Control> = {
 
 // The free state's program (action 1), which reads the fighter's variable 0
 // (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
+// The life reads in scaled units against a mark scale of the seat's
+// effective maximum (HPA-767).
 const idleVM = (f: Fighter, seed?: number) =>
   Object.assign(
     new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
       0x40: f.variables[0] ?? 0,
     }),
-    { life: f.hp },
+    { life: f.hp, lifeScale: f.maxHp / lifeOf(f.who) },
   );
 
 export class TrainingScene extends Phaser.Scene {
@@ -518,7 +520,15 @@ export class TrainingScene extends Phaser.Scene {
     const { battle, fighters, lost } = this.match;
     if (!battle)
       return this.match.teams ? this.openTeamSelect() : this.openSelect();
-    [this.storyLife, this.storyLost] = [fighters[0].hp, lost];
+    // Authored (HPA-767): the runner's jump values are native life, so the
+    // 1P's ending life reads back in native units — every route choice,
+    // the tightly spaced pairs included, survives a scaled maximum. With
+    // cheats off maxHp is native and this is the identity.
+    const one = fighters[0];
+    [this.storyLife, this.storyLost] = [
+      Math.trunc((one.hp * lifeOf(one.who)) / one.maxHp),
+      lost,
+    ];
     if (this.match.matchWinner !== 'player' && battle.flags & 1)
       return this.openDemo(9, (demo) => new Continue(demo));
     this.runStory(this.story!.next(this.storyLife, this.storyLost));

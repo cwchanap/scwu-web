@@ -135,6 +135,30 @@ test('cheats settings live in the menu, persist and leave identity alone', async
       }),
     );
 
+  // An out-of-range entry normalizes to the bound and the field shows the
+  // clamped value, not the raw entry: 9 over a held 5 reads back 5.
+  const playerHp = dialog.getByLabel('Player HP');
+  await playerHp.fill('5');
+  await playerHp.blur();
+  await playerHp.fill('9');
+  await playerHp.blur();
+  await expect(playerHp).toHaveValue('5');
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
+    .toBe(
+      JSON.stringify({
+        enabled: true,
+        playerHpMultiplier: 5,
+        playerEnLimit: 3,
+        unlimitedEn: false,
+        enemyHpMultiplier: 0.5,
+        playerDamageMultiplier: 1,
+      }),
+    );
+  // Reset it for the assertions below.
+  await playerHp.fill('1');
+  await playerHp.blur();
+
   // Keys stay contained to the dialog: a leaked Escape would pause, an R
   // reset; the close still behaves and nothing errors.
   await dialog.getByRole('button', { name: 'Close' }).focus();

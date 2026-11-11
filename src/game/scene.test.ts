@@ -784,4 +784,69 @@ describe('cheats (HPA-767)', () => {
     expect(backing.w - green.w).toBeGreaterThanOrEqual(37);
     expect(backing.w - green.w).toBeLessThanOrEqual(38);
   });
+
+  it('reads the story route from the 1P’s native-equivalent life', async () => {
+    // The runner’s jump values (Ryuko’s 162, 163 and 250) are native life:
+    // matchOver converts the 1P’s ending life back to native units before
+    // handing it to Story.next, so a scaled maximum keeps all four route
+    // choices — including the tightly spaced 162/163 pair — where reading
+    // the scaled life directly collapses them (HPA-767).
+    const native = (life: number) => {
+      const story = new Story('ryuko');
+      story.next();
+      const next = story.next(life, 0);
+      return next.kind === 'battle'
+        ? { kind: next.kind, battle: next.battle }
+        : next;
+    };
+    const route = async (multiplier: number, hp: number) => {
+      const { view, artIn, completes, finishLoad } = boot();
+      artIn();
+      const story = new Story('ryuko');
+      const first = story.next();
+      if (first.kind !== 'battle') throw new Error('expected a battle');
+      view.story = story;
+      const match = Match.story('ryuko', first.battle, 0);
+      match.useCheats(
+        cheats({ enabled: true, playerHpMultiplier: multiplier }),
+      );
+      match.wins = [1, 0];
+      match.fighters[0].hp = hp;
+      view.match = match;
+      (view.matchOver as () => void)();
+      if (view.wanted)
+        return {
+          kind: 'battle' as const,
+          battle: (view.wanted as Match).battle,
+        };
+      await vi.waitFor(() => expect(completes).toHaveLength(1));
+      finishLoad();
+      return { kind: 'demo' as const, demo: (view.select as StoryDemo).index };
+    };
+    // ×0.5 (maximum 255): 81 and 80 scaled read as native 162 and 160 —
+    // the tight pair’s lower edge and the route below it; 82 and 125 land
+    // in the middle and top bands.
+    expect(await route(0.5, 81)).toEqual(native(162));
+    expect(await route(0.5, 80)).toEqual(native(160));
+    expect(await route(0.5, 82)).toEqual(native(164));
+    expect(await route(0.5, 125)).toEqual(native(250));
+    // ×2 (maximum 1020): 325 reads as native 162, and 500 keeps the full-
+    // life route.
+    expect(await route(2, 325)).toEqual(native(162));
+    expect(await route(2, 300)).toEqual(native(150));
+    expect(await route(2, 500)).toEqual(native(250));
+  });
+
+  it('gives the idle interpreter the seat’s life in scaled units and its mark scale', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
+    scene.reset('practice');
+    // begin seated the fighters before their idle programs started, so
+    // SIN-style op 0x11 marks (standing.ts) read the scaled life against
+    // the scaled mark.
+    const [vm] = view.idle as { life: number; lifeScale: number }[];
+    expect(vm.life).toBe(1020);
+    expect(vm.lifeScale).toBe(2);
+  });
 });
