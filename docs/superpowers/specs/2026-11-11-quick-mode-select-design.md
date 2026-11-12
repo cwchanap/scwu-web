@@ -1,82 +1,89 @@
 # HPA-765 — Quick mode select after picking a fighter — design
 
-**Status:** planning only; implementation and verification will continue in this same draft PR.
+**Status:** planning only; implementation and verification continue in this same draft PR.
 **Linear:** https://linear.app/cwchanap/issue/HPA-765/quick-mode-select-after-picking-a-fighter
-**Reference mockup:** the three-frame mode-select.png attached to HPA-765 (Ryuko selected).
-**Delivery:** one draft PR for spec, implementation and verification.
-**Downstream:** HPA-770 (B.R. CHAOS) and HPA-858 (boss BR Another) depend on this flow. HPA-772 owns new CHAOS sign lettering as a separate art-only task.
+**Mockup:** the three-frame `mode-select.png` attached to HPA-765 (Ryuko selected). Its B.R. CHAOS board is a placeholder for later HPA-770/772.
+**Review:** 2026-11-12 — simplified per PR #17's design review, findings 1–7.
+**Delivery:** one PR for design, implementation and E2E acceptance. No new art or SFX.
 
-## User-facing behavior
+## Player experience
 
-SINGLE still opens the original character-select screen. After an eligible fighter is confirmed and the existing select-close animation finishes, dim that screen and display a **Phaser-drawn, two-step mode selector** instead of playing the Chii sign-fight:
+In SINGLE, selecting an eligible fighter now opens a quick, two-step mode selector instead of fighting the original Chii sign-battle:
 
-1. **Mode:** STORY MODE or B.R. MODE, using the original ZAKU/PAC-HELO sign images.
-2. **Route:** STORY MODE offers ROUTE 1 (Easy) and ROUTE 2 (Hard); B.R. MODE offers B.R. ZERO and B.R. ANOTHER. The selected mode's sign remains smaller at the top. Confirming a route immediately enters that route's first story step (battle or demo), without the original sign battle.
+1. **Mode:** STORY MODE or B.R. MODE.
+2. **Route:** STORY offers ROUTE 1 (Easy) or ROUTE 2 (Hard); B.R. offers B.R. ZERO or B.R. ANOTHER.
 
-On each step, a lit sign is slightly larger, other signs dim, and the original 1P arrow (UI image 170) bobs over the current choice. Do not introduce a DOM overlay or redraw the signs as text. Respect the mockup's composition and the select screen's existing art. The two-sign view may use approximately 1.2x source scale; adjust only for legibility in the running canvas, not to invent a new screen style.
+The route starts immediately in the existing `Story` runner (its first demo or battle), never in the old Chii sign-fight. The selector is drawn in Phaser over the original, dimmed character-select backdrop. Use the actual source sign images: active sign lit and slightly enlarged, inactive dimmed, a moving 1P arrow above the selection, and the chosen mode's smaller sign above the route options. Match the Linear mockup; do not reproduce its future CHAOS placeholder in this ticket.
 
-Controls:
-- A/D, W/S and arrow keys move between signs. An attack key or Enter confirms. A direct tap on either sign selects it. Touch navigation/confirm controls also work.
-- Escape on the **route** step returns to the **mode** step; Escape on the **mode** step returns to SINGLE character select, preserving the character-select cursor. Escape elsewhere keeps its established behavior (character select -> title, gameplay -> pause). R keeps the established reset/title behavior.
-- Reopening the selector in the same page session highlights the last confirmed mode and route for that mode. Default to STORY MODE / ROUTE 1 when no choice has been made. Keep only in-memory state; no localStorage or profile preference.
-- The currently selected sign, not a second tap, is confirmed by a keyboard/virtual attack. A tap directly confirms the tapped sign, even if it was previously unselected.
+A/D, W/S, arrows and touch directions move; attack or Enter confirms. Tapping a sign selects it directly. Escape from the route step goes back to mode; Escape from mode returns to SINGLE character select at its remembered cursor. Escape on character select still returns to title; during gameplay it still pauses. Remember the last mode and its route for the **current page session only**. Default to STORY / ROUTE 1.
 
-Skip this menu for characters whose source story does not contain the opening Chii mode-select battle and its four route jumps, including GOLF and other CPU-only stories. ZENKA, ALPHA, SHIN-Z and DoraEmon retain their current direct stories until HPA-858. VS and TEAM VS do not change.
+A story without the original opening Chii mode-select battle skips this screen and starts as before. This includes GOLF and CPU-only stories; ZENKA, ALPHA, SHIN-Z and DoraEmon keep their direct starts until HPA-858. VS and TEAM VS do not change.
 
-## Route discovery: source data remains authoritative
+## Route handling: reuse the existing jump interpreter
 
-`src/game/story.ts` currently walks `scenarioOf(who)` with `Story.next(life, lost)` and a mutable `step`. For Ryuko, step 0 is the opening ZAKU/PAC-HELO sign battle, followed by life-threshold jump steps that choose first route steps **4 (Easy), 21 (Hard), 47 (BR ZERO), 62 (BR Another)**. The initial choice is not a distinct game mode; it is a branch of the same story. Other fighters do not necessarily put the jumps at identical step numbers (for example, YINAN and AYA); do not copy a Ryuko-only index table.
+The original route choices are already recovered in `docs/evidence.md` (Globals) and exercised by `src/game/team.test.ts`, rather than an unsolved per-fighter graph-discovery problem. In Ryuko's opening battle Single Start first removes 1 life, and KOing the two chosen signs leaves:
 
-Add one pure story helper, such as `modeRoutesOf(who)`, that:
-- Recognizes the eligible **opening sign battle** from that fighter's actual story steps (the ZAKU/PAC-HELO encounter), not just the existence of any battle at step 0.
-- Resolves the four reachable route-entry indices from the opening branch and its life-threshold conditions, including fighters with a different entry-jump layout. Use the existing story runner's jump semantics or a narrowly scoped source-step walker; no hand-maintained per-fighter route table.
-- Labels the no-damage/default branch Easy and the other three branches Hard, BR ZERO, BR Another in increasing sign-damage/decreasing native-life order. Validate the sign-to-branch ordering against the original evidence, especially ROUTE 1 vs ROUTE 2, rather than assuming a particular numeric threshold for all characters.
-- Returns no selector for nonmatching scenarios. For an expected eligible fighter, missing/ambiguous/duplicate route targets must **fail focused tests visibly** rather than silently assigning the wrong mode. Do not rewrite or mutate generated scenario JSON.
+| Selection | Further 1P life taken | Ryuko's life after the sign choice | Ryuko's route step |
+| --- | ---: | ---: | ---: |
+| STORY → ROUTE 1 (Easy) | 100 | 409 | 4 |
+| STORY → ROUTE 2 (Hard) | 346 | 163 | 21 |
+| B.R. → B.R. ZERO | 347 | 162 | 47 |
+| B.R. → B.R. ANOTHER | 348 | 161 | 62 |
 
-Extend `Story` with a small start-on-route entry point, e.g. `startOnRoute(route)`, that positions its counter just before the chosen step and calls the existing `next()`. This keeps all later demo, battle, result, retry and continue behavior in `Story`; do not create a parallel BR/story runner or directly instantiate a match from a menu pick. The menu must bypass the sign battle entirely, not fake its outcome by starting it with special HP or cheat settings. Preserve any session-global state required by subsequent source demos, but do not synthesize an entire intro battle.
+ZAKU supplies STORY, ROUTE 1 and B.R. ZERO; PAC-HELO supplies B.R., ROUTE 2 and B.R. ANOTHER. These labels and values are already verified by the source-based Chii battle test; the implementation does not need to rediscover them.
 
-A successful route choice starts a **new run** for the HPA-767 cheated-run marker, just as today's story-select handoff resets it. Keep the selected fighter's palette and `storyHeld`, and preserve the current game's asset-load cancellation guards. The route is recorded at selection time for later HPA-771 achievements; that future event reporting is not part of this ticket.
+Add one closed `Route` type (`story-easy | story-hard | br-zero | br-another`) and a constant four-entry take table in `src/game/story.ts`. The small `Story.startOnRoute(route)` method positions the runner **after step 0**, then invokes its existing `next(lifeOf(who) - 1 - take[route], 0)`. Those native-life values recreate what the skipped sign-battle left for the actual per-fighter jump conditions. Do **not** build `modeRoutesOf`, an alternate jump interpreter, or a per-fighter target table. The real `Story.next` decides every fighter's route, including YINAN/AYA's extra lost-round gate and MASA/TIMES/Z-MEGA/RARIO's distinct route layout. `Story.retry`, Continue, all subsequent demos and battles stay unchanged.
 
-## Small, explicit screen model
+Define one cheap `opensOnModeSelect(who)` predicate using `scenarioOf(who)[0]`: the opening step is a battle with the Chii ZAKU/PAC-HELO sign actors in its other seats, rather than an unrelated story's first battle. Require a plausible sign-battle shape (at least the two opponents; nonempty slots all use the sign actors) and test the full roster's eligible/ineligible results. This is the only eligibility special case, not a hand-maintained character allowlist.
 
-Prefer a tiny Phaser-free selection model (e.g. `src/game/modeSelect.ts`), containing:
-- Current step (`mode` or `route`), available entries, highlighted index and session defaults.
-- Pure move/confirm/back transitions, plus a final typed selection (`story-easy`, `story-hard`, `br-zero`, `br-another`).
-- A single source of truth for sign texture keys and layout slots used by scene rendering.
+The scene sets `storyLife = lifeOf(who) - 1 - take[route]` and `storyLost = 0` as the skipped battle would, and resets `runCheated` on **route confirmation** rather than on fighter confirmation. Route choice is a fresh run; no battle begins during the selector, and pending cheat multipliers must never affect this native-life selection calculation. There is no sign-battle `Match` and no need to synthesize an HP change.
 
-`TrainingScene` owns the active selection model and renders it over the existing character-select backdrop. Keeping the current `CharacterSelect` screen visible but no longer advancing its completed input is acceptable and avoids reimplementing the exported select backdrop. In `stepSelect`, route input to the model **before** advancing `CharacterSelect` once it has been chosen. Do not let a held select attack trigger both the fighter pick and the first sign pick. On cancel, reopen the correct earlier step. On confirmation, build `Story` and enter its chosen route using the existing `runStory` / `whenReady` path.
+### Globals: intentionally no synthetic writes
 
-Add `GameStatus.choosingMode: boolean` (false by default), keeping `selecting: true` while the selector is active so the existing Menu and touch controls remain usable. Add this field to `initialStatus` and the Svelte initial-status literal. Do not change `mode: Mode` or introduce a new combat mode; the two-step selector is an intermediate screen, not a `Match` variant.
+The menu **writes no session globals**. The skipped Chii battle would set globals 8/9/15, but the first route demos establish the global 10 state needed by their battles; demos D3/D4/D6/D18 clear 9, KGT 13 clears 15 at a new round, and TEAM VS alone consumes the other 8/9 behavior under its own global 3 rules. Do not mirror the skipped battle's stale global values or add a compatibility shim. Record the authored skip and source evidence in `docs/evidence.md`.
 
-Handle Escape and Enter **only while this selector is active** in the scene's keydown handler, before the existing Escape-to-title/pause branches. Keep the existing arrow/A/D/W/S and attack `Control` mapping. Process model navigation on press edges so held keys or scene transitions cannot skip two choices. Pointer hit-testing uses Phaser's scaled game coordinates and the same rectangles used to draw the signs. Keep the Menu dialog's keyboard containment intact.
+### Delete newly unreachable sign-battle code
 
-`src/App.svelte` currently conditionally hides touch buttons based on fighter moves. While `choosingMode` is true, always expose navigation and at least one confirm control, even for unusual fighter move layouts. Reuse the existing virtual `scene.control` API, not another touch UI layer.
+Once all eligible SINGLE flows skip the Chii battle, the old mode-selection `Match` case is dead runtime code:
 
-## Art and boot-pack contract
+- Remove `Match.choosingMode`, its exceptional suppression in `brawlEnemies`, and the Chii-specific native-life exception in `cheatSeat`. Ordinary story brawls still use the existing all-hostiles-defeated rule; do not change their behavior.
+- Remove the two `src/game/team.test.ts` cases that simulate the otherwise unreachable Chii sign battle, **after** preserving their recovered take/route observations in `docs/evidence.md` and replacing their user-flow coverage with the new all-fighter route test. Remove outdated Chii-specific comments in `match.ts` and gameplay docs.
+- Do not remove generally applicable global, stage, versus or brawl logic simply because those tests mention global 10; scope deletion to sign-choice-only code.
 
-The original art already exists in the exported character files:
-- ZAKU: image 8001 STORY MODE, 8004 blank pink, 8005 ROUTE 1, 8006 B.R. ZERO.
-- PAC-HELO: image 8001 B.R. MODE, 8004 blank cyan, 8005 ROUTE 2, 8006 B.R. ANOTHER.
-- UI image 170: the select-screen 1P arrow.
+This avoids two competing notions of `choosingMode`: `GameStatus.choosingMode` will refer only to the new interactive screen.
 
-Add these eight sign image indices to `selectAssets` in `src/game/packs.ts` and the mirrored subset in `scripts/export_assets.py`'s `export_packs` so they are in **boot.bin** rather than requiring a new fighter-pack fetch just for the selector. Preserve the existing partition invariant: each image key is in exactly one pack, and unloading a fighter never discards required select/sign textures. Existing `src/game/packs.test.ts` covers exact membership; add targeted assertions for the eight sign keys and their absence from fighter remainders. `src/game/scene.ts` already knows their texture sizes through `CHARACTERS` and `selectSizes`.
+## Smallest screen integration
 
-The B.R. CHAOS entry is **not shown in HPA-765**. HPA-770 later adds it as a third B.R. choice, after HPA-772 supplies original-style lettering. No new images, SVG substitutes, SFX, stage, original source assets or generated binaries are committed in this ticket.
+Implement `ModeSelect extends Screen` in the existing `src/game/select.ts`, beside `Continue`. Reuse `Screen.step`, `word()`, the press-edge/release latch from `Continue`, and module-local remembered picks as used by `Title.place` and `storyRemembered`. Do not create a second independent selector model or separate input router. It holds the completed `CharacterSelect` as `background` and steps that with no input so its backdrop remains animated; the scene draws the background objects and their chosen palettes underneath the dimmer. When the selector closes, `TrainingScene.open(...)` clears screen/loading state as it already does.
 
-## Expected verification and boundaries
+Reuse the original 1P arrow by spawning KGT action 84 (`LAYOUT.cursors[0]`) inside `ModeSelect`. Its exported sprite program already animates/bobs the arrow, so no new tween is needed. Only sign sprites and the dimmer require authored rendering, using one sign rectangle table for layout and scaled pointer hit tests. Draw the small selected-mode sign at the top of step two. Keep the current `drawSelect` sprite pipeline and palette lookup, extended only to compose `ModeSelect.background.objects` then `ModeSelect.objects`.
 
-Automated:
-- Pure route tests across every eligible `scenarioOf`: four distinct valid destinations with the correct signs; Ryuko's 4/21/47/62 is a regression fixture; YINAN/AYA and the special/CPU-only/boss bypass cases are explicitly covered. Running a route should return the first real demo/battle and preserve later retry/continue behavior.
-- Selection-model tests for move, two confirms, separate remembered routes for STORY and BR, stepwise Escape, touch selection and prevention of double-confirm on held input.
-- Scene tests for select -> model -> story, Escape/Enter scope, pointer and virtual controls, correct `GameStatus`, run-cheated reset at route choice, and cancellation of a pending battle/demo load.
-- Boot-pack tests for all sign keys, no duplicate entries and no late fighter-pack dependency.
+`TrainingScene.select` adds `ModeSelect` to its current union. On completed story character select:
+- If `opensOnModeSelect(who)`, open `ModeSelect` with that finished select screen and its selected fighter. Do not run the story yet.
+- Otherwise, keep the present direct story start.
+- When `ModeSelect` returns a final `Route`, preserve the select's existing palette/`storyHeld`, reset the cheated-run mark, create a `Story` and call `startOnRoute(route)` through `runStory`. Escape at the first step reopens `CharacterSelect(undefined, true)`, which already restores its remembered cell. Escape at the route step calls the screen's `back()`.
+- Handle Enter and Escape only while `ModeSelect` is active, before the general pause/title branches. An initial no-input tick and the release latch prevent the character-pick key from also choosing a sign. Reset/Menu Character select uses the existing `open` navigation and cannot leave a detached model active.
 
-End-to-end acceptance after implementation:
-- **macOS (Chrome/Safari) and Windows (Chrome/Edge):** pick a regular fighter in SINGLE; use keyboard direction, Enter/attack and Escape to visit both steps, launch all four routes, and return from the route step to the original character select. Confirm VS and TEAM VS remain unchanged.
-- **iOS Safari:** verify both portrait and landscape scaling, direct sign taps, existing touch directions/attack and two-step Escape/back via keyboard where available.
-- **Visual review on all applicable platforms:** compare against the ticket's mode-select.png mockup: original select background, dimming, two authentic signs, highlighted vs dim artwork, bobbing 1P arrow and small chosen-mode sign at the top of route step. Do not include the CHAOS placeholder as shipped UI.
-- Validate that excluded characters start their own scenarios directly; a selected route never spawns a Chii sign battle; normal stage demos, Continue and cheat-run semantics still work.
+Add `GameStatus.choosingMode` (default false) and keep `selecting: true` while choosing so the touch pad and Menu behave as on other selection screens; this is not a new `Match.mode`. For touch, make the existing Svelte `has()` show a minimum directional + punch/confirm pad for **any** `status.selecting` screen, rather than a special case only for ModeSelect. The touch press still calls `scene.control`. A sign tap uses the same screen choice transition, never an alternate route-start path.
 
-This is a web feature, so no Android or Linux **manual** acceptance is required; Linux CI/browser automation provides their regression signal. Implement and test it in the **same one PR** as this spec.
+## Resident assets: only six boards needed
 
-**Out of scope:** HPA-770 BR CHAOS, HPA-858 boss BR routes, HPA-766 battle lineup/ten-seat work, HPA-772 art, VS/TEAM VS redesign, new/generated art or audio, persistence beyond this tab, account/profile/backend work, new routing/navigation frameworks and backward-compatibility adapters.
+Load the **six used signs** in the existing boot pack: ZAKU indices **8001, 8005, 8006** and PAC-HELO indices **8001, 8005, 8006**. The source image 8004 is a blank sign for later B.R. CHAOS art and is not shown by HPA-765; leave it in the fighter packs until HPA-770/772 need it. UI image 170 is already resident.
+
+Mirror the three added indices per fighter in `src/game/packs.ts`'s `selectAssets` and `scripts/export_assets.py`'s `export_packs`. The existing `src/game/packs.test.ts` exact boot membership + one-key-in-one-pack checks catch TypeScript/Python drift; do not add redundant duplicate-membership assertions. Do not commit generated binary art or introduce additional packs, SVG substitutes, new sound effects, or a new renderer.
+
+## Verification and boundaries
+
+Automated tests:
+- One scenario-wide test ensures each eligible story reaches four distinct, valid branch starts through `Story.startOnRoute`, with Ryuko steps 4/21/47/62, YINAN/AYA 6/23/49/64, and MASA/TIMES/Z-MEGA/RARIO 4/17/33/44 as fixtures. Assert excluded stories bypass the selector. Test a route's normal retry and Continue behavior.
+- `select.test.ts` exercises the `ModeSelect` two-step behavior, session memory, press/release latch, Escape back and sign tap. `scene.test.ts` covers transitions, globals unchanged by menu, keyboard scope, loading cancellation, cheated-run reset and `GameStatus.choosingMode`.
+- Keep the existing exact boot-pack tests plus normal source combat regressions; delete only old sign-battle-only test cases after recording their evidence.
+- One Playwright E2E reaches a route from SINGLE with keyboard; a focused touch check exercises sign taps and accessible confirm controls.
+
+Acceptance (manual scope kept short, but all target platforms represented):
+- **macOS desktop Chromium:** full keyboard path (both steps and Escape), a route from each mode, and visual comparison against `mode-select.png`.
+- **Windows desktop Edge:** short end-to-end keyboard and navigation/regression pass, plus visual sanity check; avoid duplicating the full macOS matrix.
+- **iOS Safari:** sign taps, existing touch directions/confirm, portrait and landscape layout, plus visual comparison.
+- Verify excluded stories still start directly; VS/TEAM VS, menu/back, normal story demos and Continue remain intact. Android/Linux require only CI coverage, not manual acceptance.
+
+**Out of scope:** HPA-770 BR CHAOS, HPA-772 CHAOS sign art, HPA-858 boss routes, HPA-766 BR Another battle lineup, new images or audio, persistent preferences, auth/profile/achievements implementation, a scene state framework, a separate router, and compatibility support for the removed unplayable Chii battle.
