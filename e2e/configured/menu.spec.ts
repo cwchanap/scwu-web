@@ -143,6 +143,10 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await playerHp.fill('9');
   await playerHp.blur();
   await expect(playerHp).toHaveValue('5');
+  // Clearing the field keeps the held value instead of saving the default.
+  await playerHp.fill('');
+  await playerHp.blur();
+  await expect(playerHp).toHaveValue('5');
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
     .toBe(

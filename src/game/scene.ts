@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ASSET_BASE as BASE } from './assetBase';
 import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
-import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
+import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
 import { selectAssets } from './packs';
 import { PackFile } from './packLoader';
@@ -707,9 +707,10 @@ export class TrainingScene extends Phaser.Scene {
     this.match.practice = { ...options };
   }
   // The Menu's cheat settings only ever update the pending values; begin
-  // reads them once as the next battle's snapshot.
+  // reads them once as the next battle's snapshot, and Match normalizes
+  // them at installation.
   setCheats(options: CheatOptions) {
-    this.pendingCheats = normalizeCheats(options);
+    this.pendingCheats = { ...options };
   }
   setFighter(who: Who) {
     this.fighter = who;

@@ -60,6 +60,7 @@ import {
 import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
 import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
 import type { CheatOptions } from './cheats';
+import { lifeAmountOf, lifeMarkOf, lifeShareOf } from './life';
 import { dummyInput } from './dummy';
 import type { DummyBehavior } from './dummy';
 import {
@@ -585,13 +586,22 @@ const perMille = (f: Fighter) =>
 // 1, so a shrunken maximum never turns a positive mark into an unreachable
 // 0. With Cheats off (maxHp native) this is the identity.
 const lifeMark = (f: Fighter, mark: number) =>
-  mark <= 0 || mark === 1
-    ? mark
-    : Math.max(1, Math.trunc((mark * f.maxHp) / lifeOf(f.who)));
+  lifeMarkOf(mark, f.maxHp, lifeOf(f.who));
+// Authored (HPA-767): a scripted amount — a drain pass, a heal, a carryover —
+// reads as its share of the same maximum; a 1-point pass still moves one.
+const lifeAmount = (f: Fighter, amount: number) =>
+  lifeAmountOf(amount, f.maxHp, lifeOf(f.who));
+const lifeShare = (f: Fighter, amount: number) =>
+  lifeShareOf(amount, f.maxHp, lifeOf(f.who));
 
-function loseLife(f: Fighter, loss: number) {
+// A loss's low-HP reduction keeps at least `floor` whole points: hit and
+// outgoing damage keep the source's 1; a self-transfer's caller passes its
+// scaled share (0 for a balanced drain pair under a shrink, so the pair
+// keeps its native net; 1 for a take-only drain, so it still reaches 1).
+function loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
   if (loss && f.hp <= lifeMark(f, desperationOf(f.who)))
-    loss = Math.max(1, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
+    loss = Math.max(floor, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
+  if (guardOne) loss = Math.min(loss, Math.max(0, f.hp - 1));
   f.hp = Math.max(0, f.hp - loss);
   if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
   // A loss that leaves no life drops the player to priority 0x3c (0x40e8cd),
@@ -1081,6 +1091,59 @@ const reactions = new Set<Action>([
   'stun',
   ...blocks,
 ]);
+// Each fighter's own response timelines (Ryuko's 101, 103, 115–117, 138,
+// 141, 142), by its own action numbers: KATE's YARA is 119, not 116.
+const ryukoResponses = responsesOf('ryuko');
+const ownReactionActions = new Map<Who, Set<number>>(
+  (Object.keys(CHARACTERS) as Who[]).map((who) => [
+    who,
+    new Set(
+      responsesOf(who).filter((_, response) =>
+        OWN_TIMELINES.has(ryukoResponses[response]),
+      ),
+    ),
+  ]),
+);
+// Authored (HPA-767): a negative op 0x15 inside a victim reaction is the
+// striker's damage, not the victim's own transfer — YARA's 29, Clothes off's
+// 260, a reaction copy's take. It runs the outgoing route, so an enemy's
+// take on the player never scales with Player HP.
+const reactionTake = (f: Fighter) =>
+  Boolean(f.copy) ||
+  (f.action === 'script'
+    ? (ownReactionActions
+        .get(f.who)
+        ?.has(Number(String(f.branch).split('+')[0])) ?? false)
+    : reactions.has(f.action) || blocks.has(f.action));
+// The source timeline an actor is playing, if one.
+const activeTimeline = (actor: Fighter | Effect) =>
+  'clip' in actor
+    ? actor.clip
+    : actor.action === 'script'
+      ? actor.branch
+      : null;
+// A scripted drain that checks for exactly 1 life — Z-MEGA's OBJ TO SHIN
+// HP0 (196) — stops there even when its scaled step is larger.
+const guardsOne = (actor: Fighter | Effect) => {
+  const key = activeTimeline(actor);
+  return (
+    key !== null &&
+    script(key, actor.who).events.some(
+      (e) => e.op === 'life' && e.below && e.value === 1,
+    )
+  );
+};
+// Whether the same timeline also gains life: ALPHA's 2-and-2 drain pair
+// keeps its net, while a take-only drain keeps a whole point.
+const pairedTake = (actor: Fighter | Effect) => {
+  const key = activeTimeline(actor);
+  return (
+    key !== null &&
+    script(key, actor.who).events.some(
+      (e) => e.op === 'power' && e.selfLife > 0,
+    )
+  );
+};
 export interface Fighter {
   // Whose container the fighter plays: actions, art, sounds and tables.
   who: Who;
@@ -1978,12 +2041,18 @@ export class Match {
     return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
   }
 
+  // The fighters hostile to the 1P, by seat.
+  private get enemiesOfOne() {
+    const [one] = this.fighters;
+    return one ? this.fighters.filter((_, i) => one.enemies & (1 << i)) : [];
+  }
+
   // Authored: all hostile seats count, except Chii acting as difficulty
   // buttons — ponytail: guessed from seats (global 10 = 10, every hostile
   // ZAKU or PAC-HELO), not a stance or state flag the battle leaves.
   private get brawlEnemies() {
-    const [one] = this.fighters;
-    const enemies = this.fighters.filter((_, i) => one.enemies & (1 << i));
+    if (!this.battle) return null;
+    const enemies = this.enemiesOfOne;
     return enemies.length > 1 && !this.choosingMode ? enemies : null;
   }
 
@@ -1992,8 +2061,7 @@ export class Match {
   // 1P's life keeps native units there (cheatSeat).
   private get choosingMode() {
     if (!this.battle || this.globals[10] !== 10) return false;
-    const [one] = this.fighters;
-    const enemies = this.fighters.filter((_, i) => one.enemies & (1 << i));
+    const enemies = this.enemiesOfOne;
     return (
       enemies.length > 1 &&
       enemies.every((f) => f.who === 'zaku' || f.who === 'pachelo')
@@ -2226,12 +2294,13 @@ export class Match {
     });
     // Authored (HPA-767): the next round seats under the same snapshot —
     // fresh Menu values cannot reach a running match — and 1P's carried
-    // stock fits the EN cap; the enemy's stock carries as it was.
+    // stock fits the EN cap; the enemy's stock carries as it was. The new
+    // seats are installed first, so hostility reads their own masks.
+    this.fighters = fighters;
     if (this.cheats.enabled) {
       fighters.forEach((f, i) => this.cheatSeat(f, i));
       fighters[0].stock = Math.min(fighters[0].stock, fighters[0].maxStock);
     }
-    this.fighters = fighters;
     this.round++;
     this.ticks = 0;
     this.winner = null;
@@ -2525,7 +2594,7 @@ export class Match {
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
     // 0, but every paid story bonus is 30 to 100: a gain. Authored (HPA-767): like
     // any scripted gain it reads as its share of the taker's bar.
-    gainLife(bonus, lifeMark(bonus, slot.life));
+    gainLife(bonus, lifeAmount(bonus, slot.life));
     addPower(bonus, slot.power);
   }
 
@@ -3492,19 +3561,34 @@ export class Match {
         // own first: a double KO. TRAINING's K refills the opponent's life
         // (PC 1633), his P takes 100 (PC 1629) and his chuck KOs himself
         // (PC 1662).
-        // Authored (HPA-767): a scripted transfer on one's own life is a
-        // native amount — the TEAM VS carryover's 102/204/306 (46 + 5,
-        // 47 + 5, 48 + 4) among them — so both sides of it scale with the
-        // actor's effective maximum as lifeMark does: the carryover lands
-        // at its bucket's share of the bar, a scripted self-KO stays a KO
-        // at any maximum, and a balanced pair keeps its net (ALPHA's
-        // 450/449 KO Boss revival, his 2-and-2 drain passes). A transfer
-        // onto the met player keeps the damage routes: its takes run
-        // outgoingDamage (×Player damage), its gains scale with the
+        // Authored (HPA-767): a scripted amount on one's own life — the TEAM
+        // VS carryover's 102/204/306 (46 + 5, 47 + 5, 48 + 4), a heal,
+        // ALPHA's 450/449 revival or 2-and-2 drain passes — reads as its
+        // share of the actor's effective maximum (lifeAmount): the carryover
+        // lands at its bucket's share, a balanced pair keeps its net, and a
+        // scripted self-KO stays a KO at any maximum. A negative take inside
+        // a victim reaction is the striker's damage instead (reactionTake),
+        // so an enemy's YARA take never scales with the player's bar. A
+        // transfer onto the met player keeps the damage routes: its takes
+        // run outgoingDamage (×Player damage), its gains scale with the
         // receiver — TRAINING's K's 1000, a refill either way.
-        if (event.selfLife > 0) gainLife(self, lifeMark(self, event.selfLife));
+        if (event.selfLife > 0)
+          gainLife(self, lifeAmount(self, event.selfLife));
         if (event.selfLife < 0) {
-          loseLife(self, lifeMark(self, -event.selfLife));
+          const take = reactionTake(self);
+          const floor = take
+            ? 1
+            : pairedTake(actor)
+              ? lifeShare(self, 1)
+              : lifeAmount(self, 1);
+          loseLife(
+            self,
+            take
+              ? this.outgoingDamage(this.met(self), self, -event.selfLife)
+              : lifeAmount(self, -event.selfLife),
+            floor,
+            !take && guardsOne(actor),
+          );
           if (self.hp === 0) this.knockOut(self);
         }
         if (!other) {
@@ -3512,7 +3596,7 @@ export class Match {
           break;
         }
         if (event.otherLife > 0)
-          gainLife(other, lifeMark(other, event.otherLife));
+          gainLife(other, lifeAmount(other, event.otherLife));
         if (event.otherLife < 0) {
           const damage = loseLife(
             other,

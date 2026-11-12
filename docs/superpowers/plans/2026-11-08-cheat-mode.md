@@ -2,8 +2,8 @@
 
 **Ticket:** https://linear.app/cwchanap/issue/HPA-767/cheat-mode-in-the-menu
 **Design:** `docs/superpowers/specs/2026-11-08-cheat-mode-design.md`
-**Status:** planning only; gameplay implementation and validation have not been run.
-**Review update:** 2026-11-08 — incorporate the six recommendations in PR #14's latest design reviews.
+**Status:** implemented on this branch; verification in progress.
+**Review update:** 2026-11-08 — incorporated the six recommendations in PR #14's latest design reviews; 2026-11-11 — addressed the gameplay review.
 
 ## One PR, one implementation path
 

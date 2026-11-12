@@ -1,9 +1,9 @@
 # HPA-767 — Cheat mode in the Menu — design
 
-**Status:** design in review; implementation not started.
+**Status:** implemented on this branch; verification in progress.
 **Linear:** https://linear.app/cwchanap/issue/HPA-767/cheat-mode-in-the-menu
 **Delivery:** one draft PR for design, implementation and verification.
-**Review update:** 2026-11-08 — addressed the two design reviews on PR #14.
+**Review update:** 2026-11-08 — addressed the two design reviews on PR #14; 2026-11-11 — addressed the gameplay review.
 **Related:** HPA-771 Achievements consumes the cheated-run flag. HPA-768 Profile, HPA-770 BR CHAOS and HPA-769 achievement art are separate tasks.
 
 ## Goal and user contract
@@ -55,7 +55,7 @@ Replace generic `lifeOf(f.who)` reads with `f.maxHp` for `gainLife`'s cap, `perM
 - In `arrive`, compare `slot.below` against `lifeMark(watchedFighter, slot.below)`; an empty watched seat keeps its existing zero-life semantics.
 - Practice **Low health** clamps 1P to `lifeMark(f, desperationOf(f.who)) - 1`, not to an unscaled 30% threshold.
 
-Positive percentages are proportional; zero/negative sentinel thresholds are untouched. Preserve a literal **1 HP** sentinel as **exactly 1 HP** (e.g., OBJ TO SHIN HP0's absolute one-HP behavior), rather than silently turning “hold at 1” into “hold at 5” when max HP is ×5. This narrow exception keeps source-script survival logic intact. With Cheats off, `maxHp === lifeOf(who)` and these comparisons remain equivalent to native rules. Record the authored proportional reinterpretation explicitly in `docs/evidence.md` and test extreme multipliers (including Enemy HP ×0.1).
+Positive percentages are proportional; zero/negative sentinel thresholds are untouched. Preserve a literal **1 HP** sentinel as **exactly 1 HP** (e.g., OBJ TO SHIN HP0's absolute one-HP behavior), rather than silently turning “hold at 1” into “hold at 5” when max HP is ×5. This narrow exception keeps source-script survival logic intact. **Life amounts** use a separate share, `lifeAmount(f, amount) = max(1, trunc(amount × f.maxHp / lifeOf(who)))`, for scripted gains and self-transfers — heals, drain passes, TEAM VS's carryover — so a 1-point pass still scales; a balanced pair's low-HP floor may round to 0 under a shrink (keeping its net), a take-only drain keeps a whole point, and a negative take inside a victim reaction runs the outgoing-damage route instead of scaling with the victim's bar. With Cheats off, `maxHp === lifeOf(who)` and these rules remain equivalent to native ones. Record the authored proportional reinterpretation explicitly in `docs/evidence.md` and test extreme multipliers (including Enemy HP ×0.1).
 
 ### EN, damage and per-tick behavior
 
@@ -63,7 +63,7 @@ Add `Fighter.maxStock`, initialized to `stocksOf(who)`; set **only 1P's** to `pl
 
 Implement **Unlimited EN** using the existing per-tick refill shape: when Cheats and Unlimited EN are enabled, at the active `step()` refill point, set `fighters[0].stock = fighters[0].maxStock` and `fighters[0].power = 0`. Do not intercept every source-script stock deduction or prime stock in constructors. An expenditure within a tick may still occur; the next active tick restores stock, preserving normal move eligibility and source logic. Cover round/team transitions and check that no rendered stock index exceeds six.
 
-For damage, keep source hitboxes, chip, reactions and the defender's reduction. Use one small helper to scale only positive **1P-originated damage to hostile opponents** (round whole, minimum 1 when the unmodified hit is positive), before `loseLife`. The three needed routes are `hitTest` (melee, projectile, blocked chip), `runEvent` `power` on another fighter, and the striker-attributed `gonMiss` path. Do not scale self-damage, self-HP costs, healing, or another fighter's attacks.
+For damage, keep source hitboxes, chip, reactions and the defender's reduction. Use one small helper to scale only positive **1P-originated damage to hostile opponents** (round whole, minimum 1 when the unmodified hit is positive), before `loseLife`. The three needed routes are `hitTest` (melee, projectile, blocked chip), `runEvent` `power` on another fighter, and the striker-attributed `gonMiss` path. A scripted life amount on the fighter's own bar — a self-cost, carryover, drain or heal — reads as its share of that fighter's maximum (`lifeAmount`), while a negative self-take inside a victim reaction counts as the striker's damage. Do not scale another fighter's attacks.
 
 ### Cheated run and status contract
 

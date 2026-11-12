@@ -1711,8 +1711,12 @@ describe('cheat options (HPA-767)', () => {
     const match = new Match('practice', false, 0, ['zmega', 'ryuko']);
     match.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
     const [zmega] = match.fighters;
+    // Let the idle pose's entry clear its variables first.
+    match.step();
     zmega.hp = 10;
-    // OBJ TO SHIN HP0 (196) drains a life a pass and branches at 1.
+    // The chuck hold's variable 3 at 30 keeps the pass in OBJ TO SHIN HP0
+    // (196), whose life check at 1 stops a scaled step from overshooting.
+    zmega.variables[3] = 30;
     spawn(match, 0, 196, { x: 480, y: 0 });
     for (let t = 0; t < 400 && zmega.hp > 1; t++) match.step();
     expect(zmega.hp).toBe(1);
@@ -1779,6 +1783,61 @@ describe('cheat options (HPA-767)', () => {
     expect(revival(5).hp).toBe(2500);
     expect(revival(1).hp).toBe(500);
     expect(revival(0.1).hp).toBe(50);
+  });
+
+  it("keeps ALPHA's drain climbing below 30% at Enemy HP ×0.5", () => {
+    // VS single leaves global 3 at 50, so KO Boss Down's take runs; at 0.5
+    // the native +2/−2 pass is +1/−1 after scaling, and the low-HP
+    // reduction's floor scales to 0, keeping the native +1 net.
+    const match = new Match('cpu', false, 0, ['ryuko', 'alpha'], 'court', true);
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    const alpha = match.fighters[1];
+    alpha.hp = 1;
+    enter(match, alpha, 93);
+    for (let t = 0; t < 200; t++) match.step();
+    // Native settles just above 30% (151 of 500); halved, 76 of 250.
+    expect(alpha.hp).toBe(76);
+  });
+
+  it("keeps a reaction's own life take on the striker's damage route (YARA, PC 1519)", () => {
+    // RARIO's poison mushroom (response 66) enters the victim's own YARA
+    // reaction (116), whose op 0x15 takes 29: the striker's 29, not 29 × 5.
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const [victim] = match.fighters;
+    enter(match, victim, 116);
+    expect(victim.hp).toBe(victim.maxHp - 29);
+    // A fighter's own YARA timeline has its own number (KATE's is 119).
+    const kate = new Match('practice', false, 0, ['kate', 'ryuko']);
+    kate.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const [hers] = kate.fighters;
+    enter(kate, hers, 119);
+    expect(hers.hp).toBe(hers.maxHp - 29);
+  });
+
+  it('scales 1-HP scripted amounts, not only thresholds (DoraEmon 72, Z-MEGA 195)', () => {
+    const heal = new Match('practice', false, 0, ['dora', 'ryuko']);
+    heal.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const dora = heal.fighters[0];
+    dora.hp = dora.maxHp - 100;
+    enter(heal, dora, 72);
+    expect(dora.hp).toBe(dora.maxHp - 95);
+    const drain = new Match('practice', false, 0, ['zmega', 'ryuko']);
+    drain.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const zmega = drain.fighters[0];
+    enter(drain, zmega, 195);
+    expect(zmega.hp).toBe(zmega.maxHp - 5);
+    // A take-only drain keeps its whole point under a shrink, so HP0 still
+    // reaches 1 where a balanced pair's take may round to 0.
+    const shrink = new Match('practice', false, 0, ['ryuko', 'zmega']);
+    shrink.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    const enemy = shrink.fighters[1];
+    shrink.step();
+    enemy.hp = 5;
+    enemy.variables[3] = 30;
+    spawn(shrink, 1, 196, { x: 480, y: 0 });
+    for (let t = 0; t < 100 && enemy.hp > 1; t++) shrink.step();
+    expect(enemy.hp).toBe(1);
   });
 
   it("scales the TEAM VS winner's carried life with its effective maximum", () => {
