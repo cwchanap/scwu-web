@@ -3,7 +3,7 @@
 **Ticket:** https://linear.app/cwchanap/issue/HPA-765/quick-mode-select-after-picking-a-fighter
 **Design:** `docs/superpowers/specs/2026-11-11-quick-mode-select-design.md`
 **Status:** planning only, implementation and tests not yet run.
-**Review update:** 2026-11-12 — addressed PR #17's seven design findings.
+**Review update:** 2026-11-12 — addressed PR #17's seven design findings plus the accepted follow-up's two scene call sites.
 **Delivery:** **one draft PR** for HPA-765, including implementation and verification on this same branch. HPA-772 art stays a separate task, not a coding subtask.
 
 ## Current code facts and decisions
@@ -38,8 +38,9 @@
 - [ ] Add `ModeSelect` to `TrainingScene.select` and the `stepSelect` switch. Eligible story fighter confirmation opens it instead of `Story.next()`; excluded stories retain direct startup. A route confirm builds `Story`, saves palette/`storyHeld`, sets `storyLife = lifeOf(who) - 1 - take`, `storyLost = 0`, resets `runCheated`, and calls `runStory(story.startOnRoute(route))`. No Chii match is started and no globals are manually written.
 - [ ] On Escape from route, call `ModeSelect.back()`; from mode, reopen story `CharacterSelect` at the remembered cell. Let `open`/`whenReady`/`openDemo` keep their existing stale-load protection. Scope Enter to ModeSelect confirm, avoiding changes to other scenes; existing Esc-to-title/pause semantics remain.
 - [ ] Draw the existing select background's objects with `drawSelect`, apply a simple Phaser dimmer, show **plain original sign sprites** in the two choices, their chosen-mode header on step two, and the KGT arrow. Use the current sprite pool and palette data; avoid new texture/tween/layout systems. This phase **must be playable**, not a UI disconnected from `stepSelect`.
+- [ ] Update both wrapper-sensitive scene call sites: `drawSelectObject()` must read `drawn[o.owner]` from `this.select instanceof ModeSelect ? this.select.background : this.select`; `storyScreen()` must include `this.select instanceof ModeSelect` so `report()` retains story-mode status while the selector is open. No extra state owner or new mode value is needed.
 - [ ] Add `GameStatus.choosingMode` (false by default) in `scene.ts` and Svelte's initial literal, while keeping `selecting` true. Show movement arrows and a punch/select action on **any** `status.selecting` screen, not a special branch for ModeSelect.
-- [ ] Tests cover fresh/held-button input, two-stage confirm, Escape scoping, remembered selections, retained palette, special-story bypass, run-cheated reset at route confirm, title/Menu cancel and status reporting.
+- [ ] Tests cover fresh/held-button input, two-stage confirm, Escape scoping, remembered selections, retained background palette, special-story bypass, run-cheated reset at route confirm, title/Menu cancel, `GameStatus.choosingMode` and `GameStatus.mode === 'story'` during the new selector when a story session is being carried through.
 
 **Checkpoint:** `bunx vitest run src/game/select.test.ts src/game/scene.test.ts src/game/story.test.ts`, then a short local **playable** desktop check entering one STORY route.
 
