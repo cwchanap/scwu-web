@@ -329,7 +329,8 @@
   }
   // A clamped entry that lands on the value already held leaves the raw
   // out-of-range text in the field (Svelte sees no change to re-apply), so
-  // each numeric field rewrites itself from the normalized value.
+  // each numeric field rewrites itself from the normalized value. A cleared
+  // field (NaN) keeps the value it had instead of saving the default.
   function cheatNumber(
     field:
       | 'playerHpMultiplier'
@@ -339,7 +340,8 @@
   ) {
     return (event: Event) => {
       const input = event.currentTarget as HTMLInputElement;
-      setCheats({ [field]: input.valueAsNumber });
+      if (Number.isFinite(input.valueAsNumber))
+        setCheats({ [field]: input.valueAsNumber });
       input.value = String(cheats[field]);
     };
   }

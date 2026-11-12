@@ -1,4 +1,6 @@
 // Port of the handoff's verified StandingVM subset, not the full gameplay VM.
+import { lifeMarkOf } from './life';
+
 export interface Frame {
   pc: number;
   image: number;
@@ -267,11 +269,7 @@ export class StandingVM {
         // the effective maximum as lifeMark does — every mark but the exact
         // 1-HP sentinel and nonpositive ones, floored at 1 — reading the
         // scaled `life` against the same share of the bar.
-        const value = u16(r, 6);
-        const mark =
-          value <= 0 || value === 1
-            ? value
-            : Math.max(1, Math.trunc((value * this.lifeMax) / this.lifeNative));
+        const mark = lifeMarkOf(u16(r, 6), this.lifeMax, this.lifeNative);
         if (r[5] & 1 ? this.life <= mark : this.life >= mark && u16(r, 2)) {
           this.target(u16(r, 2), r[4]);
           continue;
