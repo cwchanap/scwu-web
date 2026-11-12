@@ -3568,14 +3568,17 @@ export class Match {
         // lands at its bucket's share, a balanced pair keeps its net, and a
         // scripted self-KO stays a KO at any maximum. A negative take inside
         // a victim reaction is the striker's damage instead (reactionTake),
-        // so an enemy's YARA take never scales with the player's bar. A
+        // so an enemy's YARA take never scales with the player's bar. Only
+        // the fighter's own records are inside its reaction: an object's
+        // drain is its own cost whatever its owner plays — Z-MEGA's OBJ TO
+        // SHIN (195) keeps its scaled pass while he is being hit. A
         // transfer onto the met player keeps the damage routes: its takes
         // run outgoingDamage (×Player damage), its gains scale with the
         // receiver — TRAINING's K's 1000, a refill either way.
         if (event.selfLife > 0)
           gainLife(self, lifeAmount(self, event.selfLife));
         if (event.selfLife < 0) {
-          const take = reactionTake(self);
+          const take = actor === self && reactionTake(self);
           const floor = take
             ? 1
             : pairedTake(actor)
