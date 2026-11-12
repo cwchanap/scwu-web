@@ -127,6 +127,6 @@ Behavior recovered from the source (each fighter's moves, objects, reactions, co
 
 ## Files and assets
 
-[CLAUDE.md](CLAUDE.md) maps the source tree: `src/game/` (rules, rendering, select screens, CPU), `src/instructions/` (the controls guide), `scripts/export_assets.py` (asset export) and `docs/`.
+[AGENTS.md](AGENTS.md) maps the source tree: `src/game/` (rules, rendering, select screens, CPU), `src/instructions/` (the controls guide), `scripts/export_assets.py` (asset export) and `docs/`.
 
 The original handoff stays unchanged and Vite refuses to serve it. Only selected PNGs and WAVs enter `public/assets/`; generated assets and fixtures are gitignored and regenerated locally. The deployed game serves them from the public R2 bucket, which is the owner's choice and does not establish redistribution rights.
