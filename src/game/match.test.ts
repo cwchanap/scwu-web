@@ -1815,6 +1815,29 @@ describe('cheat options (HPA-767)', () => {
     expect(hers.hp).toBe(hers.maxHp - 29);
   });
 
+  it("keeps an object's drain on the self-cost route while its owner reacts (Z-MEGA 195)", () => {
+    // Shin Z's drain object (195) takes a point of its owner's life a pass:
+    // the object's own cost, not the striker's damage, even while the owner
+    // is in a hit reaction. The classification reads the actor, so a hostile
+    // Z-MEGA's drain never inherits the 1P's damage multiplier, and the
+    // player's own drain keeps scaling with Player HP.
+    const hostile = new Match('practice', false, 0, ['ryuko', 'zmega']);
+    hostile.useCheats(cheats({ enabled: true, playerDamageMultiplier: 5 }));
+    const enemy = hostile.fighters[1];
+    enemy.caught = hostile.fighters[0];
+    pose(hostile, enemy, 'hit', 0);
+    spawn(hostile, 1, 195, { x: 480, y: 0 }, 5);
+    hostile.step();
+    expect(enemy.hp).toBe(enemy.maxHp - 1);
+    const own = new Match('practice', false, 0, ['zmega', 'ryuko']);
+    own.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
+    const zmega = own.fighters[0];
+    pose(own, zmega, 'hit', 0);
+    spawn(own, 0, 195, { x: 480, y: 0 }, 5);
+    own.step();
+    expect(zmega.hp).toBe(zmega.maxHp - 5);
+  });
+
   it('scales 1-HP scripted amounts, not only thresholds (DoraEmon 72, Z-MEGA 195)', () => {
     const heal = new Match('practice', false, 0, ['dora', 'ryuko']);
     heal.useCheats(cheats({ enabled: true, playerHpMultiplier: 5 }));
