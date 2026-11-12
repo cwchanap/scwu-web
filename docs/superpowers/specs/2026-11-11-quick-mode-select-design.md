@@ -3,7 +3,7 @@
 **Status:** planning only; implementation and verification continue in this same draft PR.
 **Linear:** https://linear.app/cwchanap/issue/HPA-765/quick-mode-select-after-picking-a-fighter
 **Mockup:** the three-frame `mode-select.png` attached to HPA-765 (Ryuko selected). Its B.R. CHAOS board is a placeholder for later HPA-770/772.
-**Review:** 2026-11-12 — simplified per PR #17's design review, findings 1–7.
+**Review:** 2026-11-12 — addressed findings 1–7 and the follow-up review's `storyScreen()`/palette call-site detail.
 **Delivery:** one PR for design, implementation and E2E acceptance. No new art or SFX.
 
 ## Player experience
@@ -58,6 +58,8 @@ Implement `ModeSelect extends Screen` in the existing `src/game/select.ts`, besi
 
 Reuse the original 1P arrow by spawning KGT action 84 (`LAYOUT.cursors[0]`) inside `ModeSelect`. Its exported sprite program already animates/bobs the arrow, so no new tween is needed. Only sign sprites and the dimmer require authored rendering, using one sign rectangle table for layout and scaled pointer hit tests. Draw the small selected-mode sign at the top of step two. Keep the current `drawSelect` sprite pipeline and palette lookup, extended only to compose `ModeSelect.background.objects` then `ModeSelect.objects`.
 
+**Two existing scene call sites must recognize the wrapper:** in `drawSelectObject()`, resolve the source character select as `this.select instanceof ModeSelect ? this.select.background : this.select` when reading `drawn[o.owner]`, retaining the chosen fighter's palette beneath the dimmer. In `storyScreen()`, return true for `this.select instanceof ModeSelect` as well as existing story screens, so `report()` keeps `GameStatus.mode` consistent with an active story-selection flow rather than treating it as a finished/abandoned story. Keep `GameStatus.choosingMode` separate from `Match.mode`; neither call site needs a new subsystem.
+
 `TrainingScene.select` adds `ModeSelect` to its current union. On completed story character select:
 - If `opensOnModeSelect(who)`, open `ModeSelect` with that finished select screen and its selected fighter. Do not run the story yet.
 - Otherwise, keep the present direct story start.
@@ -76,7 +78,7 @@ Mirror the three added indices per fighter in `src/game/packs.ts`'s `selectAsset
 
 Automated tests:
 - One scenario-wide test ensures each eligible story reaches four distinct, valid branch starts through `Story.startOnRoute`, with Ryuko steps 4/21/47/62, YINAN/AYA 6/23/49/64, and MASA/TIMES/Z-MEGA/RARIO 4/17/33/44 as fixtures. Assert excluded stories bypass the selector. Test a route's normal retry and Continue behavior.
-- `select.test.ts` exercises the `ModeSelect` two-step behavior, session memory, press/release latch, Escape back and sign tap. `scene.test.ts` covers transitions, globals unchanged by menu, keyboard scope, loading cancellation, cheated-run reset and `GameStatus.choosingMode`.
+- `select.test.ts` exercises the `ModeSelect` two-step behavior, session memory, press/release latch, Escape back and sign tap. `scene.test.ts` covers transitions, globals unchanged by menu, keyboard scope, loading cancellation, cheated-run reset, preserved background palette, `GameStatus.choosingMode` and correct `GameStatus.mode` during the selector.
 - Keep the existing exact boot-pack tests plus normal source combat regressions; delete only old sign-battle-only test cases after recording their evidence.
 - One Playwright E2E reaches a route from SINGLE with keyboard; a focused touch check exercises sign taps and accessible confirm controls.
 
