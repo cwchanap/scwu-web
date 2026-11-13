@@ -129,28 +129,24 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
     await page.waitForTimeout(150);
   };
 
-  // A route-confirming key or tap must leave the selector on its own:
-  // while it is up, its boards and header draw fixed opaque values
-  // (lit ≈ 209/229 here), so once the route's demo takes over the
-  // sampled pair diverges. The pair is read before the one confirm
-  // input, then must move with nothing else pressed — a dropped Enter
-  // or tap leaves it exactly there and times the poll out, and without
-  // this gate skipToBattle's own 'g' would confirm the highlighted
-  // route and mask the miss (both screens show the same five pad
-  // buttons).
-  const confirmRoute = async (lit: Rect, send: () => Promise<void>) => {
-    const before = await sample({ lit, hdr: HEADER });
-    const l0 = before.lit.lum;
-    const h0 = before.hdr.lum;
+  // A route-confirming key or tap must leave the selector on its own,
+  // proven where highlighting can't reach: the mode's small header sign
+  // draws only while the route step is up, and it holds fixed opaque
+  // values there — flipping the pick (a direction, or a tap that
+  // selected without confirming) dims a board but never touches it.
+  // Read it before the one confirm input, then require it to change
+  // with nothing else pressed — a dropped Enter or tap, or an input
+  // that only moved the highlight, leaves it fixed and times the poll
+  // out. Without this gate skipToBattle's own 'g' would confirm the
+  // highlighted route and mask the miss (both screens show the same
+  // five pad buttons).
+  const confirmRoute = async (send: () => Promise<void>) => {
+    const h0 = await lum('h', HEADER);
     await send();
     await expect
-      .poll(
-        async () => {
-          const s = await sample({ lit, hdr: HEADER });
-          return Math.abs(s.lit.lum - l0) + Math.abs(s.hdr.lum - h0);
-        },
-        { timeout: 15_000 },
-      )
+      .poll(async () => Math.abs((await lum('h', HEADER)) - h0), {
+        timeout: 15_000,
+      })
       .toBeGreaterThan(25);
   };
   // A route's opening demo skips on a fresh button once armed; keep
@@ -215,7 +211,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await press('Enter');
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
   // B.R.'s routes rest on ZERO, ANOTHER dimmed.
-  await confirmRoute(ROUTE_LEFT, () => press('Enter'));
+  await confirmRoute(() => press('Enter'));
   await skipToBattle();
   // B.R. ZERO's opening brawl seats ZAKU first (200) and runs untimed.
   await expect(player).toHaveAttribute('aria-valuemax', '510');
@@ -236,7 +232,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
   await press('d');
   await expect.poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT)).toBeGreaterThan(30);
-  await confirmRoute(ROUTE_RIGHT, () => press('Enter'));
+  await confirmRoute(() => press('Enter'));
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '510');
   await expect(opponent).toHaveAttribute('aria-valuemax', '470', {
@@ -251,7 +247,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await tap(480, 394);
   await tap(720, 300);
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
-  await confirmRoute(ROUTE_LEFT, () => tap(720, 400));
+  await confirmRoute(() => tap(720, 400));
   await skipToBattle();
   // B.R. ANOTHER's brawl seats HISO first (480), also untimed.
   await expect(player).toHaveAttribute('aria-valuemax', '510');
