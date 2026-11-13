@@ -1156,6 +1156,30 @@ describe('mode select (HPA-765)', () => {
     await vi.dynamicImportSettled();
   });
 
+  it('reads a canvas tap on the lit board’s drawn box, not a stale rect', () => {
+    const { view } = boot();
+    const mode = openMode(view);
+    mode.step();
+    mode.choice = 1;
+    mode.step();
+    const tap = (x: number, y: number) =>
+      (view.tap as (x: number, y: number) => void)(x, y);
+    // With B.R. lit its board's pixels reach the pair's gap — but a tap
+    // there picks nothing, not STORY under it (review, HPA-765).
+    tap(470, 221);
+    expect(mode.stage).toBe(0);
+    // The board's own drawn edge picks it.
+    tap(487, 394);
+    expect(mode.stage).toBe(1);
+    expect(
+      (
+        mode.objects.filter(
+          (o) => o.alive && o.frame && o.container !== 'kgt',
+        )[0].frame as { image: number }
+      ).image,
+    ).toBe(8006);
+  });
+
   it('ignores canvas taps while the selector is frozen or a load is on', () => {
     const { scene, view } = boot();
     const mode = openMode(view);
