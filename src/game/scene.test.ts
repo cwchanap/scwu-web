@@ -904,6 +904,60 @@ describe('mode select (HPA-765)', () => {
     expect(view.loading).toBe(true);
   });
 
+  it('reads a pick key still down at the transition as held, not fresh on its repeat', () => {
+    // open() clears held input; before the fix, a pick key still down
+    // armed the selector on an empty tick and its next keyboard repeat
+    // repopulated held — the held press then looked fresh and confirmed
+    // the mode without the key ever coming up (HPA-765 review).
+    vi.stubGlobal('HTMLElement', class {});
+    vi.stubGlobal('HTMLButtonElement', class {});
+    const { view } = boot();
+    // The frames below need no drawing; the menu's art has its own test.
+    view.drawSelect = () => {};
+    const down = (code: string, repeat = false) =>
+      (view.keydown as (e: unknown) => void)({
+        code,
+        repeat,
+        target: {},
+        preventDefault: () => {},
+      });
+    const up = (code: string) => (view.keyup as (e: unknown) => void)({ code });
+    const frame = () => (view.update as (t: number, d: number) => void)(0, 10);
+
+    // The pick press (G = punch) — and a direction — still down as the
+    // pick's done lands: the selector opens inside this frame.
+    down('KeyG');
+    down('ArrowRight');
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = ['ryuko', 'ryuko'];
+    frame();
+    const mode = view.select as ModeSelect;
+    expect(mode).toBeInstanceOf(ModeSelect);
+    const start = mode.choice;
+
+    // The arm frame, then the held keys' repeats with no release: held
+    // input is not fresh — it can neither confirm nor move.
+    frame();
+    down('KeyG', true);
+    frame();
+    down('ArrowRight', true);
+    frame();
+    frame();
+    expect(mode.stage).toBe(0);
+    expect(mode.choice).toBe(start);
+    expect(mode.done).toBeNull();
+
+    // A real release and a fresh press confirm the mode.
+    up('KeyG');
+    up('ArrowRight');
+    frame();
+    down('KeyG');
+    frame();
+    expect(mode.stage).toBe(1);
+    expect(mode.done).toBeNull();
+  });
+
   it('enters the picked route through the runner with the life its take left', async () => {
     const { view, completes, finishLoad } = boot();
     const mode = openMode(view);

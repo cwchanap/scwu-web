@@ -507,8 +507,18 @@ export class TrainingScene extends Phaser.Scene {
     if (select.story) {
       // A story the mode select opens for offers it first (authored,
       // HPA-765); the finished select shows underneath it.
-      if (opensOnModeSelect(select.done[0]))
-        return this.open(new ModeSelect(select));
+      if (opensOnModeSelect(select.done[0])) {
+        // The pick's button may still be down: open()'s input clear would
+        // hide it until a keyboard repeat repopulates held, looking fresh
+        // to the selector's arm tick — so the still-down keys and touch
+        // controls carry over the transition (authored, HPA-765 review).
+        const held = [...this.held];
+        const virtual = [...this.virtual];
+        this.open(new ModeSelect(select));
+        for (const key of held) this.held.add(key);
+        for (const control of virtual) this.virtual.add(control);
+        return;
+      }
       // A story route picked starts a fresh run for its cheated mark.
       this.runCheated = false;
       this.story = new Story(select.done[0]);
