@@ -810,35 +810,50 @@ const ROUTE_BOARDS: readonly (readonly (ModeBoard & { route: Route })[])[] = [
     { who: 'pachelo', image: 8006, route: 'br-another' },
   ],
 ];
-// The boards are 260×204 source pixels. Each step's two stand side by
-// side at the issue's ~1.2×, the pick's slightly larger; the chosen
-// mode's heads the route step at half size. The canvas-pixel rectangles
-// below (the 960×720 game) place the signs AND test a tap — one table for
-// both (authored, HPA-765). ART_SCALE is scene.ts's: canvas pixels a
-// source pixel draws at.
+// The boards are 260×204 source pixels. Each step's two hang side by
+// side by the centre of their top edge — the spots below, in the
+// 960×720 game's canvas pixels — the pick's a size larger, and the
+// chosen mode's heads the route step at half size. bounds() gives the
+// box a spot and scale draw: the same box put() stands the sign in AND
+// tap() hit-tests (authored, HPA-765). The pair is spaced so even the
+// pick's larger box stays on-canvas and clear of the other's — the
+// mockup's ~1.2×/1.3× pair could not (two 507px boards on 960px), so it
+// lands a size down at ~1.1×/1.2×. ART_SCALE is scene.ts's: canvas
+// pixels a source pixel draws at.
 const SIGN_W = 260;
 const SIGN_H = 204;
 const ART_SCALE = 1.5;
-const SIGN_SCALE = 1.2;
-const ACTIVE_SCALE = 1.3;
+const SIGN_SCALE = 1.1;
+const ACTIVE_SCALE = 1.2;
 interface Rect {
   x: number;
   y: number;
   w: number;
   h: number;
 }
-// A board's box at a scale: its source size × ART_SCALE × scale.
-const board = (x: number, y: number, scale = SIGN_SCALE): Rect => ({
-  x,
-  y,
+interface Spot {
+  cx: number;
+  top: number;
+}
+// A sign's box at a scale: its source size × ART_SCALE × scale, hung by
+// the centre of its top edge.
+const bounds = (spot: Spot, scale: number): Rect => ({
+  x: spot.cx - (SIGN_W * ART_SCALE * scale) / 2,
+  y: spot.top,
   w: SIGN_W * ART_SCALE * scale,
   h: SIGN_H * ART_SCALE * scale,
 });
-const SIGN_RECTS: readonly (readonly [Rect, Rect])[] = [
-  [board(8, 210), board(484, 210)],
-  [board(8, 285), board(484, 285)],
+const SIGN_SPOTS: readonly (readonly [Spot, Spot])[] = [
+  [
+    { cx: 240, top: 210 },
+    { cx: 720, top: 210 },
+  ],
+  [
+    { cx: 240, top: 285 },
+    { cx: 720, top: 285 },
+  ],
 ];
-const HEADER_RECT = board(382.5, 60, 0.5);
+const HEADER_SPOT: Spot = { cx: 480, top: 60 };
 const SIGN_Z = 0x110;
 const CURSOR_Z = 0x120;
 let modePlace = 0;
@@ -910,11 +925,11 @@ export class ModeSelect extends Screen {
   private show() {
     for (const o of this.objects) if (o !== this.cursor) o.alive = false;
     this.signs = this.boards().map((board, i) =>
-      this.sign(board.who, board.image, SIGN_RECTS[this.stage][i]),
+      this.sign(board.who, board.image, SIGN_SPOTS[this.stage][i]),
     );
     if (this.stage) {
       const mode = MODE_BOARDS[modePlace];
-      this.sign(mode.who, mode.image, HEADER_RECT);
+      this.sign(mode.who, mode.image, HEADER_SPOT, 0.5);
     }
     this.cursor ??= this.spawn('kgt', LAYOUT.cursors[0], 0, 0, CURSOR_Z);
     this.place();
@@ -924,13 +939,15 @@ export class ModeSelect extends Screen {
     return this.stage ? ROUTE_BOARDS[modePlace] : MODE_BOARDS;
   }
 
-  // A canvas tap (game pixels) on one of the step's sign rectangles picks
-  // and confirms it — the same as a fresh button does (authored, HPA-765).
+  // A canvas tap (game pixels) lands on the box its board draws — the
+  // same bounds() its put() stands it in — and picks and confirms it,
+  // the same as a fresh button does (authored, HPA-765).
   tap(x: number, y: number) {
     if (!this.cursor || this.done) return false;
-    const i = SIGN_RECTS[this.stage].findIndex(
-      (r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h,
-    );
+    const i = this.signs.findIndex((o, j) => {
+      const b = bounds(SIGN_SPOTS[this.stage][j], o.scale ?? SIGN_SCALE);
+      return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
+    });
     if (i < 0) return false;
     this.choice = i;
     this.confirm();
@@ -944,20 +961,25 @@ export class ModeSelect extends Screen {
       const active = i === this.choice;
       this.put(
         o,
-        SIGN_RECTS[this.stage][i],
+        SIGN_SPOTS[this.stage][i],
         active ? ACTIVE_SCALE : SIGN_SCALE,
       );
       o.color = active ? NORMAL_COLOR : { mode: 1, r: 0, g: 0, b: 0, fade: 0 };
     });
-    const rect = SIGN_RECTS[this.stage][this.choice];
-    this.cursor!.x = (rect.x + rect.w / 2) / ART_SCALE - 15;
-    this.cursor!.y = rect.y / ART_SCALE - 10;
+    const spot = SIGN_SPOTS[this.stage][this.choice];
+    this.cursor!.x = spot.cx / ART_SCALE - 15;
+    this.cursor!.y = spot.top / ART_SCALE - 10;
   }
 
-  // A sign: one display of its image, held, standing in its rectangle.
-  private sign(who: 'zaku' | 'pachelo', image: number, rect: Rect) {
+  // A sign: one display of its image, held, hung by its spot's top edge.
+  private sign(
+    who: 'zaku' | 'pachelo',
+    image: number,
+    spot: Spot,
+    scale = SIGN_SCALE,
+  ) {
     const o = this.spawn(who, 0, 0, 0, SIGN_Z);
-    this.put(o, rect, rect.w / (SIGN_W * ART_SCALE));
+    this.put(o, spot, scale);
     o.frame = {
       pc: 0,
       image,
@@ -975,12 +997,14 @@ export class ModeSelect extends Screen {
     return o;
   }
 
-  // Where a sign's object stands for its rectangle and scale: a player's
+  // Where a sign's object stands for its spot and scale: a player's
   // display centres on o.x and bottoms on o.y, and the scene's sprite
-  // scale grows from the top left, so the box's centre-top is the stand.
-  private put(o: SelectObject, rect: Rect, scale: number) {
-    o.x = (rect.x + rect.w / 2) / ART_SCALE + (SIGN_W / 2) * (1 - scale);
-    o.y = rect.y / ART_SCALE + SIGN_H;
+  // scale grows from the top left, so the unscaled half-width shift
+  // centres the box on spot.cx — bounds() of the same spot and scale is
+  // the box it draws.
+  private put(o: SelectObject, spot: Spot, scale: number) {
+    o.x = spot.cx / ART_SCALE + (SIGN_W / 2) * (1 - scale);
+    o.y = spot.top / ART_SCALE + SIGN_H;
     o.scale = scale;
   }
 }

@@ -542,8 +542,8 @@ describe('mode select (authored, HPA-765)', () => {
     press(mode, { punch: true });
     expect(mode.stage).toBe(1);
     expect(signs(mode).map((o) => [o.frame!.image, o.scale])).toEqual([
-      [8005, 1.3],
       [8005, 1.2],
+      [8005, 1.1],
       [8001, 0.5],
     ]);
     // The chosen mode's smaller board heads the route step.
@@ -625,67 +625,114 @@ describe('mode select (authored, HPA-765)', () => {
     expect(mode.choice).toBe(remembered);
   });
 
-  it('draws the pick’s board slightly larger than the other ~1.2× one', () => {
+  it('draws the pick’s board slightly larger than the other ~1.1× one', () => {
     // The issue’s mockup asked for two boards at about 1.2× source, the
     // picked one slightly larger; its link is dead so this lands on the
-    // playable view (authored, HPA-765).
+    // playable view (authored, HPA-765). The ~1.3/1.2 pair cannot fit —
+    // two 507px boxes over 960px of canvas — so the pair sits a size
+    // down with the same step between them.
     const mode = new ModeSelect(picked());
     mode.step();
     // The remembered mode decides which board starts lit; whichever it
-    // is, its board draws slightly larger than the other's ~1.2×.
+    // is, its board draws slightly larger than the other's ~1.1×.
     const start = mode.choice;
-    expect(signs(mode)[start].scale).toBe(1.3);
-    expect(signs(mode)[1 - start].scale).toBe(1.2);
+    expect(signs(mode)[start].scale).toBe(1.2);
+    expect(signs(mode)[1 - start].scale).toBe(1.1);
     mode.step({ right: true });
     expect(mode.choice).toBe(1 - start);
-    expect(signs(mode)[mode.choice].scale).toBe(1.3);
-    expect(signs(mode)[start].scale).toBe(1.2);
+    expect(signs(mode)[mode.choice].scale).toBe(1.2);
+    expect(signs(mode)[start].scale).toBe(1.1);
   });
 
   it('takes a tap on a board through the same pick a button confirms', () => {
     const mode = new ModeSelect(picked());
     // Before the arm tick there is nothing to hit; after done nothing.
-    expect(mode.tap(718, 394)).toBe(false);
+    expect(mode.tap(720, 394)).toBe(false);
     mode.step();
     // The right board’s centre — B.R. — picks and confirms it like a
     // button press does.
-    expect(mode.tap(718, 394)).toBe(true);
+    expect(mode.tap(720, 394)).toBe(true);
     expect(mode.stage).toBe(1);
     expect(signs(mode).map((o) => o.frame!.image)).toEqual([8006, 8006, 8001]);
     // The right route board lands the same route as pressing on it.
-    expect(mode.tap(718, 469)).toBe(true);
+    expect(mode.tap(720, 469)).toBe(true);
     expect(mode.done).toBe('br-another');
-    expect(mode.tap(242, 469)).toBe(false);
+    expect(mode.tap(240, 469)).toBe(false);
   });
 
-  it('tests the same game-pixel rectangles its boards draw into', () => {
-    // Each board’s drawn box shares its tap rectangle: the picked one
-    // draws slightly larger around the same centre, the box its test.
-    for (const i of [0, 1]) {
+  // A sign's drawn box, read off its object as the sprite draws it: the
+  // display anchored centre-bottom, its scale growing from the top left.
+  const boxOf = (o: { x: number; y: number; scale?: number }) => {
+    const s = o.scale ?? 1;
+    return {
+      x: (o.x - 130) * 1.5,
+      y: (o.y - 204) * 1.5,
+      w: 390 * s,
+      h: 306 * s,
+    };
+  };
+
+  it('keeps every sign’s drawn box on-canvas and clear of the other', () => {
+    // The pick's larger board must leave the other's box alone and stay
+    // on the 960×720 canvas: the review caught the ~1.3× sign drawn
+    // over the left board's tap area and past the canvas edge.
+    const expectClear = (mode: ModeSelect) => {
+      const boxes = signs(mode).map(boxOf);
+      for (const b of boxes) {
+        expect(b.x).toBeGreaterThanOrEqual(0);
+        expect(b.x + b.w).toBeLessThanOrEqual(960);
+        expect(b.y).toBeGreaterThanOrEqual(0);
+        expect(b.y + b.h).toBeLessThanOrEqual(720);
+      }
+      expect(boxes[0].x + boxes[0].w).toBeLessThan(boxes[1].x);
+    };
+    for (const pick of [0, 1]) {
       const mode = new ModeSelect(picked());
       mode.step();
-      const o = signs(mode)[i];
-      const box = {
-        x: (o.x - 130) * 1.5,
-        y: (o.y - 204) * 1.5,
-        w: 390 * (o.scale ?? 1),
-        h: 306 * (o.scale ?? 1),
-      };
-      expect(mode.tap(box.x + box.w / 2, box.y + box.h / 2)).toBe(true);
+      mode.choice = pick;
+      mode.step();
+      expectClear(mode);
+      press(mode, { punch: true });
+      // Both route picks' placements on the second step too.
+      for (const route of [0, 1]) {
+        mode.choice = route;
+        mode.step();
+        expectClear(mode);
+      }
+    }
+  });
+
+  it('takes a tap on a board’s drawn edge through to its routes', () => {
+    // A tap tests the same box the sign draws: its edge pixels pick the
+    // board they cover — never the other sign (review, HPA-765): with
+    // B.R. lit, (470,221) sat inside its drawn board but read STORY.
+    for (const pick of [0, 1]) {
+      const mode = new ModeSelect(picked());
+      mode.step();
+      mode.choice = pick;
+      mode.step();
+      const b = signs(mode).map(boxOf)[pick];
+      // One pixel inside the lit board's inner top edge.
+      const x = pick ? b.x + 1 : b.x + b.w - 1;
+      expect(mode.tap(x, b.y + 1)).toBe(true);
       expect(mode.stage).toBe(1);
-      // STORY's routes read 8005, B.R.'s 8006: board i is the one taken.
+      // STORY's routes read 8005, B.R.'s 8006: the board tapped is the
+      // mode whose routes opened.
       expect(
         signs(mode)
           .slice(0, 2)
           .map((o) => o.frame!.image),
-      ).toEqual(Array(2).fill(i ? 8006 : 8005));
+      ).toEqual(Array(2).fill(pick ? 8006 : 8005));
     }
   });
 
   it('ignores taps in the boards’ gap and off them', () => {
     const mode = new ModeSelect(picked());
     mode.step();
-    expect(mode.tap(480, 394)).toBe(false); // the 8px strip between them
+    mode.choice = 1;
+    mode.step();
+    expect(mode.tap(470, 221)).toBe(false); // between the drawn boards
+    expect(mode.tap(480, 394)).toBe(false); // the strip between them
     expect(mode.tap(480, 120)).toBe(false); // above them
     expect(mode.tap(4, 394)).toBe(false); // left of the first
     expect(mode.tap(956, 394)).toBe(false); // right of the last
