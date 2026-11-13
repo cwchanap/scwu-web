@@ -304,6 +304,12 @@ export class TrainingScene extends Phaser.Scene {
     window.addEventListener('keyup', this.keyup);
     window.addEventListener('blur', this.blur);
     document.addEventListener('visibilitychange', this.visibility);
+    // Phaser's pointer input reports game pixels through Scale.FIT's
+    // letterboxing in either orientation, so a canvas tap reads the mode
+    // select's rectangles directly (authored, HPA-765).
+    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) =>
+      this.tap(pointer.x, pointer.y),
+    );
     this.events.once('shutdown', () => {
       window.removeEventListener('keydown', this.keydown);
       window.removeEventListener('keyup', this.keyup);
@@ -395,6 +401,13 @@ export class TrainingScene extends Phaser.Scene {
       this.virtual.add(control);
       this.pressed.add(control);
     } else this.virtual.delete(control);
+  }
+  // A canvas tap in game pixels goes to the mode select's boards, which
+  // take it as the same pick a button confirms (authored, HPA-765); a
+  // frozen or loading scene steps nothing, so it ignores the tap as well.
+  private tap(x: number, y: number) {
+    if (this.frozen() || this.loading) return;
+    if (this.select instanceof ModeSelect) this.select.tap(x, y);
   }
   togglePause() {
     if (!this.ready || (this.match.resultReady && !this.select)) return;

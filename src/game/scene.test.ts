@@ -1136,4 +1136,53 @@ describe('mode select (HPA-765)', () => {
     // takes its recoloured texture from there, not a palette of its own.
     expect(calls).toContain('ryuko-1@3');
   });
+
+  it('confirms a canvas tap on a board into the same route entry as a key', async () => {
+    const { view } = boot();
+    const mode = openMode(view);
+    mode.step();
+    const tap = (x: number, y: number) =>
+      (view.tap as (x: number, y: number) => void)(x, y);
+    // The left board on each step — STORY, then ROUTE 1 — in the canvas's
+    // game pixels lands the same 'story-easy' the button presses land.
+    tap(242, 394);
+    expect(mode.stage).toBe(1);
+    tap(242, 469);
+    expect(mode.done).toBe('story-easy');
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.step).toBe(4);
+    expect(view.storyLife).toBe(lifeOf('ryuko') - 1 - 100);
+    await vi.dynamicImportSettled();
+  });
+
+  it('ignores canvas taps while the selector is frozen or a load is on', () => {
+    const { scene, view } = boot();
+    const mode = openMode(view);
+    mode.step();
+    const tap = (x: number, y: number) =>
+      (view.tap as (x: number, y: number) => void)(x, y);
+    view.paused = true;
+    tap(242, 394);
+    view.paused = false;
+    scene.setModal(true);
+    tap(242, 394);
+    scene.setModal(false);
+    view.loading = true;
+    tap(242, 394);
+    view.loading = false;
+    expect(mode.stage).toBe(0);
+    // Live again, the same tap picks.
+    tap(242, 394);
+    expect(mode.stage).toBe(1);
+  });
+
+  it('drops the selector for a menu reset instead of leaving a stale one', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    openMode(view);
+    scene.reset('cpu');
+    expect(view.select).toBeNull();
+    expect(scene.match.mode).toBe('cpu');
+  });
 });

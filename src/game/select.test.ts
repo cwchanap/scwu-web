@@ -542,8 +542,8 @@ describe('mode select (authored, HPA-765)', () => {
     press(mode, { punch: true });
     expect(mode.stage).toBe(1);
     expect(signs(mode).map((o) => [o.frame!.image, o.scale])).toEqual([
-      [8005, 1],
-      [8005, 1],
+      [8005, 1.3],
+      [8005, 1.2],
       [8001, 0.5],
     ]);
     // The chosen mode's smaller board heads the route step.
@@ -623,6 +623,73 @@ describe('mode select (authored, HPA-765)', () => {
     press(mode, { punch: true });
     expect(mode.stage).toBe(1);
     expect(mode.choice).toBe(remembered);
+  });
+
+  it('draws the pick’s board slightly larger than the other ~1.2× one', () => {
+    // The issue’s mockup asked for two boards at about 1.2× source, the
+    // picked one slightly larger; its link is dead so this lands on the
+    // playable view (authored, HPA-765).
+    const mode = new ModeSelect(picked());
+    mode.step();
+    // The remembered mode decides which board starts lit; whichever it
+    // is, its board draws slightly larger than the other's ~1.2×.
+    const start = mode.choice;
+    expect(signs(mode)[start].scale).toBe(1.3);
+    expect(signs(mode)[1 - start].scale).toBe(1.2);
+    mode.step({ right: true });
+    expect(mode.choice).toBe(1 - start);
+    expect(signs(mode)[mode.choice].scale).toBe(1.3);
+    expect(signs(mode)[start].scale).toBe(1.2);
+  });
+
+  it('takes a tap on a board through the same pick a button confirms', () => {
+    const mode = new ModeSelect(picked());
+    // Before the arm tick there is nothing to hit; after done nothing.
+    expect(mode.tap(718, 394)).toBe(false);
+    mode.step();
+    // The right board’s centre — B.R. — picks and confirms it like a
+    // button press does.
+    expect(mode.tap(718, 394)).toBe(true);
+    expect(mode.stage).toBe(1);
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([8006, 8006, 8001]);
+    // The right route board lands the same route as pressing on it.
+    expect(mode.tap(718, 469)).toBe(true);
+    expect(mode.done).toBe('br-another');
+    expect(mode.tap(242, 469)).toBe(false);
+  });
+
+  it('tests the same game-pixel rectangles its boards draw into', () => {
+    // Each board’s drawn box shares its tap rectangle: the picked one
+    // draws slightly larger around the same centre, the box its test.
+    for (const i of [0, 1]) {
+      const mode = new ModeSelect(picked());
+      mode.step();
+      const o = signs(mode)[i];
+      const box = {
+        x: (o.x - 130) * 1.5,
+        y: (o.y - 204) * 1.5,
+        w: 390 * (o.scale ?? 1),
+        h: 306 * (o.scale ?? 1),
+      };
+      expect(mode.tap(box.x + box.w / 2, box.y + box.h / 2)).toBe(true);
+      expect(mode.stage).toBe(1);
+      // STORY's routes read 8005, B.R.'s 8006: board i is the one taken.
+      expect(
+        signs(mode)
+          .slice(0, 2)
+          .map((o) => o.frame!.image),
+      ).toEqual(Array(2).fill(i ? 8006 : 8005));
+    }
+  });
+
+  it('ignores taps in the boards’ gap and off them', () => {
+    const mode = new ModeSelect(picked());
+    mode.step();
+    expect(mode.tap(480, 394)).toBe(false); // the 8px strip between them
+    expect(mode.tap(480, 120)).toBe(false); // above them
+    expect(mode.tap(4, 394)).toBe(false); // left of the first
+    expect(mode.tap(956, 394)).toBe(false); // right of the last
+    expect([mode.stage, mode.done]).toEqual([0, null]);
   });
 });
 
