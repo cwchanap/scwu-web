@@ -41,8 +41,9 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
     timeout: 60_000,
   });
   await expect(failed).toBeHidden();
-  // While a select screen is up the pad is the five select controls; a
-  // battle shows the fighter's own (Ryuko has more).
+  // While a select screen is up the pad is the eight select controls —
+  // the four directions and the four palette-picking buttons (HPA-765
+  // review); a battle shows the fighter's own (Ryuko has more).
   const pad = page.locator('.touch-controls button');
   const player = page.getByLabel('Player health');
   const opponent = page.getByLabel('Opponent health');
@@ -139,7 +140,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // that only moved the highlight, leaves it fixed and times the poll
   // out. Without this gate skipToBattle's own 'g' would confirm the
   // highlighted route and mask the miss (both screens show the same
-  // five pad buttons).
+  // eight pad buttons).
   const confirmRoute = async (send: () => Promise<void>) => {
     const h0 = await lum('h', HEADER);
     await send();
@@ -154,13 +155,13 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // through the load lands on the demo's or battle's first tick).
   const skipToBattle = async () => {
     const deadline = Date.now() + 45_000;
-    while ((await pad.count()) <= 5 && Date.now() < deadline) {
+    while ((await pad.count()) <= 8 && Date.now() < deadline) {
       await page.keyboard.press('g');
       await page.waitForTimeout(300);
     }
     await expect
       .poll(() => pad.count(), { timeout: 30_000 })
-      .toBeGreaterThan(5);
+      .toBeGreaterThan(8);
   };
 
   // From a live story battle back to the selector: Menu's Character select
@@ -183,7 +184,14 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await press('g');
   await expect.poll(() => lum('l', MODE_LEFT)).toBeGreaterThan(170);
   await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(40);
-  await expect(pad).toHaveCount(5);
+  // The select pad keeps every button the screens' word reads: each of
+  // G/H/K/J picks its palette on the character select, not just G
+  // confirming (HPA-765 review).
+  await expect(pad).toHaveCount(8);
+  for (const name of ['Punch', 'Kick', 'Hit Up', 'Throw'])
+    await expect(
+      page.locator('.touch-controls').getByRole('button', { name }),
+    ).toBeVisible();
 
   // Escape on the mode step returns to the select screen; picking again
   // reopens the selector the same way. A failed Escape would leave the
@@ -244,7 +252,12 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // sign picks and confirms it like a button — B.R. then B.R. ANOTHER.
   await backToModeSelect();
   await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  // The gap tap lands ignored, proven before the next tap: STORY stays
+  // lit over dimmed B.R. and no route header lights — a mistaken pick or
+  // confirm would have flipped the boards or lit the header band.
   await tap(480, 394);
+  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  expect(await lum('h', HEADER)).toBeLessThan(160);
   await tap(720, 300);
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
   await confirmRoute(() => tap(720, 400));
