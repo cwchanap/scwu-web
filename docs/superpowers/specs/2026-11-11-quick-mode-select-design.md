@@ -23,12 +23,12 @@ A story without the original opening Chii mode-select battle skips this screen a
 
 The original route choices are already recovered in `docs/evidence.md` (Globals) and exercised by `src/game/team.test.ts`, rather than an unsolved per-fighter graph-discovery problem. In Ryuko's opening battle Single Start first removes 1 life, and KOing the two chosen signs leaves:
 
-| Selection | Further 1P life taken | Ryuko's life after the sign choice | Ryuko's route step |
-| --- | ---: | ---: | ---: |
-| STORY → ROUTE 1 (Easy) | 100 | 409 | 4 |
-| STORY → ROUTE 2 (Hard) | 346 | 163 | 21 |
-| B.R. → B.R. ZERO | 347 | 162 | 47 |
-| B.R. → B.R. ANOTHER | 348 | 161 | 62 |
+| Selection              | Further 1P life taken | Ryuko's life after the sign choice | Ryuko's route step |
+| ---------------------- | --------------------: | ---------------------------------: | -----------------: |
+| STORY → ROUTE 1 (Easy) |                   100 |                                409 |                  4 |
+| STORY → ROUTE 2 (Hard) |                   346 |                                163 |                 21 |
+| B.R. → B.R. ZERO       |                   347 |                                162 |                 47 |
+| B.R. → B.R. ANOTHER    |                   348 |                                161 |                 62 |
 
 ZAKU supplies STORY, ROUTE 1 and B.R. ZERO; PAC-HELO supplies B.R., ROUTE 2 and B.R. ANOTHER. These labels and values are already verified by the source-based Chii battle test; the implementation does not need to rediscover them.
 
@@ -61,6 +61,7 @@ Reuse the original 1P arrow by spawning KGT action 84 (`LAYOUT.cursors[0]`) insi
 **Two existing scene call sites must recognize the wrapper:** in `drawSelectObject()`, resolve the source character select as `this.select instanceof ModeSelect ? this.select.background : this.select` when reading `drawn[o.owner]`, retaining the chosen fighter's palette beneath the dimmer. In `storyScreen()`, return true for `this.select instanceof ModeSelect` as well as existing story screens, so `report()` keeps `GameStatus.mode` consistent with an active story-selection flow rather than treating it as a finished/abandoned story. Keep `GameStatus.choosingMode` separate from `Match.mode`; neither call site needs a new subsystem.
 
 `TrainingScene.select` adds `ModeSelect` to its current union. On completed story character select:
+
 - If `opensOnModeSelect(who)`, open `ModeSelect` with that finished select screen and its selected fighter. Do not run the story yet.
 - Otherwise, keep the present direct story start.
 - When `ModeSelect` returns a final `Route`, preserve the select's existing palette/`storyHeld`, reset the cheated-run mark, create a `Story` and call `startOnRoute(route)` through `runStory`. Escape at the first step reopens `CharacterSelect(undefined, true)`, which already restores its remembered cell. Escape at the route step calls the screen's `back()`.
@@ -77,12 +78,14 @@ Mirror the three added indices per fighter in `src/game/packs.ts`'s `selectAsset
 ## Verification and boundaries
 
 Automated tests:
+
 - One scenario-wide test ensures each eligible story reaches four distinct, valid branch starts through `Story.startOnRoute`, with Ryuko steps 4/21/47/62, YINAN/AYA 6/23/49/64, and MASA/TIMES/Z-MEGA/RARIO 4/17/33/44 as fixtures. Assert excluded stories bypass the selector. Test a route's normal retry and Continue behavior.
 - `select.test.ts` exercises the `ModeSelect` two-step behavior, session memory, press/release latch, Escape back and sign tap. `scene.test.ts` covers transitions, globals unchanged by menu, keyboard scope, loading cancellation, cheated-run reset, preserved background palette, `GameStatus.choosingMode` and correct `GameStatus.mode` during the selector.
 - Keep the existing exact boot-pack tests plus normal source combat regressions; delete only old sign-battle-only test cases after recording their evidence.
 - One Playwright E2E reaches a route from SINGLE with keyboard; a focused touch check exercises sign taps and accessible confirm controls.
 
 Acceptance (manual scope kept short, but all target platforms represented):
+
 - **macOS desktop Chromium:** full keyboard path (both steps and Escape), a route from each mode, and visual comparison against `mode-select.png`.
 - **Windows desktop Edge:** short end-to-end keyboard and navigation/regression pass, plus visual sanity check; avoid duplicating the full macOS matrix.
 - **iOS Safari:** sign taps, existing touch directions/confirm, portrait and landscape layout, plus visual comparison.
