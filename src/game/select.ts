@@ -500,7 +500,14 @@ export class CharacterSelect extends Screen {
         this.palettes[p] = buttonIndex(pressed[p]);
         takePalette(this.drawn, p, this.palettes[p]);
         this.decide(p);
-      } else this.rest(p, directions[p]);
+      } else if (this.rest(p, directions[p]) && pressed[p] & BUTTONS) {
+        // The tick the cursor lands on chooses too — a fresh press the
+        // transition queued behind it (the team's rest-then-pick,
+        // 0x40754c), unlike a button already held.
+        this.palettes[p] = buttonIndex(pressed[p]);
+        takePalette(this.drawn, p, this.palettes[p]);
+        this.decide(p);
+      }
     }
     if (this.sides.some((p) => !this.decided[p]) || this.done) return;
     // 0x407a94: then a hundred ticks before the battle, or story mode's

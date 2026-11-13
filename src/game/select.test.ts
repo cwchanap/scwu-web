@@ -457,6 +457,24 @@ describe('story select (object type 10, story mode)', () => {
     while (!select.done) select.step();
     expect(select.done).toEqual(['dora', 'dora']);
   });
+
+  it('chooses on the tick its cursor lands — a pick queued behind the screen opening is not lost', () => {
+    // The title-to-select hand-off clears the held keys, so a fresh press
+    // can land on the select's first step: resting and choosing on it is
+    // the team's rest-then-pick (0x40754c), not a swallowed press.
+    const select = new CharacterSelect([[0, 0]], true);
+    select.step({ punch: true });
+    expect(select.decided).toEqual([true, false]);
+    while (!select.done) select.step();
+    expect(select.done).toEqual(['ryuko', 'ryuko']);
+    // VS single's cursor lands the same way.
+    const vs = new CharacterSelect([
+      [0, 0],
+      [0, 0],
+    ]);
+    vs.step({ punch: true });
+    expect(vs.decided).toEqual([true, false]);
+  });
 });
 
 describe('story demos (object type 16, 0x406c10)', () => {

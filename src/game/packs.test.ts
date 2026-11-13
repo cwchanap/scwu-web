@@ -117,14 +117,19 @@ const packFiles = () =>
   readdirSync(PACKS).filter((name) => name.endsWith('.bin'));
 const ASSETS = new URL('../../public/assets/', import.meta.url);
 const fighters = Object.keys(CHARACTERS) as Who[];
-const demos = import.meta.glob<{
-  default: { images: Entry[]; sounds: Entry[] };
-}>('./generated/demos/*.json', { eager: true });
+const DEMOS = new URL('./generated/demos/', import.meta.url);
 // Each generated/demos/<n>.json: its number, images and sounds.
-const demoList = Object.entries(demos).map(([path, { default: demo }]) => ({
-  n: path.replace(/^.*\/|\.json$/g, ''),
-  ...demo,
-}));
+const demoList = existsSync(DEMOS)
+  ? readdirSync(DEMOS)
+      .filter((name) => name.endsWith('.json'))
+      .map((name) => ({
+        n: name.replace(/\.json$/, ''),
+        ...(JSON.parse(readFileSync(new URL(name, DEMOS), 'utf8')) as {
+          images: Entry[];
+          sounds: Entry[];
+        }),
+      }))
+  : [];
 const hasAny = (part: { images: unknown[]; sounds: unknown[] }) =>
   part.images.length + part.sounds.length > 0;
 // A fighter's exported files, split by whether its select programs use them
