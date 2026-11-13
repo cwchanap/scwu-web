@@ -332,8 +332,17 @@ export class TrainingScene extends Phaser.Scene {
       this.held.add(e.code);
       if (!e.repeat) this.pressed.add(keyMap[e.code]);
     }
-    // Enter is the mode select's other confirm (authored, HPA-765).
-    if (!e.repeat && e.code === 'Enter' && this.select instanceof ModeSelect) {
+    // Enter is the mode select's other confirm (authored, HPA-765) —
+    // a canvas one: a focused DOM button keeps it for its own activation
+    // (Menu, Resume), as the keyMap controls already allow, and an event
+    // a handler already took isn't re-taken here.
+    if (
+      !e.repeat &&
+      e.code === 'Enter' &&
+      this.select instanceof ModeSelect &&
+      !(e.target instanceof HTMLButtonElement) &&
+      !e.defaultPrevented
+    ) {
       e.preventDefault();
       this.pressed.add('punch');
     }
@@ -527,7 +536,13 @@ export class TrainingScene extends Phaser.Scene {
         // controls carry over the transition (authored, HPA-765 review).
         const held = [...this.held];
         const virtual = [...this.virtual];
+        // open()'s stopAll would drop the finished select's track for
+        // good: the overlay keeps it, restarted — stopped sounds can't
+        // resume — as the Music toggle allows (authored, HPA-765 review).
+        const track = this.selectTrack;
         this.open(new ModeSelect(select));
+        this.selectTrack = track;
+        if (this.music) track?.play();
         for (const key of held) this.held.add(key);
         for (const control of virtual) this.virtual.add(control);
         return;

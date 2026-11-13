@@ -1054,6 +1054,7 @@ describe('mode select (HPA-765)', () => {
 
   it('Enter feeds a select press only while the selector is up', () => {
     vi.stubGlobal('HTMLElement', class {});
+    vi.stubGlobal('HTMLButtonElement', class {});
     const { scene, view } = boot();
     const enter = () =>
       (view.keydown as (e: unknown) => void)({
@@ -1068,6 +1069,55 @@ describe('mode select (HPA-765)', () => {
     openMode(view);
     enter();
     expect(view.pressed as Set<string>).toContain('punch');
+  });
+
+  it('leaves a focused button’s Enter — or one already taken — to the DOM', () => {
+    // Tab → Menu → Enter must activate Menu, not confirm the route:
+    // the keydown's preventDefault cancels a button's native activation
+    // and its punch lands on the selector the same tick (HPA-765 final
+    // review). The paused selector's Resume button is the same case.
+    vi.stubGlobal('HTMLElement', class {});
+    class Button extends (globalThis.HTMLElement as new () => object) {}
+    vi.stubGlobal('HTMLButtonElement', Button);
+    const { view } = boot();
+    openMode(view);
+    const down = (target: object, defaultPrevented = false) => {
+      let prevented = 0;
+      (view.keydown as (e: unknown) => void)({
+        code: 'Enter',
+        repeat: false,
+        target,
+        defaultPrevented,
+        preventDefault: () => void prevented++,
+      });
+      return prevented;
+    };
+    // A focused DOM button keeps Enter's default action and feeds no
+    // canvas punch; an event a handler already took is left alone too.
+    expect(down(new Button())).toBe(0);
+    expect((view.pressed as Set<string>).size).toBe(0);
+    expect(down({}, true)).toBe(0);
+    expect((view.pressed as Set<string>).size).toBe(0);
+    // The canvas's own Enter still confirms.
+    expect(down({})).toBe(1);
+    expect(view.pressed as Set<string>).toContain('punch');
+  });
+
+  it('keeps the finished select’s track across the overlay, as Music allows', () => {
+    // open()'s stopAll silenced the select screen's track for good — the
+    // selector sat silent even with Music ticked (HPA-765 final review).
+    const { view } = boot();
+    const track = { stop: () => {}, play: vi.fn(), pause: () => {} };
+    view.selectTrack = track;
+    openMode(view);
+    expect(view.selectTrack).toBe(track);
+    expect(track.play).toHaveBeenCalledTimes(1);
+    // With Music off it stays quiet but keeps the track, so ticking it
+    // on later still plays it, as on the select screens.
+    view.music = false;
+    openMode(view);
+    expect(view.selectTrack).toBe(track);
+    expect(track.play).toHaveBeenCalledTimes(1);
   });
 
   it('draws the selector’s player objects in the finished select’s palettes', () => {

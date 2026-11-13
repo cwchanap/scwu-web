@@ -263,14 +263,19 @@
   const moveKeys = new Set(
     Object.values(KEYS).flatMap((keys) => keys.map(([control]) => control)),
   );
-  // A select screen's pad (authored, HPA-765): the directions and one
-  // confirm button on every one, whatever the last fighter's moves were.
+  // A select screen's pad (authored, HPA-765): the directions and every
+  // button the screens' input word reads — each chooses, in its own
+  // palette (select.ts word/buttonIndex), so keeping G alone would cost
+  // touch players H/K/J's alternate palettes in SINGLE, VS and TEAM VS.
   const SELECT_CONTROLS: ReadonlySet<Control> = new Set([
     'left',
     'right',
     'jump',
     'crouch',
     'punch',
+    'kick',
+    'hitUp',
+    'throw',
   ]);
   const has = (control: Control) =>
     status.selecting
