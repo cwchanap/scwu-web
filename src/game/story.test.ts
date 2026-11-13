@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { Story, scenarioOf } from './story';
-import type { Battle } from './story';
+import { CHARACTERS } from './characters';
+import type { Who } from './characters';
+import { opensOnModeSelect, Story, scenarioOf, TAKES } from './story';
+import type { Battle, Route } from './story';
 
 const at = (story: Story) => story.step;
 
@@ -99,5 +101,59 @@ describe('story runner', () => {
     const giant = story.next();
     expect(giant.kind === 'battle' && giant.battle.slots[0]?.player).toBe(6);
     expect(story.retry()).toEqual(giant);
+  });
+
+  it('opens the mode select only where a Chii battle leads', () => {
+    // Every story that opens on the Chii battle (its slots only ZAKU and
+    // PAC-HELO) takes each route to a distinct battle or demo step; the
+    // steps the four takes reach form three families.
+    const families = new Set<string>();
+    const excluded: Who[] = [];
+    for (const who of Object.keys(CHARACTERS) as Who[]) {
+      if (!opensOnModeSelect(who)) {
+        excluded.push(who);
+        continue;
+      }
+      const steps = (Object.keys(TAKES) as Route[]).map((route) => {
+        const story = new Story(who);
+        expect(story.startOnRoute(route).kind, `${who} ${route}`).not.toBe(
+          'title',
+        );
+        return at(story);
+      });
+      expect(new Set(steps).size, who).toBe(4);
+      families.add(steps.join('/'));
+    }
+    expect([...families].sort()).toEqual([
+      '4/17/33/44',
+      '4/21/47/62',
+      '6/23/49/64',
+    ]);
+    // Stories without the Chii opener never open this menu.
+    expect(excluded.sort()).toEqual([
+      'alpha',
+      'astroman',
+      'asura',
+      'dora',
+      'golf',
+      'pachelo',
+      'shinz',
+      'training',
+      'ttro',
+      'zaku',
+      'zenka',
+    ]);
+    // Ryuko's Hard take lands on step 21's demo; its battle follows, and
+    // retry replays it as next() always did.
+    const story = new Story('ryuko');
+    expect(story.startOnRoute('story-hard')).toEqual({
+      kind: 'demo',
+      demo: 3,
+    });
+    expect(at(story)).toBe(21);
+    const battle = story.next();
+    expect(battle.kind).toBe('battle');
+    expect(at(story)).toBe(22);
+    expect(story.retry()).toEqual(battle);
   });
 });

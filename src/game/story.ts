@@ -1,8 +1,9 @@
 // Port of story mode's runner (0x4069b0): each player's story (PLAYER
 // +0x7cc9, export_assets.scenario) is up to 100 steps, run from the step
 // after the last until one starts a battle or a demo.
-import { CHARACTERS } from './characters';
+import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
+import { ROSTER } from './select';
 
 export interface Slot {
   flags: number;
@@ -87,6 +88,34 @@ const DORA_STORY = doraStory();
 export const scenarioOf = (who: Who) =>
   who === 'dora' ? DORA_STORY : (CHARACTERS[who].scenario as readonly Step[]);
 
+// The routes a mode-select battle's Chii signs offer (docs/evidence.md,
+// Globals): striking a sign KO's it into taking the 1P's life by its take —
+// 100 for Easy, 346 for Hard, 347 for BR ZERO and 348 for BR Another —
+// which steps 1–3's jumps read.
+export type Route = 'story-easy' | 'story-hard' | 'br-zero' | 'br-another';
+export const TAKES: Record<Route, number> = {
+  'story-easy': 100,
+  'story-hard': 346,
+  'br-zero': 347,
+  'br-another': 348,
+};
+
+// Whether the story opens on its mode select: the first step is the Chii
+// battle, whose seats hold only ZAKU's and PAC-HELO's sign actors.
+export const opensOnModeSelect = (who: Who) => {
+  const [step] = scenarioOf(who);
+  return (
+    step?.type === 1 &&
+    step.slots.some((s) => s !== null) &&
+    step.slots.every(
+      (s) =>
+        s === null ||
+        ROSTER[s.player] === 'zaku' ||
+        ROSTER[s.player] === 'pachelo',
+    )
+  );
+};
+
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
@@ -122,5 +151,14 @@ export class Story {
   retry() {
     this.step--;
     return this.next();
+  }
+
+  // Enter the story as if the 1P struck the route's Chii sign: the skipped
+  // sign battle is step 0's, and next() reads the life it left — the 1P's
+  // less its take and the Single Start's 1 — through the usual jumps, whose
+  // branches (YINAN's/AYA's and RARIO's included) stay the runner's.
+  startOnRoute(route: Route): Next {
+    this.step = 0;
+    return this.next(lifeOf(this.who) - 1 - TAKES[route], 0);
   }
 }

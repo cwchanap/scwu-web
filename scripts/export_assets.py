@@ -4925,6 +4925,11 @@ def assets_version(files):
 # Mirrors packs.ts's selectAssets (scene.ts's before): the images (op 0x0c) and sounds (op 0x03) that a
 # player's select programs (select.ts) show or play, within what the player exports. Boot holds them,
 # since the select screen uses them from the start; the rest of a player's files go to its fighter pack.
+# ZAKU's and PAC-HELO's Chii sign boards join boot for the mode select too — its select programs never
+# name them; the blank 8004 boards stay in the fighter packs.
+SIGNS = {"zaku": {8001, 8005, 8006}, "pachelo": {8001, 8005, 8006}}
+
+
 def export_packs():
     def load(name):
         return json.loads((GENERATED / name).read_text(encoding="utf8"))
@@ -4941,7 +4946,7 @@ def export_packs():
     for who in ["ryuko", *FIGHTERS]:
         data = load("assets.json" if who == "ryuko" else f"{who}.json")
         records = [bytes(r) for actions in data["select"]["actions"].values() for r in actions]
-        shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c}
+        shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c} | SIGNS.get(who, set())
         played = {u16(r, 2) for r in records if r[0] == 0x03}
         boot_images.update(files([e for e in data["images"] if e["index"] in shown], who))
         boot_sounds.update(files([e for e in data["sounds"] if e["index"] in played], f"{who}-sound"))
