@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
-import { opensOnModeSelect, Story, scenarioOf, TAKES } from './story';
+import {
+  isModeSelectBattle,
+  opensOnModeSelect,
+  Story,
+  scenarioOf,
+  TAKES,
+} from './story';
 import type { Battle, Route } from './story';
 
 const at = (story: Story) => story.step;
@@ -155,5 +161,24 @@ describe('story runner', () => {
     expect(battle.kind).toBe('battle');
     expect(at(story)).toBe(22);
     expect(story.retry()).toEqual(battle);
+  });
+
+  it('rejects a one-sign battle as the mode select', () => {
+    const chii = scenarioOf('ryuko')[0] as Battle;
+    expect(isModeSelectBattle(chii)).toBe(true);
+    // A lone sign actor could not offer the four-way pick.
+    const lone = {
+      ...chii,
+      slots: chii.slots.map((s, i) => (i === 0 ? s : null)),
+    };
+    expect(isModeSelectBattle(lone)).toBe(false);
+    // Nor could seats the 1P does not fight (the ally flag 0x200).
+    const allied = {
+      ...chii,
+      slots: chii.slots.map((s, i) =>
+        i < 2 ? s && { ...s, flags: s.flags | 0x200 } : null,
+      ),
+    };
+    expect(isModeSelectBattle(allied)).toBe(false);
   });
 });

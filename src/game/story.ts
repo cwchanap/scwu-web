@@ -100,21 +100,24 @@ export const TAKES: Record<Route, number> = {
   'br-another': 348,
 };
 
+// Whether a step is the mode-select battle: the Chii, whose seats hold only
+// ZAKU's and PAC-HELO's sign actors, and at least two opponents (hostile
+// seats — the 0x200 flag marks an ally) — a lone sign could not offer the
+// pick.
+export const isModeSelectBattle = (step: Step | undefined) =>
+  step?.type === 1 &&
+  step.slots.every(
+    (s) =>
+      s === null ||
+      ROSTER[s.player] === 'zaku' ||
+      ROSTER[s.player] === 'pachelo',
+  ) &&
+  step.slots.filter((s) => s !== null && !(s.flags & 0x200)).length >= 2;
+
 // Whether the story opens on its mode select: the first step is the Chii
-// battle, whose seats hold only ZAKU's and PAC-HELO's sign actors.
-export const opensOnModeSelect = (who: Who) => {
-  const [step] = scenarioOf(who);
-  return (
-    step?.type === 1 &&
-    step.slots.some((s) => s !== null) &&
-    step.slots.every(
-      (s) =>
-        s === null ||
-        ROSTER[s.player] === 'zaku' ||
-        ROSTER[s.player] === 'pachelo',
-    )
-  );
-};
+// battle.
+export const opensOnModeSelect = (who: Who) =>
+  isModeSelectBattle(scenarioOf(who)[0]);
 
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
