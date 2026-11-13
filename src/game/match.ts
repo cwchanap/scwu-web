@@ -2047,25 +2047,11 @@ export class Match {
     return one ? this.fighters.filter((_, i) => one.enemies & (1 << i)) : [];
   }
 
-  // Authored: all hostile seats count, except Chii acting as difficulty
-  // buttons — ponytail: guessed from seats (global 10 = 10, every hostile
-  // ZAKU or PAC-HELO), not a stance or state flag the battle leaves.
+  // Authored: all hostile seats count.
   private get brawlEnemies() {
     if (!this.battle) return null;
     const enemies = this.enemiesOfOne;
-    return enemies.length > 1 && !this.choosingMode ? enemies : null;
-  }
-
-  // The same detection, read wherever the non-combat selector matters: it
-  // encodes its route as native otherLife subtractions off the 1P, so the
-  // 1P's life keeps native units there (cheatSeat).
-  private get choosingMode() {
-    if (!this.battle || this.globals[10] !== 10) return false;
-    const enemies = this.enemiesOfOne;
-    return (
-      enemies.length > 1 &&
-      enemies.every((f) => f.who === 'zaku' || f.who === 'pachelo')
-    );
+    return enemies.length > 1 ? enemies : null;
   }
 
   // State 300 in a story (0x409062). At a time-up, seat 1 scores the step's
@@ -2100,8 +2086,7 @@ export class Match {
     const enemies = this.brawlEnemies;
     // Authored: combat brawls resolve by survival — a wipe-out on the last
     // tick still wins and a knockout on it still loses, not the time-up's
-    // points. Mode selection keeps its points. A fallen hostile stays
-    // defeated for the result even risen.
+    // points. A fallen hostile stays defeated for the result even risen.
     if (enemies && (!timeUp || !one.hp || enemies.every((f) => f.downed))) {
       ours = one.hp > 0 ? 1 : 0;
       theirs = enemies.some((f) => !f.downed) ? 1 : 0;
@@ -2383,14 +2368,10 @@ export class Match {
   // fighters start native, so an enabled-off battle never passes here.
   private cheatSeat(f: Fighter, i: number) {
     if (!i) {
-      // The mode-select battle encodes its route in native units off the
-      // 1P's life (choosingMode), so its 1P keeps native life: reading the
-      // scaled bar KOs it at strong shrinks and misroutes every choice.
-      if (!this.choosingMode)
-        f.maxHp = Math.max(
-          1,
-          Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
-        );
+      f.maxHp = Math.max(
+        1,
+        Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
+      );
       f.maxStock = this.cheats.playerEnLimit;
     } else if (this.hostile(0, i))
       f.maxHp = Math.max(
@@ -5301,8 +5282,7 @@ export class Match {
     // PC 1037) is never seen at 0. A story's ends as the 1P is KO'd or any
     // player reaches 100 points (0x408eda). Authored: a brawl instead waits
     // for every hostile seat to have fallen, including waiting ones — a
-    // revived boss still counting once it has been KO'd. Mode selection's
-    // Chii (global 10 = 10) keep their scripted point objective.
+    // revived boss still counting once it has been KO'd.
     // Seeing the end it sets state 300
     // (0x408ec7), which picks the result the tick after from the lives then,
     // by per mille (+0xdf09, 0x408f68) as lives differ, or a story's
