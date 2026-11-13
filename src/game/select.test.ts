@@ -8,6 +8,7 @@ import {
   Continue,
   CONTINUE,
   LAYOUT,
+  ModeSelect,
   MODES,
   ROSTER,
   selectable,
@@ -499,6 +500,129 @@ describe('story demos (object type 16, 0x406c10)', () => {
     }
     demo.step();
     expect([o.action, o.pc, o.frame?.image]).toEqual([2, 27, 1000]);
+  });
+});
+
+describe('mode select (authored, HPA-765)', () => {
+  // A finished story select — Ryuko taken with J — for the menu to sit
+  // over.
+  const picked = () => {
+    const select = new CharacterSelect([[0, 0]], true);
+    select.step();
+    run(select, tap({ punch: true }));
+    while (!select.done) select.step();
+    return select;
+  };
+  const signs = (mode: ModeSelect) =>
+    mode.objects.filter((o) => o.alive && o.frame && o.container !== 'kgt');
+  // A fresh press: the tick before lets any held keys — and with them the
+  // latch — go.
+  const press = (mode: ModeSelect, input: Input) => run(mode, [{}, input]);
+
+  it('opens on the STORY and B.R. boards and the bobbing 1P arrow, its first tick deaf to the pick button', () => {
+    const mode = new ModeSelect(picked());
+    // The button that chose the fighter is still down on tick one: the
+    // screen arms without it (authored).
+    mode.step({ punch: true });
+    expect(mode.stage).toBe(0);
+    expect(mode.done).toBeNull();
+    expect(signs(mode).map((o) => [o.container, o.frame!.image])).toEqual([
+      ['zaku', 8001],
+      ['pachelo', 8001],
+    ]);
+    expect(
+      mode.objects.some((o) => o.container === 'kgt' && o.action === 84),
+    ).toBe(true);
+    expect([0, 1]).toContain(mode.choice);
+    // Held past the first tick it is still not fresh; let go and pressed
+    // again it confirms the mode and brings up the route step.
+    mode.step({ punch: true });
+    expect(mode.stage).toBe(0);
+    mode.choice = 0;
+    press(mode, { punch: true });
+    expect(mode.stage).toBe(1);
+    expect(signs(mode).map((o) => [o.frame!.image, o.scale])).toEqual([
+      [8005, 1],
+      [8005, 1],
+      [8001, 0.5],
+    ]);
+    // The chosen mode's smaller board heads the route step.
+    expect(
+      mode.objects.some((o) => o.frame?.image === 8001 && o.scale === 0.5),
+    ).toBe(true);
+  });
+
+  it('steps its finished select with no input, palette and pick intact', () => {
+    const background = picked();
+    const view = background as unknown as { tick: number };
+    const before = view.tick;
+    const mode = new ModeSelect(background);
+    expect(mode.who).toBe('ryuko');
+    mode.step();
+    mode.step();
+    expect(view.tick).toBe(before + 2);
+    expect(mode.background).toBe(background);
+    expect(mode.background.drawn).toBe(background.drawn);
+    expect(mode.background.done).toEqual(['ryuko', 'ryuko']);
+    // The menu's own objects write none of the session globals.
+    for (let t = 0; t < 200; t++) mode.step();
+    expect(mode.globals).toEqual(Array<number>(64).fill(0));
+  });
+
+  it('moves the arrow with any direction, latching until every key is let go, and confirms the route on step two', () => {
+    const mode = new ModeSelect(picked());
+    mode.step();
+    const start = mode.choice;
+    mode.step({ right: true });
+    mode.step({ right: true });
+    expect(mode.choice).toBe(1 - start);
+    mode.step({ crouch: true });
+    // A held direction can't move again until all keys come up.
+    expect(mode.choice).toBe(1 - start);
+    mode.step();
+    mode.step({ crouch: true });
+    expect(mode.choice).toBe(start);
+    mode.choice = 0;
+    press(mode, { punch: true });
+    expect(mode.stage).toBe(1);
+    mode.choice = 1;
+    press(mode, { kick: true });
+    expect(mode.done).toBe('story-hard');
+  });
+
+  it('remembers the last mode and each mode’s route for the page session', () => {
+    const first = new ModeSelect(picked());
+    first.step();
+    first.choice = 1;
+    press(first, { punch: true });
+    first.choice = 1;
+    press(first, { punch: true });
+    expect(first.done).toBe('br-another');
+    const second = new ModeSelect(picked());
+    second.step();
+    expect(second.choice).toBe(1);
+    press(second, { punch: true });
+    expect(second.choice).toBe(1);
+    press(second, { punch: true });
+    expect(second.done).toBe('br-another');
+  });
+
+  it('back() returns to the mode step, the confirmed picks still held', () => {
+    const mode = new ModeSelect(picked());
+    mode.step();
+    mode.choice = 1;
+    press(mode, { punch: true });
+    expect(mode.stage).toBe(1);
+    const remembered = mode.choice;
+    mode.choice = remembered ? 0 : 1;
+    mode.back();
+    expect([mode.stage, mode.done]).toEqual([0, null]);
+    expect(mode.choice).toBe(1);
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
+    // The route step picks up its remembered route again.
+    press(mode, { punch: true });
+    expect(mode.stage).toBe(1);
+    expect(mode.choice).toBe(remembered);
   });
 });
 
