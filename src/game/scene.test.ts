@@ -1,13 +1,19 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type Phaser from 'phaser';
-import { CHARACTERS, STAGES } from './characters';
+import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
 import { Match, LIFE } from './match';
 import { parsePack } from './packs';
-import { CharacterSelect, Continue, StoryDemo, Title } from './select';
+import {
+  CharacterSelect,
+  Continue,
+  ModeSelect,
+  StoryDemo,
+  Title,
+} from './select';
 import type { Demo } from './select';
 import { scenarioOf, Story } from './story';
 import type { Battle } from './story';
@@ -694,20 +700,29 @@ describe('cheats (HPA-767)', () => {
     expect(statuses.at(-1)?.cheated).toBe(true);
   });
 
-  it('resets the run mark when a story route is picked', () => {
-    const { scene, view, artIn, statuses, finishLoad } = boot();
+  it('resets the run mark when a story route is picked', async () => {
+    const { scene, view, artIn, statuses, completes, finishLoad } = boot();
     artIn();
     scene.setCheats(cheats({ enabled: true }));
     scene.reset('practice');
     expect(statuses.at(-1)?.cheated).toBe(true);
-    // Picking a story route starts a fresh run, clean while cheats are off.
+    // Picking a story route starts a fresh run, clean while cheats are
+    // off. An eligible pick (Ryuko's) goes through the mode select first
+    // (HPA-765); the pick alone keeps the old run's mark.
     scene.setCheats(cheats());
     const select = new CharacterSelect(undefined, true);
     view.select = select;
     select.done = ['ryuko', 'ryuko'];
     stepSelect(view);
+    const mode = view.select as ModeSelect;
+    expect(mode).toBeInstanceOf(ModeSelect);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    mode.stage = 1;
+    mode.done = 'br-zero';
+    stepSelect(view);
+    await vi.waitFor(() => expect(completes).toHaveLength(1));
     finishLoad();
-    expect(scene.match.mode).toBe('story');
+    expect(view.select).toBeInstanceOf(StoryDemo);
     expect(statuses.at(-1)?.cheated).toBe(false);
   });
 
@@ -853,5 +868,218 @@ describe('cheats (HPA-767)', () => {
     expect(vm.life).toBe(1020);
     expect(vm.lifeMax).toBe(1020);
     expect(vm.lifeNative).toBe(LIFE);
+  });
+});
+
+// HPA-765's quick mode select: the two-step menu an eligible story pick
+// opens over the finished select, and its route start through the runner.
+describe('mode select (HPA-765)', () => {
+  const openMode = (view: { [key: string]: unknown }) => {
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = ['ryuko', 'ryuko'];
+    stepSelect(view);
+    return view.select as ModeSelect;
+  };
+
+  it('opens the selector on an eligible story pick instead of the sign battle', () => {
+    const { view } = boot();
+    const mode = openMode(view);
+    expect(mode).toBeInstanceOf(ModeSelect);
+    expect(mode.background.done).toEqual(['ryuko', 'ryuko']);
+    // No Chii match is started and no demo loads yet.
+    expect(view.loading).toBe(false);
+    expect(view.wanted).toBeUndefined();
+    expect(view.story).toBeNull();
+    expect(mode.globals).toBe(view.globals);
+  });
+
+  it('keeps an excluded story on its direct start', () => {
+    const { view } = boot();
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = ['shinz', 'shinz'];
+    stepSelect(view);
+    expect(view.select).toBe(select);
+    expect(view.loading).toBe(true);
+  });
+
+  it('enters the picked route through the runner with the life its take left', async () => {
+    const { view, completes, finishLoad } = boot();
+    const mode = openMode(view);
+    mode.stage = 1;
+    mode.done = 'story-easy';
+    stepSelect(view);
+    expect(view.loading).toBe(true);
+    const story = view.story as Story;
+    expect(story.who).toBe('ryuko');
+    // Ryuko easy: the runner lands on step 4's demo, the 1P at the native
+    // life the skipped Chii battle would have left (510 − 1 − 100).
+    expect(story.step).toBe(4);
+    expect(view.storyLife).toBe(lifeOf('ryuko') - 1 - 100);
+    expect(view.storyLost).toBe(0);
+    expect(view.storyHeld).toEqual(mode.background.drawn);
+    await vi.waitFor(() => expect(completes).toHaveLength(1));
+    finishLoad();
+    expect(view.select).toBeInstanceOf(StoryDemo);
+  });
+
+  it('resets the run’s cheated mark at the route pick, not the fighter pick', () => {
+    const { scene, view, statuses, artIn } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+    const mode = openMode(view);
+    // The fighter pick alone keeps the old run's mark.
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    mode.stage = 1;
+    mode.done = 'br-zero';
+    stepSelect(view);
+    (view.report as () => void)();
+    expect(statuses.at(-1)?.cheated).toBe(false);
+  });
+
+  it('reports choosingMode and story mode while the selector carries a story session', () => {
+    const { view, statuses } = boot();
+    const story = new Story('ryuko');
+    const first = story.next();
+    if (first.kind !== 'battle') throw new Error('expected a battle');
+    view.story = story;
+    view.match = Match.story('ryuko', first.battle, 0);
+    openMode(view);
+    expect(statuses.at(-1)).toMatchObject({
+      selecting: true,
+      choosingMode: true,
+      mode: 'story',
+    });
+  });
+
+  it('Escape on the mode step reopens the story select; Escape on the route step steps back', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { view } = boot();
+    const mode = openMode(view);
+    mode.stage = 1;
+    esc(view);
+    expect(view.select).toBe(mode);
+    expect(mode.stage).toBe(0);
+    esc(view);
+    const select = view.select as CharacterSelect;
+    expect(select).toBeInstanceOf(CharacterSelect);
+    expect(select.story).toBe(true);
+  });
+
+  it('Escape after the route pick cancels the start still loading', async () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { view, finishLoad } = boot();
+    const mode = openMode(view);
+    mode.stage = 1;
+    mode.done = 'story-easy';
+    stepSelect(view);
+    expect(view.loading).toBe(true);
+    esc(view);
+    expect(view.loading).toBe(false);
+    expect(view.select).toBe(mode);
+    expect(mode.stage).toBe(0);
+    expect(mode.done).toBeNull();
+    // The demo's module and art land cancelled: the menu stays.
+    await vi.dynamicImportSettled();
+    await new Promise((resolve) => setTimeout(resolve));
+    finishLoad();
+    expect(view.select).toBe(mode);
+  });
+
+  it('R on the selector returns to the title', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { view } = boot();
+    openMode(view);
+    r(view);
+    expect(view.select).toBeInstanceOf(Title);
+  });
+
+  it('Enter feeds a select press only while the selector is up', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view } = boot();
+    const enter = () =>
+      (view.keydown as (e: unknown) => void)({
+        code: 'Enter',
+        repeat: false,
+        target: {},
+        preventDefault: () => {},
+      });
+    scene.openSelect();
+    enter();
+    expect((view.pressed as Set<string>).size).toBe(0);
+    openMode(view);
+    enter();
+    expect(view.pressed as Set<string>).toContain('punch');
+  });
+
+  it('draws the selector’s player objects in the finished select’s palettes', () => {
+    const { view } = boot();
+    const mode = openMode(view);
+    const background = mode.background;
+    // Seat 0's palette (3, J), kept on the finished select.
+    background.drawn[0] = 3;
+    const textures = view.textures as { exists(key: string): boolean };
+    textures.exists = (key) => key === 'ryuko-1@3';
+    const calls: (string | undefined)[] = [];
+    const sprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => {
+          if (prop === 'then') return undefined;
+          return (value?: unknown) => {
+            if (prop === 'setTexture') calls.push(value as string);
+            return sprite;
+          };
+        },
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    const o = {
+      container: 'ryuko',
+      action: 0,
+      pc: 0,
+      timer: Infinity,
+      frame: {
+        pc: 0,
+        image: 1,
+        duration: 0,
+        dx: 0,
+        dy: 0,
+        flip_x: false,
+        flip_y: false,
+        ignore_facing: false,
+        packed_image: 1,
+        extra_bytes: '',
+      },
+      displayed: true,
+      x: 100,
+      y: 200,
+      vx: 0,
+      vy: 0,
+      ax: 0,
+      ay: 0,
+      facing: 1 as const,
+      z: 0x50,
+      color: { mode: 0, r: 0, g: 0, b: 0, fade: 0 },
+      locals: {},
+      alive: true,
+      born: 0,
+      owner: 0,
+      single: null,
+      call: null,
+    };
+    (
+      view.drawSelectObject as (
+        sprite: Phaser.GameObjects.Image,
+        o: unknown,
+        index: number,
+      ) => void
+    )(sprite, o, 0);
+    // Seat 0's palette (3, J) lives on the background's drawn: the object
+    // takes its recoloured texture from there, not a palette of its own.
+    expect(calls).toContain('ryuko-1@3');
   });
 });

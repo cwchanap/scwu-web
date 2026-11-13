@@ -41,6 +41,8 @@ class File {
 export default {
   Scene: class {},
   GameObjects: { Image: class {} },
+  // Phaser's BlendModes enum (blendmodes.js).
+  BlendModes: { NORMAL: 0, ADD: 1 },
   Loader: {
     File,
     Events: { COMPLETE: 'complete', FILE_LOAD_ERROR: 'loaderror' },

@@ -13,13 +13,14 @@ import {
   battlePalettes,
   CharacterSelect,
   Continue,
+  ModeSelect,
   StoryDemo,
   TEAM_DEMO,
   Title,
   TITLE,
 } from './select';
 import type { Demo, SelectObject } from './select';
-import { Story } from './story';
+import { opensOnModeSelect, Story, TAKES } from './story';
 import type { Battle, Next } from './story';
 import {
   createHud,
@@ -64,6 +65,8 @@ export interface GameStatus {
   error: string;
   // On the title or the character select screen, and the pair it last chose.
   selecting: boolean;
+  // The mode select a story pick opened is up (authored, HPA-765).
+  choosingMode: boolean;
   fighters: [Who, Who];
   // In a story battle.
   story: boolean;
@@ -87,6 +90,7 @@ export const initialStatus: GameStatus = {
   matchWinner: null,
   error: '',
   selecting: true,
+  choosingMode: false,
   fighters: ['ryuko', 'zoma'],
   story: false,
   mode: 'practice',
@@ -229,8 +233,11 @@ export class TrainingScene extends Phaser.Scene {
   private track?: Phaser.Sound.BaseSound;
   // The title, which the game opens on, then the select screen, or story
   // mode's demos and continue screen.
-  private select: Title | CharacterSelect | StoryDemo | Continue | null =
+  private select:
+    Title | CharacterSelect | StoryDemo | Continue | ModeSelect | null =
     new Title();
+  // The mode select's dimmer over its finished select (authored, HPA-765).
+  private dimmer?: Phaser.GameObjects.Rectangle;
   // Story mode: the story running (story.ts), its 1P's palette, and the
   // 1P's life and the rounds it lost or drew as its last battle ended, which
   // the runner's jumps read; and whether a demo or stage is loading.
@@ -318,6 +325,24 @@ export class TrainingScene extends Phaser.Scene {
       e.preventDefault();
       this.held.add(e.code);
       if (!e.repeat) this.pressed.add(keyMap[e.code]);
+    }
+    // Enter is the mode select's other confirm (authored, HPA-765).
+    if (!e.repeat && e.code === 'Enter' && this.select instanceof ModeSelect) {
+      e.preventDefault();
+      this.pressed.add('punch');
+    }
+    // Esc on the mode select's route step goes back to the mode pick —
+    // cancelling a route's start still loading — and on the mode step to
+    // the story select, which remembers its cell (authored, HPA-765).
+    if (!e.repeat && e.code === 'Escape' && this.select instanceof ModeSelect) {
+      e.preventDefault();
+      if (this.select.stage === 1) {
+        this.select.back();
+        this.wanted = undefined;
+        this.demoRequest = undefined;
+        this.loading = false;
+      } else this.open(new CharacterSelect(undefined, true));
+      return;
     }
     // Esc on a select screen goes back to the title, not pause (authored).
     if (
@@ -463,8 +488,27 @@ export class TrainingScene extends Phaser.Scene {
       return select.done === 'yes'
         ? this.runStory(this.story!.retry())
         : this.openTitle();
+    // The mode select's route pick (authored, HPA-765): the runner enters
+    // as if the 1P struck its Chii sign — the skipped battle's life left
+    // for its jumps — and a fresh run for the cheated mark.
+    if (select instanceof ModeSelect) {
+      const { who } = select;
+      this.runCheated = false;
+      this.story = new Story(who);
+      this.storyHeld = [...select.background.drawn];
+      this.teams = null;
+      [this.storyLife, this.storyLost] = [
+        lifeOf(who) - 1 - TAKES[select.done],
+        0,
+      ];
+      return this.runStory(this.story.startOnRoute(select.done));
+    }
     // The story's first step (0x4069b0), its counter reset by the title.
     if (select.story) {
+      // A story the mode select opens for offers it first (authored,
+      // HPA-765); the finished select shows underneath it.
+      if (opensOnModeSelect(select.done[0]))
+        return this.open(new ModeSelect(select));
       // A story route picked starts a fresh run for its cheated mark.
       this.runCheated = false;
       this.story = new Story(select.done[0]);
@@ -485,6 +529,7 @@ export class TrainingScene extends Phaser.Scene {
   private leaveScreen() {
     this.select = null;
     this.selectTrack?.stop();
+    this.dimmer?.setVisible(false);
     for (const sprite of this.selectSprites) sprite.setVisible(false);
   }
 
@@ -663,8 +708,23 @@ export class TrainingScene extends Phaser.Scene {
   }
   // Demo and KGT objects draw their display's top left at their offset; a
   // player's select face and name stand on their ground point (placement).
+  // The mode select draws its finished select under a dimmer first, its own
+  // signs and arrow above it (authored, HPA-765).
   private drawSelect() {
-    const objects = this.select!.objects.filter((o) => o.frame);
+    const select = this.select!;
+    const objects = (
+      select instanceof ModeSelect
+        ? [...select.background.objects, ...select.objects]
+        : select.objects
+    ).filter((o) => o.alive && o.frame);
+    if (select instanceof ModeSelect) {
+      this.dimmer ??= this.add
+        .rectangle(0, 0, WIDTH, HEIGHT, 0, 0.55)
+        .setOrigin(0)
+        .setScrollFactor(0)
+        .setDepth(200.9);
+      this.dimmer.setVisible(true);
+    } else this.dimmer?.setVisible(false);
     this.pool(this.selectSprites, objects.length).forEach((sprite, index) => {
       const o = objects[index];
       if (!o) return sprite.setVisible(false);
@@ -690,13 +750,18 @@ export class TrainingScene extends Phaser.Scene {
           flip_x: frame.flip_x,
           flip_y: frame.flip_y,
         };
+    // The mode select's own player objects take the palettes its finished
+    // select's seats drew with (authored, HPA-765).
+    const behind =
+      this.select instanceof ModeSelect ? this.select.background : this.select;
     const palette =
-      player && this.select instanceof CharacterSelect
-        ? Math.max(0, this.select.drawn[o.owner])
+      player && behind instanceof CharacterSelect
+        ? Math.max(0, behind.drawn[o.owner])
         : 0;
     this.paint(sprite, pose, o.color, prefix as Container, palette)
       .setOrigin(0)
       .setScrollFactor(0)
+      .setScale(ART_SCALE * (o.scale ?? 1))
       .setDepth(200 + o.z / 256 + index / 1e6)
       .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
       .setFlip(p.flip_x, p.flip_y);
@@ -1381,13 +1446,15 @@ export class TrainingScene extends Phaser.Scene {
     }
   }
 
-  // The screen up is the story's own — its 1P select, a demo or the
-  // continue screen — which steps back into the runner, so the session a
-  // finished battle left is still alive. Any other ends it.
+  // The screen up is the story's own — its 1P select, the mode select it
+  // opened, a demo or the continue screen — which steps back into the
+  // runner, so the session a finished battle left is still alive. Any
+  // other ends it.
   private storyScreen() {
     return (
       this.select instanceof StoryDemo ||
       this.select instanceof Continue ||
+      this.select instanceof ModeSelect ||
       (this.select instanceof CharacterSelect && this.select.story)
     );
   }
@@ -1412,6 +1479,7 @@ export class TrainingScene extends Phaser.Scene {
       matchWinner: over ? this.match.matchWinner : null,
       error: this.error,
       selecting: !!this.select,
+      choosingMode: this.select instanceof ModeSelect,
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
       // The requested match's mode while it loads, so a pick mid-load

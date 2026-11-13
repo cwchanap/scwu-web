@@ -73,6 +73,7 @@
     matchWinner: null,
     error: '',
     selecting: true,
+    choosingMode: false,
     fighters: ['ryuko', 'zoma'],
     story: false,
     mode: 'practice',
@@ -262,11 +263,22 @@
   const moveKeys = new Set(
     Object.values(KEYS).flatMap((keys) => keys.map(([control]) => control)),
   );
+  // A select screen's pad (authored, HPA-765): the directions and one
+  // confirm button on every one, whatever the last fighter's moves were.
+  const SELECT_CONTROLS: ReadonlySet<Control> = new Set([
+    'left',
+    'right',
+    'jump',
+    'crouch',
+    'punch',
+  ]);
   const has = (control: Control) =>
-    control in buttonsOf(fighter)
-      ? usesButton(fighter, control)
-      : !moveKeys.has(control) ||
-        KEYS[fighter].some(([key]) => key === control);
+    status.selecting
+      ? SELECT_CONTROLS.has(control)
+      : control in buttonsOf(fighter)
+        ? usesButton(fighter, control)
+        : !moveKeys.has(control) ||
+          KEYS[fighter].some(([key]) => key === control);
 
   onMount(() => {
     // The Cheats menu's saved settings (HPA-767): read here — a failed

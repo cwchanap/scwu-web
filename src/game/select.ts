@@ -6,10 +6,12 @@
 // player's select face, run from their raw records.
 import { CHARACTERS } from './characters';
 import type { Who } from './characters';
+import { NORMAL_COLOR } from './animations';
 import type { Color } from './animations';
 import type { Input } from './match';
 import { rand } from './standing';
 import type { Frame } from './standing';
+import type { Route } from './story';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -125,6 +127,9 @@ export interface SelectObject {
   // left and the return (+0x7c, +0x7d, +0x81); each an action and offset.
   single: [number, number] | null;
   call: { left: number; to: [number, number]; back: [number, number] } | null;
+  // Authored: a scale the scene draws the display at (the mode select's
+  // smaller header board); absent is the usual 1.5×.
+  scale?: number;
 }
 export interface Cue {
   container: SelectContainer;
@@ -777,6 +782,171 @@ export class Continue extends Screen {
       return;
     }
     [this.cursor.x, this.cursor.y] = CONTINUE.items[this.choice];
+  }
+}
+
+// Authored (HPA-765): the quick mode select an eligible story pick opens
+// over the finished select screen. Step one offers STORY and B.R. by their
+// sign boards (the ZAKU's and PAC-HELO's image 8001), step two that mode's
+// two routes (8005, 8006) under the mode's smaller board; the KGT's 1P
+// cursor (action 84) bobs over the pick. The finished select keeps
+// stepping untouched underneath. The last mode and each mode's route stand
+// for the page session.
+interface ModeBoard {
+  who: 'zaku' | 'pachelo';
+  image: number;
+}
+const MODE_BOARDS: readonly ModeBoard[] = [
+  { who: 'zaku', image: 8001 },
+  { who: 'pachelo', image: 8001 },
+];
+const ROUTE_BOARDS: readonly (readonly (ModeBoard & { route: Route })[])[] = [
+  [
+    { who: 'zaku', image: 8005, route: 'story-easy' },
+    { who: 'pachelo', image: 8005, route: 'story-hard' },
+  ],
+  [
+    { who: 'zaku', image: 8006, route: 'br-zero' },
+    { who: 'pachelo', image: 8006, route: 'br-another' },
+  ],
+];
+// The boards are 260×204; the two of a step rest side by side, the mode's
+// on the route step again at half size up top.
+const SIGN_W = 260;
+const SIGN_H = 204;
+const SIGN_X = [175, 465];
+const SIGN_TOP = [140, 190];
+const HEADER_TOP = 40;
+const SIGN_Z = 0x110;
+const CURSOR_Z = 0x120;
+let modePlace = 0;
+const routePlace = [0, 0];
+
+export class ModeSelect extends Screen {
+  done: Route | null = null;
+  // 0 picks STORY or B.R., 1 that mode's route.
+  stage = 0;
+  // The fighter the finished select took.
+  readonly who: Who;
+  choice = modePlace;
+  private signs: SelectObject[] = [];
+  private cursor: SelectObject | null = null;
+  private latch = false;
+  private previous = 0;
+
+  constructor(readonly background: CharacterSelect) {
+    super();
+    this.who = background.done![0];
+  }
+
+  protected control(input: Input) {
+    this.background.step();
+    const now = word(input);
+    const pressed = (now ^ this.previous) & now;
+    this.previous = now;
+    if (!this.cursor) {
+      // Tick one arms the screen; the button the fighter was picked with
+      // can't also choose.
+      this.show();
+      return;
+    }
+    if (!now) this.latch = false;
+    else if (pressed & 0xf && !this.latch) {
+      this.choice ^= 1;
+      this.latch = true;
+    } else if (pressed & BUTTONS && !this.latch) {
+      this.confirm();
+      return;
+    }
+    this.place();
+  }
+
+  // Escape on the route step comes back here, the picks kept.
+  back() {
+    this.stage = 0;
+    this.choice = modePlace;
+    this.done = null;
+    this.latch = true;
+    this.show();
+  }
+
+  private confirm() {
+    this.latch = true;
+    if (!this.stage) {
+      modePlace = this.choice;
+      this.stage = 1;
+      this.choice = routePlace[modePlace];
+      this.show();
+      return;
+    }
+    routePlace[modePlace] = this.choice;
+    this.done = ROUTE_BOARDS[modePlace][this.choice].route;
+  }
+
+  // The step's sign boards — the modes', or its routes under the mode's
+  // smaller board — and the cursor over the pick.
+  private show() {
+    for (const o of this.objects) if (o !== this.cursor) o.alive = false;
+    this.signs = this.boards().map((board, i) =>
+      this.sign(board.who, board.image, SIGN_X[i], SIGN_TOP[this.stage]),
+    );
+    if (this.stage) {
+      const mode = MODE_BOARDS[modePlace];
+      this.sign(mode.who, mode.image, 320, HEADER_TOP, 0.5);
+    }
+    this.cursor ??= this.spawn('kgt', LAYOUT.cursors[0], 0, 0, CURSOR_Z);
+    this.place();
+  }
+
+  private boards(): readonly ModeBoard[] {
+    return this.stage ? ROUTE_BOARDS[modePlace] : MODE_BOARDS;
+  }
+
+  // The arrow over the pick, the other board dark.
+  private place() {
+    this.signs.forEach((o, i) => {
+      o.color =
+        i === this.choice
+          ? NORMAL_COLOR
+          : { mode: 1, r: 0, g: 0, b: 0, fade: 0 };
+    });
+    const o = this.signs[this.choice];
+    this.cursor!.x = o.x - 15;
+    this.cursor!.y = o.y - SIGN_H - 10;
+  }
+
+  // A sign: one display of its image, held. The board's anchor is its left
+  // bottom, like a cell face's.
+  private sign(
+    who: 'zaku' | 'pachelo',
+    image: number,
+    cx: number,
+    top: number,
+    scale = 1,
+  ) {
+    const o = this.spawn(
+      who,
+      0,
+      cx + (SIGN_W / 2) * (1 - scale),
+      top + SIGN_H,
+      SIGN_Z,
+    );
+    o.frame = {
+      pc: 0,
+      image,
+      duration: 0,
+      dx: 0,
+      dy: 0,
+      flip_x: false,
+      flip_y: false,
+      ignore_facing: true,
+      packed_image: image,
+      extra_bytes: '',
+    };
+    o.displayed = true;
+    o.timer = Infinity;
+    o.scale = scale;
+    return o;
   }
 }
 
