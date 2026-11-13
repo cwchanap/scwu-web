@@ -129,6 +129,30 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
     await page.waitForTimeout(150);
   };
 
+  // A route-confirming key or tap must leave the selector on its own:
+  // while it is up, its boards and header draw fixed opaque values
+  // (lit ≈ 209/229 here), so once the route's demo takes over the
+  // sampled pair diverges. The pair is read before the one confirm
+  // input, then must move with nothing else pressed — a dropped Enter
+  // or tap leaves it exactly there and times the poll out, and without
+  // this gate skipToBattle's own 'g' would confirm the highlighted
+  // route and mask the miss (both screens show the same five pad
+  // buttons).
+  const confirmRoute = async (lit: Rect, send: () => Promise<void>) => {
+    const before = await sample({ lit, hdr: HEADER });
+    const l0 = before.lit.lum;
+    const h0 = before.hdr.lum;
+    await send();
+    await expect
+      .poll(
+        async () => {
+          const s = await sample({ lit, hdr: HEADER });
+          return Math.abs(s.lit.lum - l0) + Math.abs(s.hdr.lum - h0);
+        },
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(25);
+  };
   // A route's opening demo skips on a fresh button once armed; keep
   // pressing until the battle's own pad shows (an early press queueing
   // through the load lands on the demo's or battle's first tick).
@@ -191,7 +215,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await press('Enter');
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
   // B.R.'s routes rest on ZERO, ANOTHER dimmed.
-  await press('Enter');
+  await confirmRoute(ROUTE_LEFT, () => press('Enter'));
   await skipToBattle();
   // B.R. ZERO's opening brawl seats ZAKU first (200) and runs untimed.
   await expect(player).toHaveAttribute('aria-valuemax', '510');
@@ -212,7 +236,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
   await press('d');
   await expect.poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT)).toBeGreaterThan(30);
-  await press('Enter');
+  await confirmRoute(ROUTE_RIGHT, () => press('Enter'));
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '510');
   await expect(opponent).toHaveAttribute('aria-valuemax', '470', {
@@ -227,7 +251,7 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await tap(480, 394);
   await tap(720, 300);
   await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
-  await tap(720, 400);
+  await confirmRoute(ROUTE_LEFT, () => tap(720, 400));
   await skipToBattle();
   // B.R. ANOTHER's brawl seats HISO first (480), also untimed.
   await expect(player).toHaveAttribute('aria-valuemax', '510');
