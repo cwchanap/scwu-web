@@ -419,6 +419,10 @@ export class TrainingScene extends Phaser.Scene {
   }
   control(control: Control, down: boolean) {
     if (down) {
+      // A down that lands still held is the same press — a focused pad
+      // button's keydown fires per auto-repeat — not a new one; only an
+      // up earns the next count.
+      if (this.virtual.has(control)) return;
       this.virtual.add(control);
       this.pressed.set(control, (this.pressed.get(control) ?? 0) + 1);
     } else this.virtual.delete(control);

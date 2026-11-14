@@ -915,6 +915,31 @@ describe('mode select (HPA-765)', () => {
     expect(view.select).toBeInstanceOf(ModeSelect);
   });
 
+  it('takes a held pad’s repeated downs as one press, not a burst', () => {
+    // A focused pad button's keydown fires on every auto-repeat, each a
+    // control(..., true) with no up between. Counted, they would pulse a
+    // fresh edge apiece and walk the mode pick straight through the route
+    // step — a down still held is the same press.
+    const { view } = boot();
+    view.drawSelect = () => {};
+    const silent = { play() {}, stop() {}, pause() {} };
+    (view.sound as { get: () => unknown }).get = () => silent;
+    (view.sound as { add: () => unknown }).add = () => silent;
+    const mode = openMode(view);
+    const frame = () => (view.update as (t: number, d: number) => void)(0, 10);
+    const press = () =>
+      (view.control as (control: string, down: boolean) => void)('punch', true);
+    frame(); // the arm tick: the pick's button can't also choose
+    for (let i = 0; i < 20; i++) {
+      press();
+      frame();
+    }
+    // The one real edge picks the mode; the held level latches the route
+    // step, which phantom presses would have confirmed too.
+    expect(mode.stage).toBe(1);
+    expect(mode.done).toBeNull();
+  });
+
   it('opens the selector on an eligible story pick instead of the sign battle', () => {
     const { view } = boot();
     const mode = openMode(view);
