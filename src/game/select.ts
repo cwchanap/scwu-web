@@ -512,10 +512,19 @@ export class CharacterSelect extends Screen {
     if (this.sides.some((p) => !this.decided[p]) || this.done) return;
     // 0x407a94: then a hundred ticks before the battle, or story mode's
     // first step (0x407b1f); VS multi's first members (0x40772a).
-    if (this.wait++ > 100)
+    if (this.wait++ > 100) {
       this.done = this.team
         ? [ROSTER[this.members[0][0]]!, ROSTER[this.members[1][0]]!]
         : [ROSTER[this.hover[0]]!, ROSTER[this.hover[this.sides.at(-1)!]]!];
+      console.log(
+        '[SCWU select] done',
+        JSON.stringify(this.done),
+        'wait:',
+        this.wait,
+      );
+    }
+    if (this.wait === 1 || this.wait === 100)
+      console.log('[SCWU select] waiting', this.wait);
   }
 
   // 0x406e70 moves a cursor a cell at a time, wrapping at the edges. Leaving
@@ -572,6 +581,16 @@ export class CharacterSelect extends Screen {
 
   // The cursor gives way to its decided form (0x407834).
   private decide(p: number) {
+    console.log(
+      '[SCWU select] decide',
+      p,
+      'hover:',
+      this.hover[p],
+      'palette:',
+      this.palettes[p],
+      'tick:',
+      this.tick,
+    );
     const cursor = this.cursors[p];
     cursor.alive = false;
     this.cursors[p] = this.spawn(
@@ -670,7 +689,10 @@ export class Title extends Screen {
         this.state = TITLE.flags & 0x40 ? 3 : 4;
         return;
       case 3:
-        if (pressed) this.state = 4;
+        if (pressed) {
+          console.log('[SCWU title] armed', pressed.toString(16));
+          this.state = 4;
+        }
         return;
       case 4:
         this.items = [4, 8, 0x10].flatMap((bit, mode) =>
@@ -689,8 +711,19 @@ export class Title extends Screen {
     } else if (pressed & 0xa && !this.latch) {
       place = place < last ? place + 1 : 0;
       this.latch = true;
-    } else if (pressed & BUTTONS && !this.latch)
+    } else if (pressed & BUTTONS && !this.latch) {
       this.done = MODES[this.items[place]];
+      console.log(
+        '[SCWU title] pick',
+        this.done,
+        'place:',
+        place,
+        'items:',
+        JSON.stringify(this.items),
+        'pressed:',
+        pressed.toString(16),
+      );
+    }
     [this.cursor!.x, this.cursor!.y] = TITLE.items[this.items[place]];
   }
 }
@@ -891,6 +924,7 @@ export class ModeSelect extends Screen {
     if (!this.cursor) {
       // Tick one arms the screen; the button the fighter was picked with
       // can't also choose.
+      console.log('[SCWU mode] arm tick, now:', now.toString(16));
       this.show();
       return;
     }
@@ -899,6 +933,13 @@ export class ModeSelect extends Screen {
       this.choice ^= 1;
       this.latch = true;
     } else if (pressed & BUTTONS && !this.latch) {
+      console.log(
+        '[SCWU mode] confirm',
+        'stage:',
+        this.stage,
+        'choice:',
+        this.choice,
+      );
       this.confirm();
       return;
     }
