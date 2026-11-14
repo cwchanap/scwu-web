@@ -25,6 +25,10 @@ const MODE_RIGHT: Rect = { x: 620, y: 320, w: 200, h: 140 };
 const ROUTE_LEFT: Rect = { x: 140, y: 390, w: 200, h: 140 };
 const ROUTE_RIGHT: Rect = { x: 620, y: 390, w: 200, h: 140 };
 const HEADER: Rect = { x: 420, y: 90, w: 120, h: 80 };
+// A board lighting means a whole screen chain ran — several opens and the
+// picked select's hundred-tick wait — so the pixel polls share the slack
+// the route check already gives confirmRoute, not the five-second default.
+const VIEW = { timeout: 15_000 };
 
 test('mode select: two-step routes by keyboard, Enter, Escape and taps', async ({
   page,
@@ -182,8 +186,10 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await press('g');
   await press('g');
   await press('g');
-  await expect.poll(() => lum('l', MODE_LEFT)).toBeGreaterThan(170);
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(40);
+  await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(40);
   // The select pad keeps every button the screens' word reads: each of
   // G/H/K/J picks its palette on the character select, not just G
   // confirming (HPA-765 review).
@@ -199,25 +205,33 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // meet a lit header and, later, ROUTE 1's battle (500, not 200/470).
   await press('Escape');
   await press('g');
-  await expect.poll(() => lum('l', MODE_LEFT)).toBeGreaterThan(170);
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(40);
+  await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(40);
 
   // Enter confirms STORY MODE; the route step heads its boards with the
   // mode's small sign, lighting a band the mode step leaves dark.
   await press('Enter');
-  await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   await press('d');
-  await expect.poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT), VIEW)
+    .toBeGreaterThan(30);
 
   // Escape on the route step comes back to the modes — STORY lit again —
   // and the pick flips to B.R. MODE. If the Escape had done nothing the
   // same keys would land ROUTE 1's battle (500), not B.R. ZERO's (200).
   await press('Escape');
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
   await press('d');
-  await expect.poll(() => boards(MODE_RIGHT, MODE_LEFT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
   await press('Enter');
-  await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   // B.R.'s routes rest on ZERO, ANOTHER dimmed.
   await confirmRoute(() => press('Enter'));
   await skipToBattle();
@@ -231,15 +245,21 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // Session memory: the selector reopens on the last mode, B.R. lit —
   // and a B.R. remembered while STORY's route still defaults to ROUTE 1.
   await backToModeSelect();
-  await expect.poll(() => boards(MODE_RIGHT, MODE_LEFT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
   // Back to STORY; ROUTE 2 (Hard) reaches the Sakuya duel (470), a timed
   // battle — a lapsed memory would land ROUTE 1's KAY duel (500) instead.
   await press('a');
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
   await press('Enter');
-  await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   await press('d');
-  await expect.poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT), VIEW)
+    .toBeGreaterThan(30);
   await confirmRoute(() => press('Enter'));
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '510');
@@ -251,15 +271,19 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   // Direct canvas taps: a tap in the boards' gap is ignored, a tap on a
   // sign picks and confirms it like a button — B.R. then B.R. ANOTHER.
   await backToModeSelect();
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
   // The gap tap lands ignored, proven before the next tap: STORY stays
   // lit over dimmed B.R. and no route header lights — a mistaken pick or
   // confirm would have flipped the boards or lit the header band.
   await tap(480, 394);
-  await expect.poll(() => boards(MODE_LEFT, MODE_RIGHT)).toBeGreaterThan(30);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
   expect(await lum('h', HEADER)).toBeLessThan(160);
   await tap(720, 300);
-  await expect.poll(() => lum('h', HEADER)).toBeGreaterThan(160);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   await confirmRoute(() => tap(720, 400));
   await skipToBattle();
   // B.R. ANOTHER's brawl seats HISO first (480), also untimed.
