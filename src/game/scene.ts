@@ -199,7 +199,14 @@ export class TrainingScene extends Phaser.Scene {
   private clock = new FixedClock();
   private held = new Set<string>();
   private virtual = new Set<Control>();
-  private pressed = new Set<Control>();
+  // The keydowns not yet consumed by a tick, counted: a press must edge on
+  // the word it reaches, not merge into a bit already high from the press
+  // before it (a stall that queues two presses into one tick used to eat
+  // the second's edge outright).
+  private pressed = new Map<Control, number>();
+  // The controls the last tick's step saw, which the next queued press
+  // needs low before its edge can land.
+  private lastNow = new Set<Control>();
   private sprites: Phaser.GameObjects.Image[] = [];
   private shadows: Phaser.GameObjects.Ellipse[] = [];
   private blacks: Phaser.GameObjects.Image[] = [];
@@ -330,7 +337,11 @@ export class TrainingScene extends Phaser.Scene {
     if (keyMap[e.code] && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault();
       this.held.add(e.code);
-      if (!e.repeat) this.pressed.add(keyMap[e.code]);
+      if (!e.repeat)
+        this.pressed.set(
+          keyMap[e.code],
+          (this.pressed.get(keyMap[e.code]) ?? 0) + 1,
+        );
     }
     // Enter is the mode select's other confirm (authored, HPA-765) —
     // a canvas one: a focused DOM button keeps it for its own activation
@@ -344,7 +355,7 @@ export class TrainingScene extends Phaser.Scene {
       !e.defaultPrevented
     ) {
       e.preventDefault();
-      this.pressed.add('punch');
+      this.pressed.set('punch', (this.pressed.get('punch') ?? 0) + 1);
     }
     // Esc on the mode select's route step goes back to the mode pick —
     // cancelling a route's start still loading — and on the mode step to
@@ -403,13 +414,36 @@ export class TrainingScene extends Phaser.Scene {
     this.held.clear();
     this.virtual.clear();
     this.pressed.clear();
+    this.lastNow.clear();
     this.clock.reset();
   }
   control(control: Control, down: boolean) {
     if (down) {
       this.virtual.add(control);
-      this.pressed.add(control);
+      this.pressed.set(control, (this.pressed.get(control) ?? 0) + 1);
     } else this.virtual.delete(control);
+  }
+  // The tick's controls: the held and touch levels plus the queued presses,
+  // each of which earns its own rising edge on the word — one waiting while
+  // the bit is still high, then taking the tick after it falls, so presses
+  // a stall queues together can't merge into one hold (0x414770's fresh
+  // presses).
+  private controls() {
+    const controls = new Set<Control>([
+      ...this.virtual,
+      ...[...this.held].map((key) => keyMap[key]),
+    ]);
+    for (const [control, count] of this.pressed) {
+      if (this.lastNow.has(control)) {
+        controls.delete(control);
+        continue;
+      }
+      controls.add(control);
+      if (count > 1) this.pressed.set(control, count - 1);
+      else this.pressed.delete(control);
+    }
+    this.lastNow = controls;
+    return controls;
   }
   // A canvas tap in game pixels goes to the mode select's boards, which
   // take it as the same pick a button confirms (authored, HPA-765); a
@@ -471,7 +505,11 @@ export class TrainingScene extends Phaser.Scene {
     this.wanted = undefined;
     this.demoRequest = undefined;
     this.loading = false;
+    // Presses still queued are the player's own — one merged behind the
+    // pick that opened the screen lands on it (the pick's edge is spent).
+    const pressed = new Map(this.pressed);
     this.clearInput();
+    this.pressed = pressed;
     this.report();
   }
   // A step of the title or the select screen with this tick's controls. VS
@@ -1238,12 +1276,7 @@ export class TrainingScene extends Phaser.Scene {
           this.clock.advance(delta, () => {
             // A screen that finished waits for what it opens to load.
             if (!this.select || this.loading) return;
-            const controls = new Set([
-              ...this.virtual,
-              ...this.pressed,
-              ...[...this.held].map((key) => keyMap[key]),
-            ]);
-            this.pressed.clear();
+            const controls = this.controls();
             this.stepSelect(
               Object.fromEntries(
                 [...controls].map((control) => [control, true]),
@@ -1260,12 +1293,7 @@ export class TrainingScene extends Phaser.Scene {
         this.clock.advance(delta, () => {
           // The match is over once it opens a screen or loads the next.
           if (this.select || this.loading) return;
-          const controls = new Set([
-            ...this.virtual,
-            ...this.pressed,
-            ...[...this.held].map((key) => keyMap[key]),
-          ]);
-          this.pressed.clear();
+          const controls = this.controls();
           const frozen = this.match.fighters.map((f) => f.hitStop > 0);
           const { round } = this.match;
           this.match.step(
