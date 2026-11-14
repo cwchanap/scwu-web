@@ -882,6 +882,39 @@ describe('mode select (HPA-765)', () => {
     return view.select as ModeSelect;
   };
 
+  it('lands each press of a burst one tick would merge (CI stalls)', () => {
+    // Under the runner's stalls whole presses queue between ticks: three
+    // 'g' taps ahead of the next frame must still arm the title, pick
+    // story and pick the fighter — a press is a count, not a bit level.
+    vi.stubGlobal('HTMLElement', class {});
+    vi.stubGlobal('HTMLButtonElement', class {});
+    const { view } = boot();
+    view.drawSelect = () => {};
+    // The title cues its T2 track and the cursor its ticks.
+    const silent = { play() {}, stop() {}, pause() {} };
+    (view.sound as { get: () => unknown }).get = () => silent;
+    (view.sound as { add: () => unknown }).add = () => silent;
+    (view as { play?: () => void }).play = () => {};
+    const down = (code: string) =>
+      (view.keydown as (e: unknown) => void)({
+        code,
+        repeat: false,
+        target: {},
+        preventDefault: () => {},
+      });
+    const up = (code: string) => (view.keyup as (e: unknown) => void)({ code });
+    const frame = () => (view.update as (t: number, d: number) => void)(0, 10);
+    view.select = new Title();
+    frame(); // T2 loads; the menu waits for a press.
+    for (let i = 0; i < 3; i++) {
+      down('KeyG');
+      up('KeyG');
+    }
+    for (let i = 0; i < 300 && !(view.select instanceof ModeSelect); i++)
+      frame();
+    expect(view.select).toBeInstanceOf(ModeSelect);
+  });
+
   it('opens the selector on an eligible story pick instead of the sign battle', () => {
     const { view } = boot();
     const mode = openMode(view);
@@ -1065,10 +1098,10 @@ describe('mode select (HPA-765)', () => {
       });
     scene.openSelect();
     enter();
-    expect((view.pressed as Set<string>).size).toBe(0);
+    expect((view.pressed as Map<string, number>).size).toBe(0);
     openMode(view);
     enter();
-    expect(view.pressed as Set<string>).toContain('punch');
+    expect((view.pressed as Map<string, number>).has('punch')).toBe(true);
   });
 
   it('leaves a focused button’s Enter — or one already taken — to the DOM', () => {
@@ -1095,12 +1128,12 @@ describe('mode select (HPA-765)', () => {
     // A focused DOM button keeps Enter's default action and feeds no
     // canvas punch; an event a handler already took is left alone too.
     expect(down(new Button())).toBe(0);
-    expect((view.pressed as Set<string>).size).toBe(0);
+    expect((view.pressed as Map<string, number>).size).toBe(0);
     expect(down({}, true)).toBe(0);
-    expect((view.pressed as Set<string>).size).toBe(0);
+    expect((view.pressed as Map<string, number>).size).toBe(0);
     // The canvas's own Enter still confirms.
     expect(down({})).toBe(1);
-    expect(view.pressed as Set<string>).toContain('punch');
+    expect((view.pressed as Map<string, number>).has('punch')).toBe(true);
   });
 
   it('keeps the finished select’s track across the overlay, as Music allows', () => {
