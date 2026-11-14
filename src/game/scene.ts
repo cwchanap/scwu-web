@@ -449,17 +449,6 @@ export class TrainingScene extends Phaser.Scene {
   // take it as the same pick a button confirms (authored, HPA-765); a
   // frozen or loading scene steps nothing, so it ignores the tap as well.
   private tap(x: number, y: number) {
-    console.log(
-      '[SCWU tap]',
-      x,
-      y,
-      'frozen:',
-      this.frozen(),
-      'loading:',
-      this.loading,
-      'select:',
-      this.dbgName(this.select),
-    );
     if (this.frozen() || this.loading) return;
     if (this.select instanceof ModeSelect) this.select.tap(x, y);
   }
@@ -505,22 +494,7 @@ export class TrainingScene extends Phaser.Scene {
   }
   private open(screen: NonNullable<TrainingScene['select']>) {
     screen.globals = this.globals;
-    const from = this.dbgName(this.select);
     this.select = screen;
-    console.log(
-      '[SCWU open]',
-      this.dbgName(screen),
-      'from',
-      from,
-      'pressed:',
-      JSON.stringify([...this.pressed]),
-      'held:',
-      JSON.stringify([...this.held]),
-      'virtual:',
-      JSON.stringify([...this.virtual]),
-      'lastNow:',
-      JSON.stringify([...this.lastNow]),
-    );
     this.sound.stopAll();
     this.selectTrack = undefined;
     // A screen opens unpaused — the dialog's held pause with it.
@@ -562,21 +536,6 @@ export class TrainingScene extends Phaser.Scene {
       else if (this.cache.audio.exists(key)) this.play(key);
     }
     if (!select.done) return;
-    console.log(
-      '[SCWU done]',
-      this.dbgName(select),
-      JSON.stringify(select.done),
-      'story:',
-      (select as { story?: boolean }).story,
-      'pressed:',
-      JSON.stringify([...this.pressed]),
-      'held:',
-      JSON.stringify([...this.held]),
-      'virtual:',
-      JSON.stringify([...this.virtual]),
-      'lastNow:',
-      JSON.stringify([...this.lastNow]),
-    );
     if (select instanceof Title)
       return select.done === 'story'
         ? this.open(new CharacterSelect(undefined, true))
@@ -608,14 +567,7 @@ export class TrainingScene extends Phaser.Scene {
     if (select.story) {
       // A story the mode select opens for offers it first (authored,
       // HPA-765); the finished select shows underneath it.
-      const oms = opensOnModeSelect(select.done[0]);
-      console.log(
-        '[SCWU story-done]',
-        select.done[0],
-        'opensOnModeSelect:',
-        oms,
-      );
-      if (oms) {
+      if (opensOnModeSelect(select.done[0])) {
         // The pick's button may still be down: open()'s input clear would
         // hide it until a keyboard repeat repopulates held, looking fresh
         // to the selector's arm tick — so the still-down keys and touch
@@ -651,7 +603,6 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   private leaveScreen() {
-    console.log('[SCWU leaveScreen]', 'was', this.dbgName(this.select));
     this.select = null;
     this.selectTrack?.stop();
     this.dimmer?.setVisible(false);
@@ -661,7 +612,6 @@ export class TrainingScene extends Phaser.Scene {
   // The story runner's step (0x4069b0): a battle (object type 14), a demo
   // (16) or the title (12).
   private runStory(next: Next) {
-    console.log('[SCWU runStory]', JSON.stringify(next));
     if (next.kind === 'title') return this.openTitle();
     if (next.kind === 'demo')
       return this.openDemo(
@@ -718,12 +668,8 @@ export class TrainingScene extends Phaser.Scene {
     // lands and again after its art, as `wanted` guards a match start.
     const request = (this.demoRequest = {});
     this.loading = true;
-    console.log('[SCWU openDemo]', index);
     void STORY_DEMOS[`./generated/demos/${index}.json`]().then((demo) => {
-      if (this.demoRequest !== request) {
-        console.log('[SCWU openDemo] superseded', index);
-        return;
-      }
+      if (this.demoRequest !== request) return;
       const prefix = `demo${index}`;
       for (const image of demo.images)
         selectSizes.set(`${prefix}-${image.index}`, image);
@@ -741,12 +687,8 @@ export class TrainingScene extends Phaser.Scene {
         this.load.addFile(new PackFile(this.load, `demo-${index}`, resident));
       }
       this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        if (this.demoRequest !== request) {
-          console.log('[SCWU openDemo] stale complete', index);
-          return;
-        }
+        if (this.demoRequest !== request) return;
         this.loading = false;
-        console.log('[SCWU openDemo] complete', index);
         this.open(make(demo));
       });
       this.load.start();
@@ -774,28 +716,15 @@ export class TrainingScene extends Phaser.Scene {
     const missing = [...players].filter((who) => !this.players.has(who));
     const start = () => {
       for (const who of missing) this.players.add(who);
-      if (this.wanted !== match) {
-        console.log('[SCWU whenReady] superseded', match.mode, match.stage);
-        return;
-      }
+      if (this.wanted !== match) return;
       this.loading = false;
       this.unloadPlayers(players);
       this.leaveScreen();
-      console.log('[SCWU begin]', match.mode, match.stage);
       then();
     };
     const { stage } = match;
     if (!missing.length && this.stageLoaded(stage)) return start();
     this.loading = true;
-    console.log(
-      '[SCWU whenReady]',
-      match.mode,
-      stage,
-      'missing:',
-      JSON.stringify(missing),
-      'stageLoaded:',
-      this.stageLoaded(stage),
-    );
     this.loadStage(stage);
     for (const who of missing) this.loadPlayer(who);
     this.load.once(Phaser.Loader.Events.COMPLETE, start);
@@ -1339,43 +1268,8 @@ export class TrainingScene extends Phaser.Scene {
     return fighterPose(f);
   }
 
-  private dbgTick = 0;
-  private dbgName(o: unknown) {
-    return (o as { constructor?: { name?: string } })?.constructor?.name;
-  }
   update(_time: number, delta: number) {
-    if (!this.ready || this.error || this.loading) {
-      if (this.dbgTick % 30 === 0)
-        console.log(
-          '[SCWU skip]',
-          'ready:',
-          this.ready,
-          'error:',
-          JSON.stringify(this.error),
-          'loading:',
-          this.loading,
-          'select:',
-          this.dbgName(this.select),
-        );
-      this.dbgTick++;
-      return;
-    }
-    if (this.dbgTick++ % 60 === 0)
-      console.log(
-        '[SCWU tick]',
-        'select:',
-        this.dbgName(this.select),
-        'frozen:',
-        this.frozen(),
-        'loading:',
-        this.loading,
-        'pressed:',
-        JSON.stringify([...this.pressed]),
-        'held:',
-        JSON.stringify([...this.held]),
-        'lastNow:',
-        JSON.stringify([...this.lastNow]),
-      );
+    if (!this.ready || this.error || this.loading) return;
     try {
       if (this.select) {
         if (!this.frozen())
@@ -1613,7 +1507,6 @@ export class TrainingScene extends Phaser.Scene {
       this.report();
     } catch (error) {
       this.error = error instanceof Error ? error.message : String(error);
-      console.log('[SCWU error]', this.error, (error as Error)?.stack);
       this.paused = true;
       this.report();
     }
