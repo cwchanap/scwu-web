@@ -99,6 +99,10 @@ export const TAKES: Record<Route, number> = {
   'br-zero': 347,
   'br-another': 348,
 };
+// Native 1P life left after the skipped Chii sign battle: 1P's max less the
+// Single Start's 1 and the chosen sign's take.
+export const routeLife = (who: Who, route: Route) =>
+  lifeOf(who) - 1 - TAKES[route];
 
 // Whether a step is the mode-select battle: the Chii, whose seats hold only
 // ZAKU's and PAC-HELO's sign actors, and at least two opponents (hostile
@@ -162,6 +166,6 @@ export class Story {
   // branches (YINAN's/AYA's and RARIO's included) stay the runner's.
   startOnRoute(route: Route): Next {
     this.step = 0;
-    return this.next(lifeOf(this.who) - 1 - TAKES[route], 0);
+    return this.next(routeLife(this.who, route), 0);
   }
 }

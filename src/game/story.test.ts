@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS } from './characters';
+import { script } from './animations';
+import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
 import {
   isModeSelectBattle,
   opensOnModeSelect,
+  routeLife,
   Story,
   scenarioOf,
   TAKES,
@@ -180,5 +182,26 @@ describe('story runner', () => {
       ),
     };
     expect(isModeSelectBattle(allied)).toBe(false);
+  });
+
+  it('pins TAKES and routeLife to the recovered Chii sign scripts (409/163/162/161)', () => {
+    // Each Chii sign punches player 1 for its exact route life take in
+    // zaku and pachelo's scripts 75/80/83; Single Start is -1 (normal start).
+    const otherLife = (who: 'zaku' | 'pachelo', index: number) =>
+      script(index, who).events.find((e) => e.op === 'power')?.otherLife;
+
+    expect(otherLife('zaku', 75)).toBe(-1);
+    expect(-otherLife('zaku', 80)!).toBe(TAKES['story-easy']);
+    expect(-otherLife('pachelo', 80)!).toBe(TAKES['story-hard']);
+    expect(-otherLife('zaku', 83)!).toBe(TAKES['br-zero']);
+    expect(-otherLife('pachelo', 83)!).toBe(TAKES['br-another']);
+
+    // And against Ryuko (life 510, minus the 1-tick death floor) those
+    // exact script takes land on 409 / 163 / 162 / 161 (steps 4/21/47/62).
+    expect(lifeOf('ryuko')).toBe(510);
+    expect(routeLife('ryuko', 'story-easy')).toBe(409);
+    expect(routeLife('ryuko', 'story-hard')).toBe(163);
+    expect(routeLife('ryuko', 'br-zero')).toBe(162);
+    expect(routeLife('ryuko', 'br-another')).toBe(161);
   });
 });

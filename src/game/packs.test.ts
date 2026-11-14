@@ -5,7 +5,13 @@ import type { Stage, Who } from './characters';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
 import t2 from './generated/t2.json';
-import { bytesOf, parsePack, selectAssets } from './packs';
+import {
+  bytesOf,
+  MODE_SELECT_SIGN_KEYS,
+  MODE_SELECT_SIGNS,
+  parsePack,
+  selectAssets,
+} from './packs';
 import type { Pack } from './packs';
 import { itWithArt } from './testing';
 
@@ -138,13 +144,16 @@ const split = (who: Who) => {
   const images = CHARACTERS[who].images as Entry[];
   const sounds = CHARACTERS[who].sounds as Entry[];
   const shown = selectAssets[who];
+  const signs = new Set(MODE_SELECT_SIGNS[who] ?? []);
   return {
     boot: {
       images: images.filter((i) => shown.images.has(i.index)),
       sounds: sounds.filter((s) => shown.sounds.has(s.index)),
     },
     rest: {
-      images: images.filter((i) => !shown.images.has(i.index)),
+      images: images.filter(
+        (i) => !shown.images.has(i.index) && !signs.has(i.index),
+      ),
       sounds: sounds.filter((s) => !shown.sounds.has(s.index)),
     },
   };
@@ -161,6 +170,7 @@ describe('exported packs', () => {
   itWithArt('has every expected pack file and no other', () => {
     const expected = [
       'boot.bin',
+      'mode-select.bin',
       ...fighters
         .filter((who) => hasAny(split(who).rest))
         .map((who) => `fighter-${who}.bin`),
@@ -198,6 +208,17 @@ describe('exported packs', () => {
           ),
         ].sort(),
       );
+    },
+  );
+
+  itWithArt(
+    'mode-select holds exactly the six Chii sign boards and no sounds',
+    () => {
+      const pack = readPack('mode-select.bin');
+      expect(Object.keys(pack.images).sort()).toEqual(
+        [...MODE_SELECT_SIGN_KEYS].sort(),
+      );
+      expect(pack.sounds).toEqual({});
     },
   );
 
