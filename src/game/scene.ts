@@ -1601,6 +1601,11 @@ export function createGame(
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [scene],
     banner: false,
+    // The FixedClock catches up real elapsed time itself (bounded 250 ms a
+    // frame); Phaser's delta smoothing clamps slow frames to the 60 fps
+    // target — and to it for good while unfocused, as a throttled tab
+    // stays — which would run the match in slow motion instead.
+    fps: { smoothStep: false },
     // The art may come from another origin (the R2 bucket); WebGL refuses
     // those textures unless the request is CORS.
     loader: { crossOrigin: 'anonymous' },
