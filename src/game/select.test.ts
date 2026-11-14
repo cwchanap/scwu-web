@@ -1,3 +1,4 @@
+import { script } from './animations';
 import { CHARACTERS } from './characters';
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
@@ -8,9 +9,11 @@ import {
   Continue,
   CONTINUE,
   LAYOUT,
+  MODE_BOARDS,
   ModeSelect,
   MODES,
   ROSTER,
+  ROUTE_BOARDS,
   selectable,
   StoryDemo,
   TEAM_SIZE,
@@ -19,6 +22,8 @@ import {
 } from './select';
 import type { Demo } from './select';
 import type { Input } from './match';
+import { scenarioOf, TAKES } from './story';
+import type { Battle } from './story';
 import { itWithArt } from './testing';
 import continueDemo from './generated/demos/9.json';
 import next from './generated/demos/3.json';
@@ -458,11 +463,14 @@ describe('story select (object type 10, story mode)', () => {
     expect(select.done).toEqual(['dora', 'dora']);
   });
 
-  it('chooses on the tick its cursor lands — a pick queued behind the screen opening is not lost', () => {
-    // The title-to-select hand-off clears the held keys, so a fresh press
-    // can land on the select's first step: resting and choosing on it is
-    // the team's rest-then-pick (0x40754c), not a swallowed press.
+  it('lands its cursor on tick 1 without choosing (0x407782)', () => {
+    // Tick 1 puts the cursor down via rest() (0x407782); a pick waits for
+    // a fresh press on a later tick so a held button landing on tick 1
+    // does not fire before the cursor sits on a cell.
     const select = new CharacterSelect([[0, 0]], true);
+    select.step({ punch: true });
+    expect(select.decided).toEqual([false, false]);
+    select.step({});
     select.step({ punch: true });
     expect(select.decided).toEqual([true, false]);
     while (!select.done) select.step();
@@ -472,6 +480,9 @@ describe('story select (object type 10, story mode)', () => {
       [0, 0],
       [0, 0],
     ]);
+    vs.step({ punch: true });
+    expect(vs.decided).toEqual([false, false]);
+    vs.step({});
     vs.step({ punch: true });
     expect(vs.decided).toEqual([true, false]);
   });
@@ -662,7 +673,7 @@ describe('mode select (authored, HPA-765)', () => {
     expect(signs(mode)[start].scale).toBe(1.1);
   });
 
-  it('takes a tap on a board through the same pick a button confirms', () => {
+  it('takes a tap on a board through the same pick a button confirms, with a cooldown', () => {
     const mode = new ModeSelect(picked());
     // Before the arm tick there is nothing to hit; after done nothing.
     expect(mode.tap(720, 394)).toBe(false);
@@ -672,10 +683,63 @@ describe('mode select (authored, HPA-765)', () => {
     expect(mode.tap(720, 394)).toBe(true);
     expect(mode.stage).toBe(1);
     expect(signs(mode).map((o) => o.frame!.image)).toEqual([8006, 8006, 8001]);
-    // The right route board lands the same route as pressing on it.
+    // A second tap within the 15-tick cooldown does not confirm the
+    // overlapping route board immediately.
+    for (let i = 0; i < 14; i++) mode.step();
+    expect(mode.tap(720, 469)).toBe(false);
+    expect(mode.done).toBeNull();
+    // Once the cooldown elapses, the right route board lands its route.
+    mode.step();
     expect(mode.tap(720, 469)).toBe(true);
     expect(mode.done).toBe('br-another');
     expect(mode.tap(240, 469)).toBe(false);
+  });
+
+  it('forwards sounds queued by its finished background select', () => {
+    const background = new CharacterSelect(undefined, true);
+    background.done = ['ryuko', 'ryuko'];
+    const mode = new ModeSelect(background);
+    for (let i = 0; i < 10 && !mode.sounds.length; i++) mode.step();
+    expect(mode.sounds).toContainEqual({ container: 'select', index: 1 });
+  });
+
+  it('pins MODE_BOARDS and ROUTE_BOARDS to the Chii sign actors and scripts', () => {
+    const chii = scenarioOf('ryuko')[0] as Battle;
+    const owners = chii.slots
+      .filter(
+        (s): s is NonNullable<typeof s> => s !== null && !(s.flags & 0x200),
+      )
+      .map((s) => ROSTER[s.player]);
+    expect(owners.slice(0, 2)).toEqual(['zaku', 'pachelo']);
+    expect(new Set(owners)).toEqual(new Set(['zaku', 'pachelo']));
+
+    const spawnImage = (who: 'zaku' | 'pachelo', actorScript: number) => {
+      const child = script(actorScript, who).events.find(
+        (e) => e.op === 'spawn',
+      );
+      expect(child?.action).toBeDefined();
+      return script(child!.action!, who).frames[0].image;
+    };
+    const otherLife = (who: 'zaku' | 'pachelo', actorScript: number) =>
+      script(actorScript, who).events.find((e) => e.op === 'power')?.otherLife;
+
+    // Mode boards match each Chii actor's Single Start sign script (75 -> 2 -> 8001).
+    for (const [i, board] of MODE_BOARDS.entries()) {
+      expect(board.who).toBe(owners[i]);
+      expect(board.image).toBe(spawnImage(board.who, 75));
+    }
+    // Route boards match script 80 (STORY, 5 -> 8005) and 83 (B.R., 8 -> 8006)
+    // and their exact power takes in zaku and pachelo.
+    const routeScripts = [80, 83] as const;
+    for (const [m, boards] of ROUTE_BOARDS.entries()) {
+      for (const [r, board] of boards.entries()) {
+        expect(board.who).toBe(owners[r]);
+        expect(board.image).toBe(spawnImage(board.who, routeScripts[m]));
+        expect(-otherLife(board.who, routeScripts[m])!).toBe(
+          TAKES[board.route],
+        );
+      }
+    }
   });
 
   // A sign's drawn box, read off its object as the sprite draws it: the

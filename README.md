@@ -99,21 +99,22 @@ Runners have no handoff, so `.github/scripts/fetch-generated.sh` downloads `gene
 
 ## Play
 
-| Input                        | Action                                                        |
-| ---------------------------- | ------------------------------------------------------------- |
-| A / D or left / right arrows | Move                                                          |
-| W or up arrow                | Jump; from neutral, again in the air: double jump             |
-| S or down arrow (hold)       | Crouch                                                        |
-| G / H                        | Punch / kick; after contact, G or H chains                    |
-| Back (hold)                  | Guard, away from the opponent                                 |
-| Shift                        | Dash; hold away for backdash                                  |
-| Left / right                 | Double-tap to dash, on the ground or in the air               |
-| J                            | Grab and throw (close range, ground only)                     |
-| E                            | Enter or leave EX mode (50 power)                             |
-| K                            | Hit Up (Jump on hit chases); COUNTER HIT in a block           |
-| F                            | IORI; tap again for each of two follow-ups                    |
-| P / Escape                   | Pause / resume; Escape on the select screen goes to the title |
-| R                            | Reset the current mode                                        |
+| Input                        | Action                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------------------ |
+| A / D or left / right arrows | Move                                                                                       |
+| W or up arrow                | Jump; from neutral, again in the air: double jump                                          |
+| S or down arrow (hold)       | Crouch                                                                                     |
+| G / H                        | Punch / kick; after contact, G or H chains                                                 |
+| Back (hold)                  | Guard, away from the opponent                                                              |
+| Shift                        | Dash; hold away for backdash                                                               |
+| Left / right                 | Double-tap to dash, on the ground or in the air                                            |
+| J                            | Grab and throw (close range, ground only)                                                  |
+| E                            | Enter or leave EX mode (50 power)                                                          |
+| K                            | Hit Up (Jump on hit chases); COUNTER HIT in a block                                        |
+| F                            | IORI; tap again for each of two follow-ups                                                 |
+| Enter                        | Confirm on the mode select (or click / tap a sign board)                                   |
+| P / Escape                   | Pause / resume; Escape steps back on mode select, or goes to the title on character select |
+| R                            | Reset the current mode, or return to the title from mode select / demos                    |
 
 Specials and supers are motion commands (↓→ G, →↓↘ G, ↓→↓→ H, …), read toward the opponent. The **Controls guide** link in the in-game **Menu** opens [instructions.html](instructions.html): one page per fighter with every move in table form.
 

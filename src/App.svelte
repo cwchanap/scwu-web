@@ -73,7 +73,6 @@
     matchWinner: null,
     error: '',
     selecting: true,
-    choosingMode: false,
     fighters: ['ryuko', 'zoma'],
     story: false,
     mode: 'practice',

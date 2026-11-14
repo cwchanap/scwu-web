@@ -4925,8 +4925,8 @@ def assets_version(files):
 # Mirrors packs.ts's selectAssets (scene.ts's before): the images (op 0x0c) and sounds (op 0x03) that a
 # player's select programs (select.ts) show or play, within what the player exports. Boot holds them,
 # since the select screen uses them from the start; the rest of a player's files go to its fighter pack.
-# ZAKU's and PAC-HELO's Chii sign boards join boot for the mode select too — its select programs never
-# name them; the blank 8004 boards stay in the fighter packs.
+# ZAKU's and PAC-HELO's Chii sign boards go to the on-demand mode-select pack (excluded from both boot
+# and fighter packs); the blank 8004 boards stay in the fighter packs.
 SIGNS = {"zaku": {8001, 8005, 8006}, "pachelo": {8001, 8005, 8006}}
 
 
@@ -4942,19 +4942,23 @@ def export_packs():
                    **files(select["images"], "select"), **files(t2["images"], "t2")}
     boot_sounds = {**files(ui["sounds"], "kgt-sound"), **files(select["sounds"], "select-sound"),
                    **files(t2["sounds"], "t2-sound")}
+    sign_images = {}
     out = {}
     for who in ["ryuko", *FIGHTERS]:
         data = load("assets.json" if who == "ryuko" else f"{who}.json")
         records = [bytes(r) for actions in data["select"]["actions"].values() for r in actions]
-        shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c} | SIGNS.get(who, set())
+        shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c}
+        signs = SIGNS.get(who, set())
         played = {u16(r, 2) for r in records if r[0] == 0x03}
         boot_images.update(files([e for e in data["images"] if e["index"] in shown], who))
         boot_sounds.update(files([e for e in data["sounds"] if e["index"] in played], f"{who}-sound"))
-        rest = (files([e for e in data["images"] if e["index"] not in shown], who),
+        sign_images.update(files([e for e in data["images"] if e["index"] in signs], who))
+        rest = (files([e for e in data["images"] if e["index"] not in shown and e["index"] not in signs], who),
                 files([e for e in data["sounds"] if e["index"] not in played], f"{who}-sound"))
         if any(rest):
             out[f"fighter-{who}"] = rest
     out["boot"] = (boot_images, boot_sounds)
+    out["mode-select"] = (sign_images, {})
     for stage, data in load("stages.json").items():
         out[f"stage-{stage}"] = (files(data["images"], stage), {})
     for path in sorted((GENERATED / "demos").glob("*.json")):

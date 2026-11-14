@@ -8,6 +8,7 @@ import { CHARACTERS } from './characters';
 import type { Who } from './characters';
 import { NORMAL_COLOR } from './animations';
 import type { Color } from './animations';
+import { ART_SCALE } from './match';
 import type { Input } from './match';
 import { rand } from './standing';
 import type { Frame } from './standing';
@@ -500,14 +501,7 @@ export class CharacterSelect extends Screen {
         this.palettes[p] = buttonIndex(pressed[p]);
         takePalette(this.drawn, p, this.palettes[p]);
         this.decide(p);
-      } else if (this.rest(p, directions[p]) && pressed[p] & BUTTONS) {
-        // The tick the cursor lands on chooses too — a fresh press the
-        // transition queued behind it (the team's rest-then-pick,
-        // 0x40754c), unlike a button already held.
-        this.palettes[p] = buttonIndex(pressed[p]);
-        takePalette(this.drawn, p, this.palettes[p]);
-        this.decide(p);
-      }
+      } else this.rest(p, directions[p]);
     }
     if (this.sides.some((p) => !this.decided[p]) || this.done) return;
     // 0x407a94: then a hundred ticks before the battle, or story mode's
@@ -803,11 +797,13 @@ interface ModeBoard {
   who: 'zaku' | 'pachelo';
   image: number;
 }
-const MODE_BOARDS: readonly ModeBoard[] = [
+export const MODE_BOARDS: readonly ModeBoard[] = [
   { who: 'zaku', image: 8001 },
   { who: 'pachelo', image: 8001 },
 ];
-const ROUTE_BOARDS: readonly (readonly (ModeBoard & { route: Route })[])[] = [
+export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
+  route: Route;
+})[])[] = [
   [
     { who: 'zaku', image: 8005, route: 'story-easy' },
     { who: 'pachelo', image: 8005, route: 'story-hard' },
@@ -825,13 +821,14 @@ const ROUTE_BOARDS: readonly (readonly (ModeBoard & { route: Route })[])[] = [
 // tap() hit-tests (authored, HPA-765). The pair is spaced so even the
 // pick's larger box stays on-canvas and clear of the other's — the
 // mockup's ~1.2×/1.3× pair could not (two 507px boards on 960px), so it
-// lands a size down at ~1.1×/1.2×. ART_SCALE is scene.ts's: canvas
-// pixels a source pixel draws at.
+// lands a size down at ~1.1×/1.2×.
 const SIGN_W = 260;
 const SIGN_H = 204;
-const ART_SCALE = 1.5;
 const SIGN_SCALE = 1.1;
 const ACTIVE_SCALE = 1.2;
+// 150 ms cooldown between taps so a double-click/double-tap cannot confirm
+// both overlapping steps at once.
+const TAP_COOLDOWN = 15;
 interface Rect {
   x: number;
   y: number;
@@ -877,6 +874,7 @@ export class ModeSelect extends Screen {
   private cursor: SelectObject | null = null;
   private latch = false;
   private previous = 0;
+  private tapTick = -TAP_COOLDOWN;
 
   constructor(readonly background: CharacterSelect) {
     super();
@@ -885,6 +883,7 @@ export class ModeSelect extends Screen {
 
   protected control(input: Input) {
     this.background.step();
+    this.sounds.push(...this.background.sounds);
     const now = word(input);
     const pressed = (now ^ this.previous) & now;
     this.previous = now;
@@ -911,6 +910,7 @@ export class ModeSelect extends Screen {
     this.choice = modePlace;
     this.done = null;
     this.latch = true;
+    this.tapTick = -TAP_COOLDOWN;
     this.show();
   }
 
@@ -950,12 +950,14 @@ export class ModeSelect extends Screen {
   // same bounds() its put() stands it in — and picks and confirms it,
   // the same as a fresh button does (authored, HPA-765).
   tap(x: number, y: number) {
-    if (!this.cursor || this.done) return false;
+    if (!this.cursor || this.done || this.tick - this.tapTick < TAP_COOLDOWN)
+      return false;
     const i = this.signs.findIndex((o, j) => {
       const b = bounds(SIGN_SPOTS[this.stage][j], o.scale ?? SIGN_SCALE);
       return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
     });
     if (i < 0) return false;
+    this.tapTick = this.tick;
     this.choice = i;
     this.confirm();
     return true;

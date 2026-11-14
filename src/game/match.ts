@@ -124,6 +124,7 @@ export const WIDTH = 960;
 export const STAGE_WIDTH = 1920;
 export const HEIGHT = 720;
 export const GROUND = 636;
+export const ART_SCALE = 1.5;
 // The walls with the camera at either end of the stage: 50 source pixels in.
 export const FIGHTER_MARGIN = 50 * 1.5;
 const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);

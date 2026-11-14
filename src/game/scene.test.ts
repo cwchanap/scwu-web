@@ -6,7 +6,7 @@ import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
 import { Match, LIFE } from './match';
-import { parsePack } from './packs';
+import { MODE_SELECT_SIGN_KEYS, parsePack } from './packs';
 import {
   CharacterSelect,
   Continue,
@@ -51,12 +51,15 @@ const boot = () => {
   // The packs the scene queued (boot, stage, fighter and demo), in order.
   const files: PackFile[] = [];
   let cached = false;
+  const silent = { play: () => {}, stop: () => {}, pause: () => {} };
   Object.assign(view, {
     sound: {
       pauseAll: () => {},
       resumeAll: () => {},
       stopAll: () => {},
       removeByKey: () => {},
+      get: () => silent,
+      add: () => silent,
     },
     load: {
       // Stage music is the one individual file left (playMusic).
@@ -600,6 +603,9 @@ itWithArt(
       )(n, (d) => new StoryDemo(n, d));
       await vi.waitFor(() => expect(files.at(-1)?.key).toBe(`demo-${n}`));
     }
+    const doneSelect = new CharacterSelect(undefined, true);
+    doneSelect.done = ['ryuko', 'ryuko'];
+    (view.openModeSelect as (select: CharacterSelect) => void)(doneSelect);
     expect(files.map((file) => file.key).sort()).toEqual(
       packNames()
         .filter((name) => name !== 'boot')
@@ -875,22 +881,25 @@ describe('cheats (HPA-767)', () => {
 // opens over the finished select, and its route start through the runner.
 describe('mode select (HPA-765)', () => {
   const openMode = (view: { [key: string]: unknown }) => {
+    const textures = view.textures as { exists: (key: string) => boolean };
+    const origExists = textures.exists;
+    textures.exists = () => true;
     const select = new CharacterSelect(undefined, true);
     view.select = select;
     select.done = ['ryuko', 'ryuko'];
     stepSelect(view);
+    textures.exists = origExists;
     return view.select as ModeSelect;
   };
 
-  it('lands each press of a burst one tick would merge (CI stalls)', () => {
-    // Under the runner's stalls whole presses queue between ticks: three
-    // 'g' taps ahead of the next frame must still arm the title, pick
-    // story and pick the fighter — a press is a count, not a bit level.
+  it('lands each press of a burst without merging, and drops presses across open()', () => {
+    // Under stalls whole presses queue between ticks: two 'g' taps queued
+    // ahead of a frame on an armed ModeSelect must pick the mode and then
+    // the route across ticks — a press is a count, not a bit level.
     vi.stubGlobal('HTMLElement', class {});
     vi.stubGlobal('HTMLButtonElement', class {});
-    const { view } = boot();
+    const { view, finishLoad } = boot();
     view.drawSelect = () => {};
-    // The title cues its T2 track and the cursor its ticks.
     const silent = { play() {}, stop() {}, pause() {} };
     (view.sound as { get: () => unknown }).get = () => silent;
     (view.sound as { add: () => unknown }).add = () => silent;
@@ -904,15 +913,29 @@ describe('mode select (HPA-765)', () => {
       });
     const up = (code: string) => (view.keyup as (e: unknown) => void)({ code });
     const frame = () => (view.update as (t: number, d: number) => void)(0, 10);
+
+    // Pressing before a screen transition opens must not leak onto the
+    // new screen's first tick: open() clears queued presses.
     view.select = new Title();
-    frame(); // T2 loads; the menu waits for a press.
-    for (let i = 0; i < 3; i++) {
-      down('KeyG');
-      up('KeyG');
-    }
-    for (let i = 0; i < 300 && !(view.select instanceof ModeSelect); i++)
-      frame();
-    expect(view.select).toBeInstanceOf(ModeSelect);
+    frame();
+    down('KeyG');
+    up('KeyG');
+    (view.open as (s: unknown) => void)(new CharacterSelect(undefined, true));
+    expect((view.pressed as Map<string, number>).size).toBe(0);
+    frame();
+    expect((view.select as CharacterSelect).decided).toEqual([false, false]);
+
+    // On an armed ModeSelect, two queued 'g' presses step mode then route
+    // across released ticks rather than collapsing into one hold.
+    const mode = openMode(view);
+    frame(); // arm tick
+    down('KeyG');
+    up('KeyG');
+    down('KeyG');
+    up('KeyG');
+    for (let i = 0; i < 20 && !mode.done; i++) frame();
+    expect(mode.done).toBeTruthy();
+    finishLoad();
   });
 
   it('takes a held pad’s repeated downs as one press, not a burst', () => {
@@ -969,7 +992,8 @@ describe('mode select (HPA-765)', () => {
     // the mode without the key ever coming up (HPA-765 review).
     vi.stubGlobal('HTMLElement', class {});
     vi.stubGlobal('HTMLButtonElement', class {});
-    const { view } = boot();
+    const { view, artIn } = boot();
+    artIn();
     // The frames below need no drawing; the menu's art has its own test.
     view.drawSelect = () => {};
     const down = (code: string, repeat = false) =>
@@ -1053,7 +1077,7 @@ describe('mode select (HPA-765)', () => {
     expect(statuses.at(-1)?.cheated).toBe(false);
   });
 
-  it('reports choosingMode and story mode while the selector carries a story session', () => {
+  it('reports story mode without an extra choosingMode flag while selecting', () => {
     const { view, statuses } = boot();
     const story = new Story('ryuko');
     const first = story.next();
@@ -1061,11 +1085,12 @@ describe('mode select (HPA-765)', () => {
     view.story = story;
     view.match = Match.story('ryuko', first.battle, 0);
     openMode(view);
-    expect(statuses.at(-1)).toMatchObject({
+    const last = statuses.at(-1)!;
+    expect(last).toMatchObject({
       selecting: true,
-      choosingMode: true,
       mode: 'story',
     });
+    expect('choosingMode' in last).toBe(false);
   });
 
   it('Escape on the mode step reopens the story select; Escape on the route step steps back', () => {
@@ -1161,21 +1186,17 @@ describe('mode select (HPA-765)', () => {
     expect((view.pressed as Map<string, number>).has('punch')).toBe(true);
   });
 
-  it('keeps the finished select’s track across the overlay, as Music allows', () => {
-    // open()'s stopAll silenced the select screen's track for good — the
-    // selector sat silent even with Music ticked (HPA-765 final review).
+  it('keeps the finished select’s track running across the overlay without stopping or restarting it', () => {
     const { view } = boot();
-    const track = { stop: () => {}, play: vi.fn(), pause: () => {} };
+    const stopAll = vi.fn();
+    (view.sound as { stopAll: () => void }).stopAll = stopAll;
+    const track = { stop: vi.fn(), play: vi.fn(), pause: () => {} };
     view.selectTrack = track;
     openMode(view);
     expect(view.selectTrack).toBe(track);
-    expect(track.play).toHaveBeenCalledTimes(1);
-    // With Music off it stays quiet but keeps the track, so ticking it
-    // on later still plays it, as on the select screens.
-    view.music = false;
-    openMode(view);
-    expect(view.selectTrack).toBe(track);
-    expect(track.play).toHaveBeenCalledTimes(1);
+    expect(stopAll).not.toHaveBeenCalled();
+    expect(track.stop).not.toHaveBeenCalled();
+    expect(track.play).not.toHaveBeenCalled();
   });
 
   it('draws the selector’s player objects in the finished select’s palettes', () => {
@@ -1243,6 +1264,28 @@ describe('mode select (HPA-765)', () => {
     // Seat 0's palette (3, J) lives on the background's drawn: the object
     // takes its recoloured texture from there, not a palette of its own.
     expect(calls).toContain('ryuko-1@3');
+
+    // A sign board object has owner -1; drawing it must use palette 0, not
+    // look up drawn[-1] -> NaN.
+    calls.length = 0;
+    textures.exists = (key) => key === 'zaku-8001';
+    (
+      view.drawSelectObject as (
+        sprite: Phaser.GameObjects.Image,
+        o: unknown,
+        index: number,
+      ) => void
+    )(
+      sprite,
+      {
+        ...o,
+        container: 'zaku',
+        owner: -1,
+        frame: { ...o.frame, image: 8001 },
+      },
+      1,
+    );
+    expect(calls).toEqual(['zaku-8001']);
   });
 
   it('confirms a canvas tap on a board into the same route entry as a key', async () => {
@@ -1255,6 +1298,7 @@ describe('mode select (HPA-765)', () => {
     // game pixels lands the same 'story-easy' the button presses land.
     tap(242, 394);
     expect(mode.stage).toBe(1);
+    for (let i = 0; i < 15; i++) mode.step();
     tap(242, 469);
     expect(mode.done).toBe('story-easy');
     stepSelect(view);
@@ -1316,5 +1360,104 @@ describe('mode select (HPA-765)', () => {
     scene.reset('cpu');
     expect(view.select).toBeNull();
     expect(scene.match.mode).toBe('cpu');
+  });
+
+  it('guards ModeSelect Escape against frozen state and unrelated loads', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view } = boot();
+    const mode = openMode(view);
+    mode.stage = 1;
+
+    // Paused without a modal: Escape unpauses rather than stepping back.
+    view.paused = true;
+    esc(view);
+    expect(view.paused).toBe(false);
+    expect(mode.stage).toBe(1);
+
+    // Modal open: Escape does nothing at all.
+    scene.setModal(true);
+    esc(view);
+    expect(view.select).toBe(mode);
+    expect(mode.stage).toBe(1);
+    scene.setModal(false);
+
+    // An unrelated load in flight on stage 1 is left untouched by Escape.
+    const unrelated = { kind: 'practice' };
+    view.wanted = unrelated;
+    view.loading = true;
+    esc(view);
+    expect(view.wanted).toBe(unrelated);
+    expect(view.loading).toBe(true);
+    expect(mode.stage).toBe(1);
+  });
+
+  it('keeps a control high while held by another key or touch input', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    vi.stubGlobal('HTMLButtonElement', class {});
+    const { view } = boot();
+    const down = (code: string) =>
+      (view.keydown as (e: unknown) => void)({
+        code,
+        repeat: false,
+        target: {},
+        preventDefault: () => {},
+      });
+    const up = (code: string) => (view.keyup as (e: unknown) => void)({ code });
+    const read = () => (view.controls as () => Set<string>)();
+
+    // Hold ArrowLeft across tick 1, then release & re-tap ArrowLeft while
+    // KeyA holds the same 'left' control: because 'left' is still held,
+    // consuming/deferring the queued press must not force it low.
+    down('ArrowLeft');
+    expect(read().has('left')).toBe(true);
+    up('ArrowLeft');
+    down('KeyA');
+    down('ArrowLeft');
+    expect(read().has('left')).toBe(true);
+    up('KeyA');
+    expect(read().has('left')).toBe(true);
+
+    // Touch button held while key queues a press stays continuous too.
+    (view.clearInput as () => void)();
+    (view.control as (c: string, d: boolean) => void)('left', true);
+    expect(read().has('left')).toBe(true);
+    down('KeyA');
+    up('KeyA');
+    down('KeyA');
+    expect(read().has('left')).toBe(true);
+  });
+
+  it('loads mode-select.bin on demand and unloads its sign textures on leave', () => {
+    const { view, files, finishLoad } = boot();
+    const loaded = new Set<string>();
+    const removed: string[] = [];
+    view.textures = {
+      exists: (k: string) => loaded.has(k),
+      get: () => ({ has: () => true, add: () => {} }),
+      getTextureKeys: () => [...loaded],
+      remove: (k: string) => {
+        loaded.delete(k);
+        removed.push(k);
+      },
+    };
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = ['ryuko', 'ryuko'];
+    stepSelect(view);
+
+    // Sign textures were not resident, so mode-select pack loads on demand.
+    expect(view.select).toBe(select);
+    expect(view.loading).toBe(true);
+    expect(files.some((f) => f.key === 'mode-select')).toBe(true);
+
+    for (const k of MODE_SELECT_SIGN_KEYS) loaded.add(k);
+    finishLoad();
+    expect(view.loading).toBe(false);
+    expect(view.select).toBeInstanceOf(ModeSelect);
+
+    // Returning to title unloads every sign texture.
+    (view.openTitle as () => void)();
+    expect(removed).toEqual([...MODE_SELECT_SIGN_KEYS]);
+    expect(loaded.size).toBe(0);
   });
 });

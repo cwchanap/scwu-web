@@ -4,7 +4,11 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { selectAssets } from './packs';
+import {
+  MODE_SELECT_SIGN_KEYS,
+  MODE_SELECT_SIGNS,
+  selectAssets,
+} from './packs';
 import { PackFile } from './packLoader';
 import ui from './generated/ui.json';
 import selectData from './generated/select.json';
@@ -20,7 +24,7 @@ import {
   TITLE,
 } from './select';
 import type { Demo, SelectObject } from './select';
-import { opensOnModeSelect, Story, TAKES } from './story';
+import { opensOnModeSelect, routeLife, Story } from './story';
 import type { Battle, Next } from './story';
 import {
   createHud,
@@ -34,6 +38,7 @@ import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
 import {
   afterimageColor,
+  ART_SCALE,
   drawnColor,
   fighterPose,
   FixedClock,
@@ -65,8 +70,6 @@ export interface GameStatus {
   error: string;
   // On the title or the character select screen, and the pair it last chose.
   selecting: boolean;
-  // The mode select a story pick opened is up (authored, HPA-765).
-  choosingMode: boolean;
   fighters: [Who, Who];
   // In a story battle.
   story: boolean;
@@ -90,14 +93,12 @@ export const initialStatus: GameStatus = {
   matchWinner: null,
   error: '',
   selecting: true,
-  choosingMode: false,
   fighters: ['ryuko', 'zoma'],
   story: false,
   mode: 'practice',
   music: true,
   cheated: false,
 };
-const ART_SCALE = 1.5;
 const DEMOS = { select: selectData, t2 };
 // A story's demos, loaded as they play.
 type StoryDemoData = Demo & {
@@ -264,6 +265,9 @@ export class TrainingScene extends Phaser.Scene {
   // The demo load last asked for (openDemo): a screen opening, a match
   // start or a newer request supersedes it — `wanted`'s twin for screens.
   private demoRequest?: object;
+  // The load request started by ModeSelect's route confirmation, so Escape
+  // cancels only the route's own in-flight load.
+  private routeLoad?: object;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -336,12 +340,11 @@ export class TrainingScene extends Phaser.Scene {
       return;
     if (keyMap[e.code] && !(e.target instanceof HTMLButtonElement)) {
       e.preventDefault();
+      const control = keyMap[e.code];
+      const wasHeld = this.isHeld(control);
       this.held.add(e.code);
-      if (!e.repeat)
-        this.pressed.set(
-          keyMap[e.code],
-          (this.pressed.get(keyMap[e.code]) ?? 0) + 1,
-        );
+      if (!e.repeat && !wasHeld && !this.loading && !this.frozen())
+        this.pressed.set(control, (this.pressed.get(control) ?? 0) + 1);
     }
     // Enter is the mode select's other confirm (authored, HPA-765) —
     // a canvas one: a focused DOM button keeps it for its own activation
@@ -352,7 +355,9 @@ export class TrainingScene extends Phaser.Scene {
       e.code === 'Enter' &&
       this.select instanceof ModeSelect &&
       !(e.target instanceof HTMLButtonElement) &&
-      !e.defaultPrevented
+      !e.defaultPrevented &&
+      !this.loading &&
+      !this.frozen()
     ) {
       e.preventDefault();
       this.pressed.set('punch', (this.pressed.get('punch') ?? 0) + 1);
@@ -362,12 +367,29 @@ export class TrainingScene extends Phaser.Scene {
     // the story select, which remembers its cell (authored, HPA-765).
     if (!e.repeat && e.code === 'Escape' && this.select instanceof ModeSelect) {
       e.preventDefault();
+      if (this.frozen()) {
+        if (!this.modal) this.togglePause();
+        return;
+      }
       if (this.select.stage === 1) {
-        this.select.back();
-        this.wanted = undefined;
-        this.demoRequest = undefined;
-        this.loading = false;
-      } else this.open(new CharacterSelect(undefined, true));
+        if (this.select.done) {
+          this.select.back();
+          if (
+            this.routeLoad &&
+            (this.wanted === this.routeLoad ||
+              this.demoRequest === this.routeLoad)
+          ) {
+            this.wanted = undefined;
+            this.demoRequest = undefined;
+            this.loading = false;
+          }
+          this.routeLoad = undefined;
+        } else if (!this.loading) {
+          this.select.back();
+        }
+      } else if (!this.loading) {
+        this.open(new CharacterSelect(undefined, true));
+      }
       return;
     }
     // Esc on a select screen goes back to the title, not pause (authored).
@@ -417,14 +439,21 @@ export class TrainingScene extends Phaser.Scene {
     this.lastNow.clear();
     this.clock.reset();
   }
+  private isHeld(control: Control) {
+    if (this.virtual.has(control)) return true;
+    for (const key of this.held) if (keyMap[key] === control) return true;
+    return false;
+  }
   control(control: Control, down: boolean) {
     if (down) {
       // A down that lands still held is the same press — a focused pad
       // button's keydown fires per auto-repeat — not a new one; only an
       // up earns the next count.
       if (this.virtual.has(control)) return;
+      const wasHeld = this.isHeld(control);
       this.virtual.add(control);
-      this.pressed.set(control, (this.pressed.get(control) ?? 0) + 1);
+      if (!wasHeld && !this.loading && !this.frozen())
+        this.pressed.set(control, (this.pressed.get(control) ?? 0) + 1);
     } else this.virtual.delete(control);
   }
   // The tick's controls: the held and touch levels plus the queued presses,
@@ -438,10 +467,12 @@ export class TrainingScene extends Phaser.Scene {
       ...[...this.held].map((key) => keyMap[key]),
     ]);
     for (const [control, count] of this.pressed) {
-      if (this.lastNow.has(control)) {
-        controls.delete(control);
+      if (controls.has(control)) {
+        if (count > 1) this.pressed.set(control, count - 1);
+        else this.pressed.delete(control);
         continue;
       }
+      if (this.lastNow.has(control)) continue;
       controls.add(control);
       if (count > 1) this.pressed.set(control, count - 1);
       else this.pressed.delete(control);
@@ -496,11 +527,15 @@ export class TrainingScene extends Phaser.Scene {
   private openTitle() {
     this.open(new Title());
   }
-  private open(screen: NonNullable<TrainingScene['select']>) {
+  private open(screen: NonNullable<TrainingScene['select']>, overlay = false) {
+    if (!overlay && this.select instanceof ModeSelect) this.unloadSigns();
     screen.globals = this.globals;
     this.select = screen;
-    this.sound.stopAll();
-    this.selectTrack = undefined;
+    if (!overlay) {
+      this.sound.stopAll();
+      this.selectTrack = undefined;
+      this.clearInput();
+    }
     // A screen opens unpaused — the dialog's held pause with it.
     this.paused = false;
     this.pausedBefore = false;
@@ -508,12 +543,8 @@ export class TrainingScene extends Phaser.Scene {
     // demo load is too: its screen must not open over this one.
     this.wanted = undefined;
     this.demoRequest = undefined;
+    this.routeLoad = undefined;
     this.loading = false;
-    // Presses still queued are the player's own — one merged behind the
-    // pick that opened the screen lands on it (the pick's edge is spent).
-    const pressed = new Map(this.pressed);
-    this.clearInput();
-    this.pressed = pressed;
     this.report();
   }
   // A step of the title or the select screen with this tick's controls. VS
@@ -561,34 +592,18 @@ export class TrainingScene extends Phaser.Scene {
       this.story = new Story(who);
       this.storyHeld = [...select.background.drawn];
       this.teams = null;
-      [this.storyLife, this.storyLost] = [
-        lifeOf(who) - 1 - TAKES[select.done],
-        0,
-      ];
-      return this.runStory(this.story.startOnRoute(select.done));
+      [this.storyLife, this.storyLost] = [routeLife(who, select.done), 0];
+      this.routeLoad = undefined;
+      this.runStory(this.story.startOnRoute(select.done));
+      if (this.loading) this.routeLoad = this.wanted ?? this.demoRequest;
+      return;
     }
     // The story's first step (0x4069b0), its counter reset by the title.
     if (select.story) {
       // A story the mode select opens for offers it first (authored,
-      // HPA-765); the finished select shows underneath it.
-      if (opensOnModeSelect(select.done[0])) {
-        // The pick's button may still be down: open()'s input clear would
-        // hide it until a keyboard repeat repopulates held, looking fresh
-        // to the selector's arm tick — so the still-down keys and touch
-        // controls carry over the transition (authored, HPA-765 review).
-        const held = [...this.held];
-        const virtual = [...this.virtual];
-        // open()'s stopAll would drop the finished select's track for
-        // good: the overlay keeps it, restarted — stopped sounds can't
-        // resume — as the Music toggle allows (authored, HPA-765 review).
-        const track = this.selectTrack;
-        this.open(new ModeSelect(select));
-        this.selectTrack = track;
-        if (this.music) track?.play();
-        for (const key of held) this.held.add(key);
-        for (const control of virtual) this.virtual.add(control);
-        return;
-      }
+      // HPA-765); the finished select shows underneath it once its sign
+      // pack is resident.
+      if (opensOnModeSelect(select.done[0])) return this.openModeSelect(select);
       // A story route picked starts a fresh run for its cheated mark.
       this.runCheated = false;
       this.story = new Story(select.done[0]);
@@ -606,7 +621,26 @@ export class TrainingScene extends Phaser.Scene {
     this.reset(this.teams ? 'cpu' : this.requestedMode());
   }
 
+  private modeSelectLoaded() {
+    return MODE_SELECT_SIGN_KEYS.every((key) => this.textures.exists(key));
+  }
+  private openModeSelect(select: CharacterSelect) {
+    if (this.modeSelectLoaded()) return this.open(new ModeSelect(select), true);
+    const request = (this.demoRequest = {});
+    this.loading = true;
+    this.load.addFile(
+      new PackFile(this.load, 'mode-select', () => this.modeSelectLoaded()),
+    );
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      if (this.demoRequest !== request) return;
+      this.loading = false;
+      this.open(new ModeSelect(select), true);
+    });
+    this.load.start();
+  }
+
   private leaveScreen() {
+    if (this.select instanceof ModeSelect) this.unloadSigns();
     this.select = null;
     this.selectTrack?.stop();
     this.dimmer?.setVisible(false);
@@ -738,13 +772,16 @@ export class TrainingScene extends Phaser.Scene {
     this.report();
   }
   // A player's images and sounds its select screens don't show, as one pack;
-  // the select screens' own are in the boot pack, which preload loads.
+  // the select screens' own are in the boot pack, which preload loads, and
+  // the mode select's six Chii boards are in `mode-select`.
   private loadPlayer(who: Who) {
     const { images, sounds } = CHARACTERS[who];
     const select = selectAssets[who];
-    // The rest, which the select screens' files don't hold, come as one pack.
+    const signs = new Set(MODE_SELECT_SIGNS[who] ?? []);
+    // The rest, which the select screens' and mode-select's packs don't
+    // hold, come as one pack.
     const restImages = images.filter(
-      (image) => !select.images.has(image.index),
+      (image) => !select.images.has(image.index) && !signs.has(image.index),
     );
     const restSounds = sounds.filter(
       (sound) => !select.sounds.has(sound.index),
@@ -772,6 +809,19 @@ export class TrainingScene extends Phaser.Scene {
       for (const { index } of CHARACTERS[who].sounds)
         if (!select.sounds.has(index)) sounds.add(`${who}-sound-${index}`);
     }
+    this.unloadTextures(textures, sounds);
+  }
+  private unloadSigns() {
+    const signKeys = new Set(MODE_SELECT_SIGN_KEYS);
+    const textures = new Set<string>();
+    for (const key of this.textures.getTextureKeys()) {
+      const [, base] = /^([a-z]+-\d+)/.exec(key) ?? [];
+      if (base && signKeys.has(base)) textures.add(key);
+    }
+    this.unloadTextures(textures);
+  }
+  private unloadTextures(textures: Set<string>, sounds?: Set<string>) {
+    if (!textures.size && !sounds?.size) return;
     for (const object of this.children.list)
       if (
         object instanceof Phaser.GameObjects.Image &&
@@ -779,6 +829,7 @@ export class TrainingScene extends Phaser.Scene {
       )
         object.setTexture('__DEFAULT');
     for (const key of textures) this.textures.remove(key);
+    if (!sounds) return;
     for (const key of sounds) {
       this.sound.removeByKey(key);
       this.cache.audio.remove(key);
@@ -835,8 +886,8 @@ export class TrainingScene extends Phaser.Scene {
     const behind =
       this.select instanceof ModeSelect ? this.select.background : this.select;
     const palette =
-      player && behind instanceof CharacterSelect
-        ? Math.max(0, behind.drawn[o.owner])
+      player && o.owner >= 0 && behind instanceof CharacterSelect
+        ? Math.max(0, behind.drawn[o.owner] ?? 0)
         : 0;
     this.paint(sprite, pose, o.color, prefix as Container, palette)
       .setOrigin(0)
@@ -1549,7 +1600,6 @@ export class TrainingScene extends Phaser.Scene {
       matchWinner: over ? this.match.matchWinner : null,
       error: this.error,
       selecting: !!this.select,
-      choosingMode: this.select instanceof ModeSelect,
       fighters: [this.fighter, this.opponent],
       story: !this.select && !!this.match.battle,
       // The requested match's mode while it loads, so a pick mid-load

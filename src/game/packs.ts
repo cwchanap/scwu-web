@@ -51,12 +51,16 @@ export const bytesOf = (
   pack.payload.subarray(range[0], range[0] + range[1]);
 
 // The boards the mode select's Chii signs show (docs/evidence.md, Globals):
-// the select programs never name them, so they join the resident set here.
-// The blank 8004 boards stay with the fighter packs.
-const SIGNS: Partial<Record<Who, readonly number[]>> = {
+// shipped in their own on-demand `mode-select` pack, loaded when ModeSelect
+// opens and unloaded when it leaves. The blank 8004 boards stay with the
+// fighter packs.
+export const MODE_SELECT_SIGNS: Partial<Record<Who, readonly number[]>> = {
   zaku: [8001, 8005, 8006],
   pachelo: [8001, 8005, 8006],
 };
+export const MODE_SELECT_SIGN_KEYS = Object.entries(MODE_SELECT_SIGNS).flatMap(
+  ([who, images]) => (images ?? []).map((index) => `${who}-${index}`),
+);
 
 // The images and sounds each player's select-screen programs show and play
 // (ops 0x0c and 0x03, select.ts), which load at start and stay; the rest of
@@ -68,8 +72,12 @@ export const selectAssets = Object.fromEntries(
     ).flat();
     const used = (op: number, read: (r: number[]) => number) =>
       new Set(records.filter((r) => r[0] === op).map(read));
-    const images = used(0x0c, (r) => (r[3] | (r[4] << 8)) & 8191);
-    for (const sign of SIGNS[who] ?? []) images.add(sign);
-    return [who, { images, sounds: used(0x03, (r) => r[2] | (r[3] << 8)) }];
+    return [
+      who,
+      {
+        images: used(0x0c, (r) => (r[3] | (r[4] << 8)) & 8191),
+        sounds: used(0x03, (r) => r[2] | (r[3] << 8)),
+      },
+    ];
   }),
 ) as Record<Who, { images: Set<number>; sounds: Set<number> }>;
