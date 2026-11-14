@@ -82,7 +82,7 @@
 
 - [ ] **macOS (Chromium):** existing automated SINGLE → fighter → B.R. MODE → B.R. ANOTHER smoke reaches first Sakura Street battle; confirm the existing HUD and arena render, mode navigation works, and no page errors occur.
 - [ ] **Windows (Edge):** same brief automated game-entry smoke and rendering check; no additional route/match test harness or full three-stage browser playthrough.
-- [ ] **iOS (Safari/WebKit):** touch-control smoke selects B.R. ANOTHER and reaches the first battle; check playable canvas/HUD in portrait and landscape with a simple visual inspection of the rendered UI (automated where available; do not claim physical Safari testing from WebKit emulation).
+- [ ] **iOS (Safari/WebKit):** touch-control smoke selects B.R. ANOTHER and reaches the first battle; assert the canvas and existing HUD remain visible in portrait and landscape with automated UI checks and retained screenshots when available (do not claim physical Safari testing from WebKit emulation).
 - [ ] **Gameplay behavior:** automated unit/integration tests establish all three stages, four boss-last arena variants, own-pair exclusions, partner wait, deterministic order, Continue/retry, ten-seat palette safety, untouched STORY/BR ZERO reachability and RARIO's bypass. These are the deterministic end-to-end gameplay-path assertions; do not drive a whole CPU tournament through browsers.
 - [ ] **Visual check:** HPA-766 has **no Linear UI mockup** and makes no new screen. Verify that existing select/arena HUD still renders (health/EN bar, opponent identity, ally/rival palette) during the short smoke; do not add artificial max-seat snapshots.
 - [ ] **CI-only:** Android and Linux receive CI coverage only; no separate platform acceptance or human sign-off.
