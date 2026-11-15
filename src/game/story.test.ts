@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { script } from './animations';
-import { CHARACTERS, lifeOf } from './characters';
+import { CHARACTERS, desperationOf, lifeOf, STAGES } from './characters';
 import type { Who } from './characters';
+import { ROSTER } from './select';
 import {
   isModeSelectBattle,
   opensOnModeSelect,
@@ -10,7 +11,7 @@ import {
   scenarioOf,
   TAKES,
 } from './story';
-import type { Battle, Route } from './story';
+import type { Battle, Route, Step } from './story';
 
 const at = (story: Story) => story.step;
 
@@ -203,5 +204,853 @@ describe('story runner', () => {
     expect(routeLife('ryuko', 'story-hard')).toBe(163);
     expect(routeLife('ryuko', 'br-zero')).toBe(162);
     expect(routeLife('ryuko', 'br-another')).toBe(161);
+  });
+});
+
+describe('source route reachability', () => {
+  const routes = Object.keys(TAKES) as Route[];
+  const sharedRoutes: Route[] = ['story-easy', 'story-hard', 'br-zero'];
+  const source = (who: Who) => CHARACTERS[who].scenario as readonly Step[];
+  const eligible = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+    opensOnModeSelect(who),
+  );
+  const miniBosses: Who[] = ['masa', 'times', 'zmega', 'rario'];
+  const twins: Who[] = ['yinan', 'aya'];
+  const regulars = eligible.filter(
+    (who) => !miniBosses.includes(who) && !twins.includes(who),
+  );
+  const familyOf = (who: Who) =>
+    miniBosses.includes(who)
+      ? 'mini-bosses'
+      : twins.includes(who)
+        ? 'twins'
+        : 'regulars';
+  const brOnlyOf = (who: Who) =>
+    familyOf(who) === 'mini-bosses'
+      ? [44, 45, 46, 47, 48, 49]
+      : familyOf(who) === 'twins'
+        ? [64, 65, 66, 67, 68]
+        : [62, 63, 64, 65, 66];
+  const sharedOf = (who: Who) =>
+    who === 'rario'
+      ? [50, 51, 52, 53, 54]
+      : who === 'zmega'
+        ? [50, 51, 52]
+        : familyOf(who) === 'mini-bosses'
+          ? [50, 51]
+          : familyOf(who) === 'twins'
+            ? [62, 63]
+            : [60, 61];
+
+  // The step a route's first next() lands on, the runner's jumps read
+  // with the life the chosen Chii sign leaves and no round lost or drawn.
+  const enter = (steps: readonly Step[], life: number) => {
+    let step = 0;
+    for (let runs = 1; runs <= 200; runs++) {
+      if (++step < 0 || step >= 100) return -1;
+      const s: Step | undefined = steps[step];
+      if (s === undefined || s.type === 0 || s.type === 4) return -1;
+      if (s.type === 1) {
+        if (s.stage) return step;
+      } else if (s.type === 2) {
+        if (s.demo) return step;
+      } else if (s.type === 3) {
+        if ([true, false, life < s.value, true][s.condition])
+          step += s.offset - 1;
+      }
+    }
+    return -1;
+  };
+
+  const sort = (ns: number[]) => ns.sort((a, b) => a - b);
+  // The battle, demo and ending steps a route can reach, both outcomes of
+  // the runner's data-dependent jumps included (condition 2 reads the
+  // 1P's life, 3 a lost or drawn round); a taken jump lands step+offset
+  // on (0x406bf4) and the runner's steps past an array read empty.
+  const reach = (steps: readonly Step[], start: number) => {
+    const seen = new Set<number>();
+    const battles: number[] = [];
+    const demos: number[] = [];
+    const ends: number[] = [];
+    const queue = [start];
+    while (queue.length) {
+      const i = queue.pop()!;
+      if (i < 0 || i >= 100 || seen.has(i)) continue;
+      seen.add(i);
+      const step: Step | undefined = steps[i];
+      if (step === undefined || step.type === 0 || step.type === 4) {
+        if (step?.type === 4) ends.push(i);
+        continue;
+      }
+      if (step.type === 3) {
+        if (step.condition === 0) queue.push(i + step.offset);
+        else if (step.condition === 1) queue.push(i + 1);
+        else queue.push(i + 1, i + step.offset);
+        continue;
+      }
+      if (step.type === 1 && step.stage) battles.push(i);
+      if (step.type === 2 && step.demo) demos.push(i);
+      queue.push(i + 1);
+    }
+    return {
+      seen,
+      battles: sort(battles),
+      demos: sort(demos),
+      ends: sort(ends),
+    };
+  };
+
+  const graphs = (steps: readonly Step[], who: Who) =>
+    Object.fromEntries(
+      routes.map((route) => [
+        route,
+        reach(steps, enter(steps, routeLife(who, route))),
+      ]),
+    ) as Record<Route, ReturnType<typeof reach>>;
+
+  const demoId = (steps: readonly Step[], i: number) => {
+    const step: Step | undefined = steps[i];
+    return step?.type === 2 ? step.demo : undefined;
+  };
+
+  it('pins each eligible fighter’s BR Another-only and shared steps', () => {
+    expect(eligible).toHaveLength(34);
+    expect(regulars).toHaveLength(28);
+    const entry = {
+      regulars: [4, 21, 47, 62],
+      twins: [6, 23, 49, 64],
+      'mini-bosses': [4, 17, 33, 44],
+    } as const;
+    const brGraph = (who: Who) =>
+      familyOf(who) === 'regulars'
+        ? {
+            battles: [63, 65],
+            demos: [
+              [60, 25],
+              [62, 4],
+              [64, 7],
+            ],
+            ends: [61],
+          }
+        : familyOf(who) === 'twins'
+          ? {
+              battles: [65, 67],
+              demos: [
+                [62, 25],
+                [64, 4],
+                [66, 7],
+              ],
+              ends: [63],
+            }
+          : who === 'rario'
+            ? {
+                battles: [45, 47, 49, 52],
+                demos: [
+                  [44, 4],
+                  [46, 4],
+                  [48, 7],
+                  [50, 25],
+                  [51, 91],
+                  [53, 92],
+                ],
+                ends: [54],
+              }
+            : who === 'zmega'
+              ? {
+                  battles: [45, 47, 49],
+                  demos: [
+                    [44, 4],
+                    [46, 4],
+                    [48, 7],
+                    [50, 25],
+                    [51, 89],
+                  ],
+                  ends: [52],
+                }
+              : {
+                  battles: [45, 47, 49],
+                  demos: [
+                    [44, 4],
+                    [46, 4],
+                    [48, 7],
+                    [50, 25],
+                  ],
+                  ends: [51],
+                };
+    for (const who of eligible) {
+      const steps = source(who);
+      const g = graphs(steps, who);
+      expect(
+        routes.map((route) => enter(steps, routeLife(who, route))),
+        who,
+      ).toEqual(entry[familyOf(who)]);
+      const others = new Set<number>(
+        sharedRoutes.flatMap((route) => [...g[route].seen]),
+      );
+      expect(
+        sort([...g['br-another'].seen].filter((i) => !others.has(i))),
+        `${who} BR Another-only`,
+      ).toEqual(brOnlyOf(who));
+      expect(
+        sort([...g['br-another'].seen].filter((i) => others.has(i))),
+        `${who} shared`,
+      ).toEqual(sharedOf(who));
+      expect(
+        {
+          battles: g['br-another'].battles,
+          demos: g['br-another'].demos.map((i) => [i, demoId(steps, i)]),
+          ends: g['br-another'].ends,
+        },
+        who,
+      ).toEqual(brGraph(who));
+    }
+  });
+
+  it('lets only BR Another-only and appended steps differ from the source', () => {
+    for (const who of eligible) {
+      const authored = scenarioOf(who);
+      const base = source(who);
+      expect(authored.length, who).toBeGreaterThanOrEqual(base.length);
+      const free = new Set(brOnlyOf(who));
+      base.forEach((step, i) => {
+        if (!free.has(i)) expect(authored[i], `${who} step ${i}`).toEqual(step);
+      });
+      const before = graphs(base, who);
+      const after = graphs(authored, who);
+      for (const route of sharedRoutes)
+        expect(
+          {
+            seen: after[route].seen,
+            battles: after[route].battles,
+            demos: after[route].demos,
+            ends: after[route].ends,
+          },
+          `${who} ${route}`,
+        ).toEqual({
+          seen: before[route].seen,
+          battles: before[route].battles,
+          demos: before[route].demos,
+          ends: before[route].ends,
+        });
+    }
+  });
+
+  it('records every route’s reachable battle, demo and ending steps', () => {
+    const record = (who: Who) => {
+      const steps = source(who);
+      const g = graphs(steps, who);
+      return Object.fromEntries(
+        routes.map((route) => [
+          route,
+          {
+            battles: g[route].battles,
+            demos: g[route].demos.map((i) => [i, demoId(steps, i)]),
+            ends: g[route].ends,
+          },
+        ]),
+      );
+    };
+    expect(record('ryuko')).toEqual({
+      'story-easy': {
+        battles: [5, 7, 9, 11, 13, 15, 17, 19, 40, 45, 67, 70, 76],
+        demos: [
+          [4, 3],
+          [6, 3],
+          [8, 3],
+          [10, 23],
+          [12, 3],
+          [14, 3],
+          [16, 3],
+          [18, 5],
+          [37, 12],
+          [39, 14],
+          [42, 15],
+          [44, 16],
+          [60, 25],
+          [69, 13],
+          [71, 31],
+          [73, 30],
+          [74, 25],
+          [75, 91],
+          [77, 92],
+        ],
+        ends: [61, 78],
+      },
+      'story-hard': {
+        battles: [22, 24, 26, 28, 30, 32, 34, 36, 40, 45, 67, 70, 76],
+        demos: [
+          [21, 3],
+          [23, 3],
+          [25, 3],
+          [27, 23],
+          [29, 23],
+          [31, 5],
+          [33, 5],
+          [35, 5],
+          [37, 12],
+          [39, 14],
+          [42, 15],
+          [44, 16],
+          [60, 25],
+          [69, 13],
+          [71, 31],
+          [73, 30],
+          [74, 25],
+          [75, 91],
+          [77, 92],
+        ],
+        ends: [61, 78],
+      },
+      'br-zero': {
+        battles: [48, 50, 52, 54, 56, 58],
+        demos: [
+          [47, 18],
+          [49, 6],
+          [51, 19],
+          [53, 20],
+          [55, 24],
+          [57, 21],
+          [59, 22],
+          [60, 25],
+        ],
+        ends: [61],
+      },
+      'br-another': {
+        battles: [63, 65],
+        demos: [
+          [60, 25],
+          [62, 4],
+          [64, 7],
+        ],
+        ends: [61],
+      },
+    });
+    expect(record('kiki')).toEqual({
+      'story-easy': {
+        battles: [5, 7, 9, 11, 13, 15, 17, 19, 40, 45, 67, 70, 77],
+        demos: [
+          [4, 3],
+          [6, 3],
+          [8, 23],
+          [10, 3],
+          [12, 3],
+          [14, 3],
+          [16, 3],
+          [18, 5],
+          [37, 12],
+          [39, 14],
+          [42, 15],
+          [44, 16],
+          [60, 25],
+          [69, 13],
+          [71, 39],
+          [73, 17],
+          [74, 38],
+          [75, 25],
+          [76, 91],
+          [78, 92],
+        ],
+        ends: [61, 79],
+      },
+      'story-hard': {
+        battles: [22, 24, 26, 28, 30, 32, 34, 36, 40, 45, 67, 70, 77],
+        demos: [
+          [21, 3],
+          [23, 3],
+          [25, 3],
+          [27, 23],
+          [29, 23],
+          [31, 5],
+          [33, 5],
+          [35, 5],
+          [37, 12],
+          [39, 14],
+          [42, 15],
+          [44, 16],
+          [60, 25],
+          [69, 13],
+          [71, 39],
+          [73, 17],
+          [74, 38],
+          [75, 25],
+          [76, 91],
+          [78, 92],
+        ],
+        ends: [61, 79],
+      },
+      'br-zero': {
+        battles: [48, 50, 52, 54, 56, 58],
+        demos: [
+          [47, 18],
+          [49, 6],
+          [51, 19],
+          [53, 20],
+          [55, 24],
+          [57, 21],
+          [59, 22],
+          [60, 25],
+        ],
+        ends: [61],
+      },
+      'br-another': {
+        battles: [63, 65],
+        demos: [
+          [60, 25],
+          [62, 4],
+          [64, 7],
+        ],
+        ends: [61],
+      },
+    });
+    expect(record('masa')).toEqual({
+      'story-easy': {
+        battles: [5, 7, 9, 11, 13, 15, 28, 30, 54],
+        demos: [
+          [4, 4],
+          [6, 4],
+          [8, 4],
+          [10, 4],
+          [12, 4],
+          [14, 5],
+          [27, 8],
+          [29, 8],
+          [31, 29],
+          [52, 25],
+          [53, 91],
+          [55, 92],
+        ],
+        ends: [56],
+      },
+      'story-hard': {
+        battles: [18, 20, 22, 24, 26, 28, 30, 54],
+        demos: [
+          [17, 4],
+          [19, 4],
+          [21, 27],
+          [23, 4],
+          [25, 5],
+          [27, 8],
+          [29, 8],
+          [31, 29],
+          [52, 25],
+          [53, 91],
+          [55, 92],
+        ],
+        ends: [56],
+      },
+      'br-zero': {
+        battles: [34, 36, 38, 40, 42],
+        demos: [
+          [33, 6],
+          [35, 26],
+          [37, 26],
+          [39, 27],
+          [41, 7],
+          [50, 25],
+        ],
+        ends: [51],
+      },
+      'br-another': {
+        battles: [45, 47, 49],
+        demos: [
+          [44, 4],
+          [46, 4],
+          [48, 7],
+          [50, 25],
+        ],
+        ends: [51],
+      },
+    });
+    expect(record('rario')).toEqual({
+      'story-easy': {
+        battles: [5, 7, 9, 11, 13, 15, 28, 30, 52],
+        demos: [
+          [4, 4],
+          [6, 4],
+          [8, 4],
+          [10, 4],
+          [12, 4],
+          [14, 5],
+          [27, 8],
+          [29, 8],
+          [31, 29],
+          [50, 25],
+          [51, 91],
+          [53, 92],
+        ],
+        ends: [54],
+      },
+      'story-hard': {
+        battles: [18, 20, 22, 24, 26, 28, 30, 52],
+        demos: [
+          [17, 4],
+          [19, 4],
+          [21, 4],
+          [23, 27],
+          [25, 5],
+          [27, 8],
+          [29, 8],
+          [31, 29],
+          [50, 25],
+          [51, 91],
+          [53, 92],
+        ],
+        ends: [54],
+      },
+      'br-zero': {
+        battles: [34, 36, 38, 40, 42, 52],
+        demos: [
+          [33, 6],
+          [35, 26],
+          [37, 26],
+          [39, 6],
+          [41, 7],
+          [50, 25],
+          [51, 91],
+          [53, 92],
+        ],
+        ends: [54],
+      },
+      'br-another': {
+        battles: [45, 47, 49, 52],
+        demos: [
+          [44, 4],
+          [46, 4],
+          [48, 7],
+          [50, 25],
+          [51, 91],
+          [53, 92],
+        ],
+        ends: [54],
+      },
+    });
+    expect(record('yinan')).toEqual({
+      'story-easy': {
+        battles: [7, 9, 11, 13, 15, 17, 19, 21, 42, 47, 69, 72, 78],
+        demos: [
+          [6, 3],
+          [8, 3],
+          [10, 3],
+          [12, 3],
+          [14, 3],
+          [16, 3],
+          [18, 3],
+          [20, 5],
+          [39, 12],
+          [41, 14],
+          [44, 15],
+          [46, 16],
+          [62, 25],
+          [71, 13],
+          [73, 87],
+          [75, 86],
+          [76, 25],
+          [77, 91],
+          [79, 92],
+        ],
+        ends: [63, 80],
+      },
+      'story-hard': {
+        battles: [24, 26, 28, 30, 32, 34, 36, 38, 42, 47, 69, 72, 78],
+        demos: [
+          [23, 3],
+          [25, 3],
+          [27, 3],
+          [29, 3],
+          [31, 23],
+          [33, 5],
+          [35, 5],
+          [37, 5],
+          [39, 12],
+          [41, 14],
+          [44, 15],
+          [46, 16],
+          [62, 25],
+          [71, 13],
+          [73, 87],
+          [75, 86],
+          [76, 25],
+          [77, 91],
+          [79, 92],
+        ],
+        ends: [63, 80],
+      },
+      'br-zero': {
+        battles: [50, 52, 54, 56, 58, 60],
+        demos: [
+          [49, 18],
+          [51, 6],
+          [53, 19],
+          [55, 20],
+          [57, 24],
+          [59, 21],
+          [61, 22],
+          [62, 25],
+        ],
+        ends: [63],
+      },
+      'br-another': {
+        battles: [65, 67],
+        demos: [
+          [62, 25],
+          [64, 4],
+          [66, 7],
+        ],
+        ends: [63],
+      },
+    });
+  });
+
+  it('keeps RARIO’s shared tail and every story route’s DoraEmon fight', () => {
+    const base = source('rario');
+    expect(base[32]).toEqual({ type: 3, condition: 0, value: 0, offset: 18 });
+    expect(base[43]).toEqual({ type: 3, condition: 0, value: 0, offset: 7 });
+    expect(base.slice(50)).toEqual([
+      { type: 2, demo: 25 },
+      { type: 2, demo: 91 },
+      expect.objectContaining({ type: 1, stage: 3, koScorer: 2 }),
+      { type: 2, demo: 92 },
+      { type: 4 },
+    ]);
+    expect(scenarioOf('rario').slice(50)).toEqual(base.slice(50));
+    for (const who of eligible) {
+      const steps = source(who);
+      const g = graphs(steps, who);
+      const dora = steps.flatMap((step, i) =>
+        step.type === 1 && step.slots.some((s) => s?.player === 45) ? [i] : [],
+      );
+      const [index] = dora;
+      expect(dora, who).toEqual([steps.length - (who === 'zmega' ? 4 : 3)]);
+      expect(steps[index - 1], `${who} demo`).toEqual({
+        type: 2,
+        demo: 91,
+      });
+      expect(steps[index + 1], `${who} demo`).toEqual({
+        type: 2,
+        demo: 92,
+      });
+      const battle = steps[index] as Battle;
+      expect(battle, who).toMatchObject({
+        type: 1,
+        stage: 3,
+        rounds: 2,
+        recover: 100,
+        flags: 1,
+        time: 0,
+        x: 520,
+        letterings: 7,
+        timeUp: 100,
+        koScorer: who === 'hiso' ? 0 : 2,
+        koPoints: 100,
+      });
+      expect(
+        battle.slots.map(
+          (s) =>
+            s && [s.player, s.flags, s.level, s.enemies, s.points, s.scorer],
+        ),
+        who,
+      ).toEqual([
+        [45, 0, 100, 1, 1, who === 'yo' ? 0 : 1],
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ]);
+      expect(
+        routes.filter((route) => g[route].battles.includes(index)),
+        who,
+      ).toEqual(who === 'rario' ? routes : ['story-easy', 'story-hard']);
+    }
+  });
+
+  it('pins the source BR Another battle templates', () => {
+    const stageKeys = Object.keys(STAGES);
+    const brBattles = (who: Who) =>
+      brOnlyOf(who)
+        .filter((i) => source(who)[i].type === 1)
+        .map((i) => source(who)[i] as Battle);
+    const stageKeysOf = (who: Who): string[] =>
+      (
+        ({
+          masa: ['japan', 'sakura', 'boss'],
+          times: ['sakura', 'japan', 'office2'],
+          zmega: ['court', 'train', 'office2'],
+          rario: ['train', 'court', 'boss'],
+        }) as Partial<Record<Who, string[]>>
+      )[who] ?? ['sakura', ROSTER.indexOf(who) & 1 ? 'office2' : 'boss'];
+    const allyOf = (who: Who): Who =>
+      who === 'zmega'
+        ? 'rario'
+        : who === 'rario'
+          ? 'zmega'
+          : ROSTER[ROSTER.indexOf(who) ^ 1]!;
+    const battleX: Partial<Record<Who, number>> = {
+      amiro: 300,
+      yo: 420,
+      lizard: 220,
+      kay: 420,
+      sin: 550,
+      rear: 200,
+      masa: 300,
+    };
+    const allyX: Partial<Record<Who, number>> = { sin: 750, kay: 550 };
+    for (const who of eligible) {
+      const steps = source(who);
+      const battles = brBattles(who);
+      expect(
+        battles.map((b) => stageKeys[b.stage - 1]),
+        who,
+      ).toEqual(stageKeysOf(who));
+      const fin = battles.at(-1)!;
+      expect(
+        {
+          type: fin.type,
+          stage: fin.stage,
+          rounds: fin.rounds,
+          recover: fin.recover,
+          flags: fin.flags,
+          time: fin.time,
+          letterings: fin.letterings,
+          timeUp: fin.timeUp,
+          koScorer: fin.koScorer,
+          koPoints: fin.koPoints,
+          x: fin.x,
+        },
+        who,
+      ).toEqual({
+        type: 1,
+        stage: stageKeys.indexOf(stageKeysOf(who).at(-1)!) + 1,
+        rounds: 1,
+        recover: 100,
+        flags: 1,
+        time: 0,
+        letterings: 3,
+        timeUp: 100,
+        koScorer: 0,
+        koPoints: 100,
+        x: battleX[who] ?? 520,
+      });
+      const slots = fin.slots;
+      expect(
+        slots.map((s) => s?.flags),
+        who,
+      ).toEqual([0x100, 0x104, 0x104, 0x104, 0x104, 0x4, 0x305]);
+      expect(
+        slots.map((s) => s?.enemies),
+        who,
+      ).toEqual([249, 249, 231, 231, 223, 191, 126]);
+      expect(
+        slots.map((s) => s?.level),
+        who,
+      ).toEqual([100, 100, 100, 100, 100, 100, 100]);
+      expect(
+        slots.map((s) => s?.delay),
+        who,
+      ).toEqual(
+        who === 'times' ? [1, 0, 0, 0, 0, 0, 0] : [0, 0, 0, 0, 0, 0, 0],
+      );
+      expect(
+        slots.map((s) => s?.watch),
+        who,
+      ).toEqual([0, 1, 2, 3, 4, 5, 0]);
+      expect(
+        slots.map((s) => s?.x),
+        who,
+      ).toEqual([850, 450, 850, 450, 850, 450, allyX[who] ?? 850]);
+      expect(
+        slots.map((s) => s?.points),
+        who,
+      ).toEqual([0, 0, 0, 0, 0, 100, 0]);
+      expect(
+        slots.map((s) => s?.scorer),
+        who,
+      ).toEqual(
+        who === 'ryuko' ? [1, 0, 0, 0, 0, 1, 0] : [0, 0, 0, 0, 0, 1, 0],
+      );
+      const below = [
+        0,
+        ...slots.slice(0, 5).map((s) => desperationOf(ROSTER[s!.player]!)),
+        desperationOf(who),
+      ];
+      if (who === 'alex') below[2] = 142;
+      expect(
+        slots.map((s) => s?.below),
+        who,
+      ).toEqual(below);
+      expect(ROSTER[slots[6]!.player], who).toBe(allyOf(who));
+      const open = battles[0]!;
+      expect(
+        open.slots.map((s) => s && s.flags),
+        who,
+      ).toEqual(
+        familyOf(who) === 'mini-bosses'
+          ? [0x100, 0x104, 0x104, 0x4, null, null, 0x305]
+          : who === 'remu'
+            ? [0x100, 0x104, 0x84, 0x104, 0x104, 0x4, 0x305]
+            : [0x100, 0x104, 0x104, 0x104, 0x104, 0x4, 0x305],
+      );
+      expect(
+        open.slots.map((s) => s && s.level),
+        who,
+      ).toEqual(
+        familyOf(who) === 'mini-bosses'
+          ? [60, 60, 60, 60, null, null, 100]
+          : [100, 100, 100, 100, 100, 100, 100],
+      );
+      if (familyOf(who) === 'mini-bosses')
+        expect(
+          battles[1]!.slots.map((s) => s && s.level),
+          who,
+        ).toEqual([80, 80, 80, 80, null, null, 100]);
+      const endDemos = sharedOf(who).flatMap((i) => {
+        const demo = demoId(steps, i);
+        return demo === undefined ? [] : [[i, demo]];
+      });
+      expect(endDemos, who).toEqual(
+        who === 'rario'
+          ? [
+              [50, 25],
+              [51, 91],
+              [53, 92],
+            ]
+          : who === 'zmega'
+            ? [
+                [50, 25],
+                [51, 89],
+              ]
+            : [[sharedOf(who)[0], 25]],
+      );
+    }
+    const first = source('ryuko')[63] as Battle;
+    expect(first).toMatchObject({
+      type: 1,
+      stage: 9,
+      rounds: 1,
+      recover: 100,
+      flags: 1,
+      time: 0,
+      x: 520,
+      letterings: 3,
+      timeUp: 100,
+      koScorer: 0,
+      koPoints: 100,
+    });
+    expect(first.slots.map((s) => s && [s.player, s.flags])).toEqual([
+      [16, 0x100],
+      [17, 0x104],
+      [2, 0x104],
+      [3, 0x104],
+      [14, 0x104],
+      [15, 0x4],
+      [1, 0x305],
+    ]);
+    expect(first.slots.map((s) => s?.enemies)).toEqual([
+      249, 249, 231, 231, 159, 159, 126,
+    ]);
+    expect(first.slots.map((s) => s?.level)).toEqual([
+      100, 100, 100, 100, 100, 100, 100,
+    ]);
   });
 });
