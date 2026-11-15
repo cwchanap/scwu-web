@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CHEATS } from './cheats';
 import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
+import { desperationOf, lifeOf } from './characters';
 import { firstStrike, LIFE, Match } from './match';
 import type { Fighter } from './match';
-import { scenarioOf } from './story';
+import { ROSTER } from './select';
+import { scenarioOf, Story } from './story';
 import { enter, playing, RYUKO } from './testing';
 import type { Battle, Slot } from './story';
+import { brAnotherStages } from './br-another';
 
 // A third player borrowed from another match: a story battle seats up to
 // eight.
@@ -873,5 +876,439 @@ describe('VS multi (TEAM VS)', () => {
     expect(next(204, 1)).toEqual([LIFE, 204, 470]);
     expect(next(1, 1)).toEqual([LIFE, 204, 470]);
     expect(next(300, 0)).toEqual([LIFE, 306, 490]);
+  });
+});
+
+describe('BR Another stages', () => {
+  it('seats the 1P, its eight enemies and its ally on ten fighters from the scene’s eight-entry held array', () => {
+    for (const who of ['zmega', 'rario'] as const) {
+      const held = [0, -1, -1, -1, -1, -1, -1, -1];
+      const { stage2 } = brAnotherStages(who);
+      const match = Match.story(who, stage2, 0, held);
+      expect(match.held, who).toBe(held);
+      expect(held, who).toHaveLength(10);
+      expect(match.stage, who).toBe('sakuranight');
+      expect(
+        match.fighters.map((f) => f.who),
+        who,
+      ).toEqual([who, ...stage2.slots.map((s) => ROSTER[s!.player]!)]);
+      expect(match.palettes, who).toEqual([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+      expect(
+        match.fighters.map((f) => f.present),
+        who,
+      ).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]);
+    }
+  });
+
+  it('marks every stage-2 enemy hostile to all but its pair-mate, and the ally only to them', () => {
+    const mate = (k: number) => (k % 2 ? k + 1 : k - 1);
+    for (const who of ['zmega', 'rario'] as const) {
+      const match = Match.story(who, brAnotherStages(who).stage2);
+      const all = (1 << 10) - 1;
+      expect(
+        match.fighters.map((f) => f.enemies),
+        who,
+      ).toEqual(
+        match.fighters.map((_, k) =>
+          k === 0 || k === 9
+            ? all & ~1 & ~(1 << 9)
+            : all & ~(1 << k) & ~(1 << mate(k)),
+        ),
+      );
+      for (const [i, a] of match.fighters.entries())
+        for (const [j, b] of match.fighters.entries())
+          expect(Boolean(a.enemies & (1 << j)), `${who} ${i}->${j}`).toBe(
+            Boolean(b.enemies & (1 << i)),
+          );
+    }
+    const match = Match.story('gigi', brAnotherStages('gigi').stage2);
+    expect(match.fighters.map((f) => f.who)).toEqual([
+      'gigi',
+      'masa',
+      'times',
+      'yinan',
+      'aya',
+      'ogi',
+      'ziro',
+      'sww',
+    ]);
+    const all = (1 << 8) - 1;
+    expect(match.fighters.map((f) => f.enemies)).toEqual(
+      match.fighters.map((_, k) =>
+        k === 0 || k === 7
+          ? all & ~1 & ~(1 << 7)
+          : all & ~(1 << k) & ~(1 << mate(k)),
+      ),
+    );
+    expect(match.fighters.map((f) => f.present)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('enters each stage-2 enemy once the fighter it watches falls below its own mark', () => {
+    const match = Match.story('zmega', brAnotherStages('zmega').stage2);
+    fight(match);
+    const [one, ...rest] = match.fighters;
+    expect(one.target).toBe(rest[0]);
+    expect(match.rival).toBeNull();
+    for (let k = 1; k <= 7; k++) {
+      const watched = rest[k - 1]!;
+      const next = rest[k]!;
+      expect(next.present).toBe(false);
+      watched.hp = desperationOf(watched.who);
+      match.step();
+      expect(next.present).toBe(false);
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present).toBe(true);
+    }
+  });
+
+  it('sends the ally in once the 1P’s life falls below its mark', () => {
+    for (const key of ['stage2', 'stage3'] as const) {
+      const match = Match.story('zmega', brAnotherStages('zmega')[key]);
+      fight(match);
+      const [one] = match.fighters;
+      const ally = match.fighters.at(-1)!;
+      expect(ally.who, key).toBe('rario');
+      expect(ally.present, key).toBe(false);
+      one.hp = desperationOf('zmega');
+      match.step();
+      expect(ally.present, key).toBe(false);
+      one.hp = desperationOf('zmega') - 1;
+      match.step();
+      expect(ally.present, key).toBe(true);
+      for (let t = 0; t < 100 && !ally.shown; t++) match.step();
+      expect(match.lifeBars, key).toEqual([ally]);
+    }
+  });
+
+  it('names no rival while several stand, then the last left or the one the 1P’s box met', () => {
+    const match = Match.story('zmega', brAnotherStages('zmega').stage2);
+    fight(match);
+    const [one, gigi] = match.fighters;
+    const ally = match.fighters.at(-1)!;
+    const box = { x: 30, y: -100, w: 40, h: 40, damage: 0, kind: 1 };
+    gigi.x = one.x + 90 * one.facing;
+    gigi.facing = -one.facing as -1 | 1;
+    one.box = { ...box };
+    gigi.box = { ...box };
+    match.step();
+    expect(match.rival).toBe(gigi);
+    for (const vm of match.cpus) if (vm) vm.input = () => ({});
+    for (const f of match.fighters.slice(2, 9)) f.hp = 0;
+    for (let t = 0; t < 1001; t++) match.step();
+    expect(match.rival).toBeNull();
+    for (const f of match.fighters.slice(1, 9)) f.hp = 0;
+    match.step();
+    expect(match.rival).toBe(ally);
+  });
+
+  it('pays a KO on the first and middle stage-2 enemies to their striker, the last only to the 1P’s score', () => {
+    const match = Match.story('zmega', brAnotherStages('zmega').stage2);
+    fight(match);
+    const [one, gigi, sww, masa, , , , , aya] = match.fighters;
+    one.hp = 100;
+    one.power = 0;
+    one.points = 0;
+    knockOut(match, gigi, one);
+    expect([one.hp, one.power, one.points]).toEqual([150, 10, 0]);
+    masa.hp = 100;
+    masa.power = 0;
+    knockOut(match, sww, masa);
+    expect([masa.hp, masa.power, masa.points]).toEqual([150, 10, 0]);
+    expect(one.points).toBe(0);
+    knockOut(match, aya, masa);
+    expect([masa.hp, masa.power, masa.points]).toEqual([150, 10, 0]);
+    expect(one.points).toBe(100);
+  });
+
+  it('enters the stage-3 bosses in their seeded order, each once its watched boss runs low', () => {
+    for (const [who, names, stage] of [
+      ['ryuko', ['zenka', 'dora', 'shinz', 'alpha'], 'office2'],
+      ['zmega', ['alpha', 'zenka', 'dora', 'shinz'], 'brboss'],
+    ] as const) {
+      const match = Match.story(who, brAnotherStages(who).stage3);
+      expect(match.stage, who).toBe(stage);
+      expect(
+        match.fighters.map((f) => f.who),
+        who,
+      ).toEqual([
+        who,
+        ...brAnotherStages(who).stage3.slots.map((s) => ROSTER[s!.player]!),
+      ]);
+      expect(
+        match.fighters.slice(1, 5).map((f) => f.who),
+        who,
+      ).toEqual(names);
+      const all = (1 << 6) - 1;
+      expect(
+        match.fighters.map((f) => f.enemies),
+        who,
+      ).toEqual(
+        match.fighters.map((_, k) =>
+          k === 0 || k === 5 ? all & ~1 & ~(1 << 5) : all & ~(1 << k),
+        ),
+      );
+      fight(match);
+      expect(
+        match.fighters.map((f) => f.present),
+        who,
+      ).toEqual([true, true, false, false, false, false]);
+      for (const [watched, next] of [
+        [match.fighters[1]!, match.fighters[2]!],
+        [match.fighters[2]!, match.fighters[3]!],
+        [match.fighters[3]!, match.fighters[4]!],
+      ] as const) {
+        watched.hp = desperationOf(watched.who);
+        match.step();
+        expect(next.present, `${who} ${next.who} at mark`).toBe(false);
+        watched.hp = desperationOf(watched.who) - 1;
+        match.step();
+        expect(next.present, `${who} ${next.who} below mark`).toBe(true);
+      }
+    }
+  });
+
+  it('pays a boss KO’s bonus to its striker, the last boss’s only to the 1P’s score', () => {
+    for (const who of ['zmega', 'ryuko'] as const) {
+      const match = Match.story(who, brAnotherStages(who).stage3);
+      fight(match);
+      const [one, first, striker, , last] = match.fighters;
+      one.hp = 100;
+      one.power = 0;
+      one.points = 0;
+      striker.hp = 100;
+      striker.power = 0;
+      knockOut(match, first, striker);
+      expect([striker.hp, striker.power, striker.points]).toEqual([150, 10, 0]);
+      expect([one.hp, one.power, one.points]).toEqual([100, 0, 0]);
+      knockOut(match, last, striker);
+      expect([striker.hp, striker.power, striker.points]).toEqual([150, 10, 0]);
+      expect([one.hp, one.power, one.points]).toEqual([100, 0, 100]);
+    }
+  });
+
+  it('wins the stage-3 brawl only once every boss has fallen', () => {
+    const match = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    fight(match);
+    const [one] = match.fighters;
+    for (const [i, boss] of match.fighters.slice(1, 5).entries()) {
+      expect(boss.present, boss.who).toBe(true);
+      knockOut(match, boss, one);
+      match.step();
+      if (i < 3) expect(match.winner).toBeNull();
+    }
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
+    expect(match).toMatchObject({ wins: [1, 0], lost: 0 });
+    expect(match.matchOver).toBe(true);
+  });
+
+  it('loses the stage-2 brawl when the 1P falls, and a continue retries the identical seeded battle', () => {
+    const story = new Story('zmega');
+    story.startOnRoute('br-another');
+    story.next();
+    story.next();
+    const next = story.next();
+    expect(next.kind).toBe('battle');
+    if (next.kind !== 'battle') return;
+    expect(next.battle.flags & 1).toBe(1);
+    const match = Match.story(
+      'zmega',
+      next.battle,
+      0,
+      [0, -1, -1, -1, -1, -1, -1, -1],
+    );
+    fight(match);
+    const [one, striker] = match.fighters;
+    const lineUp = match.fighters.map((f) => f.who);
+    const palettes = match.palettes;
+    knockOut(match, one, striker);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match).toMatchObject({ winner: 'opponent', lost: 1 });
+    const retried = story.retry();
+    expect(retried).toEqual(next);
+    if (retried.kind !== 'battle') return;
+    expect(retried.battle).toBe(next.battle);
+    const again = Match.story(
+      'zmega',
+      retried.battle,
+      0,
+      [0, -1, -1, -1, -1, -1, -1, -1],
+    );
+    expect(again.fighters.map((f) => f.who)).toEqual(lineUp);
+    expect(again.palettes).toEqual(palettes);
+  });
+
+  it('scales each watched mark with its holder’s effective life under cheats', () => {
+    const scaled = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    scaled.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 2,
+    });
+    fight(scaled);
+    const zenka = scaled.fighters[1]!;
+    const dora = scaled.fighters[2]!;
+    expect(zenka.maxHp).toBe(960);
+    zenka.hp = 200;
+    scaled.step();
+    expect(dora.present).toBe(true);
+    const native = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    fight(native);
+    native.fighters[1]!.hp = 200;
+    native.step();
+    expect(native.fighters[2]!.present).toBe(false);
+    const scaledOne = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    scaledOne.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      playerHpMultiplier: 2,
+    });
+    fight(scaledOne);
+    const [one, , , , , zoma] = scaledOne.fighters;
+    expect(one.maxHp).toBe(1020);
+    one.hp = 200;
+    scaledOne.step();
+    expect(zoma.present).toBe(true);
+    const plain = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    fight(plain);
+    plain.fighters[0]!.hp = 200;
+    plain.step();
+    expect(plain.fighters[5]!.present).toBe(false);
+  });
+
+  it('carries the seats’ palettes from stage 2 into stage 3 on the shared held array', () => {
+    const held = [0, -1, -1, -1, -1, -1, -1, -1];
+    const { stage2, stage3 } = brAnotherStages('zmega');
+    const second = Match.story('zmega', stage2, 0, held);
+    fight(second);
+    for (const f of second.fighters.slice(1, 8)) {
+      f.hp = 1;
+      second.step();
+    }
+    expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, -1]);
+    expect(second.palettes).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 0]);
+    const third = Match.story('zmega', stage3, 0, held);
+    expect(third.held).toBe(held);
+    expect(third.palettes).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, -1]);
+  });
+
+  it('plays each folded fighter’s stage 1 as one three-pair battle on Sakura Street', () => {
+    for (const who of ['masa', 'times', 'zmega', 'rario'] as const) {
+      const { stage1 } = brAnotherStages(who);
+      const match = Match.story(who, stage1!);
+      expect(match.stage, who).toBe('sakura');
+      expect(
+        match.fighters.map((f) => f.who),
+        who,
+      ).toEqual([who, ...stage1!.slots.map((s) => ROSTER[s!.player]!)]);
+      const all = (1 << 8) - 1;
+      expect(
+        match.fighters.map((f) => f.enemies),
+        who,
+      ).toEqual(
+        match.fighters.map((_, k) =>
+          k === 0 || k === 7
+            ? all & ~1 & ~(1 << 7)
+            : all & ~(1 << k) & ~(1 << (k % 2 ? k + 1 : k - 1)),
+        ),
+      );
+      expect(
+        match.fighters.map((f) => f.present),
+        who,
+      ).toEqual([true, true, false, false, false, false, false, false]);
+      fight(match);
+      const [one] = match.fighters;
+      for (const f of match.fighters.slice(1, 6)) {
+        expect(f.present, `${who} ${f.who}`).toBe(true);
+        knockOut(match, f, one);
+        match.step();
+      }
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, who).toBeNull();
+      const last = match.fighters[6]!;
+      expect(last.present).toBe(true);
+      knockOut(match, last, one);
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, who).toBe('player');
+      expect(match.lost, who).toBe(0);
+    }
+  });
+
+  it('keeps DoraEmon’s EN charge and KO RELOAD unchanged as a stage-3 boss', () => {
+    const match = Match.story('kiki', brAnotherStages('kiki').stage3);
+    expect(match.fighters.map((f) => f.who)).toEqual([
+      'kiki',
+      'alpha',
+      'shinz',
+      'zenka',
+      'dora',
+      'chung',
+    ]);
+    for (const [i, vm] of match.cpus.entries())
+      if (i) vm!.input = i === 4 ? () => ({ ex: true }) : () => ({});
+    fight(match);
+    const [one, alpha, shinz, zenka, dora] = match.fighters;
+    for (const [watched, next] of [
+      [alpha, shinz],
+      [shinz, zenka],
+      [zenka, dora],
+    ] as const) {
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present).toBe(true);
+      watched.hp = watched.maxHp;
+    }
+    dora.stock = 0;
+    const seen = new Set<unknown>();
+    for (let t = 0; t < 120 && dora.stock < 3; t++) {
+      match.step();
+      if (dora.action === 'script') seen.add(dora.branch);
+    }
+    expect([...seen].some((b) => b === 239 || b === '240+3')).toBe(true);
+    expect(dora.stock).toBeGreaterThanOrEqual(3);
+    dora.stock = 4;
+    knockOut(match, dora, one);
+    const path: unknown[] = [];
+    for (let t = 0; t < 2000 && dora.hp < lifeOf('dora'); t++) {
+      match.step();
+      const current = playing(dora);
+      if (path.at(-1) !== current) path.push(current);
+    }
+    expect(path.indexOf(72)).toBeGreaterThanOrEqual(0);
+    expect(path.indexOf(74)).toBeGreaterThan(path.indexOf(72));
+    expect([dora.hp, dora.stock, dora.downed, match.winner]).toEqual([
+      lifeOf('dora'),
+      1,
+      true,
+      null,
+    ]);
+    for (const boss of [alpha, shinz, zenka]) {
+      knockOut(match, boss, one);
+      match.step();
+    }
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
   });
 });
