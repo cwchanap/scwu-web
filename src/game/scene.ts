@@ -100,6 +100,10 @@ export const initialStatus: GameStatus = {
   cheated: false,
 };
 const DEMOS = { select: selectData, t2 };
+// Select demo (CHAR SELECT, `select.json`) action 13: once KGT's decided
+// cursor adds 5 to global 7 (`0x407a94`) while global 3 remains <= 40
+// (story mode, unlike VS single's 50), it plays the title-logo transition
+// panels (images 35..41) that close out the screen.
 const SELECT_EXIT_OVERLAY_ACTION = 13;
 // A story's demos, loaded as they play.
 type StoryDemoData = Demo & {
@@ -272,6 +276,7 @@ export class TrainingScene extends Phaser.Scene {
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
+  private readonly selectDrawList: SelectObject[] = [];
   // The palette each player's objects draw with, from the select's buttons.
   private palettes = [0, 0];
   // The title's or the select screen's track.
@@ -840,23 +845,22 @@ export class TrainingScene extends Phaser.Scene {
   }
   // Demo and KGT objects draw their display's top left at their offset; a
   // player's select face and name stand on their ground point (placement).
-  // The mode select draws its finished select under a dimmer first, its own
-  // signs and arrow above it (authored, HPA-765).
+  // The mode select draws its finished select under a dimmer first —
+  // omitting the select demo's closing title-logo overlay (action 13,
+  // `SELECT_EXIT_OVERLAY_ACTION`) so it does not cover the backdrop — with
+  // its own signs and arrow above it (authored, HPA-765).
   private drawSelect() {
     const select = this.select!;
-    const objects = (
-      select instanceof ModeSelect
-        ? [
-            ...select.background.objects.filter(
-              (o) =>
-                o.container !== 'select' ||
-                o.action !== SELECT_EXIT_OVERLAY_ACTION,
-            ),
-            ...select.objects,
-          ]
-        : select.objects
-    ).filter((o) => o.alive && o.frame);
+    const objects = this.selectDrawList;
+    objects.length = 0;
     if (select instanceof ModeSelect) {
+      for (const o of select.background.objects)
+        if (
+          o.alive &&
+          o.frame &&
+          (o.container !== 'select' || o.action !== SELECT_EXIT_OVERLAY_ACTION)
+        )
+          objects.push(o);
       this.dimmer ??= this.add
         .rectangle(0, 0, WIDTH, HEIGHT, 0, 0.55)
         .setOrigin(0)
@@ -864,6 +868,7 @@ export class TrainingScene extends Phaser.Scene {
         .setDepth(200.9);
       this.dimmer.setVisible(true);
     } else this.dimmer?.setVisible(false);
+    for (const o of select.objects) if (o.alive && o.frame) objects.push(o);
     this.pool(this.selectSprites, objects.length).forEach((sprite, index) => {
       const o = objects[index];
       if (!o) return sprite.setVisible(false);

@@ -40,6 +40,8 @@ const BOSS_ARENAS: Record<number, number> = {
   45: 18,
 };
 
+const FOLDED_START = 44;
+
 const finaleIndex = (who: Who) =>
   FOLDED.includes(who) ? 49 : TWINS.includes(who) ? 67 : 65;
 
@@ -133,4 +135,45 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     BOSS_ARENAS[bosses.at(-1)!],
   );
   return { stage1, stage2, stage3 };
+};
+
+export const brAnotherStory = (who: Who): readonly Step[] => {
+  const source = CHARACTERS[who].scenario as readonly Step[];
+  const { stage1, stage2, stage3 } = brAnotherStages(who);
+  const finale = finaleIndex(who);
+  const steps: Step[] = [...source];
+  if (stage1 !== null) {
+    steps.splice(
+      FOLDED_START,
+      finale - FOLDED_START + 1,
+      { type: 2, demo: 4 },
+      stage1,
+      { type: 2, demo: 7 },
+      stage2,
+      stage3,
+      who === 'rario'
+        ? { type: 3, condition: 0, value: 0, offset: source.length - finale }
+        : { type: 2, demo: 0 },
+    );
+    if (who === 'rario') steps.push({ type: 2, demo: 25 }, { type: 4 });
+    return steps;
+  }
+  const returnJump = source[finale + 1];
+  if (returnJump?.type !== 3)
+    throw new Error(`${who} step ${finale + 1} is not a return jump`);
+  const ending = finale + 1 + returnJump.offset;
+  steps[finale] = stage2;
+  steps[finale + 1] = {
+    type: 3,
+    condition: 0,
+    value: 0,
+    offset: source.length - (finale + 1),
+  };
+  steps.push(stage3, {
+    type: 3,
+    condition: 0,
+    value: 0,
+    offset: ending - (source.length + 1),
+  });
+  return steps;
 };

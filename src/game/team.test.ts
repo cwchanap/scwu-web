@@ -184,7 +184,7 @@ describe('story battles', () => {
       held,
     );
     expect(next.palettes).toEqual([0, 5]);
-    expect(held).toEqual([0, 1, 2, 3, 4, -1, -1, 5, -1, -1]);
+    expect(held).toEqual([0, 1, 2, 3, 4, -1, -1, 5]);
   });
 
   it('seats ten players on the scene’s eight-entry palette array, a repeat once the eight run out (authored)', () => {
@@ -213,6 +213,24 @@ describe('story battles', () => {
     );
     expect(next.palettes).toEqual([0, 1, 5, 0, 0]);
     expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 0]);
+  });
+
+  it('pads held to battles with more than nine seats so waiting seats never read NaN', () => {
+    const held = [0, -1, -1, -1, -1, -1, -1, -1];
+    const match = Match.story(
+      'ryuko',
+      battle({
+        slots: Array.from({ length: 11 }, (_, i) =>
+          i < 9 ? slot() : slot({ flags: 4, watch: i, below: 150 }),
+        ),
+      }),
+      0,
+      held,
+    );
+    expect(held).toHaveLength(12);
+    expect(match.palettes).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 0, 0, 0]);
+    for (const palette of match.palettes)
+      expect(Number.isNaN(palette)).toBe(false);
   });
 
   it.each([

@@ -820,7 +820,8 @@ export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
 // box a spot and scale draw: the same box put() stands the sign in AND
 // tap() hit-tests (authored, HPA-765). The pair is spaced so even the
 // pick's larger box stays on-canvas and clear of the other's. The
-// 0.8×/0.85× scales include the game's 1.5× art scale, leaving room
+// 0.8×/0.85× scales multiply on top of the game's 1.5× art scale (so
+// the signs draw at 1.2×/1.275× their source 260×204 size), leaving room
 // for the surrounding select screen, as in the mockup.
 const SIGN_W = 260;
 const SIGN_H = 204;
@@ -1040,8 +1041,11 @@ function buttonIndex(pressed: number) {
   for (let bit = 0; bit < 6; bit++) if (pressed & (0x10 << bit)) index = bit;
   return index;
 }
-// 0x406f20 and 0x412056: a palette any other of the eight seats holds
-// (player +0xe00b) moves on to the next of the eight, and the seat takes it.
+// 0x406f20 and 0x412056: a palette any other seat holds (player +0xe00b)
+// moves on to the next of the eight, and the seat takes it. Authored:
+// bounded to eight tries (not from the original game, which never seated
+// more than eight), so in battles with more than eight seats a ninth or
+// tenth seat accepts a duplicate palette once all eight are taken.
 export function takePalette(held: number[], seat: number, palette: number) {
   for (
     let tries = 0;

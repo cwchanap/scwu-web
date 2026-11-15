@@ -1344,6 +1344,49 @@ describe('mode select (HPA-765)', () => {
     expect(calls).toEqual(['zaku-8001']);
   });
 
+  it('omits the select demo’s closing action 13 overlay while ModeSelect draws', () => {
+    const { view } = boot();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    const node = (): Record<string, unknown> => {
+      const self: Record<string, unknown> = {
+        setOrigin: () => self,
+        setScrollFactor: () => self,
+        setDepth: () => self,
+        setVisible: () => self,
+        setScale: () => self,
+      };
+      return self;
+    };
+    view.add = { rectangle: node, image: node };
+    const select = new CharacterSelect(undefined, true);
+    select.step();
+    select.step({ punch: true });
+    while (!select.done) select.step();
+    const overlay = select.objects.find(
+      (o) => o.container === 'select' && o.action === 13,
+    );
+    expect(overlay?.alive && overlay.frame).toBeTruthy();
+    view.select = select;
+    stepSelect(view);
+    const mode = view.select as ModeSelect;
+    expect(mode).toBeInstanceOf(ModeSelect);
+    mode.step();
+    const drawn: { container: string; action: number }[] = [];
+    view.drawSelectObject = (
+      _sprite: unknown,
+      o: { container: string; action: number },
+    ) => {
+      drawn.push({ container: o.container, action: o.action });
+    };
+    (view.drawSelect as () => void)();
+    expect(drawn.some((o) => o.container === 'select' && o.action === 13)).toBe(
+      false,
+    );
+    expect(drawn.some((o) => o.container === 'select')).toBe(true);
+    expect(drawn.some((o) => o.container === 'zaku')).toBe(true);
+  });
+
   it('confirms a canvas tap on a board into the same route entry as a key', async () => {
     const { view } = boot();
     const mode = openMode(view);
