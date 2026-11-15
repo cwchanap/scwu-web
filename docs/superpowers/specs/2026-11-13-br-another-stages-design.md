@@ -10,39 +10,39 @@
 
 B.R. ANOTHER becomes three stages for each eligible regular fighter. Their existing partner is the ally in every stage, entering when the player runs low on life.
 
-| Stage | Arena | Opponents |
-| --- | --- | --- |
-| 1 | Sakura Street (`sakura`) | Three regular pairs |
-| 2 | Sakura Night (`sakuranight`) | SWW + GIGI, MASA + 3-TIMES, YINAN + AYA, OGI + ZIRO, minus the player's own pair if among these eight fighters |
-| 3 | Determined by last boss | ZENKA, ALPHA, SHIN-Z and DoraEmon |
+| Stage | Arena                        | Opponents                                                                                                      |
+| ----- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 1     | Sakura Street (`sakura`)     | Three regular pairs                                                                                            |
+| 2     | Sakura Night (`sakuranight`) | SWW + GIGI, MASA + 3-TIMES, YINAN + AYA, OGI + ZIRO, minus the player's own pair if among these eight fighters |
+| 3     | Determined by last boss      | ZENKA, ALPHA, SHIN-Z and DoraEmon                                                                              |
 
 Stage 1 stays source-authored for regular fighters. MASA, 3-TIMES, Z-MEGA and RARIO replace their two small two-pair fights with a single ordinary three-pair stage 1. Draw those three pairs from the 12 fixed regular pairs other than SWW/GIGI, MASA/3-TIMES and OGI/ZIRO; YINAN/AYA is the fourth stage-2-only pair.
 
 Each opposing pair is friendly internally, hostile to the player and all other pairs. Eight named stage-2 fighters do not face their own pair; their partner remains the ally. Z-MEGA and RARIO ally with each other and fight all four opposing pairs (player + ally + eight enemies = **ten seats**). All four bosses in stage 3 are hostile to each other and to the player; the first enters immediately, then the next comes in as the previous falls below the original life threshold. All four must be defeated; player KO uses existing Continue.
 
-| Last boss | Stage 3 arena |
-| --- | --- |
-| ZENKA | Boss Base (`boss`) |
-| ALPHA | ZM Office T2 (`office2`) |
-| SHIN-Z | BR Boss Base (`brboss`) |
-| DoraEmon | Street Night (`streetnight`) |
+| Last boss | Stage 3 arena                |
+| --------- | ---------------------------- |
+| ZENKA     | Boss Base (`boss`)           |
+| ALPHA     | ZM Office T2 (`office2`)     |
+| SHIN-Z    | BR Boss Base (`brboss`)      |
+| DoraEmon  | Street Night (`streetnight`) |
 
 DoraEmon keeps his existing EN charge and KO RELOAD in this ticket; HPA-858 changes those skills separately.
 
 ## Architecture: static overrides of BR-only source steps
 
-**Do not replace a suffix starting at BR Another's entry.** Other routes reach steps *after* the BR Another-exclusive block, including shared endings and STORY boss routes. A suffix replacement would silently delete STORY/BR ZERO content.
+**Do not replace a suffix starting at BR Another's entry.** Other routes reach steps _after_ the BR Another-exclusive block, including shared endings and STORY boss routes. A suffix replacement would silently delete STORY/BR ZERO content.
 
 Keep generated JSON intact. Follow the existing `DORA_STORY` pattern: construct **one static authored scenario per eligible fighter**, at module load, by copying the source array and overwriting only BR Another-exclusive indices. `scenarioOf(who)` returns the authored array where present and retains the existing DoraEmon special case; unmodified source arrays remain available as `CHARACTERS[who].scenario` for evidence tests. `Story`, `next()`, `startOnRoute()`, `retry()` and scene routing remain unchanged, with **no new per-Story active-steps state**. Since lineups are seeded from the fighter, there is no reason to choose an override per run.
 
 The review checked all 34 mode-select fighters against generated scenarios and identified these source-exclusive regions. Pin these families and the unchanged reachability of every other route in tests:
 
-| Fighter family | BR-only indices | Required patch |
-| --- | --- | --- |
-| 28 regular fighters | 62–66 | Preserve D4, existing stage 1 and D7; replace old finale with stage 2, change old final jump to reach appended `[stage 3, jump to original ending]` |
-| YINAN, AYA | 64–68 | Same pattern, with original shared ending at 62–63 |
-| MASA, 3-TIMES, Z-MEGA | 44–49 | D4 → new stage 1 → D7 → stage 2 → stage 3 → no-op demo 0; fall through into their unchanged shared ending |
-| RARIO | 44–49 | Same three stages; last step jumps over the shared tail to appended `[D25, end]` |
+| Fighter family        | BR-only indices | Required patch                                                                                                                                      |
+| --------------------- | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 28 regular fighters   | 62–66           | Preserve D4, existing stage 1 and D7; replace old finale with stage 2, change old final jump to reach appended `[stage 3, jump to original ending]` |
+| YINAN, AYA            | 64–68           | Same pattern, with original shared ending at 62–63                                                                                                  |
+| MASA, 3-TIMES, Z-MEGA | 44–49           | D4 → new stage 1 → D7 → stage 2 → stage 3 → no-op demo 0; fall through into their unchanged shared ending                                           |
+| RARIO                 | 44–49           | Same three stages; last step jumps over the shared tail to appended `[D25, end]`                                                                    |
 
 The source `Story.next()` always-jump is `{ type: 3, condition: 0, value: 0, offset: targetIndex - currentIndex }`. Overflow steps append **after the original array length**, within the runner's <100-step bound (longest original scenario: 81 steps). For the folded non-RARIO fighters, `{ type: 2, demo: 0 }` skips itself and falls through to the original shared end. Prefer these existing step types over new runner semantics. Copy source arrays shallowly, replacing only authored steps; never mutate exported JSON.
 
@@ -63,10 +63,10 @@ Add a small `src/game/br-another.ts` that builds the three authored `Battle` obj
 
 ### Enemy slot roles for 4, 6 and 8 opponents
 
-Each fighter's original BR Another finale has **six enemies plus one ally**. The source `slots` cannot be copied positionally into stage 2 (up to eight enemies) or stage 3 (four bosses): `slots[5]` is a special *final enemy*, `slots[6]` is the ally, and there is no `slots[7]`.
+Each fighter's original BR Another finale has **six enemies plus one ally**. The source `slots` cannot be copied positionally into stage 2 (up to eight enemies) or stage 3 (four bosses): `slots[5]` is a special _final enemy_, `slots[6]` is the ally, and there is no `slots[7]`.
 
 - **First enemy:** clone the source `slots[0]` role (`flags: 0x100`, `x: 850`, immediate entry). Preserve its source `delay` if present (3-TIMES has `delay: 1`), level and KO bonus.
-- **Intermediate enemies (indices 1 through n−2):** clone the source `slots[1]` *waiting* role (`flags: 0x104`, striker KO bonus `life: 50` / `power: 10`), set `watch: i` to the previous enemy's **1-based seat**, and alternate `x` between `450` for odd `i` and `850` for even `i`. Preserve the source's non-scoring fields instead of inheriting final-slot points.
+- **Intermediate enemies (indices 1 through n−2):** clone the source `slots[1]` _waiting_ role (`flags: 0x104`, striker KO bonus `life: 50` / `power: 10`), set `watch: i` to the previous enemy's **1-based seat**, and alternate `x` between `450` for odd `i` and `850` for even `i`. Preserve the source's non-scoring fields instead of inheriting final-slot points.
 - **Final enemy (index n−1):** clone source `slots[5]` (`flags: 0x4`, `points: 100`, `scorer: 1`; no `0x100` KO life/power bonus), set `watch: n−1` and `x: 450`, and retain the source final-slot scoring/life/power/time-up fields.
 - **Ally:** clone source `slots[6]` into the new last slot (index `n`) with its original `0x200` friendship, `watch: 0`, fighter-dependent `below` and support timing. Rebuild `enemies` masks for the new seats rather than carrying over source high bits.
 
