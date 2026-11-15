@@ -12,7 +12,8 @@ import {
   scenarioOf,
   TAKES,
 } from './story';
-import type { Battle, Route, Step } from './story';
+import type { Battle, Next, Route, Step } from './story';
+import { brAnotherStages } from './br-another';
 
 const at = (story: Story) => story.step;
 
@@ -1079,5 +1080,265 @@ describe('source route reachability', () => {
     expect(first.slots.map((s) => s?.level)).toEqual([
       100, 100, 100, 100, 100, 100, 100,
     ]);
+  });
+
+  describe('BR Another staged scenarios', () => {
+    const stagedWalk = (who: Who) => {
+      const story = new Story(who);
+      const path: { step: number; next: Next }[] = [];
+      for (let next = story.startOnRoute('br-another'); ; next = story.next()) {
+        path.push({ step: at(story), next });
+        if (next.kind === 'title') return path;
+        if (next.kind === 'battle')
+          expect(story.retry(), `${who} retry ${at(story)}`).toEqual(next);
+      }
+    };
+
+    it('runs every staged story through its three battles and shared ending', () => {
+      for (const who of eligible) {
+        const { stage1, stage2, stage3 } = brAnotherStages(who);
+        const family = familyOf(who);
+        const len = source(who).length;
+        const path = stagedWalk(who);
+        expect(
+          path.map((p) => [p.step, p.next.kind]),
+          who,
+        ).toEqual(
+          who === 'rario'
+            ? [
+                [44, 'demo'],
+                [45, 'battle'],
+                [46, 'demo'],
+                [47, 'battle'],
+                [48, 'battle'],
+                [55, 'demo'],
+                [56, 'title'],
+              ]
+            : who === 'zmega'
+              ? [
+                  [44, 'demo'],
+                  [45, 'battle'],
+                  [46, 'demo'],
+                  [47, 'battle'],
+                  [48, 'battle'],
+                  [50, 'demo'],
+                  [51, 'demo'],
+                  [52, 'title'],
+                ]
+              : family === 'mini-bosses'
+                ? [
+                    [44, 'demo'],
+                    [45, 'battle'],
+                    [46, 'demo'],
+                    [47, 'battle'],
+                    [48, 'battle'],
+                    [50, 'demo'],
+                    [51, 'title'],
+                  ]
+                : family === 'twins'
+                  ? [
+                      [64, 'demo'],
+                      [65, 'battle'],
+                      [66, 'demo'],
+                      [67, 'battle'],
+                      [len, 'battle'],
+                      [62, 'demo'],
+                      [63, 'title'],
+                    ]
+                  : [
+                      [62, 'demo'],
+                      [63, 'battle'],
+                      [64, 'demo'],
+                      [65, 'battle'],
+                      [len, 'battle'],
+                      [60, 'demo'],
+                      [61, 'title'],
+                    ],
+        );
+        const battles = path.flatMap((p) =>
+          p.next.kind === 'battle' ? [p.next.battle] : [],
+        );
+        expect(battles, who).toEqual([
+          family === 'mini-bosses'
+            ? stage1
+            : source(who)[family === 'twins' ? 65 : 63],
+          stage2,
+          stage3,
+        ]);
+        const demos = path.flatMap((p) =>
+          p.next.kind === 'demo' ? [p.next.demo] : [],
+        );
+        expect(demos, who).toEqual(
+          who === 'zmega' ? [4, 7, 25, 89] : [4, 7, 25],
+        );
+      }
+    });
+
+    it('overwrites only each family’s BR block and appends its overflow', () => {
+      for (const who of eligible) {
+        const base = source(who);
+        const steps = scenarioOf(who);
+        const chars = CHARACTERS[who].scenario as readonly Step[];
+        const { stage1, stage2, stage3 } = brAnotherStages(who);
+        expect(steps.length, who).toBeLessThanOrEqual(100);
+        if (familyOf(who) === 'mini-bosses') {
+          expect(steps.length, who).toBe(
+            base.length + (who === 'rario' ? 2 : 0),
+          );
+          expect(steps.slice(44, 50), who).toEqual([
+            { type: 2, demo: 4 },
+            stage1,
+            { type: 2, demo: 7 },
+            stage2,
+            stage3,
+            who === 'rario'
+              ? { type: 3, condition: 0, value: 0, offset: base.length - 49 }
+              : { type: 2, demo: 0 },
+          ]);
+          if (who === 'rario')
+            expect(steps.slice(50), who).toEqual([
+              ...base.slice(50),
+              { type: 2, demo: 25 },
+              { type: 4 },
+            ]);
+        } else {
+          const finale = familyOf(who) === 'twins' ? 67 : 65;
+          const ending = finale - 5;
+          expect(steps.length, who).toBe(base.length + 2);
+          for (let i = finale - 3; i < finale; i++)
+            expect(steps[i], `${who} step ${i}`).toBe(chars[i]);
+          expect(steps[finale], who).toEqual(stage2);
+          expect(steps[finale + 1], who).toEqual({
+            type: 3,
+            condition: 0,
+            value: 0,
+            offset: base.length - (finale + 1),
+          });
+          expect(steps.slice(base.length), who).toEqual([
+            stage3,
+            {
+              type: 3,
+              condition: 0,
+              value: 0,
+              offset: ending - (base.length + 1),
+            },
+          ]);
+        }
+      }
+    });
+
+    it('gives BR Another its staged battles and shared ending on the graph', () => {
+      for (const who of eligible) {
+        const steps = scenarioOf(who);
+        const len = source(who).length;
+        const family = familyOf(who);
+        const graph = reach(steps, enter(steps, routeLife(who, 'br-another')));
+        expect(
+          {
+            battles: graph.battles,
+            demos: graph.demos.map((i) => [i, demoId(steps, i)]),
+            ends: graph.ends,
+          },
+          who,
+        ).toEqual(
+          who === 'rario'
+            ? {
+                battles: [45, 47, 48],
+                demos: [
+                  [44, 4],
+                  [46, 7],
+                  [55, 25],
+                ],
+                ends: [56],
+              }
+            : who === 'zmega'
+              ? {
+                  battles: [45, 47, 48],
+                  demos: [
+                    [44, 4],
+                    [46, 7],
+                    [50, 25],
+                    [51, 89],
+                  ],
+                  ends: [52],
+                }
+              : family === 'mini-bosses'
+                ? {
+                    battles: [45, 47, 48],
+                    demos: [
+                      [44, 4],
+                      [46, 7],
+                      [50, 25],
+                    ],
+                    ends: [51],
+                  }
+                : family === 'twins'
+                  ? {
+                      battles: [65, 67, len],
+                      demos: [
+                        [62, 25],
+                        [64, 4],
+                        [66, 7],
+                      ],
+                      ends: [63],
+                    }
+                  : {
+                      battles: [63, 65, len],
+                      demos: [
+                        [60, 25],
+                        [62, 4],
+                        [64, 7],
+                      ],
+                      ends: [61],
+                    },
+        );
+      }
+    });
+
+    it('builds each staged scenario once and leaves every source untouched', () => {
+      for (const who of Object.keys(CHARACTERS) as Who[]) {
+        expect(scenarioOf(who), who).toBe(scenarioOf(who));
+        const base = CHARACTERS[who].scenario as readonly Step[];
+        if (eligible.includes(who)) {
+          expect(scenarioOf(who), who).not.toBe(base);
+          expect(base, who).toEqual(source(who));
+        } else if (who !== 'dora') {
+          expect(scenarioOf(who), who).toBe(base);
+        }
+      }
+    });
+
+    it('keeps RARIO’s steps 50–54 reachable on its other routes only', () => {
+      const run = (route: Route) => {
+        const story = new Story('rario');
+        const path: number[] = [];
+        for (let next = story.startOnRoute(route); ; next = story.next()) {
+          path.push(at(story));
+          if (next.kind === 'title') return path;
+        }
+      };
+      for (const route of sharedRoutes) {
+        const path = run(route);
+        expect(path, route).toContain(52);
+        expect(path, route).toContain(54);
+        expect(path, route).not.toContain(55);
+        expect(path, route).not.toContain(56);
+      }
+      expect(run('br-another')).toEqual([44, 45, 46, 47, 48, 55, 56]);
+    });
+
+    it('lands every route on its native entry step', () => {
+      const entry = {
+        regulars: [4, 21, 47, 62],
+        twins: [6, 23, 49, 64],
+        'mini-bosses': [4, 17, 33, 44],
+      } as const;
+      for (const who of eligible)
+        for (const [i, route] of routes.entries()) {
+          const story = new Story(who);
+          story.startOnRoute(route);
+          expect(at(story), `${who} ${route}`).toBe(entry[familyOf(who)][i]);
+        }
+    });
   });
 });

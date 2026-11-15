@@ -3,6 +3,7 @@
 // after the last until one starts a battle or a demo.
 import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
+import { brAnotherStages } from './br-another';
 import { ROSTER } from './select';
 
 export interface Slot {
@@ -86,7 +87,10 @@ const doraStory = (): Step[] => {
 const DORA_STORY = doraStory();
 
 export const scenarioOf = (who: Who) =>
-  who === 'dora' ? DORA_STORY : (CHARACTERS[who].scenario as readonly Step[]);
+  who === 'dora'
+    ? DORA_STORY
+    : (BR_ANOTHER_STORIES.get(who) ??
+      (CHARACTERS[who].scenario as readonly Step[]));
 
 // The routes a mode-select battle's Chii signs offer (docs/evidence.md,
 // Globals): striking a sign KO's it into taking the 1P's life by its take —
@@ -122,6 +126,51 @@ export const isModeSelectBattle = (step: Step | undefined) =>
 // battle.
 export const opensOnModeSelect = (who: Who) =>
   isModeSelectBattle(scenarioOf(who)[0]);
+
+const brAnotherStory = (who: Who): readonly Step[] => {
+  const source = CHARACTERS[who].scenario as readonly Step[];
+  const { stage1, stage2, stage3 } = brAnotherStages(who);
+  const steps: Step[] = [...source];
+  if (stage1 !== null) {
+    steps.splice(
+      44,
+      6,
+      { type: 2, demo: 4 },
+      stage1,
+      { type: 2, demo: 7 },
+      stage2,
+      stage3,
+      who === 'rario'
+        ? { type: 3, condition: 0, value: 0, offset: source.length - 49 }
+        : { type: 2, demo: 0 },
+    );
+    if (who === 'rario') steps.push({ type: 2, demo: 25 }, { type: 4 });
+    return steps;
+  }
+  const finale = who === 'yinan' || who === 'aya' ? 67 : 65;
+  steps[finale] = stage2;
+  steps[finale + 1] = {
+    type: 3,
+    condition: 0,
+    value: 0,
+    offset: source.length - (finale + 1),
+  };
+  steps.push(stage3, {
+    type: 3,
+    condition: 0,
+    value: 0,
+    offset: finale - 6 - source.length,
+  });
+  return steps;
+};
+
+const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
+  (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
+    isModeSelectBattle((CHARACTERS[who].scenario as readonly Step[])[0])
+      ? [[who, brAnotherStory(who)]]
+      : [],
+  ),
+);
 
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
