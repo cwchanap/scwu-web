@@ -16,6 +16,7 @@ import {
   ROUTE_BOARDS,
   selectable,
   StoryDemo,
+  takePalette,
   TEAM_SIZE,
   Title,
   TITLE,
@@ -278,6 +279,13 @@ describe('character select (object type 10, VS single)', () => {
     // In battle player 1 enters first and moves off player 2's (0x412056).
     expect(battlePalettes(select.palettes)).toEqual([2, 1]);
     expect(battlePalettes([3, 0])).toEqual([3, 0]);
+  });
+
+  it('seats a player past the eight seats on a held palette (authored)', () => {
+    // All eight taken: the seat still settles, on a repeat of palette 0.
+    const held = [0, 1, 2, 3, 4, 5, 6, 7];
+    takePalette(held, 8, 0);
+    expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0]);
   });
 });
 

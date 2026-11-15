@@ -1041,7 +1041,11 @@ function buttonIndex(pressed: number) {
 // 0x406f20 and 0x412056: a palette any other of the eight seats holds
 // (player +0xe00b) moves on to the next of the eight, and the seat takes it.
 export function takePalette(held: number[], seat: number, palette: number) {
-  while (held.some((other, i) => i !== seat && other === palette))
+  for (
+    let tries = 0;
+    tries < 8 && held.some((other, i) => i !== seat && other === palette);
+    tries++
+  )
     palette = (palette + 1) % 8;
   held[seat] = palette;
 }
