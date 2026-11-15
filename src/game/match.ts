@@ -1901,7 +1901,10 @@ export class Match {
       new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]),
     ];
     this.calls = intro;
-    if (battle) this.seat(battle, seed);
+    if (battle) {
+      this.seat(battle, seed);
+      while (this.held.length < 10) this.held.push(-1);
+    }
     this.fighters = battle
       ? this.storyFighters()
       : intro
