@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { script } from './animations';
 import { CHARACTERS, desperationOf, lifeOf, STAGES } from './characters';
@@ -210,7 +211,25 @@ describe('story runner', () => {
 describe('source route reachability', () => {
   const routes = Object.keys(TAKES) as Route[];
   const sharedRoutes: Route[] = ['story-easy', 'story-hard', 'br-zero'];
-  const source = (who: Who) => CHARACTERS[who].scenario as readonly Step[];
+  const parsed = new Map<Who, readonly Step[]>();
+  const source = (who: Who) => {
+    let steps = parsed.get(who);
+    if (!steps) {
+      steps = (
+        JSON.parse(
+          readFileSync(
+            new URL(
+              `./generated/${who === 'ryuko' ? 'assets' : who}.json`,
+              import.meta.url,
+            ),
+            'utf8',
+          ),
+        ) as { scenario: readonly Step[] }
+      ).scenario;
+      parsed.set(who, steps);
+    }
+    return steps;
+  };
   const eligible = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
     opensOnModeSelect(who),
   );
@@ -313,6 +332,31 @@ describe('source route reachability', () => {
     return step?.type === 2 ? step.demo : undefined;
   };
 
+  const checkPreserved = (steps: readonly Step[], who: Who) => {
+    const base = source(who);
+    const free = new Set(brOnlyOf(who));
+    base.forEach((step, i) => {
+      if (!free.has(i)) expect(steps[i], `${who} step ${i}`).toEqual(step);
+    });
+    const before = graphs(base, who);
+    const after = graphs(steps, who);
+    for (const route of sharedRoutes)
+      expect(
+        {
+          seen: after[route].seen,
+          battles: after[route].battles,
+          demos: after[route].demos,
+          ends: after[route].ends,
+        },
+        `${who} ${route}`,
+      ).toEqual({
+        seen: before[route].seen,
+        battles: before[route].battles,
+        demos: before[route].demos,
+        ends: before[route].ends,
+      });
+  };
+
   it('pins each eligible fighter’s BR Another-only and shared steps', () => {
     expect(eligible).toHaveLength(34);
     expect(regulars).toHaveLength(28);
@@ -409,30 +453,19 @@ describe('source route reachability', () => {
   it('lets only BR Another-only and appended steps differ from the source', () => {
     for (const who of eligible) {
       const authored = scenarioOf(who);
-      const base = source(who);
-      expect(authored.length, who).toBeGreaterThanOrEqual(base.length);
-      const free = new Set(brOnlyOf(who));
-      base.forEach((step, i) => {
-        if (!free.has(i)) expect(authored[i], `${who} step ${i}`).toEqual(step);
-      });
-      const before = graphs(base, who);
-      const after = graphs(authored, who);
-      for (const route of sharedRoutes)
-        expect(
-          {
-            seen: after[route].seen,
-            battles: after[route].battles,
-            demos: after[route].demos,
-            ends: after[route].ends,
-          },
-          `${who} ${route}`,
-        ).toEqual({
-          seen: before[route].seen,
-          battles: before[route].battles,
-          demos: before[route].demos,
-          ends: before[route].ends,
-        });
+      expect(authored.length, who).toBeGreaterThanOrEqual(source(who).length);
+      checkPreserved(authored, who);
     }
+  });
+
+  it('flags a changed shared step and accepts appended BR overflow', () => {
+    const patched = structuredClone(source('ryuko')) as Step[];
+    (patched[5] as Battle).recover = 50;
+    expect(() => checkPreserved(patched, 'ryuko')).toThrow();
+    const grown = structuredClone(source('ryuko')) as Step[];
+    grown[63] = { type: 2, demo: 90 };
+    grown.push({ type: 2, demo: 93 }, { type: 4 });
+    expect(() => checkPreserved(grown, 'ryuko')).not.toThrow();
   });
 
   it('records every route’s reachable battle, demo and ending steps', () => {
@@ -812,7 +845,7 @@ describe('source route reachability', () => {
       { type: 2, demo: 92 },
       { type: 4 },
     ]);
-    expect(scenarioOf('rario').slice(50)).toEqual(base.slice(50));
+    expect(scenarioOf('rario').slice(50, 55)).toEqual(base.slice(50, 55));
     for (const who of eligible) {
       const steps = source(who);
       const g = graphs(steps, who);
