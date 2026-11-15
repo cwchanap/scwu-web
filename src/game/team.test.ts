@@ -185,8 +185,6 @@ describe('story battles', () => {
   });
 
   it('seats ten players on the scene’s eight-entry palette array, a repeat once the eight run out (authored)', () => {
-    // The scene hands every stage's battle the same array the select
-    // screen's eight seats left (storyHeld); nine slots sit behind the 1P.
     const held = [0, -1, -1, -1, -1, -1, -1, -1];
     const match = Match.story(
       'ryuko',
@@ -194,8 +192,6 @@ describe('story battles', () => {
       0,
       held,
     );
-    // The array grew in place to seat 9; seats 8 and 9, finding every one
-    // of the eight palettes held, each repeat palette 0.
     expect(match.held).toBe(held);
     expect(match.palettes).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 0]);
     for (const palette of match.palettes) {
@@ -204,8 +200,6 @@ describe('story battles', () => {
       expect(palette).toBeLessThanOrEqual(7);
     }
     expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0, 0]);
-    // A later battle reads the same array: a re-entered seat moves off
-    // the held eight and every untouched seat keeps its palette.
     const next = Match.story(
       'ryuko',
       battle({

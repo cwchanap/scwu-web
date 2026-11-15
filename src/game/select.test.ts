@@ -282,7 +282,6 @@ describe('character select (object type 10, VS single)', () => {
   });
 
   it('seats a player past the eight seats on a held palette (authored)', () => {
-    // All eight taken: the seat still settles, on a repeat of palette 0.
     const held = [0, 1, 2, 3, 4, 5, 6, 7];
     takePalette(held, 8, 0);
     expect(held).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 0]);

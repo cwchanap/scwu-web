@@ -261,8 +261,6 @@ describe('source route reachability', () => {
             ? [62, 63]
             : [60, 61];
 
-  // The step a route's first next() lands on, the runner's jumps read
-  // with the life the chosen Chii sign leaves and no round lost or drawn.
   const enter = (steps: readonly Step[], life: number) => {
     let step = 0;
     for (let runs = 1; runs <= 200; runs++) {
@@ -282,10 +280,6 @@ describe('source route reachability', () => {
   };
 
   const sort = (ns: number[]) => ns.sort((a, b) => a - b);
-  // The battle, demo and ending steps a route can reach, both outcomes of
-  // the runner's data-dependent jumps included (condition 2 reads the
-  // 1P's life, 3 a lost or drawn round); a taken jump lands step+offset
-  // on (0x406bf4) and the runner's steps past an array read empty.
   const reach = (steps: readonly Step[], start: number) => {
     const seen = new Set<number>();
     const battles: number[] = [];
