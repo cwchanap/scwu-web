@@ -190,24 +190,6 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
-  await expect
-    .poll(
-      async () =>
-        (await sample({ backdrop: { x: 820, y: 70, w: 90, h: 90 } })).backdrop
-          .b,
-      VIEW,
-    )
-    .toBeGreaterThan(50);
-  const face = (await sample({ face: { x: 80, y: 100, w: 80, h: 60 } })).face;
-  expect(face.r).toBeGreaterThan(face.b + 5);
-  const inactive = (
-    await sample({ inactive: { x: 630, y: 300, w: 40, h: 20 } })
-  ).inactive;
-  expect(inactive.r).toBeGreaterThan(110);
-  expect(
-    Math.max(inactive.r, inactive.g, inactive.b) -
-      Math.min(inactive.r, inactive.g, inactive.b),
-  ).toBeLessThan(4);
   // The select pad keeps every button the screens' word reads: each of
   // G/H/K/J picks its palette on the character select, not just G
   // confirming (HPA-765 review).

@@ -1903,7 +1903,7 @@ export class Match {
     this.calls = intro;
     if (battle) {
       this.seat(battle, seed);
-      while (this.held.length < 10) this.held.push(-1);
+      while (this.held.length < battle.slots.length + 1) this.held.push(-1);
     }
     this.fighters = battle
       ? this.storyFighters()
@@ -2140,12 +2140,12 @@ export class Match {
   private takeSeat(i: number) {
     const seat = this.seats[i];
     if (seat) this.held[seat] = -1;
-    takePalette(this.held, seat, Math.max(0, this.held[seat]));
+    takePalette(this.held, seat, Math.max(0, this.held[seat] ?? -1));
   }
 
   // Each fighter's palette.
   get palettes() {
-    return this.seats.map((seat) => Math.max(0, this.held[seat]));
+    return this.seats.map((seat) => Math.max(0, this.held[seat] ?? -1));
   }
   get cpu() {
     return this.cpus[1]!;
