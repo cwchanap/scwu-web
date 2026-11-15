@@ -100,6 +100,7 @@ export const initialStatus: GameStatus = {
   cheated: false,
 };
 const DEMOS = { select: selectData, t2 };
+const SELECT_EXIT_OVERLAY_ACTION = 13;
 // A story's demos, loaded as they play.
 type StoryDemoData = Demo & {
   images: { index: number; width: number; height: number; filename: string }[];
@@ -845,7 +846,14 @@ export class TrainingScene extends Phaser.Scene {
     const select = this.select!;
     const objects = (
       select instanceof ModeSelect
-        ? [...select.background.objects, ...select.objects]
+        ? [
+            ...select.background.objects.filter(
+              (o) =>
+                o.container !== 'select' ||
+                o.action !== SELECT_EXIT_OVERLAY_ACTION,
+            ),
+            ...select.objects,
+          ]
         : select.objects
     ).filter((o) => o.alive && o.frame);
     if (select instanceof ModeSelect) {

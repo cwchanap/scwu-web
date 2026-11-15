@@ -578,13 +578,13 @@ describe('mode select (authored, HPA-765)', () => {
     press(mode, { punch: true });
     expect(mode.stage).toBe(1);
     expect(signs(mode).map((o) => [o.frame!.image, o.scale])).toEqual([
-      [8005, 1.2],
-      [8005, 1.1],
-      [8001, 0.5],
+      [8005, 0.85],
+      [8005, 0.8],
+      [8001, 0.34],
     ]);
     // The chosen mode's smaller board heads the route step.
     expect(
-      mode.objects.some((o) => o.frame?.image === 8001 && o.scale === 0.5),
+      mode.objects.some((o) => o.frame?.image === 8001 && o.scale === 0.34),
     ).toBe(true);
   });
 
@@ -603,6 +603,14 @@ describe('mode select (authored, HPA-765)', () => {
     // The menu's own objects write none of the session globals.
     for (let t = 0; t < 200; t++) mode.step();
     expect(mode.globals).toEqual(Array<number>(64).fill(0));
+  });
+
+  it('dims the inactive board without making it translucent', () => {
+    const mode = new ModeSelect(picked());
+    mode.step();
+    const inactive = signs(mode)[1 - mode.choice];
+    expect(inactive.color.mode).toBe(0);
+    expect(inactive.color.r).toBeLessThan(0);
   });
 
   it('moves the arrow with any direction, latching until every key is let go, and confirms the route on step two', () => {
@@ -661,23 +669,23 @@ describe('mode select (authored, HPA-765)', () => {
     expect(mode.choice).toBe(remembered);
   });
 
-  it('draws the pick’s board slightly larger than the other ~1.1× one', () => {
-    // The issue’s mockup asked for two boards at about 1.2× source, the
-    // picked one slightly larger; its link is dead so this lands on the
-    // playable view (authored, HPA-765). The ~1.3/1.2 pair cannot fit —
-    // two 507px boxes over 960px of canvas — so the pair sits a size
-    // down with the same step between them.
+  it('draws the pick’s board slightly larger than the other one', () => {
+    // The issue's mockup asks for two compact boards with the picked one
+    // slightly larger. At the game's 1.5× art scale these sizes leave
+    // the background visible, and the same spacing keeps the boards apart
+    // on the 960px canvas when either one is active (authored, HPA-765).
+    // Both stay on-canvas and follow the same step between their scales.
     const mode = new ModeSelect(picked());
     mode.step();
     // The remembered mode decides which board starts lit; whichever it
-    // is, its board draws slightly larger than the other's ~1.1×.
+    // is, its board draws slightly larger than the other.
     const start = mode.choice;
-    expect(signs(mode)[start].scale).toBe(1.2);
-    expect(signs(mode)[1 - start].scale).toBe(1.1);
+    expect(signs(mode)[start].scale).toBe(0.85);
+    expect(signs(mode)[1 - start].scale).toBe(0.8);
     mode.step({ right: true });
     expect(mode.choice).toBe(1 - start);
-    expect(signs(mode)[mode.choice].scale).toBe(1.2);
-    expect(signs(mode)[start].scale).toBe(1.1);
+    expect(signs(mode)[mode.choice].scale).toBe(0.85);
+    expect(signs(mode)[start].scale).toBe(0.8);
   });
 
   it('takes a tap on a board through the same pick a button confirms, with a cooldown', () => {

@@ -1372,12 +1372,12 @@ describe('mode select (HPA-765)', () => {
     mode.step();
     const tap = (x: number, y: number) =>
       (view.tap as (x: number, y: number) => void)(x, y);
-    // With B.R. lit its board's pixels reach the pair's gap — but a tap
-    // there picks nothing, not STORY under it (review, HPA-765).
-    tap(470, 221);
+    // With B.R. lit its board's left edge lies between these two
+    // coordinates, so a tap outside it picks nothing.
+    tap(494, 394);
     expect(mode.stage).toBe(0);
     // The board's own drawn edge picks it.
-    tap(487, 394);
+    tap(495, 394);
     expect(mode.stage).toBe(1);
     expect(
       (

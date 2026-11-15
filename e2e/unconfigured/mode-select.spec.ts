@@ -5,7 +5,7 @@ import { expect, test } from '@playwright/test';
 // confirmed route starts in the original's demos and battles. The boards
 // draw only on the canvas, so beyond the DOM health/pad signals this spec
 // samples scene pixels: a sign board's region is white-bright when lit
-// (full alpha), far dimmer tinted at half alpha, and the route step's small
+// (full alpha), far dimmer when tinted, and the route step's small
 // header sign lights a band that is plain dim backdrop on the mode step.
 // Independent of Google auth — the unconfigured bundle is used.
 test.use({ hasTouch: true });
@@ -18,13 +18,13 @@ interface Rect {
 }
 // The inner — always opaque — area of each sign's drawn box in the 960×720
 // scene's pixels (select.ts SIGN_SPOTS/HEADER_SPOT, any pick's scale):
-// mode-step boards hang at top 210, route boards at 285, the mode's
-// half-size header at (382..578, 60..213).
-const MODE_LEFT: Rect = { x: 140, y: 320, w: 200, h: 140 };
-const MODE_RIGHT: Rect = { x: 620, y: 320, w: 200, h: 140 };
-const ROUTE_LEFT: Rect = { x: 140, y: 390, w: 200, h: 140 };
-const ROUTE_RIGHT: Rect = { x: 620, y: 390, w: 200, h: 140 };
-const HEADER: Rect = { x: 420, y: 90, w: 120, h: 80 };
+// mode-step boards hang at top 250, route boards at 285, the mode's
+// smaller header at (414..546, 40..144).
+const MODE_LEFT: Rect = { x: 160, y: 320, w: 180, h: 140 };
+const MODE_RIGHT: Rect = { x: 620, y: 320, w: 180, h: 140 };
+const ROUTE_LEFT: Rect = { x: 160, y: 390, w: 180, h: 130 };
+const ROUTE_RIGHT: Rect = { x: 620, y: 390, w: 180, h: 130 };
+const HEADER: Rect = { x: 440, y: 65, w: 80, h: 65 };
 // A board lighting means a whole screen chain ran — several opens and the
 // picked select's hundred-tick wait — so the pixel polls share the slack
 // the route check already gives confirmRoute, not the five-second default.
@@ -190,6 +190,24 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
+  await expect
+    .poll(
+      async () =>
+        (await sample({ backdrop: { x: 820, y: 70, w: 90, h: 90 } })).backdrop
+          .b,
+      VIEW,
+    )
+    .toBeGreaterThan(50);
+  const face = (await sample({ face: { x: 80, y: 100, w: 80, h: 60 } })).face;
+  expect(face.r).toBeGreaterThan(face.b + 5);
+  const inactive = (
+    await sample({ inactive: { x: 630, y: 300, w: 40, h: 20 } })
+  ).inactive;
+  expect(inactive.r).toBeGreaterThan(110);
+  expect(
+    Math.max(inactive.r, inactive.g, inactive.b) -
+      Math.min(inactive.r, inactive.g, inactive.b),
+  ).toBeLessThan(4);
   // The select pad keeps every button the screens' word reads: each of
   // G/H/K/J picks its palette on the character select, not just G
   // confirming (HPA-765 review).

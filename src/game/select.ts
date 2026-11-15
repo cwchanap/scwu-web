@@ -816,16 +816,16 @@ export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
 // The boards are 260×204 source pixels. Each step's two hang side by
 // side by the centre of their top edge — the spots below, in the
 // 960×720 game's canvas pixels — the pick's a size larger, and the
-// chosen mode's heads the route step at half size. bounds() gives the
+// chosen mode's heads the route step at a smaller size. bounds() gives the
 // box a spot and scale draw: the same box put() stands the sign in AND
 // tap() hit-tests (authored, HPA-765). The pair is spaced so even the
-// pick's larger box stays on-canvas and clear of the other's — the
-// mockup's ~1.2×/1.3× pair could not (two 507px boards on 960px), so it
-// lands a size down at ~1.1×/1.2×.
+// pick's larger box stays on-canvas and clear of the other's. The
+// 0.8×/0.85× scales include the game's 1.5× art scale, leaving room
+// for the surrounding select screen, as in the mockup.
 const SIGN_W = 260;
 const SIGN_H = 204;
-const SIGN_SCALE = 1.1;
-const ACTIVE_SCALE = 1.2;
+const SIGN_SCALE = 0.8;
+const ACTIVE_SCALE = 0.85;
 // 150 ms cooldown between taps so a double-click/double-tap cannot confirm
 // both overlapping steps at once.
 const TAP_COOLDOWN = 15;
@@ -849,15 +849,15 @@ const bounds = (spot: Spot, scale: number): Rect => ({
 });
 const SIGN_SPOTS: readonly (readonly [Spot, Spot])[] = [
   [
-    { cx: 240, top: 210 },
-    { cx: 720, top: 210 },
+    { cx: 300, top: 250 },
+    { cx: 660, top: 250 },
   ],
   [
-    { cx: 240, top: 285 },
-    { cx: 720, top: 285 },
+    { cx: 300, top: 285 },
+    { cx: 660, top: 285 },
   ],
 ];
-const HEADER_SPOT: Spot = { cx: 480, top: 60 };
+const HEADER_SPOT: Spot = { cx: 480, top: 40 };
 const SIGN_Z = 0x110;
 const CURSOR_Z = 0x120;
 let modePlace = 0;
@@ -936,7 +936,7 @@ export class ModeSelect extends Screen {
     );
     if (this.stage) {
       const mode = MODE_BOARDS[modePlace];
-      this.sign(mode.who, mode.image, HEADER_SPOT, 0.5);
+      this.sign(mode.who, mode.image, HEADER_SPOT, 0.34);
     }
     this.cursor ??= this.spawn('kgt', LAYOUT.cursors[0], 0, 0, CURSOR_Z);
     this.place();
@@ -973,7 +973,9 @@ export class ModeSelect extends Screen {
         SIGN_SPOTS[this.stage][i],
         active ? ACTIVE_SCALE : SIGN_SCALE,
       );
-      o.color = active ? NORMAL_COLOR : { mode: 1, r: 0, g: 0, b: 0, fade: 0 };
+      o.color = active
+        ? NORMAL_COLOR
+        : { mode: 0, r: -16, g: -16, b: -16, fade: 0 };
     });
     const spot = SIGN_SPOTS[this.stage][this.choice];
     this.cursor!.x = spot.cx / ART_SCALE - 15;
