@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { script } from './animations';
 import { CHARACTERS, desperationOf, lifeOf, STAGES } from './characters';
 import type { Who } from './characters';
+import { Match } from './match';
 import { ROSTER } from './select';
 import {
   isModeSelectBattle,
@@ -1091,6 +1092,7 @@ describe('source route reachability', () => {
         if (next.kind === 'title') return path;
         if (next.kind === 'battle')
           expect(story.retry(), `${who} retry ${at(story)}`).toEqual(next);
+        expect(path.length, `${who} route bound`).toBeLessThan(100);
       }
     };
 
@@ -1315,6 +1317,7 @@ describe('source route reachability', () => {
         for (let next = story.startOnRoute(route); ; next = story.next()) {
           path.push(at(story));
           if (next.kind === 'title') return path;
+          expect(path.length, route).toBeLessThan(100);
         }
       };
       for (const route of sharedRoutes) {
@@ -1339,6 +1342,65 @@ describe('source route reachability', () => {
           story.startOnRoute(route);
           expect(at(story), `${who} ${route}`).toBe(entry[familyOf(who)][i]);
         }
+    });
+
+    it('plays RARIO’s three staged battles only, while his other routes still seat the DoraEmon tail', () => {
+      const tail = CHARACTERS['rario'].scenario[52] as Battle;
+      const battlesOf = (route: Route) => {
+        const story = new Story('rario');
+        const battles: { step: number; battle: Battle }[] = [];
+        for (
+          let next = story.startOnRoute(route), yields = 1;
+          next.kind !== 'title';
+          next = story.next(), yields++
+        ) {
+          if (next.kind === 'battle')
+            battles.push({ step: at(story), battle: next.battle });
+          expect(yields, route).toBeLessThan(100);
+        }
+        return battles;
+      };
+      const another = battlesOf('br-another');
+      expect(another.map((b) => b.step)).toEqual([45, 47, 48]);
+      for (const { step, battle } of another)
+        expect(battle, `step ${step}`).toBe(scenarioOf('rario')[step]);
+      for (const route of ['story-easy', 'br-zero'] as Route[]) {
+        const hit = battlesOf(route).find((b) => b.step === 52);
+        expect(hit?.battle, route).toBe(tail);
+        expect(
+          Match.story('rario', tail).fighters.map((f) => f.who),
+          route,
+        ).toEqual(['rario', 'dora']);
+      }
+    });
+
+    it('seats the battles its STORY and BR ZERO routes keep, unchanged from their source steps', () => {
+      for (const who of ['ryuko', 'rario'] as Who[]) {
+        const chars = CHARACTERS[who].scenario as readonly Step[];
+        for (const route of ['story-easy', 'br-zero'] as Route[]) {
+          const story = new Story(who);
+          for (
+            let next = story.startOnRoute(route), yields = 1;
+            next.kind !== 'title';
+            next = story.next(), yields++
+          ) {
+            expect(yields, `${who} ${route} bound`).toBeLessThan(100);
+            if (next.kind !== 'battle') continue;
+            const i = at(story);
+            expect(next.battle, `${who} ${route} ${i}`).toBe(chars[i]);
+            const match = Match.story(who, next.battle);
+            expect(
+              match.fighters.map((f) => f.who),
+              `${who} ${route} ${i}`,
+            ).toEqual([
+              who,
+              ...next.battle.slots.flatMap((s) =>
+                s ? [ROSTER[s.player]!] : [],
+              ),
+            ]);
+          }
+        }
+      }
     });
   });
 });
