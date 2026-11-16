@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf } from './characters';
 import type { Who } from './characters';
-import { ROSTER } from './select';
+import { BOSSES, ROSTER } from './select';
 import { opensOnModeSelect } from './story';
 import type { Battle, Step } from './story';
-import { brAnotherStages } from './br-another';
+import { brAnotherStages, bossBrAnotherStory } from './br-another';
 import type { BrAnotherStages } from './br-another';
 
 const ELIGIBLE = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
@@ -42,7 +42,7 @@ const STAGE_TWO_PAIRS: readonly (readonly [number, number])[] = [
   [40, 41],
   [26, 27],
 ];
-const BOSSES = [30, 32, 33, 45];
+const BOSS_SEATS = BOSSES.map((who) => ROSTER.indexOf(who));
 const ARENAS: ReadonlyMap<number, number> = new Map([
   [30, 12],
   [32, 14],
@@ -330,7 +330,7 @@ describe('BR Another seeded lineup builder', () => {
       expect(
         [...bosses].sort((a, b) => a - b),
         who,
-      ).toEqual(BOSSES);
+      ).toEqual(BOSS_SEATS);
       expect(stage3.slots[4]!.player, who).toBe(finaleOf(who).slots[6]!.player);
       expect(stage3.stage, who).toBe(ARENAS.get(bosses[3]!));
       landed.set(bosses[3]!, [...(landed.get(bosses[3]!) ?? []), who]);
@@ -460,5 +460,252 @@ describe('BR Another seeded lineup builder', () => {
       for (const slot of brAnotherStages('masa').stage1!.slots)
         expect(template.slots).not.toContain(slot);
     }
+  });
+});
+
+describe('boss B.R. ANOTHER route', () => {
+  const battlesOf = (who: Who): Battle[] =>
+    bossBrAnotherStory(who).filter((step): step is Battle => step.type === 1);
+
+  // Authored (HPA-858): each slot equals its donor role slot with only the
+  // seat details overridden — the ally role never appears.
+  const expectDonorRoles = (
+    battle: Battle,
+    roles: Battle,
+    paired: boolean,
+    tough: boolean,
+  ) => {
+    const n = battle.slots.length;
+    battle.slots.forEach((slot, i) => {
+      const role =
+        i === 0
+          ? roles.slots[0]!
+          : i === n - 1
+            ? roles.slots[5]!
+            : roles.slots[1]!;
+      const { player, enemies, watch, below, x } = slot!;
+      expect(slot).toEqual({
+        ...role,
+        player,
+        enemies,
+        watch,
+        below,
+        x,
+        tough: tough || undefined,
+      });
+      const all = (1 << (n + 1)) - 1;
+      let expected = all & ~(1 << (i + 1));
+      if (paired) expected &= ~(1 << (i % 2 === 0 ? i + 2 : i));
+      expect(slot!.enemies).toBe(expected);
+    });
+  };
+
+  it('shares the one boss list with the selector, seated at 30, 32, 33 and 45', () => {
+    expect([...BOSSES]).toEqual(['zenka', 'alpha', 'shinz', 'dora']);
+    expect(BOSSES.map((who) => ROSTER.indexOf(who))).toEqual([30, 32, 33, 45]);
+  });
+
+  it('is three battles and the end step, no demos, every stage permitting Continue', () => {
+    for (const who of BOSSES) {
+      const steps = bossBrAnotherStory(who);
+      expect(steps, who).toHaveLength(4);
+      expect(
+        steps.map((s) => s.type),
+        who,
+      ).toEqual([1, 1, 1, 4]);
+      for (const battle of battlesOf(who))
+        expect(battle.flags & 1, who).toBe(1);
+    }
+  });
+
+  it('builds 6, 6 and 3 hostile seats, no ally, and never the player’s own boss', () => {
+    for (const who of BOSSES) {
+      const [stage1, stage2, stage3] = battlesOf(who);
+      expect(stage1.slots, who).toHaveLength(6);
+      expect(stage2.slots, who).toHaveLength(6);
+      expect(stage3.slots, who).toHaveLength(3);
+      const own = ROSTER.indexOf(who);
+      for (const battle of [stage1, stage2, stage3])
+        for (const slot of battle.slots) {
+          expect(slot!.player, who).not.toBe(own);
+          expect(slot!.flags & 0x200, who).toBe(0);
+          expect(slot!.enemies & 1, `${who} seat ${slot!.player}`).toBe(1);
+        }
+      expect(
+        stage3.slots.map((s) => s!.player).sort((a, b) => a - b),
+        who,
+      ).toEqual(BOSS_SEATS.filter((seat) => seat !== own));
+    }
+  });
+
+  it('draws stable, distinct seeded lineups on one stream from the boss’s roster seat', () => {
+    const drawn = Object.fromEntries(
+      BOSSES.map((who) => {
+        const [stage1, stage2, stage3] = battlesOf(who);
+        return [
+          who,
+          {
+            stage1: stage1.slots.map((s) => s!.player),
+            stage2: stage2.slots.map((s) => s!.player),
+            stage3: stage3.slots.map((s) => s!.player),
+            arena: stage3.stage,
+          },
+        ];
+      }),
+    );
+    expect(drawn).toEqual({
+      zenka: {
+        stage1: [2, 3, 0, 1, 18, 19],
+        stage2: [24, 25, 26, 27, 28, 29],
+        stage3: [45, 33, 32],
+        arena: 14,
+      },
+      alpha: {
+        stage1: [8, 9, 10, 11, 4, 5],
+        stage2: [24, 25, 28, 29, 26, 27],
+        stage3: [45, 30, 33],
+        arena: 15,
+      },
+      shinz: {
+        stage1: [18, 19, 12, 13, 16, 17],
+        stage2: [28, 29, 24, 25, 26, 27],
+        stage3: [32, 30, 45],
+        arena: 18,
+      },
+      dora: {
+        stage1: [14, 15, 4, 5, 22, 23],
+        stage2: [28, 29, 40, 41, 24, 25],
+        stage3: [30, 33, 32],
+        arena: 14,
+      },
+    });
+    for (const who of BOSSES)
+      expect(bossBrAnotherStory(who), who).toEqual(bossBrAnotherStory(who));
+  });
+
+  it('keeps drawn pairs whole, omits exactly one extra pair, and stages on 9/3/the last boss’s arena', () => {
+    for (const who of BOSSES) {
+      const [stage1, stage2, stage3] = battlesOf(who);
+      for (const [battle, pool] of [
+        [stage1, STAGE_ONE_POOL],
+        [stage2, STAGE_TWO_PAIRS],
+      ] as const) {
+        const drawn = pairsOf(battle.slots.map((s) => s!.player));
+        expect(drawn, who).toHaveLength(3);
+        for (const [a, b] of drawn)
+          expect(
+            pool.some(([pa, pb]) => pa === a && pb === b),
+            `${who} drew [${a}, ${b}]`,
+          ).toBe(true);
+      }
+      const omitted = STAGE_TWO_PAIRS.filter(
+        (pair) =>
+          !pairsOf(stage2.slots.map((s) => s!.player)).some(
+            ([a, b]) => a === pair[0] && b === pair[1],
+          ),
+      );
+      expect(omitted, who).toHaveLength(1);
+      expect(stage1.stage, who).toBe(9);
+      expect(stage2.stage, who).toBe(3);
+      expect(stage3.stage, who).toBe(ARENAS.get(stage3.slots.at(-1)!.player));
+    }
+  });
+
+  it('runs symmetric hostility from the real seat count: mates allied on stages 1–2, every boss hostile on stage 3', () => {
+    for (const who of BOSSES)
+      for (const [i, battle] of battlesOf(who).entries()) {
+        const paired = i < 2;
+        const n = battle.slots.length;
+        const all = (1 << (n + 1)) - 1;
+        for (const [a, seat] of battle.slots.entries()) {
+          expect(seat!.enemies, `${who} range ${a}`).toBeLessThanOrEqual(all);
+          expect(seat!.enemies & (1 << (a + 1)), `${who} self ${a}`).toBe(0);
+          for (const [b, other] of battle.slots.entries())
+            expect(
+              Boolean(seat!.enemies & (1 << (b + 1))),
+              `${who} ${a + 1}->${b + 1}`,
+            ).toBe(Boolean(other!.enemies & (1 << (a + 1))));
+          const mate = paired ? (a % 2 === 0 ? a + 1 : a - 1) : null;
+          for (let b = 0; b < n; b++)
+            expect(
+              Boolean(seat!.enemies & (1 << (b + 1))),
+              `${who} stage ${i + 1} ${a}->${b}`,
+            ).toBe(b !== a && b !== mate);
+        }
+      }
+  });
+
+  it('watches the seat before each enemy and enters it below that fighter’s own mark', () => {
+    for (const who of BOSSES)
+      for (const battle of battlesOf(who)) {
+        const players = battle.slots.map((s) => s!.player);
+        expect(
+          battle.slots.map((s) => s!.watch),
+          who,
+        ).toEqual(players.map((_, i) => i));
+        expect(
+          battle.slots.map((s) => s!.below),
+          who,
+        ).toEqual([
+          0,
+          ...players.slice(0, -1).map((p) => desperationOf(ROSTER[p]!)),
+        ]);
+        expect(
+          battle.slots.map((s) => s!.x),
+          who,
+        ).toEqual(
+          players.map((_, i) =>
+            i === players.length - 1 ? 450 : i % 2 === 0 ? 850 : 450,
+          ),
+        );
+      }
+  });
+
+  it('donates ryuko’s source steps 63 and 65 for headers and roles, overriding only stage and seat details', () => {
+    const opener = sourceStep('ryuko', 63);
+    const finale = sourceStep('ryuko', 65);
+    for (const who of BOSSES) {
+      const [stage1, stage2, stage3] = battlesOf(who);
+      for (const key of HEADER_KEYS)
+        expect(stage1[key], `${who} ${key}`).toBe(opener[key]);
+      for (const battle of [stage2, stage3])
+        for (const key of HEADER_KEYS)
+          expect(battle[key], `${who} ${key}`).toBe(finale[key]);
+      expectDonorRoles(stage1, opener, true, true);
+      expectDonorRoles(stage2, finale, true, true);
+      expectDonorRoles(stage3, finale, false, false);
+    }
+  });
+
+  it('marks the six enemy slots of stages 1 and 2 tough and leaves stage 3 native', () => {
+    for (const who of BOSSES) {
+      const [stage1, stage2, stage3] = battlesOf(who);
+      for (const slot of stage1.slots) expect(slot!.tough, who).toBe(true);
+      for (const slot of stage2.slots) expect(slot!.tough, who).toBe(true);
+      for (const slot of stage3.slots) expect(slot!.tough, who).toBeUndefined();
+    }
+    for (const slot of sourceStep('ryuko', 63).slots)
+      expect(slot!.tough).toBeUndefined();
+    for (const battle of built(brAnotherStages('masa')))
+      for (const slot of battle.slots) expect(slot!.tough).toBeUndefined();
+  });
+
+  it('never mutates the source scenarios or the regular B.R. ANOTHER stages, and reuses no donor slot', () => {
+    const before = new Map(
+      (Object.keys(CHARACTERS) as Who[]).map((who) => [
+        who,
+        JSON.stringify(CHARACTERS[who].scenario),
+      ]),
+    );
+    const regular = JSON.stringify(brAnotherStages('masa'));
+    const donors = [sourceStep('ryuko', 63), sourceStep('ryuko', 65)];
+    for (const who of BOSSES)
+      for (const battle of battlesOf(who))
+        for (const slot of battle.slots)
+          for (const donor of donors) expect(donor.slots).not.toContain(slot);
+    for (const who of BOSSES) bossBrAnotherStory(who);
+    for (const [who, json] of before)
+      expect(JSON.stringify(CHARACTERS[who].scenario), who).toBe(json);
+    expect(JSON.stringify(brAnotherStages('masa'))).toBe(regular);
   });
 });

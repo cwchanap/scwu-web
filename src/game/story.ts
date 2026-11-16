@@ -21,6 +21,10 @@ export interface Slot {
   power: number;
   scorer: number;
   timeUp: number;
+  // Authored (HPA-858): marks one of the generated boss B.R. ANOTHER's
+  // regular enemy seats, whose stats Match toughens (match.ts). Native
+  // exported slots never set it.
+  tough?: boolean;
 }
 export interface Battle {
   type: 1;
@@ -139,17 +143,22 @@ export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
 
-  constructor(readonly who: Who) {}
+  constructor(
+    readonly who: Who,
+    // Authored (HPA-858): a generated step list overrides the exported
+    // scenario — the bosses' B.R. ANOTHER route (br-another.ts).
+    readonly steps?: readonly Step[],
+  ) {}
 
   // The runner reads the 1P's life (+0xdf05) and the rounds it lost or drew
   // in the last battle (0x424e64) for its jumps.
   next(life = 0, lost = 0): Next {
-    const steps = scenarioOf(this.who);
+    const scenario = this.steps ?? scenarioOf(this.who);
     // More than 200 steps in one run, a step out of 0–99, an empty step
     // (type 0) or the end (4) return to the title (0x406b75–0x406bcb).
     for (let runs = 1; runs <= 200; runs++) {
       if (++this.step < 0 || this.step >= 100) break;
-      const step = steps[this.step] ?? { type: 0 };
+      const step = scenario[this.step] ?? { type: 0 };
       if (step.type === 1) {
         // A battle without a stage (+1) or a demo without an index runs on.
         if (step.stage) return { kind: 'battle', battle: step };
