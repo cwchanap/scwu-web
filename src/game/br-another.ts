@@ -1,6 +1,6 @@
 import { CHARACTERS, desperationOf } from './characters';
 import type { Who } from './characters';
-import { ROSTER } from './select';
+import { BOSSES, ROSTER } from './select';
 import { rand } from './standing';
 import type { Battle, Slot, Step } from './story';
 
@@ -32,7 +32,7 @@ const STAGE_TWO_PAIRS: readonly (readonly [number, number])[] = [
   [40, 41],
   [26, 27],
 ];
-const BOSSES: readonly number[] = [30, 32, 33, 45];
+const BOSS_SEATS: readonly number[] = BOSSES.map((who) => ROSTER.indexOf(who));
 const BOSS_ARENAS: Record<number, number> = {
   30: 12,
   32: 14,
@@ -41,6 +41,22 @@ const BOSS_ARENAS: Record<number, number> = {
 };
 
 const FOLDED_START = 44;
+
+// The seeded Fisher–Yates draw both route builders share: one stream per
+// fighter, seeded by its ROSTER seat, every stage drawn in order.
+const seededShuffle = (start: number) => {
+  let seed = start;
+  return <T>(units: readonly T[]): T[] => {
+    const shuffled = [...units];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const [next, pick] = rand(seed);
+      seed = next;
+      const j = pick % (i + 1);
+      [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
+    }
+    return shuffled;
+  };
+};
 
 const finaleIndex = (who: Who) =>
   FOLDED.includes(who) ? 49 : TWINS.includes(who) ? 67 : 65;
@@ -51,13 +67,15 @@ const sourceStep = (who: Who, index: number) =>
 const assemble = (
   roles: Battle,
   header: Battle,
-  ally: Slot,
   players: readonly number[],
   paired: boolean,
   stage: number,
+  ally?: Slot,
 ): Battle => {
   const n = players.length;
-  const all = (1 << (n + 2)) - 1;
+  // The hostility bits cover the actual seats: the 1P, the n players and,
+  // when the route's finale donates one, the ally behind them.
+  const all = (1 << (n + (ally ? 2 : 1))) - 1;
   const slots: Slot[] = players.map((player, i) => {
     const enemies =
       all & ~(1 << (i + 1)) & ~(paired ? 1 << (i % 2 === 0 ? i + 2 : i) : 0);
@@ -80,7 +98,7 @@ const assemble = (
       below: desperationOf(ROSTER[players[i - 1]!]!),
     };
   });
-  slots.push({ ...ally, enemies: all & ~1 & ~(1 << (n + 1)) });
+  if (ally) slots.push({ ...ally, enemies: all & ~1 & ~(1 << (n + 1)) });
   return {
     type: header.type,
     stage,
@@ -98,43 +116,74 @@ const assemble = (
 };
 
 export const brAnotherStages = (who: Who): BrAnotherStages => {
-  let seed = ROSTER.indexOf(who);
-  const shuffle = <T>(units: readonly T[]): T[] => {
-    const shuffled = [...units];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const [next, pick] = rand(seed);
-      seed = next;
-      const j = pick % (i + 1);
-      [shuffled[i], shuffled[j]] = [shuffled[j]!, shuffled[i]!];
-    }
-    return shuffled;
-  };
+  const shuffle = seededShuffle(ROSTER.indexOf(who));
   const finale = sourceStep(who, finaleIndex(who));
   const ally = finale.slots[6]!;
   const stage1 = FOLDED.includes(who)
     ? assemble(
         sourceStep('ryuko', 63),
         sourceStep(who, 45),
-        ally,
         shuffle(STAGE_ONE_POOL).slice(0, 3).flat(),
         true,
         9,
+        ally,
       )
     : null;
   const pairs = STAGE_TWO_PAIRS.filter(
     (pair) => !pair.includes(ROSTER.indexOf(who)),
   );
-  const stage2 = assemble(finale, finale, ally, shuffle(pairs).flat(), true, 3);
-  const bosses = shuffle(BOSSES);
+  const stage2 = assemble(finale, finale, shuffle(pairs).flat(), true, 3, ally);
+  const bosses = shuffle(BOSS_SEATS);
   const stage3 = assemble(
     finale,
     finale,
+    bosses,
+    false,
+    BOSS_ARENAS[bosses.at(-1)!],
     ally,
+  );
+  return { stage1, stage2, stage3 };
+};
+
+// Authored (HPA-858): the four bosses' B.R. ANOTHER route — three pure
+// battles and the end step, no demos and no ally. Ryuko's source steps
+// donate the roles and header: 63 for stage 1, 65 for stages 2 and 3; both
+// flags' bit 0 keeps Continue. One seed stream from the boss's ROSTER seat
+// draws stage 1's three of the twelve regular pairs, stage 2's three of the
+// four extra pairs (one seeded omission) and the three other bosses in
+// order; the last boss's arena hosts stage 3. Stages 1–2 mark all six enemy
+// slots tough (Slot.tough; match.ts applies the stats).
+export const bossBrAnotherStory = (who: Who): readonly Step[] => {
+  const shuffle = seededShuffle(ROSTER.indexOf(who));
+  const opener = sourceStep('ryuko', 63);
+  const finale = sourceStep('ryuko', 65);
+  const stage1 = assemble(
+    opener,
+    opener,
+    shuffle(STAGE_ONE_POOL).slice(0, 3).flat(),
+    true,
+    9,
+  );
+  const stage2 = assemble(
+    finale,
+    finale,
+    shuffle(STAGE_TWO_PAIRS).slice(0, 3).flat(),
+    true,
+    3,
+  );
+  const bosses = shuffle(
+    BOSS_SEATS.filter((seat) => seat !== ROSTER.indexOf(who)),
+  );
+  const stage3 = assemble(
+    finale,
+    finale,
     bosses,
     false,
     BOSS_ARENAS[bosses.at(-1)!],
   );
-  return { stage1, stage2, stage3 };
+  for (const battle of [stage1, stage2])
+    for (const slot of battle.slots) slot!.tough = true;
+  return [stage1, stage2, stage3, { type: 4 }];
 };
 
 export const brAnotherStory = (who: Who): readonly Step[] => {

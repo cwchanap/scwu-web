@@ -102,6 +102,12 @@ export const selectable = (index: number, bit = 2) =>
   (index === 45 || (LAYOUT.flags[index] & bit) !== 0) &&
   ROSTER[index] !== null;
 
+// Authored (HPA-858): the four boss characters, seated at 30, 32, 33 and 45.
+// The quick mode selector opens them for STORY or B.R. MODE, and their B.R.
+// ANOTHER route is generated (br-another.ts), which imports this list —
+// never the reverse, which would cycle through story.ts.
+export const BOSSES: readonly Who[] = ['zenka', 'alpha', 'shinz', 'dora'];
+
 export interface SelectObject {
   container: SelectContainer;
   action: number;
