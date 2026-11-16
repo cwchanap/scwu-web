@@ -1584,6 +1584,90 @@ describe('cheat options (HPA-767)', () => {
     expect([one.hp, enemy.hp, ally.hp, other.hp]).toEqual([510, 20, 200, 20]);
   });
 
+  it("composes with the boss route's tough slots: Enemy HP ×3 seats a tough enemy ×6, at its five-stock cap", () => {
+    // A tough seat (the route's ×2), a plain hostile, an ally, and a
+    // fourth seat waiting on seat 1's life.
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ tough: true }),
+          storySlot(),
+          storySlot({ flags: 0x201 }),
+          storySlot({ tough: true, flags: 4, watch: 1, below: 153 }),
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    match.useCheats(
+      cheats({ enabled: true, enemyHpMultiplier: 3, playerEnLimit: 6 }),
+    );
+    const [one, tough, plain, ally, waiting] = match.fighters;
+    // ZAKU's native 200: the route's ×2 under ×3 seats 1200, full, at the
+    // route's five stocks — never the player's EN limit.
+    expect([tough.maxHp, tough.hp, tough.maxStock]).toEqual([1200, 1200, 5]);
+    // A plain hostile keeps its semantics: ⌊200 × 3⌋ at its native cap.
+    expect([plain.maxHp, plain.hp, plain.maxStock]).toEqual([600, 600, 1]);
+    // Allies stay native, and Enemy HP never touches the 1P.
+    expect([ally.maxHp, ally.hp]).toEqual([200, 200]);
+    expect([one.maxHp, one.hp, one.maxStock]).toEqual([510, 510, 6]);
+    // A waiting seat is seated by the same snapshot before it enters.
+    expect([waiting.maxHp, waiting.hp, waiting.maxStock]).toEqual([
+      1200, 1200, 5,
+    ]);
+  });
+
+  it('leaves a tough seat at the route ×2 when cheats stay off, with the snapshot untouched', () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [storySlot({ tough: true }), null, null, null, null, null, null],
+      }),
+    );
+    match.useCheats(cheats({ enabled: false, enemyHpMultiplier: 3 }));
+    // The route's hardening is not a cheat: the switch stays off and the
+    // disabled seating applies no multiplier, leaving the tough stats as
+    // they seated.
+    expect(match.cheats.enabled).toBe(false);
+    expect(match.fighters[1]).toMatchObject({
+      hp: 400,
+      maxHp: 400,
+      maxStock: 5,
+      enGainMultiplier: 2,
+    });
+  });
+
+  it("scales a watched slot's arrival mark to the tough maximum without cheats", () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ tough: true }),
+          storySlot({ flags: 4, watch: 1, below: 153 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    toFight(match);
+    const [, zaku, waiting] = match.fighters;
+    // The tough maximum is 400, so the mark is ⌊153 × 400 / 200⌋ = 306.
+    zaku.hp = 306;
+    match.step();
+    expect(waiting.present).toBe(false);
+    zaku.hp = 305;
+    match.step();
+    expect(waiting.present).toBe(true);
+    // Entering runs only the opening script: the waiting seat keeps its
+    // own stats — native here, since only slot 0 is tough.
+    expect(waiting).toMatchObject({ hp: 200, maxHp: 200, maxStock: 1 });
+  });
+
   it("scales a watched slot's arrival mark to the watched fighter's maximum", () => {
     const match = Match.story(
       'ryuko',

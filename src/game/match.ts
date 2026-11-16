@@ -1159,6 +1159,9 @@ export interface Fighter {
   // `stocksOf(who)` natively, 1P's `playerEnLimit` under cheats.
   maxHp: number;
   maxStock: number;
+  // Authored (HPA-858): the boss B.R. ANOTHER route's tough seats gain EN
+  // doubly (addPower); every native path is 1.
+  enGainMultiplier: number;
   // +0xdf25: life a loss took that a story's life bar still shows in red,
   // and +0xdf29, the steps before it drains (lifeBars).
   lost: number;
@@ -1585,6 +1588,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   hp: lifeOf(who),
   maxHp: lifeOf(who),
   maxStock: stocksOf(who),
+  enGainMultiplier: 1,
   lost: 0,
   lostDelay: 0,
   bar: { x, y: 0 },
@@ -1699,7 +1703,10 @@ function walkSpeed(who: Who, back: boolean) {
 // cap (its effective `maxStock`, HPA-767), and borrows stock back; none at
 // the start (+0x7cc2).
 export function addPower(f: Fighter, amount: number) {
-  f.power += amount;
+  // Authored (HPA-858): a route-tough seat's positive gain doubles; costs
+  // and drains pass through native, as do the direct op-0x10 stock adds
+  // that never come through here.
+  f.power += amount > 0 ? amount * f.enGainMultiplier : amount;
   while (f.power < 0) {
     if (f.stock === 0) f.power = 0;
     else {
@@ -2026,6 +2033,17 @@ export class Match {
       const who = slot ? ROSTER[slot.player]! : this.characters[0];
       const ally = !slot || slot.flags & 0x200;
       const f = fighter((slot ?? battle).x * 1.5, ally ? 1 : -1, who);
+      // Authored (HPA-858): the boss B.R. ANOTHER route marks its regular
+      // enemy seats tough — twice the life, five 100-EN stocks and doubled
+      // positive EN gain. The stats seat on every rebuild of the round's
+      // fighters (nextRound shares this path), never accumulating, and
+      // compose with the Cheats snapshot in cheatSeat.
+      if (slot?.tough && !(slot.flags & 0x200)) {
+        f.maxHp = 2 * lifeOf(f.who);
+        f.hp = f.maxHp;
+        f.maxStock = 5;
+        f.enGainMultiplier = 2;
+      }
       f.enemies = bits(slot ? slot.enemies : ~1 & ~allies);
       const entry = slot ? (slot.flags >> 1) & 3 : 0;
       if (entry === 2) {
@@ -2384,9 +2402,12 @@ export class Match {
       );
       f.maxStock = this.cheats.playerEnLimit;
     } else if (this.hostile(0, i))
+      // Authored (HPA-858): the multiplier reads the freshly seated
+      // maximum — a tough seat's route ×2 under the cheat, a native
+      // fighter's plain lifeOf.
       f.maxHp = Math.max(
         1,
-        Math.round(lifeOf(f.who) * this.cheats.enemyHpMultiplier),
+        Math.round(f.maxHp * this.cheats.enemyHpMultiplier),
       );
     f.hp = f.maxHp;
   }

@@ -1620,7 +1620,7 @@ describe('mode select (HPA-858 bosses)', () => {
   });
 
   it('B.R. starts a boss on the generated route a new Story owns, marked B.R.', () => {
-    const { scene, view, artIn } = boot();
+    const { scene, view, artIn, statuses } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true; // the sign pack and stage are resident
@@ -1644,6 +1644,16 @@ describe('mode select (HPA-858 bosses)', () => {
     expect(scene.match.stage).toBe('sakura');
     expect(scene.match.fighters[0].who).toBe('shinz');
     expect(scene.match.fighters).toHaveLength(7);
+    // The route's own hardening seats without cheats: every enemy at the
+    // route's ×2 with five stocks, and the run stays unmarked.
+    expect(scene.match.cheats).toEqual(DEFAULT_CHEATS);
+    expect(statuses.at(-1)?.cheated).toBe(false);
+    for (const f of scene.match.fighters.slice(1))
+      expect(f, f.who).toMatchObject({
+        hp: 2 * lifeOf(f.who),
+        maxHp: 2 * lifeOf(f.who),
+        maxStock: 5,
+      });
   });
 
   it('marks an ordinary fighter’s B.R. ZERO route B.R. too', async () => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, desperationOf } from './characters';
+import { CHARACTERS, desperationOf, lifeOf, stocksOf } from './characters';
 import type { Who } from './characters';
+import { Match } from './match';
 import { BOSSES, ROSTER } from './select';
 import { opensOnModeSelect } from './story';
 import type { Battle, Step } from './story';
@@ -688,6 +689,26 @@ describe('boss B.R. ANOTHER route', () => {
       expect(slot!.tough).toBeUndefined();
     for (const battle of built(brAnotherStages('masa')))
       for (const slot of battle.slots) expect(slot!.tough).toBeUndefined();
+  });
+
+  it('seats the boss route tough through Match while the regular route stays native', () => {
+    const boss = Match.story('zenka', battlesOf('zenka')[0]!);
+    expect(boss.fighters[0]).toMatchObject({ maxHp: lifeOf('zenka') });
+    for (const f of boss.fighters.slice(1))
+      expect(f, f.who).toMatchObject({
+        hp: 2 * lifeOf(f.who),
+        maxHp: 2 * lifeOf(f.who),
+        maxStock: 5,
+        enGainMultiplier: 2,
+      });
+    const regular = Match.story('masa', built(brAnotherStages('masa'))[1]!);
+    for (const f of regular.fighters)
+      expect(f, f.who).toMatchObject({
+        hp: lifeOf(f.who),
+        maxHp: lifeOf(f.who),
+        maxStock: stocksOf(f.who),
+        enGainMultiplier: 1,
+      });
   });
 
   it('never mutates the source scenarios or the regular B.R. ANOTHER stages, and reuses no donor slot', () => {
