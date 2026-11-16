@@ -5218,7 +5218,7 @@ export const GUIDES_DATA = {
           {
             name: 'EN',
             input: 'hold <kbd>E</kbd>',
-            desc: 'Charges his gauge; his stocks hold 90 power each, up to five, and once full he taunts, giving the opponent 20.',
+            desc: 'Charges his gauge; his stocks hold 90 power each, up to five, and once full he taunts, giving the opponent 20. Unavailable to you in every mode, and to any DoraEmon in a B.R. route — only a CPU DoraEmon elsewhere charges.',
             cost: 0,
           },
           {
