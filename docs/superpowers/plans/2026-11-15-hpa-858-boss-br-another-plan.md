@@ -13,86 +13,95 @@
 - Source/generated .PLAYER/.json and packed R2 assets are not hand-edited or committed. No backward-compatibility layer required.
 - The HPA-858 original ticket wins over older notes: DoraEmon **retains KO RELOAD in BR** and loses it only when player-controlled outside BR.
 
-## Phase 1 — Lock down route and boss selection with tests
+## Review decisions recorded before implementation
 
-**Read/change:** src/game/select.ts, src/game/story.ts, src/game/select.test.ts (or the nearest current screen/flow test), src/game/br-another.test.ts.
+These resolve the blocking and open assumptions in [review #5914086465](https://github.com/cwchanap/scwu-web/pull/22#pullrequestreview-5914086465):
 
-- [ ] Add table tests for the four boss roster entries (zenka, alpha, shinz, dora) and assert normal selectable fighters retain the original two-step mode and route menu.
-- [ ] Add boss-mode UI tests for keyboard and touch/tap: first board offers STORY MODE and B.R. MODE, then directly produces boss-story vs BR Another without displaying a route board; Escape/cancel works and previous choice remains reasonable.
-- [ ] Record current boss scenarioOf(who) and assert each boss selecting STORY MODE starts its exact existing story, including DoraEmon's authored story.
-- [ ] Add a narrow Story input to play an explicit generated Step list for boss BR while default Story(who) still uses scenarioOf(who). Prove continue replay (retry) and win -> title.
+1. **Battle template donor:** Ryuko's **source step 63** is the stage-1 roles/header donor; **source step 65** supplies stages 2 and 3. Do **not** call `brAnotherStages(boss)`: bosses lack the 49/65/67 regular-fighter finale steps, and Dora's story is separately authored. The donor's flag bit 0 permits Continue.
+2. **Difficulty storage:** optional authored `Slot.tough` for exactly the six regular enemy slots of each boss stage 1 and 2. Applied in `storyFighters` and on each round rebuild.
+3. **EN denomination:** every eligible regular enemy already uses 100 EN per stock, including YINAN and AYA. Set `maxStock = 5` without introducing a per-stock override. Scale positive `addPower` amounts x2; negative EN and direct op-0x10 stock changes stay native.
+4. **Cheat ordering:** native fighter -> route `tough` -> HPA-767 enemy HP cheat. In `cheatSeat` multiply the fighter's **existing `maxHp`** (freshly created per round), not `lifeOf`. The route alone does not mark the match cheated.
+5. **Minimal route state:** Store the selected route and optional generated steps on `Story`; pass only `br: boolean` to `Match.story` when constructing each battle. No rules registry, extra reset plumbing or stage-number detection. B.R. includes `br-zero` and `br-another`, plus later explicit B.R. routes.
+6. **Shared boss list:** `BOSSES: readonly Who[]` beside `ROSTER` in `select.ts`. Keep `opensOnModeSelect` limited to the 34 regular fighters, since its callers build source-specific B.R. stories.
+7. **Escape:** cancel a completed but loading boss mode pick via `select.done`, even at stage 0. Keep existing stage-1/back and stage-0/character-select navigation.
+8. **E2E pragmatism:** Reuse the two current canvas pixel-probe tests or add two cases to `e2e/unconfigured/mode-select.spec.ts`; do not install a new browser farm. Keep platform-specific macOS, Windows and iOS acceptance as conditional automated checks, and include a visual check against HPA-765's mode-select mockup as a *reference*, not pixel-perfect matching. The existing CI runs Linux Chromium only on non-draft PRs; it does not test Android.
 
-**Checkpoint:** Boss mode choices can be represented without changing normal fighter routes or original boss stories.
+## Phase 1 — Boss entry, route ownership and cancellation
 
-## Phase 2 — Generate three ally-free boss BR battles
+**Change:** `src/game/select.ts`, `src/game/scene.ts`, `src/game/story.ts`; focused `select.test.ts`, `scene.test.ts`, `story.test.ts`.
 
-**Change:** src/game/br-another.ts, src/game/story.ts, src/game/br-another.test.ts, src/game/team.test.ts.
+- [ ] Export the four-boss `BOSSES` list from `select.ts`, not from `br-another.ts` (avoids a circular import). Only `scene.ts` extends the menu gate to `opensOnModeSelect(who) || BOSSES.includes(who)`; keep the predicate's regular-fighter enumeration unchanged.
+- [ ] For boss `ModeSelect`, return `'story'` or `'br-another'` when confirming the **first** sign. Change `done` to `Route | 'story' | null`, with no route-sign screen for bosses. Regular fighters still see mode + route signs, with the same remembered choices, keys and taps.
+- [ ] STORY creates default `new Story(who)`; boss B.R. creates `new Story(who, bossBrAnotherStory(who), 'br-another')` and calls `next()`. Give `Story` a small optional steps override and `Route | null` value; ordinary `startOnRoute(route)` records the route. Avoid a `routeLife` branch for the new boss route: the generated path has no Chii-sign jumps.
+- [ ] Derive `br` from the active `Story.route` and pass it from `TrainingScene.startBattle` to `Match.story`. Ordinary story/VS/practice remain non-B.R.; a new Story naturally owns a new route. Cover B.R. ZERO explicitly.
+- [ ] Update Escape handling to cancel the pending route request whenever `ModeSelect.done` is present, **whether stage is 0 or 1**. Unconfirmed stage 1 still backs to stage 0; unconfirmed stage 0 returns to character select. Add an asynchronous boss-load cancellation test.
+- [ ] Regression-test the original stories of ZENKA, ALPHA, SHIN-Z and DoraEmon, plus regular fighters' two-step mode selector and its `opensOnModeSelect` roster count of 34.
 
-- [ ] Reuse one seeded pair shuffle using ROSTER.indexOf(who); use existing regular and extra pairs, boss IDs, arena mappings and low-life thresholds.
-- [ ] Change the shared battle assembler minimally so ally is optional and hostility masks use the real number of seats. Keep paired allies neutral to one another and hostile to all outside their pair.
-- [ ] Build boss stage 1 from three of 12 regular pairs at Sakura Street; stage 2 from three of four extra pairs at Sakura Night; stage 3 from the three bosses *other than the player*, using the last boss's arena.
-- [ ] Set deterministic lead member and order with the existing seed logic. No boss's own fighter is an enemy. Do not introduce HPA-1035's full-roster balancing search.
-- [ ] Use existing battle flags so a loss shows Continue, and a cleared route finishes at title. Emit exactly battle/battle/battle/end; no inter-stage demo or ally.
-- [ ] Add deterministic tests for **all four bosses**: 6/6/3 opponents, no ally, pair makeup and cohesion, seeded stability, exclusions, stage keys/last-boss arena, correct entry/watch rules, symmetric hostility, win and Continue. Ensure no seat overflows.
-- [ ] Keep the current 34 regular B.R. ANOTHER scenarios unchanged until HPA-1035; rerun their existing lineup and team tests.
+**Checkpoint:** Both boss choices start the correct story path, no accidental normal-fighter builder call, and Escape works during a pending stage-0 boss route load.
 
-**Checkpoint:** Pure-generated boss BR route runs through the existing Story and Match without a separate battle implementation.
+## Phase 2 — Pure ally-free boss B.R. generation
 
-## Phase 3 — Connect route context and stat tuning
+**Change:** `src/game/br-another.ts`, `src/game/story.ts`, `src/game/br-another.test.ts`, `src/game/team.test.ts`.
 
-**Change:** src/game/scene.ts, src/game/match.ts, possibly src/game/characters.ts only if necessary, and focused Match/scene tests.
+- [ ] Extract existing seeded shuffle as a small reusable closure seeded by the chosen `ROSTER` index, then draw stages **in order from one seed stream**. Do not generate a search/optimization system for HPA-1035's later global balancing.
+- [ ] Make the `assemble` ally slot optional, and derive all hostility masks from the actual seat count (player + opponents only for the boss route). Pairs stay allied to their mate; all other pairs/bosses are hostile as today.
+- [ ] **Explicit donors:** use `sourceStep('ryuko', 63)` for stage 1's roles/header and `sourceStep('ryuko', 65)` for stages 2 and 3. Copy the donor `flags & 1` Continue capability. Override arena and slot/player/entry details; never mutate source steps.
+- [ ] Build stage 1: Sakura Street, three of 12 regular pairs (six fighters). Stage 2: Sakura Night, three of the four extra pairs (six fighters), with one seeded omission. Stage 3: **three other bosses**, no selected boss, in shuffled order; stage arena determined by last boss.
+- [ ] Produce `[stage1, stage2, stage3, { type: 4 }]` and make normal `Story.next` and `retry` handle it. No demos or ally; Continue should retry the *same* battle, completion returns title.
+- [ ] Set optional `tough: true` on **all six stage-1 and all six stage-2 enemy slots**, none on stage 3. Keep `Slot` authored flag optional, so native exported slots are untouched.
+- [ ] Table-test all four bosses: 6/6/3 enemy counts and slot indices; no ally; stable seeded and distinct lineups; pair cohesion and symmetric hostility; correct watch/below order and arena; no own-boss appearance; donor headers and Continue flag; no mutation of source data or regular BR Another scenarios.
 
-- [ ] Extend CharacterSelect -> ModeSelect flow to include the four bosses. When the first board returns STORY, launch default Story(who). When it returns BR, launch generated boss steps directly with untouched native starting HP (no Chii routeLife subtraction).
-- [ ] Carry a **small explicit BR-route/boss-route context** from scene to each new Match.story; clear it on title/new ordinary game. Avoid trying to infer BR from stage number or opponent roster.
-- [ ] Apply x2 effective HP and five stocks of 100 EN to *regular enemy seats in boss BR stages 1 and 2 only*, before battle begins. Verify the original perStock for YINAN/AYA and any other outlier; preserve 500-EN semantics, stage-3 native bosses and player native stats.
-- [ ] Apply x2 to **positive EN gains** on those same seats only. Centralize the award hook in the smallest viable place so HPA-972 can later reuse it. Prove drains/spends, negative adjustments, stock cost and other modes do not double.
-- [ ] Retain the HPA-767 cheat snapshot's independent behavior and the game's cheated-run marker; boss-route tuning itself does not turn on cheats. Test with cheats enabled and disabled, plus native stage-3 stats.
-- [ ] Keep a future-friendly distinction between route being BR and being the new tougher boss-specific BR. No generic buff engine or public API necessary.
+**Checkpoint:** Three pure generated battles work through existing Match and Story on all bosses, without extra seats or donor index errors.
 
-**Checkpoint:** Only intended stage-1 and stage-2 enemies get 2x HP/500 EN/2x EN gain, independent of cheat activation.
+## Phase 3 — Persistent route stats and cheat composition
 
-## Phase 4 — DoraEmon's EN-charge and KO RELOAD rules
+**Change:** `src/game/match.ts`; focused `team.test.ts`, `br-another.test.ts` and existing cheat tests.
 
-**Change:** narrow paths in src/game/match.ts (and src/game/scene.ts if route context enters there), src/game/dora.test.ts, src/game/team.test.ts.
+- [ ] In `storyFighters`, apply `Slot.tough` on each freshly constructed hostile: `f.maxHp = 2 * lifeOf(f.who)`, `f.hp = f.maxHp`, `f.maxStock = 5`, `f.enGainMultiplier = 2` (default 1 in the fighter factory). The same construction path is used after `nextRound`; no start-only buff.
+- [ ] Reuse `addPower(f, amount)` to multiply **only positive** amounts by `f.enGainMultiplier`. Negative costs/drains, direct op-0x10 stock additions and base `perStockOf` stay unchanged. Candidate foes have 100 EN per stock; no override.
+- [ ] In the hostile branch of `cheatSeat`, apply `enemyHpMultiplier` to fresh `f.maxHp` instead of native `lifeOf`. With cheats off the route gives 2x; with Enemy HP x3 the tough enemy gets 6x. Non-tough enemies keep existing semantics. Player max EN settings apply only to player 0, never to these enemies.
+- [ ] Assert modifier survives a drawn/multi-round reset and is **not applied twice**; verify HP/EN on waiting and present enemies, late-entry thresholds based on effective `maxHp`, no stat change to stage-3 bosses or player. Test normal story/VS and regular B.R. are unaffected.
+- [ ] Verify the route's hardening does not activate `cheats.enabled` or mark `runCheated` and does not interfere with existing HPA-767 cheat snapshots.
 
-- [ ] Identify the existing Dora EN charge entry (E command and source action 239/240+3) and gate only charge when player controls Dora, **or** the match is BR. Preserve EN from hits, kills and other scripts.
-- [ ] In Dora's KO NORMAL to KO RELOAD (source action 72 then 74), suppress the three-stock revive only for player Dora *outside BR*; leave it on for player Dora in BR and for CPU Dora in BR as enemy/partner, matching ALPHA. Do not change other fighters or HPA-973's after-KO HP fix.
-- [ ] Add a concise matrix of deterministic tests:
-  - player Dora in practice, VS, TEAM VS and authored STORY: EN charge off, KO RELOAD off;
-  - player Dora in B.R. ANOTHER: charge off, KO RELOAD on;
-  - CPU Dora in B.R. ANOTHER (stage-3 boss): charge off, KO RELOAD on;
-  - CPU Dora in ordinary non-BR: source behavior retained;
-  - EN earned by non-charge sources, and ALPHA's revive, unaffected.
-- [ ] Update src/game/team.test.ts's now-obsolete assertion that Dora's **charge** works as a stage-3 BR boss; keep its KO RELOAD assertion and all relevant brawl downed/result tests.
-- [ ] Test reset/continue so Dora restrictions don't leak between matches.
+**Checkpoint:** Boss stages 1/2 have x2 HP, five 100-EN stocks and x2 positive EN gain on every round, including with independent optional cheats.
 
-**Checkpoint:** All route/control combinations match the latest HPA-858 owner decision, with no global EN suppression.
+## Phase 4 — DoraEmon's charge and KO RELOAD matrix
 
-## Phase 5 — Documentation, checks and same-PR review
+**Change:** small action entry/KO check in `src/game/match.ts`, `src/game/dora.test.ts`, `src/game/team.test.ts`.
 
-**Change:** docs/evidence.md, docs/gameplay.md and move list only if its current wording conflicts.
+- [ ] Treat **fighter index 0** as player-controlled for every mode, including TEAM VS's active 1P. Gate only Dora's EN-charge action **239** at entry when `i === 0 || br`; the charge follow-up `240+3` is reached through its 239 window. No global `addPower` suppression.
+- [ ] In the KO-normal check inside `enterPending` (near line 4468), bypass the **Dora-specific stock test targeting KO RELOAD action 72** if `i === 0 && !br`. Preserve other stock tests, ALPHA revival, Dora 72/74 in B.R. and source behavior for non-B.R. CPU Dora.
+- [ ] Table-test player Dora in practice/VS/TEAM VS/authored STORY (no charge, ordinary KO), player Dora in B.R. ANOTHER (no charge, KO RELOAD), CPU Dora in regular B.R. ANOTHER stage 3 (no charge, KO RELOAD), and CPU Dora in ordinary non-B.R. (native charge/revive). Pass `br` for **B.R. ZERO** in a focused route-context test, even if Dora does not appear in its normal enemy lineup.
+- [ ] Assert a CPU Dora with denied charge still performs an ordinary attack within a bounded number of ticks; retain non-charge EN rewards and other characters' behavior.
+- [ ] Replace the existing `team.test.ts` expectation that Dora *charges* in B.R. stage 3; keep the stage-3 KO RELOAD/brawl-win expectation. Reconcile unrelated HPA-973 tests if that PR merges first.
 
-- [ ] Document the boss-specific generated route and tuned values as authored, including no ally, seeded selection and arena rule.
-- [ ] Document Dora's charge and revive restrictions and update any existing "Dora story" prose that says otherwise; preserve source-vs-authored distinction.
-- [ ] Update the draft PR body to summarize implementation, test evidence, visual checks and any unavailable platform runners; keep it draft until accepted for review.
-- [ ] Run bun run validate, bun run build and bun run e2e on the available environment; include exact outcomes. If scripts/export_assets.py cannot run without private handoff, report it as **not run** rather than passing.
-- [ ] Recheck the diff against HPA-858 and avoid incorporating HPA-1035, HPA-972 or HPA-973 implementation.
+**Checkpoint:** All Dora mode/seat cases pass and KO RELOAD remains on for every B.R. Dora role.
+
+## Phase 5 — Documentation, automated acceptance and one-PR completion
+
+**Change:** `docs/evidence.md`, `docs/gameplay.md`, optionally move-list text if it conflicts, `e2e/unconfigured/mode-select.spec.ts` and PR body.
+
+- [ ] Document the authored generated boss route, donor steps, enemy stats, cheat composition, and charge/revive conditions while preserving original-vs-authored distinctions.
+- [ ] Extend the existing **Desktop Chrome canvas pixel-probe** E2E instead of making a new UI infrastructure. Boss B.R. case: a selected boss sees lit `MODE_LEFT`/`MODE_RIGHT` boards; B.R. confirmation enters battle with **no intermediate lit `HEADER` band** and with health bars visible. Boss STORY case: a chosen boss starts the original story. Include touch/tap navigation in the existing test setup.
+- [ ] Run `bun run validate`, `bun run build`, `bun run e2e` in the available environment and log exact outcomes. The E2E GitHub Actions job runs Linux Chromium and skips **draft PRs**; for a draft, use an actual local run instead of claiming CI E2E passed. Record unavailable private asset export/handoff as **not run**.
+- [ ] Keep all implementation/test/documentation commits **on this PR**, review the diff for HPA-858 only, and update the PR's checked items/status truthfully. No image/SFX task is needed.
 
 ## Automated end-to-end acceptance criteria
 
-The gameplay matrix above is verified by deterministic Vitest/Match tests. Product-level checks use the project's existing Playwright/browser facilities; **no human acceptance** and no new browser farm are required.
+These checks follow the project's platform targeting without adding browser-infrastructure tasks. Platform checks that cannot run are explicitly *not verified*, rather than replaced by human sign-off.
 
-- [ ] **macOS / Chromium:** An automated browser test starts SINGLE, picks each of ZENKA, ALPHA, SHIN-Z and DoraEmon, sees the first STORY/B.R. board, selects B.R. and starts the new boss route without a second route board. Select STORY for a representative boss and verify it starts the original story. Assert the HUD and arena respond and no page errors occur.
-- [ ] **Windows / Edge:** When an existing runner is available, automate boss selection, direct B.R. entry, a match start and visible HUD/canvas. Capture a screenshot and assert navigation/board appearance. If unavailable, record **not run (runner unavailable)**; do not introduce new infrastructure.
-- [ ] **iOS / Safari or WebKit:** When an existing simulator/device runner exists, use touch to choose a boss, tap B.R. directly, enter the arena, and verify the board fits portrait and landscape and no route-step confusion. Clearly distinguish actual iOS Safari from desktop WebKit emulation. Record unavailable runs honestly.
-- [ ] **Visual/mockup:** Compare automated snapshots of the first-step sign boards, dimmed selection background, active sign and cursor with the established **HPA-765 Linear mode-select mockup**. Verify original assets remain intact. HPA-858 introduces no new mockup, sign, layout or art; no additional screen redesign is allowed.
-- [ ] **Regression:** Existing normal-fighter two-stage choice, boss STORY path, 34 normal B.R. ANOTHER routes, menu/cheats, Continue and KO result transitions still function under current CI/e2e tests.
-- [ ] **CI only:** Android/Linux covered by the existing CI workflow, not separate end-to-end acceptance.
+- [ ] **macOS (Chromium):** With the existing Playwright harness, automated SINGLE → four boss selections → STORY/B.R. direct choice. Confirm B.R. skips the route substep, shows a battle HUD, and STORY starts the native route. The existing mode-select pixel probes check active/dim sign appearance, and browser page errors are absent.
+- [ ] **Windows (Edge):** When an existing Windows/Edge runner is available, automate boss selection, direct B.R. start, canvas/HUD visibility and sign/cursor appearance with a screenshot. Otherwise record **not run: no Edge runner**; no dedicated new runner is part of this ticket.
+- [ ] **iOS (Safari):** When an existing iOS simulator/device runner is available, use touch to pick STORY/B.R., assert direct B.R. entry, readable signs/HUD in portrait and landscape, and no route-substep flash. If only desktop WebKit emulation exists, label it **WebKit emulation, not iOS Safari**; if neither exists, record **not run**.
+- [ ] **Visual check against Linear mockup:** Use the **HPA-765 sign-menu mockup** as the design reference (real sign assets, dimmed selected character background, highlighted mode sign and cursor placement). Automated screenshots/pixel-region probes verify these properties; do **not** expect pixel-perfect equality with a conceptual mockup. No new HPA-858 mockup/art exists.
+- [ ] **Regression:** Existing ordinary-fighter two-step mode choice, 34 regular B.R. ANOTHER scenarios, unchanged boss STORY, Continue, HPA-767 cheats and Dora KO/brawl outcomes pass deterministic tests and the available browser smoke checks.
+
+Android and Linux are excluded from dedicated platform acceptance; rely only on the current CI coverage where applicable. The current CI uses Linux Chromium **and does not run Android**. No human acceptance criterion.
 
 ## Ready-for-review definition
 
-- [ ] All four bosses have first-step STORY/B.R. choice, no extra route step; original boss stories unchanged.
-- [ ] Boss BR has precisely three no-ally stages, 6/6/3 opponents, native continue/title behavior and deterministic fair-enough seeded pair choice; last boss chooses arena.
-- [ ] Only regular enemies of boss stages 1/2 get x2 HP, 500 EN and x2 positive EN gain; boss player and stage-3 bosses remain native and normal runs are unaffected.
-- [ ] Dora player cannot charge EN in any mode and cannot KO RELOAD outside BR; Dora in any BR seat keeps KO RELOAD but cannot charge; no other move/KO path regresses.
-- [ ] Documentation, deterministic tests and available automated product/visual checks are in **this one PR**; exact test statuses are recorded without claiming unavailable checks passed.
+- [ ] All four bosses have STORY/B.R. first-step choices, B.R. skips the route step; original boss stories and the 34 regular B.R. routes are unchanged.
+- [ ] Boss route uses Ryuko donor steps 63/65, generates 6/6/3 hostile opponents, no ally and no demos, preserves Continue and finishes at title; generated flags and masks are validated.
+- [ ] `tough` applies only to boss stage-1/2 regular enemies and persists across rounds; HP = native x2 x optional cheat, Max EN = five 100-EN stocks, positive EN gain x2; native paths, player and stage-3 bosses unaffected.
+- [ ] Dora charge prohibited for player Dora everywhere and CPU Dora in B.R.; KO RELOAD off only for player Dora outside B.R.; B.R. ZERO flag and CPU responsiveness tested.
+- [ ] No unrelated feature/art/SFX work; one draft PR updated with accurate verification and any unavailable-platform statuses.
