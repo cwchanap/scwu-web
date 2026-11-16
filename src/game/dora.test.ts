@@ -1004,7 +1004,10 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
         [...seen].some((b) => b === 239 || b === '240+3' || b === 421),
       ).toBe(false);
       expect([dora.stock, dora.power]).toEqual([0, 0]);
-      // Ordinary KO: no KO RELOAD (72), no KR Down (74).
+      // Ordinary KO: no KO RELOAD (72), no KR Down (74) — and no reload
+      // spends a stock. Four stocks sit inside KO RELOAD's own three-stock
+      // test, so a missing bypass cannot hide behind an empty stock table.
+      dora.stock = 4;
       other.x = dora.x + 90;
       driveCpus(match, 0, { punch: true });
       knockOut(match, dora);
@@ -1017,6 +1020,7 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       expect(match.winner).toBe('opponent');
       expect([dora.hp, dora.downed]).toEqual([0, true]);
       expect(path.some((a) => a === 72 || a === 74)).toBe(false);
+      expect(dora.stock).toBe(4);
     },
   );
 
@@ -1059,10 +1063,13 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
   });
 
   it('blocks the real CPU’s EN command (421) in B.R. — seed 4 — and the CPU still attacks', () => {
-    // The Vs. CPU table run (seed 4) enters 421 outside B.R.; the same
-    // table on a B.R. stage 3 never does, and no charge EN accrues in a
-    // contact-free window. His wave comes in through the desperation watch,
-    // as in team.test.ts.
+    // The Vs. CPU table run (seed 4) enters 421 outside B.R. Here the same
+    // table runs for real against a grounded opponent inside its EN entry's
+    // own distance window (slot 56: 250–700 source pixels, both standing),
+    // so the table asks for the EN command itself; the wrapper only records
+    // its input. Blocked, none of the feeds enters a charge and the gauge
+    // stands through them; unblocked, a feed from a free tick enters 421
+    // and loops 4 power a tick from idle (the non-B.R. run here plays it).
     const match = Match.story(
       'kiki',
       brAnotherStages('kiki').stage3,
@@ -1086,44 +1093,55 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       expect(next.present).toBe(true);
       watched.hp = watched.maxHp;
     }
-    // Contact-free: the present fighters idle far away, so any EN could
-    // only come from a charge.
+    // One grounded target inside the EN entry's distance window; every
+    // other fighter stands beyond it, so the nearest is always that one.
     for (const f of match.fighters)
-      if (f !== dora && f.present) f.x = dora.x + 1200;
+      if (f !== dora && f.present) f.x = dora.x + 1500;
+    alpha.x = dora.x + 600;
     dora.stock = 0;
-    const seen = new Set<unknown>();
-    for (let t = 0; t < 400; t++) {
-      match.step();
-      if (dora.action === 'script') seen.add(dora.branch);
-    }
-    // No charge action ever enters, and the window's EN stays at the
-    // attacks' script rewards — a live CPU EN (421) loops 4 power a tick
-    // (PCs on 421) and would blow far past one stock's 90.
-    expect([...seen].some((b) => b === 239 || b === '240+3' || b === 421)).toBe(
-      false,
-    );
-    expect(seen.size).toBeGreaterThan(0);
-    expect(dora.power + dora.stock * perStockOf('dora')).toBeLessThan(270);
-    // The denied CPU answers the EN command itself with nothing: let his
-    // last attack run out on a blank input — a quiet point, so no attack
-    // script's EN tail smears the total — freeze the EN there, then feed
-    // his seat the CPU's own command 42 (record injects it like the
-    // table's own step would). Blocked, the command enters nothing and the
-    // total stands; a live 421 charges from idle the very tick he is free.
     const vm = match.cpus[4]!;
-    vm.input = () => ({});
-    for (let t = 0; t < 200 && dora.action !== 'idle'; t++) match.step();
-    expect(dora.action).toBe('idle');
-    const charged = dora.power + dora.stock * perStockOf('dora');
-    vm.input = () => ({ command: 42 });
-    for (let t = 0; t < 60; t++) {
+    const real = vm.input.bind(vm);
+    let fed: Input = {};
+    let wasFree = false;
+    vm.input = (self, opponent) => {
+      fed = real(self, opponent);
+      // Whether he was free entering the tick the table's word applies to.
+      wasFree = dora.action === 'idle';
+      return fed;
+    };
+    const total = () => dora.power + dora.stock * perStockOf('dora');
+    const entered: [number, unknown][] = [];
+    let prev: unknown = 'idle';
+    let rejection = -1;
+    let hold = 0;
+    for (let t = 0; t < 1500; t++) {
       match.step();
-      if (dora.action === 'script') seen.add(dora.branch);
+      const action = now(dora);
+      if (action !== prev) {
+        prev = action;
+        entered.push([t, action]);
+      }
+      if (rejection < 0) {
+        // The table's own EN command (42), fed while he is free — the very
+        // setup an unblocked 421 charges from.
+        if (fed.command === 42 && wasFree) {
+          rejection = t;
+          hold = total();
+        }
+      } else if (t <= rejection + 8) {
+        // Blocked, the feed enters nothing and the gauge stands.
+        expect(total()).toBe(hold);
+      }
     }
-    expect([...seen].some((b) => b === 239 || b === '240+3' || b === 421)).toBe(
-      false,
-    );
-    expect(dora.power + dora.stock * perStockOf('dora')).toBe(charged);
+    // The table asked for the EN command within the window — and no charge
+    // action ever joins his branches, so no EN accrues from one.
+    expect(rejection).toBeGreaterThanOrEqual(0);
+    expect(
+      entered.some(([, b]) => b === 239 || b === '240+3' || b === 421),
+    ).toBe(false);
+    // And the denied CPU stays responsive: his HIT UP launch (231) enters
+    // 189 ticks after the rejection.
+    expect(entered).toContainEqual([rejection + 189, 231]);
   });
 
   it('marks a B.R. ZERO battle B.R. through its story route, though DoraEmon is absent there', () => {
