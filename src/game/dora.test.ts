@@ -15,13 +15,14 @@ import {
   pushboxes,
   script,
 } from './animations';
+import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, Match } from './match';
 import type { Fighter, Input } from './match';
 import { CharacterSelect, StoryDemo } from './select';
 import type { Demo } from './select';
 import { StandingVM } from './standing';
-import { scenarioOf } from './story';
+import { Story, scenarioOf } from './story';
 import type { Battle } from './story';
 
 // DoraEmon as player 1, `gap` from Ryuko as player 2.
@@ -636,24 +637,34 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     ]);
   });
 
-  it('charges power while E (EN, buttons E and F) is held, taunting once full', () => {
-    // EN up (239) opens a level-2 window (PC 3409) that the held EN entry
-    // keeps re-entering, 4 power a tick (PCs 3432–3442).
+  it('charges no EN while E (EN, buttons E and F) is held as 1P: 239 and the held 240+3 never enter', () => {
+    // Authored (HPA-858): the EN charge is disabled for fighter 0 in every
+    // mode (TEAM VS's active 1P included) and for any DoraEmon seat on a
+    // B.R. route; the press (EN up, 239) and the held entry's charge window
+    // (240+3) both enter nothing, and no other EN source is touched.
     expect(
       play((t) => (t < 100 ? { ex: true } : {}), { stock: 0 }),
-    ).toMatchObject({
-      mine: [239, '240+3', 'idle'],
-      stock: 4,
-      power: 56,
-    });
-    // At five stocks it enters 挑発 (241, PC 3428), a taunt that gives the
-    // opponent 20 power (PC 3451).
+    ).toMatchObject({ mine: ['idle'], stock: 0, power: 0 });
     expect(
       play((t) => (t < 300 ? { ex: true } : {}), { stock: 0 }),
-    ).toMatchObject({
-      mine: [239, '240+3', 241, 242, 'idle'],
-      stock: 5,
-    });
+    ).toMatchObject({ mine: ['idle'], stock: 0 });
+  });
+
+  it('keeps the CPU partner’s EN charge outside B.R.: held E plays 239 and its window for stocks', () => {
+    // Source behavior preserved (the matrix below covers the B.R. seats):
+    // EN up (239) opens a level-2 window (PC 3409) that the held EN entry
+    // keeps re-entering, 4 power a tick (PCs 3432–3442), and at five stocks
+    // it enters 挑発 (241, PC 3428).
+    const match = new Match('practice', false, 3, ['ryuko', 'dora']);
+    const dora = match.fighters[1];
+    dora.stock = 0;
+    const seen = new Set<unknown>();
+    for (let t = 0; t < 300; t++) {
+      match.step({}, { ex: true });
+      if (dora.action === 'script') seen.add(dora.branch);
+    }
+    expect([...seen]).toEqual(expect.arrayContaining([239, '240+3']));
+    expect(dora.stock).toBeGreaterThan(0);
   });
 
   it('darkens the court through variable 14, which his Black (50) tests', () => {
@@ -867,40 +878,50 @@ describe("DoraEmon's story (authored)", () => {
     expect((scenarioOf('dora')[1] as Battle).flags & 1).toBe(1);
   });
 
-  it('enters KO RELOAD in a duel with three stocks but still loses, unrecovered', () => {
+  it('loses the duel on an ordinary KO with three stocks: no KO RELOAD (72/74) for the player', () => {
+    // Authored (HPA-858): player-controlled outside B.R., KO RELOAD's stock
+    // test (PC 775) is bypassed; global 3 at 10 still takes the KO NORMAL
+    // CPU chain (70) that scores the story slot.
     const result = lose(1, 4);
-    expect(result.path).toContain('72');
-    expect(result).toMatchObject({ winner: 'opponent', stock: 4 });
-    expect(result.hp).toBeLessThanOrEqual(1);
+    expect(result.path).not.toContain('72');
+    expect(result.path).not.toContain('74');
+    expect(result).toMatchObject({
+      g3: 10,
+      atFight: 'idle',
+      winner: 'opponent',
+      hp: 0,
+      stock: 4,
+    });
   });
 
   // Steps 5, 11, 13, 15, 19 and 21 give his KO to the last fighter whose box
   // met his (KO scorer 0); KO'd from FIGHT, before any has, nobody scores it.
-  it('revives through KO RELOAD in a brawl when nobody has caught him, spending three stocks for 600 life', () => {
-    const result = lose(5, 4, (m) => m.fighters[0].hp >= 600);
-    // The KO marks him downed even though KO RELOAD restores his life before
-    // the run loop can read the 0.
+  it('loses the brawl to an ordinary KO with three stocks: no KO RELOAD (72/74) for the player', () => {
+    // KO'd from FIGHT before any box has met his: nobody scores the KO.
+    const result = lose(5, 4, (m) => !!m.winner);
     expect(result).toMatchObject({
       g3: 0,
       atFight: 'idle',
-      stock: 1,
-      hp: 600,
+      winner: 'opponent',
+      hp: 0,
+      stock: 4,
       downed: true,
     });
-    const reload = result.path.indexOf('72');
-    expect(reload).toBeGreaterThanOrEqual(0);
-    expect(result.path.indexOf('74')).toBeGreaterThan(reload);
+    expect(result.path).not.toContain('72');
+    expect(result.path).not.toContain('74');
   });
 
   it("loses a brawl when KO'd with fewer than three stocks before anyone has caught him", () => {
     expect(lose(5, 0).winner).toBe('opponent');
   });
 
-  it('keeps a brawl running through KO RELOAD even after an enemy scores 100', () => {
-    const result = lose(5, 4, (m) => m.fighters[0].stock < 4, true);
-    expect(result).toMatchObject({ winner: null, stock: 1 });
-    expect(result.path).toContain('72');
-    expect(result.path).toContain('74');
+  it('ends the brawl on the ordinary KO even though an enemy has caught him for 100 points', () => {
+    const result = lose(5, 4, (m) => !!m.winner, true);
+    // The catch scores the KO (scorer 0) as before; only the reload is gone.
+    expect(result.winner).toBe('opponent');
+    expect(result.stock).toBe(4);
+    expect(result.path).not.toContain('72');
+    expect(result.path).not.toContain('74');
     expect(Math.max(...result.points.slice(1))).toBeGreaterThanOrEqual(100);
   });
 
@@ -922,5 +943,204 @@ describe("DoraEmon's story (authored)", () => {
       atFight: 'idle',
       winner: 'opponent',
     });
+  });
+});
+
+describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
+  // A forced KO queues the same lose action a hit's KO does (team.test.ts);
+  // `caught` stays unset, so nobody scores it.
+  const knockOut = (match: Match, f: Fighter) => {
+    f.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(f);
+  };
+  // Settle an intro match past FIGHT; a free match (practice) has no round
+  // flow, so the cap bounds it there.
+  const settle = (match: Match) => {
+    for (let t = 0; t < 900 && match.roundTicks <= match.fightTick; t++)
+      match.step({});
+  };
+  const driveCpus = (match: Match, except: number, input: Input) => {
+    for (const [i, vm] of match.cpus.entries())
+      if (i !== except && vm) vm.input = () => input;
+  };
+
+  it.each([
+    ['practice', () => new Match('practice', false, 3, ['dora', 'ryuko'])],
+    [
+      'VS single',
+      () => new Match('cpu', true, 0, ['dora', 'ryuko'], 'court', true),
+    ],
+    [
+      'TEAM VS',
+      () =>
+        Match.team(
+          [
+            ['dora', 'ryuko'],
+            ['kiki', 'zoma'],
+          ],
+          'court',
+        ),
+    ],
+    [
+      'his authored story',
+      () => Match.story('dora', scenarioOf('dora')[1] as Battle),
+    ],
+  ] as const)(
+    'denies %s 1P DoraEmon his EN charge and lets an ordinary KO stand',
+    (_mode, build) => {
+      const match = build();
+      const [dora, other] = match.fighters;
+      driveCpus(match, 0, {});
+      settle(match);
+      dora.stock = 0;
+      const seen = new Set<unknown>();
+      for (let t = 0; t < 200; t++) {
+        match.step({ ex: true });
+        if (dora.action === 'script') seen.add(dora.branch);
+      }
+      // Neither charge action ever enters: the press (239), the held
+      // entry's window (240+3) or the CPU's EN command (421).
+      expect(
+        [...seen].some((b) => b === 239 || b === '240+3' || b === 421),
+      ).toBe(false);
+      expect([dora.stock, dora.power]).toEqual([0, 0]);
+      // Ordinary KO: no KO RELOAD (72), no KR Down (74).
+      other.x = dora.x + 90;
+      driveCpus(match, 0, { punch: true });
+      knockOut(match, dora);
+      const path: unknown[] = [];
+      for (let t = 0; t < 2000 && match.winner === null; t++) {
+        match.step({}, { punch: true });
+        const action = now(dora);
+        if (path.at(-1) !== action) path.push(action);
+      }
+      expect(match.winner).toBe('opponent');
+      expect([dora.hp, dora.downed]).toEqual([0, true]);
+      expect(path.some((a) => a === 72 || a === 74)).toBe(false);
+    },
+  );
+
+  it('keeps 1P DoraEmon’s KO RELOAD in his B.R. ANOTHER while E stays dead', () => {
+    const battle = bossBrAnotherStory('dora').find(
+      (s): s is Battle => s.type === 1,
+    )!;
+    const match = Match.story('dora', battle, 0, undefined, undefined, true);
+    expect(match.br).toBe(true);
+    const [dora] = match.fighters;
+    driveCpus(match, 0, {});
+    while (match.roundTicks <= match.fightTick) match.step({});
+    dora.stock = 4;
+    const seen = new Set<unknown>();
+    for (let t = 0; t < 200; t++) {
+      match.step({ ex: true });
+      if (dora.action === 'script') seen.add(dora.branch);
+    }
+    expect([...seen].some((b) => b === 239 || b === '240+3' || b === 421)).toBe(
+      false,
+    );
+    expect(dora.stock).toBe(4);
+    // A KO reloads: the stock test (KO RELOAD, 72) stands in B.R.
+    knockOut(match, dora);
+    const path: unknown[] = [];
+    for (let t = 0; t < 2000 && dora.hp < lifeOf('dora'); t++) {
+      match.step({});
+      const action = now(dora);
+      if (path.at(-1) !== action) path.push(action);
+    }
+    const reload = path.indexOf(72);
+    expect(reload).toBeGreaterThanOrEqual(0);
+    expect(path.indexOf(74)).toBeGreaterThan(reload);
+    expect([dora.hp, dora.stock, dora.downed, match.winner]).toEqual([
+      lifeOf('dora'),
+      1,
+      true,
+      null,
+    ]);
+  });
+
+  it('blocks the real CPU’s EN command (421) in B.R. — seed 4 — and the CPU still attacks', () => {
+    // The Vs. CPU table run (seed 4) enters 421 outside B.R.; the same
+    // table on a B.R. stage 3 never does, and no charge EN accrues in a
+    // contact-free window. His wave comes in through the desperation watch,
+    // as in team.test.ts.
+    const match = Match.story(
+      'kiki',
+      brAnotherStages('kiki').stage3,
+      4,
+      undefined,
+      undefined,
+      true,
+    );
+    const dora = match.fighters[4];
+    expect(dora.who).toBe('dora');
+    driveCpus(match, 4, {});
+    while (match.roundTicks <= match.fightTick) match.step();
+    const [, alpha, shinz, zenka] = match.fighters;
+    for (const [watched, next] of [
+      [alpha, shinz],
+      [shinz, zenka],
+      [zenka, dora],
+    ] as const) {
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present).toBe(true);
+      watched.hp = watched.maxHp;
+    }
+    // Contact-free: the present fighters idle far away, so any EN could
+    // only come from a charge.
+    for (const f of match.fighters)
+      if (f !== dora && f.present) f.x = dora.x + 1200;
+    dora.stock = 0;
+    const seen = new Set<unknown>();
+    for (let t = 0; t < 400; t++) {
+      match.step();
+      if (dora.action === 'script') seen.add(dora.branch);
+    }
+    // No charge action ever enters, and the window's EN stays at the
+    // attacks' script rewards — a live CPU EN (421) loops 4 power a tick
+    // (PCs on 421) and would blow far past one stock's 90.
+    expect([...seen].some((b) => b === 239 || b === '240+3' || b === 421)).toBe(
+      false,
+    );
+    expect(seen.size).toBeGreaterThan(0);
+    expect(dora.power + dora.stock * perStockOf('dora')).toBeLessThan(270);
+    // The denied CPU answers the EN command itself with nothing: let his
+    // last attack run out on a blank input — a quiet point, so no attack
+    // script's EN tail smears the total — freeze the EN there, then feed
+    // his seat the CPU's own command 42 (record injects it like the
+    // table's own step would). Blocked, the command enters nothing and the
+    // total stands; a live 421 charges from idle the very tick he is free.
+    const vm = match.cpus[4]!;
+    vm.input = () => ({});
+    for (let t = 0; t < 200 && dora.action !== 'idle'; t++) match.step();
+    expect(dora.action).toBe('idle');
+    const charged = dora.power + dora.stock * perStockOf('dora');
+    vm.input = () => ({ command: 42 });
+    for (let t = 0; t < 60; t++) {
+      match.step();
+      if (dora.action === 'script') seen.add(dora.branch);
+    }
+    expect([...seen].some((b) => b === 239 || b === '240+3' || b === 421)).toBe(
+      false,
+    );
+    expect(dora.power + dora.stock * perStockOf('dora')).toBe(charged);
+  });
+
+  it('marks a B.R. ZERO battle B.R. through its story route, though DoraEmon is absent there', () => {
+    // The scene derives the flag from the route (startBattle); these seat
+    // rules read exactly that flag, so B.R. ZERO propagates it the same.
+    const story = new Story('ryuko');
+    let next = story.startOnRoute('br-zero');
+    while (next.kind === 'demo') next = story.next();
+    if (next.kind !== 'battle') throw new Error('expected a battle');
+    const match = Match.story(
+      'ryuko',
+      next.battle,
+      0,
+      undefined,
+      undefined,
+      story.route === 'br-zero' || story.route === 'br-another',
+    );
+    expect(match.br).toBe(true);
   });
 });

@@ -1275,8 +1275,17 @@ describe('BR Another stages', () => {
     }
   });
 
-  it('keeps DoraEmon’s EN charge and KO RELOAD unchanged as a stage-3 boss', () => {
-    const match = Match.story('kiki', brAnotherStages('kiki').stage3);
+  it('denies stage-3 boss DoraEmon his EN charge but keeps his KO RELOAD in a B.R. stage 3', () => {
+    // Authored (HPA-858): on a B.R. route the charge is dead for any
+    // DoraEmon seat, CPU included, while the KO RELOAD stocks stay live.
+    const match = Match.story(
+      'kiki',
+      brAnotherStages('kiki').stage3,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
     expect(match.fighters.map((f) => f.who)).toEqual([
       'kiki',
       'alpha',
@@ -1301,12 +1310,12 @@ describe('BR Another stages', () => {
     }
     dora.stock = 0;
     const seen = new Set<unknown>();
-    for (let t = 0; t < 120 && dora.stock < 3; t++) {
+    for (let t = 0; t < 120; t++) {
       match.step();
       if (dora.action === 'script') seen.add(dora.branch);
     }
-    expect([...seen].some((b) => b === 239 || b === '240+3')).toBe(true);
-    expect(dora.stock).toBeGreaterThanOrEqual(3);
+    expect([...seen].some((b) => b === 239 || b === '240+3')).toBe(false);
+    expect(dora.stock).toBe(0);
     dora.stock = 4;
     knockOut(match, dora, one);
     const path: unknown[] = [];

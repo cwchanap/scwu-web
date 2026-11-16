@@ -4411,6 +4411,18 @@ export class Match {
     // Each entry enters its stance's action, which plays from its own
     // timeline; a window passes it by that action's level.
     const index = entriesOf(f.who)[found.entry - 1][found.stance];
+    // Authored (HPA-858): DoraEmon's EN charge is disabled while he is
+    // fighter 0 — the player in every mode, TEAM VS's active 1P included —
+    // or the match runs a B.R. route (his CPU seat included): the ex press
+    // (EN up, 239), the held EN entry (240, whose charge window plays
+    // 240+3) and the CPU's EN command 42 (421) all enter nothing. His other
+    // commands and every other EN path (scripts, addPower) stand.
+    if (
+      f.who === 'dora' &&
+      (index === 239 || index === 240 || index === 421) &&
+      (this.fighters.indexOf(f) === 0 || this.br)
+    )
+      return false;
     if (!ok(LEVELS[f.who][index], index)) return false;
     this.enterSource(f, index);
     const i = this.fighters.indexOf(f);
@@ -4490,9 +4502,16 @@ export class Match {
         0,
         ko.findIndex((e) => e.t || (e.op !== 'stock' && e.op !== 'test')),
       );
+      // Authored (HPA-858): outside a B.R. route, a player-controlled
+      // DoraEmon (fighter 0) skips KO RELOAD's stock test (PC 775, action
+      // 72) and takes the ordinary KO; in B.R. he reloads as player, enemy
+      // or ally, and every other fighter's checks stand.
+      const plainKo = !this.br && this.fighters.indexOf(f) === 0;
       const check = checks.find((e) =>
         e.op === 'stock'
-          ? e.atLeast && f.stock >= e.min
+          ? e.atLeast &&
+            f.stock >= e.min &&
+            !(plainKo && f.who === 'dora' && e.target === 72)
           : e.op === 'test' && this.passes(f, f, e),
       );
       const again = check?.op === 'test' && check.selector === 0x43;
