@@ -5,6 +5,7 @@ import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import {
   battlePalettes,
+  BOSSES,
   CharacterSelect,
   Continue,
   CONTINUE,
@@ -834,6 +835,64 @@ describe('mode select (authored, HPA-765)', () => {
     expect(mode.tap(4, 394)).toBe(false); // left of the first
     expect(mode.tap(956, 394)).toBe(false); // right of the last
     expect([mode.stage, mode.done]).toEqual([0, null]);
+  });
+});
+
+// HPA-858: the four bosses' selector — their first sign picks the mode
+// outright (STORY, or the generated B.R. ANOTHER), with no route step.
+describe('mode select (authored, HPA-858 bosses)', () => {
+  // A finished story select whose pick is the boss, for the menu to sit
+  // over.
+  const bossPicked = (who: (typeof BOSSES)[number]) => {
+    const background = new CharacterSelect(undefined, true);
+    background.done = [who, who];
+    return background;
+  };
+  const signs = (mode: ModeSelect) =>
+    mode.objects.filter((o) => o.alive && o.frame && o.container !== 'kgt');
+  // A fresh press: the tick before lets any held keys — and with them the
+  // latch — go.
+  const press = (mode: ModeSelect, input: Input) => run(mode, [{}, input]);
+
+  it('confirms a boss’s first sign straight to STORY, with no route step', () => {
+    for (const who of BOSSES) {
+      const mode = new ModeSelect(bossPicked(who));
+      mode.step({ punch: true }); // the pick's own button: the arm tick
+      mode.choice = 0;
+      press(mode, { punch: true });
+      expect([mode.stage, mode.done]).toEqual([0, 'story']);
+      // The mode boards stay up; no route boards opened.
+      expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
+    }
+  });
+
+  it('confirms a boss’s B.R. sign straight to br-another, by key and by tap', () => {
+    for (const who of BOSSES) {
+      const mode = new ModeSelect(bossPicked(who));
+      mode.step();
+      mode.choice = 1;
+      press(mode, { punch: true });
+      expect([mode.stage, mode.done]).toEqual([0, 'br-another']);
+      // A tap on the right board lands the same pick on the first step.
+      const tapped = new ModeSelect(bossPicked(who));
+      tapped.step();
+      expect(tapped.tap(720, 394)).toBe(true);
+      expect([tapped.stage, tapped.done]).toEqual([0, 'br-another']);
+    }
+  });
+
+  it('backs a confirmed boss pick out to the mode step, the pick kept', () => {
+    const mode = new ModeSelect(bossPicked('shinz'));
+    mode.step();
+    mode.choice = 1;
+    press(mode, { punch: true });
+    expect(mode.done).toBe('br-another');
+    mode.back();
+    expect([mode.stage, mode.done, mode.choice]).toEqual([0, null, 1]);
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
+    // The same sign confirms again.
+    press(mode, { punch: true });
+    expect(mode.done).toBe('br-another');
   });
 });
 

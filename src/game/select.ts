@@ -871,8 +871,12 @@ let modePlace = 0;
 const routePlace = [0, 0];
 
 export class ModeSelect extends Screen {
-  done: Route | null = null;
-  // 0 picks STORY or B.R., 1 that mode's route.
+  // The route a route sign picked (authored, HPA-765) — or, for a boss
+  // (authored, HPA-858), the mode its first sign picked: bosses have no
+  // route step, and B.R. is their generated ANOTHER route.
+  done: Route | 'story' | null = null;
+  // 0 picks STORY or B.R., 1 that mode's route. A boss confirms on the
+  // first sign, so stage never leaves 0.
   stage = 0;
   // The fighter the finished select took.
   readonly who: Who;
@@ -911,7 +915,8 @@ export class ModeSelect extends Screen {
     this.place();
   }
 
-  // Escape on the route step comes back here, the picks kept.
+  // Escape over a confirmed pick (or a route step) comes back here, the
+  // picks kept.
   back() {
     this.stage = 0;
     this.choice = modePlace;
@@ -923,6 +928,13 @@ export class ModeSelect extends Screen {
 
   private confirm() {
     this.latch = true;
+    // A boss's first sign confirms the mode outright (authored, HPA-858):
+    // STORY, or B.R.'s generated ANOTHER route.
+    if (BOSSES.includes(this.who)) {
+      modePlace = this.choice;
+      this.done = this.choice ? 'br-another' : 'story';
+      return;
+    }
     if (!this.stage) {
       modePlace = this.choice;
       this.stage = 1;

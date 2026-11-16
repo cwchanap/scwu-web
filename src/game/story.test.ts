@@ -169,6 +169,31 @@ describe('story runner', () => {
     expect(story.retry()).toEqual(battle);
   });
 
+  it('keeps the mode-select predicate to its 34 regular fighters', () => {
+    // The bosses (30, 32, 33, 45) join the selector through BOSSES in
+    // scene.ts, never through this predicate, whose callers build the
+    // source-specific B.R. stories (authored, HPA-858).
+    expect(
+      (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+        opensOnModeSelect(who),
+      ),
+    ).toHaveLength(34);
+  });
+
+  it('records the active route: null on an ordinary story, a picked sign route, or a constructor route', () => {
+    const story = new Story('ryuko');
+    expect(story.route).toBeNull();
+    // The route a route sign picked stays on the story (HPA-858), which
+    // marks the battles it starts B.R.
+    story.startOnRoute('br-zero');
+    expect(story.route).toBe('br-zero');
+    // The bosses' generated B.R. ANOTHER route comes owned (HPA-858).
+    const steps = scenarioOf('ryuko').slice(0, 3);
+    const owned = new Story('shinz', steps, 'br-another');
+    expect(owned.route).toBe('br-another');
+    expect(owned.steps).toBe(steps);
+  });
+
   it('rejects a one-sign battle as the mode select', () => {
     const chii = scenarioOf('ryuko')[0] as Battle;
     expect(isModeSelectBattle(chii)).toBe(true);
