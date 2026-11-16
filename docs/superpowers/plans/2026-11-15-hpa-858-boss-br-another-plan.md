@@ -26,7 +26,7 @@ These resolve the blocking and open assumptions in [review #5914086465](https://
 7. **Escape:** cancel a completed but loading boss mode pick via `select.done`, even at stage 0. Keep existing stage-1/back and stage-0/character-select navigation.
 8. **E2E pragmatism:** Extend `e2e/unconfigured/mode-select.spec.ts` with boss B.R. and boss STORY cases using its existing canvas pixel probes; do not install a new browser farm. Keep macOS, Windows and iOS checks conditional and the HPA-765 mockup as a visual reference, not a screenshot baseline. CI runs Linux Chromium only on non-draft PRs; not Android.
 9. **Two separate charge actions:** Dora standard EN charge enters **239** via `{ ex: true }`; actual CPU EN command 42 enters **421** (see `dora.test.ts:777`). Gate **both** at `Match.command` when Dora is fighter 0 or the match is B.R.; test a real `CpuVM` seed-4 run, not only the mocked `ex` input.
-10. **Existing regressions:** six scene tests use SHIN-Z as a *direct-start* story and must use another non-boss excluded story such as GOLF/TTRO after bosses gain ModeSelect. One practice Dora charge test and three authored Dora story KO RELOAD tests assert old behavior and must be rewritten. Do not change CPU Dora's non-B.R. KO RELOAD assertions.
+10. **Existing regressions:** six scene tests use SHIN-Z as a _direct-start_ story and must use another non-boss excluded story such as GOLF/TTRO after bosses gain ModeSelect. One practice Dora charge test and three authored Dora story KO RELOAD tests assert old behavior and must be rewritten. Do not change CPU Dora's non-B.R. KO RELOAD assertions.
 11. **Pixel-probe timing:** HEADER is meaningful only while the selector's touch pad has eight buttons. Check its luminance **before** battle entry, account for persisted `modePlace`, and then assert 1P native HP and first stage-1 enemy 2× HP through accessible `aria-valuemax`. Never sample HEADER after the battle renders.
 
 ## Phase 1 — Boss entry, route ownership and cancellation
@@ -51,7 +51,7 @@ These resolve the blocking and open assumptions in [review #5914086465](https://
 - [ ] Make the `assemble` ally slot optional, and derive all hostility masks from the actual seat count (player + opponents only for the boss route). Pairs stay allied to their mate; all other pairs/bosses are hostile as today.
 - [ ] **Explicit donors:** use `sourceStep('ryuko', 63)` for stage 1's roles/header and `sourceStep('ryuko', 65)` for stages 2 and 3. Copy the donor `flags & 1` Continue capability. Override arena and slot/player/entry details; never mutate source steps.
 - [ ] Build stage 1: Sakura Street, three of 12 regular pairs (six fighters). Stage 2: Sakura Night, three of the four extra pairs (six fighters), with one seeded omission. Stage 3: **three other bosses**, no selected boss, in shuffled order; stage arena determined by last boss.
-- [ ] Produce `[stage1, stage2, stage3, { type: 4 }]` and make normal `Story.next` and `retry` handle it. No demos or ally; Continue should retry the *same* battle, completion returns title.
+- [ ] Produce `[stage1, stage2, stage3, { type: 4 }]` and make normal `Story.next` and `retry` handle it. No demos or ally; Continue should retry the _same_ battle, completion returns title.
 - [ ] Set optional `tough: true` on **all six stage-1 and all six stage-2 enemy slots**, none on stage 3. Keep `Slot` authored flag optional, so native exported slots are untouched.
 - [ ] Table-test all four bosses: 6/6/3 enemy counts and slot indices; no ally; stable seeded and distinct lineups; pair cohesion and symmetric hostility; correct watch/below order and arena; no own-boss appearance; donor headers and Continue flag; no mutation of source data or regular BR Another scenarios.
 
@@ -79,7 +79,7 @@ These resolve the blocking and open assumptions in [review #5914086465](https://
 - [ ] Update the old **practice 1P charge** assertion in `src/game/dora.test.ts:639–657` to verify no 239/240+3 and no charge EN. Preserve/retest CPU Dora outside B.R. with `{ ex: true }` where needed.
 - [ ] Update the **three** authored-story player-Dora KO RELOAD tests in `src/game/dora.test.ts:870–905` to assert an ordinary KO with **no 72/74**, retaining the existing source-accurate non-B.R. CPU Dora tests at `:717–770`.
 - [ ] Use **real `CpuVM` with seed 4** from `src/game/dora.test.ts:777` (already demonstrates action 421 in non-B.R.) to prove the action is **blocked in B.R.** and charge-based stocks do not accumulate. The existing stage-3 test injects `{ ex: true }` and only exercises 239, so cover both branches. Assert denied-charge CPU Dora still executes a non-charge attack within a bounded number of ticks. Keep 421 in the non-B.R. CPU regression, preserve non-charge EN rewards and other fighters.
-- [ ] Replace the existing `team.test.ts` expectation that Dora *charges* in B.R. stage 3; keep the stage-3 KO RELOAD/brawl-win expectation. Reconcile unrelated HPA-973 tests if that PR merges first.
+- [ ] Replace the existing `team.test.ts` expectation that Dora _charges_ in B.R. stage 3; keep the stage-3 KO RELOAD/brawl-win expectation. Reconcile unrelated HPA-973 tests if that PR merges first.
 
 **Checkpoint:** All Dora mode/seat cases pass and KO RELOAD remains on for every B.R. Dora role.
 
@@ -94,7 +94,7 @@ These resolve the blocking and open assumptions in [review #5914086465](https://
 
 ## Automated end-to-end acceptance criteria
 
-These checks follow the project's platform targeting without adding browser-infrastructure tasks. Platform checks that cannot run are explicitly *not verified*, rather than replaced by human sign-off.
+These checks follow the project's platform targeting without adding browser-infrastructure tasks. Platform checks that cannot run are explicitly _not verified_, rather than replaced by human sign-off.
 
 - [ ] **macOS (Chromium):** With existing Playwright, automate SINGLE → four boss selections → STORY/B.R. direct choice. Account for remembered selector mode; assert the B.R. route HEADER remains dim **only before battle transition** (`pad.count() <= 8`), then check battle HUD, boss native maximum HP and first opponent's 2× max HP. STORY starts the original boss route. Existing canvas pixel probes check active/dim sign and cursor, and page errors are absent.
 - [ ] **Windows (Edge):** When an existing Windows/Edge runner is available, automate boss selection, direct B.R. start, canvas/HUD visibility and sign/cursor appearance with a screenshot. Otherwise record **not run: no Edge runner**; no dedicated new runner is part of this ticket.
