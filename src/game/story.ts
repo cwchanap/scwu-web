@@ -142,13 +142,20 @@ const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
+  // Authored (HPA-858): the route this run is on — the picked sign route,
+  // or the bosses' generated B.R. ANOTHER — which marks the battles it
+  // starts B.R.; null on an ordinary story.
+  route: Route | null;
 
   constructor(
     readonly who: Who,
     // Authored (HPA-858): a generated step list overrides the exported
     // scenario — the bosses' B.R. ANOTHER route (br-another.ts).
     readonly steps?: readonly Step[],
-  ) {}
+    route: Route | null = null,
+  ) {
+    this.route = route;
+  }
 
   // The runner reads the 1P's life (+0xdf05) and the rounds it lost or drew
   // in the last battle (0x424e64) for its jumps.
@@ -184,8 +191,10 @@ export class Story {
   // Enter the story as if the 1P struck the route's Chii sign: the skipped
   // sign battle is step 0's, and next() reads the life it left — the 1P's
   // less its take and the Single Start's 1 — through the usual jumps, whose
-  // branches (YINAN's/AYA's and RARIO's included) stay the runner's.
+  // branches (YINAN's/AYA's and RARIO's included) stay the runner's. The
+  // route stays on the story (authored, HPA-858).
   startOnRoute(route: Route): Next {
+    this.route = route;
     this.step = 0;
     return this.next(routeLife(this.who, route), 0);
   }

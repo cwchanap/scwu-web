@@ -1893,6 +1893,9 @@ export class Match {
     // (export_stage), and KGT 13 holds it at 10 for each round's first 10
     // ticks (`step`).
     readonly globals = selected(vs ? 50 : 0),
+    // Authored (HPA-858): the story runs a B.R. route (br-zero,
+    // br-another or a generated one), which seat rules gate on.
+    readonly br = false,
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
@@ -1941,6 +1944,8 @@ export class Match {
     seed = 0,
     held?: number[],
     globals?: number[],
+    // Authored (HPA-858): whether the active story route is a B.R. one.
+    br = false,
   ) {
     return new Match(
       'story',
@@ -1952,6 +1957,7 @@ export class Match {
       battle,
       held,
       globals,
+      br,
     );
   }
 
