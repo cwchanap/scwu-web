@@ -130,6 +130,18 @@ const openArena = async (page: Page) => {
     const s = await sample({ left, right });
     return s.left.lum - s.right.lum;
   };
+  // The KGT 1P cursor bobs just above the pick's board top-centre and is
+  // the only thing drawing there — the bands sit over the dimmed select
+  // screen, sampled in one screenshot so their background difference is
+  // fixed. The side it brightens follows the pick, so a signed flip is
+  // its appearance and placement in one probe.
+  const cursorOver = async (side: 'l' | 'r') => {
+    const s = await sample({
+      l: { x: 260, y: 205, w: 80, h: 45 },
+      r: { x: 620, y: 205, w: 80, h: 45 },
+    });
+    return side === 'l' ? s.l.lum - s.r.lum : s.r.lum - s.l.lum;
+  };
 
   // A canvas tap at a 960×720 game point — the same conversion Phaser's
   // Scale.FIT applies to a real touch. The settle wait lets a pick land
@@ -249,6 +261,7 @@ const openArena = async (page: Page) => {
     sample,
     lum,
     boards,
+    cursorOver,
     tap,
     confirmRoute,
     confirmDirect,
@@ -408,6 +421,7 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
     press,
     lum,
     boards,
+    cursorOver,
     tap,
     confirmDirect,
   } = await openArena(page);
@@ -419,11 +433,12 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
   for (const key of ['d', 'd', 'd', 'd', 'd', 'd', 's', 's', 's'])
     await press(key);
   await press('g');
-  // STORY lit left over the dimmed B.R. board.
+  // STORY lit left over the dimmed B.R. board, the 1P cursor over it.
   await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
+  await expect.poll(() => cursorOver('l'), VIEW).toBeGreaterThan(5);
 
   // A tap on the B.R. sign picks and confirms it, and a boss's confirm is
   // the start itself. confirmDirect reads the header band dark before the
@@ -458,6 +473,7 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
     press,
     lum,
     boards,
+    cursorOver,
     confirmDirect,
     skipToBattle,
   } = await openArena(page);
@@ -473,17 +489,19 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
     .toBeGreaterThan(40);
 
   // Set the pick explicitly instead of trusting the fresh-page default —
-  // right to B.R., back to STORY, lit again — then Enter confirms. A
-  // boss's STORY confirm starts her story itself; skipToBattle then only
-  // skips the story's own opening demo.
+  // right to B.R., back to STORY, lit again — then Enter confirms. The
+  // cursor bob follows each flip; a boss's STORY confirm starts her story
+  // itself; skipToBattle then only skips the story's own opening demo.
   await press('d');
   await expect
     .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
     .toBeGreaterThan(30);
+  await expect.poll(() => cursorOver('r'), VIEW).toBeGreaterThan(5);
   await press('a');
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(30);
+  await expect.poll(() => cursorOver('l'), VIEW).toBeGreaterThan(5);
   // confirmDirect proves the selector left for her demo with the route
   // band never lit before skipToBattle sends its first demo-skip press —
   // a buggy route step would still be up with its band lit, and those
