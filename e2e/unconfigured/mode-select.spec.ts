@@ -184,10 +184,12 @@ const openArena = async (page: Page) => {
   // drops one that landed mid-transition — the band is never read once
   // the arena's pad shows. A story keeps the eight controls through its
   // demo, so the mode boards are the selector's trace instead: while they
-  // draw the band must stay dark, and the sample where they leave must
-  // find it dark too — a buggy route step lights the band as it replaces
-  // the boards and never leaves on its own, so only the direct exit's
-  // demo follows. Demo-skip presses wait for all of that.
+  // draw the band must stay dark — a buggy route step lights the band and
+  // holds its own boards lit over the left one's spot, so it fails the
+  // check without reaching the exit. Once the boards leave the band reads
+  // the demo's own art (a story's panels fill the top of the screen), so
+  // only their leaving proves the direct exit. Demo-skip presses wait for
+  // all of that.
   const confirmDirect = async (send: () => Promise<void>, demo: boolean) => {
     expect(await lum('h', HEADER), 'boss header before confirm').toBeLessThan(
       160,
@@ -210,9 +212,6 @@ const openArena = async (page: Page) => {
     while (Date.now() < deadline) {
       const s = await sample({ h: HEADER, l: MODE_LEFT });
       if (s.l.lum <= 170) {
-        expect(s.h.lum, 'boss header as the mode boards leave').toBeLessThan(
-          160,
-        );
         exited = true;
         break;
       }
