@@ -1051,7 +1051,7 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     },
   );
 
-  it('keeps 1P DoraEmon’s KO RELOAD in his B.R. ANOTHER while E stays dead', () => {
+  it('lets an ordinary KO stand for 1P DoraEmon in his B.R. ANOTHER while E stays dead', () => {
     const battle = bossBrAnotherStory('dora').find(
       (s): s is Battle => s.type === 1,
     )!;
@@ -1070,26 +1070,22 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       false,
     );
     expect(dora.stock).toBe(4);
-    // A KO reloads: the stock test (KO RELOAD, 72) stands in B.R.
+    // Ordinary KO: no KO RELOAD (72), no KR Down (74) — the player seat's
+    // stock test is off in every mode, B.R. included (HPA-858); CPU seats
+    // keep theirs until HPA-1035.
     knockOut(match, dora);
     const path: unknown[] = [];
-    for (let t = 0; t < 2000 && dora.hp < lifeOf('dora'); t++) {
+    for (let t = 0; t < 2000 && match.winner === null; t++) {
       match.step({});
       const action = now(dora);
       if (path.at(-1) !== action) path.push(action);
     }
-    const reload = path.indexOf(72);
-    expect(reload).toBeGreaterThanOrEqual(0);
-    expect(path.indexOf(74)).toBeGreaterThan(reload);
-    expect([dora.hp, dora.stock, dora.downed, match.winner]).toEqual([
-      lifeOf('dora'),
-      1,
-      true,
-      null,
-    ]);
+    expect(match.winner).toBe('opponent');
+    expect(path.some((a) => a === 72 || a === 74)).toBe(false);
+    expect([dora.hp, dora.stock, dora.downed]).toEqual([0, 4, true]);
   });
 
-  it('keeps the global-0 KO path (77) from reloading player DoraEmon outside B.R. only', () => {
+  it('keeps the global-0 KO path (77) from reloading player DoraEmon in any mode', () => {
     // His lose action (68) jumps on global 0 at 10 — which LIZARD's, HISO's,
     // SEAN's and G Suneo's lethal blows hold for their strike's tick —
     // straight into 77, whose own three-stock op 0x10 enters KO RELOAD (72)
@@ -1121,7 +1117,7 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       const path: unknown[] = [];
       for (
         let t = 0;
-        t < 2000 && (br ? dora.hp < lifeOf('dora') : match.winner === null);
+        t < 2000 && match.winner === null && (!br || dora.hp < lifeOf('dora'));
         t++
       ) {
         match.step({});
@@ -1136,28 +1132,26 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
         winner: match.winner,
       };
     };
-    // Outside B.R. the player's stocks buy no reload through 77 either: the
-    // jump itself still plays its ordinary fall, and he stays down.
-    const solo = run(false, true);
-    expect(solo.path).toContain(77);
-    expect(solo.path.some((a) => a === 72 || a === 74)).toBe(false);
-    expect(solo).toMatchObject({
-      hp: 0,
-      stock: 4,
-      downed: true,
-      winner: 'opponent',
-    });
-    // In B.R., and for a non-B.R. CPU, the same path still reloads him.
-    for (const [br, player] of [
-      [true, true],
-      [false, false],
-    ] as const) {
-      const kept = run(br, player);
-      const reload = kept.path.indexOf(72);
-      expect(reload).toBeGreaterThanOrEqual(0);
-      expect(kept.path.indexOf(74)).toBeGreaterThan(reload);
-      expect(kept).toMatchObject({ hp: lifeOf('dora'), stock: 1 });
+    // The player's stocks buy no reload through 77 in any mode, B.R.
+    // included: the jump itself still plays its ordinary fall, and he
+    // stays down.
+    for (const br of [false, true] as const) {
+      const solo = run(br, true);
+      expect(solo.path).toContain(77);
+      expect(solo.path.some((a) => a === 72 || a === 74)).toBe(false);
+      expect(solo).toMatchObject({
+        hp: 0,
+        stock: 4,
+        downed: true,
+        winner: 'opponent',
+      });
     }
+    // For a non-B.R. CPU the same path still reloads him.
+    const kept = run(false, false);
+    const reload = kept.path.indexOf(72);
+    expect(reload).toBeGreaterThanOrEqual(0);
+    expect(kept.path.indexOf(74)).toBeGreaterThan(reload);
+    expect(kept).toMatchObject({ hp: lifeOf('dora'), stock: 1 });
   });
 
   it('skips the CPU’s EN command (42) in B.R. — seed 4 — without stalling, and still blocks injected 42', () => {

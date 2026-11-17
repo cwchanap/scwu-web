@@ -4490,15 +4490,13 @@ export class Match {
     target.pending = { action, stop, attackerStop, power, own };
   }
 
-  // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) outside a
-  // B.R. route takes the ordinary KO, never KO RELOAD (72) — whichever of
-  // its two entries (KO Normal's check, PC 775, or the lose action's 77)
-  // the source reaches first.
+  // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) takes the
+  // ordinary KO in every mode, B.R. included, never KO RELOAD (72) —
+  // whichever of its two entries (KO Normal's check, PC 775, or the lose
+  // action's 77) the source reaches first.
   private koReloadBlocked(f: Fighter) {
     return (
-      Boolean(SEAT_GATES[f.who]?.koReload) &&
-      !this.br &&
-      this.fighters.indexOf(f) === 0
+      Boolean(SEAT_GATES[f.who]?.koReload) && this.fighters.indexOf(f) === 0
     );
   }
 
@@ -4538,12 +4536,13 @@ export class Match {
         0,
         ko.findIndex((e) => e.t || (e.op !== 'stock' && e.op !== 'test')),
       );
-      // Authored (HPA-858): outside a B.R. route, a player-controlled
-      // DoraEmon (fighter 0) skips KO RELOAD's stock test (PC 775, action
-      // 72) and takes the ordinary KO; in B.R. he reloads as player, enemy
-      // or ally, and every other fighter's checks stand. The same restriction
-      // guards the stock handler itself, because the lose action's global-0
-      // jump (68 into 77) runs its own stock test past this loop.
+      // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) skips
+      // KO RELOAD's stock test (PC 775, action 72) and takes the ordinary
+      // KO in every mode, B.R. included; a CPU DoraEmon still reloads, and
+      // every other fighter's checks stand (HPA-1035 owns switching revival
+      // off for all of them in B.R.). The same restriction guards the stock
+      // handler itself, because the lose action's global-0 jump (68 into
+      // 77) runs its own stock test past this loop.
       const plainKo = this.koReloadBlocked(f);
       const koReload = SEAT_GATES[f.who]?.koReload;
       const check = checks.find((e) =>
