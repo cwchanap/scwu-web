@@ -35,19 +35,24 @@ const VIEW = { timeout: 15_000 };
 
 // Every case opens its own fresh page — the selector's remembered mode is
 // the default STORY and the select cursor starts on Ryuko's cell — over
-// this shared boot wait, DOM signals and canvas pixel probes.
+// this shared boot wait, DOM signals and canvas pixel probes. boot()
+// re-runs the wait after a reload, which drops the session's selector
+// memory and cursor for a second boss on the same page.
 const openArena = async (page: Page) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/');
 
   const canvas = page.locator('.arena canvas');
   const menu = page.getByRole('button', { name: 'Menu' });
   const failed = page.getByText('Couldn’t enter the arena.');
-  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
-    timeout: 60_000,
-  });
-  await expect(failed).toBeHidden();
+  const boot = async () => {
+    await page.goto('/');
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 60_000,
+    });
+    await expect(failed).toBeHidden();
+  };
+  await boot();
   // While a select screen is up the pad is the eight select controls —
   // the four directions and the four palette-picking buttons (HPA-765
   // review); a battle shows the fighter's own (Ryuko has more).
@@ -127,14 +132,16 @@ const openArena = async (page: Page) => {
   };
 
   // A canvas tap at a 960×720 game point — the same conversion Phaser's
-  // Scale.FIT applies to a real touch.
-  const tap = async (gx: number, gy: number) => {
+  // Scale.FIT applies to a real touch. The settle wait lets a pick land
+  // before the next read; a confirming tap passes 0 so the caller's watch
+  // starts with no blind gap after it.
+  const tap = async (gx: number, gy: number, settle = 150) => {
     const box = (await canvas.boundingBox())!;
     await page.touchscreen.tap(
       box.x + (gx / 960) * box.width,
       box.y + (gy / 720) * box.height,
     );
-    await page.waitForTimeout(150);
+    if (settle) await page.waitForTimeout(settle);
   };
 
   // A route-confirming key or tap must leave the selector on its own,
@@ -156,6 +163,52 @@ const openArena = async (page: Page) => {
         timeout: 15_000,
       })
       .toBeGreaterThan(25);
+  };
+  // A boss's confirm starts the story or generated route itself, so the
+  // route step's small header sign must never light. The band is read
+  // dark before the confirm and then sampled with no blind gap after it.
+  // A route has no demo: the pad stops being the eight select controls
+  // only when the battle renders, and the pad re-check after each sample
+  // drops one that landed mid-transition — the band is never read once
+  // the arena's pad shows. A story keeps the eight controls through its
+  // demo, so the mode boards are the selector's trace instead: while they
+  // draw the band must stay dark, and the sample where they leave must
+  // find it dark too — a buggy route step lights the band as it replaces
+  // the boards and never leaves on its own, so only the direct exit's
+  // demo follows. Demo-skip presses wait for all of that.
+  const confirmDirect = async (send: () => Promise<void>, demo: boolean) => {
+    expect(await lum('h', HEADER), 'boss header before confirm').toBeLessThan(
+      160,
+    );
+    await send();
+    const deadline = Date.now() + 120_000;
+    if (!demo) {
+      while ((await pad.count()) <= 8 && Date.now() < deadline) {
+        const header = await lum('h', HEADER);
+        if ((await pad.count()) > 8) break;
+        expect(header, 'boss header while selector visible').toBeLessThan(160);
+        await page.waitForTimeout(150);
+      }
+      await expect
+        .poll(() => pad.count(), { timeout: 30_000 })
+        .toBeGreaterThan(8);
+      return;
+    }
+    let exited = false;
+    while (Date.now() < deadline) {
+      const s = await sample({ h: HEADER, l: MODE_LEFT });
+      if (s.l.lum <= 170) {
+        expect(s.h.lum, 'boss header as the mode boards leave').toBeLessThan(
+          160,
+        );
+        exited = true;
+        break;
+      }
+      expect(s.h.lum, 'boss header while the mode boards draw').toBeLessThan(
+        160,
+      );
+    }
+    expect(exited, 'mode boards leave after a boss STORY confirm').toBe(true);
   };
   // A route's opening demo skips on a fresh button once armed; keep
   // pressing until the battle's own pad shows (an early press queueing
@@ -186,6 +239,7 @@ const openArena = async (page: Page) => {
 
   return {
     errors,
+    boot,
     menu,
     pad,
     player,
@@ -197,6 +251,7 @@ const openArena = async (page: Page) => {
     boards,
     tap,
     confirmRoute,
+    confirmDirect,
     skipToBattle,
     backToModeSelect,
   };
@@ -345,8 +400,17 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
   page,
 }) => {
   test.setTimeout(300_000);
-  const { errors, pad, player, opponent, health, press, lum, boards, tap } =
-    await openArena(page);
+  const {
+    errors,
+    player,
+    opponent,
+    health,
+    press,
+    lum,
+    boards,
+    tap,
+    confirmDirect,
+  } = await openArena(page);
 
   // Title → SINGLE → the grid: six rights and three downs put the cursor
   // on ZENKA (cell 6,3), whose pick opens the selector like any fighter's.
@@ -362,20 +426,12 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
     .toBeGreaterThan(40);
 
   // A tap on the B.R. sign picks and confirms it, and a boss's confirm is
-  // the start itself. Watch the header band only while the select pad is
-  // still the eight controls — it must never light (no route step) — and
-  // stop sampling the moment the battle pad renders, the region then
-  // being the arena's. The pad check after each sample absorbs a
-  // transition landing mid-screenshot.
-  await tap(720, 300);
-  const deadline = Date.now() + 120_000;
-  while ((await pad.count()) <= 8 && Date.now() < deadline) {
-    const header = await lum('h', HEADER);
-    if ((await pad.count()) > 8) break;
-    expect(header, 'boss B.R. header while selector visible').toBeLessThan(160);
-    await page.waitForTimeout(150);
-  }
-  await expect.poll(() => pad.count(), { timeout: 30_000 }).toBeGreaterThan(8);
+  // the start itself. confirmDirect reads the header band dark before the
+  // tap and resumes sampling with no settle gap, so a route step could
+  // not appear and leave unobserved in the old 150 ms blind window; the
+  // band is sampled only while the select pad is still the eight
+  // controls, never the arena's.
+  await confirmDirect(() => tap(720, 300, 0), false);
 
   // The route's stage 1 seats ZENKA native (480) over the drawn pair's
   // first fighter KIKI at twice her native 490 — 980 — and the opener
@@ -394,8 +450,17 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
   page,
 }) => {
   test.setTimeout(300_000);
-  const { errors, player, opponent, health, press, lum, boards, skipToBattle } =
-    await openArena(page);
+  const {
+    errors,
+    player,
+    opponent,
+    health,
+    press,
+    lum,
+    boards,
+    confirmDirect,
+    skipToBattle,
+  } = await openArena(page);
 
   // Title → SINGLE → ALPHA (cell 0,4): four downs, then her pick.
   await press('g');
@@ -419,7 +484,11 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(30);
-  await press('Enter');
+  // confirmDirect proves the selector left for her demo with the route
+  // band never lit before skipToBattle sends its first demo-skip press —
+  // a buggy route step would still be up with its band lit, and those
+  // presses would confirm its default route into the same duel.
+  await confirmDirect(() => press('Enter'), true);
   await skipToBattle();
 
   // Her own story opens on YO at native 480 — the boss route would seat
@@ -433,11 +502,26 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
   expect(errors).toEqual([]);
 });
 
-test('bosses: SHIN-Z and DoraEmon reach the same first-step signs', async ({
+// The other two bosses confirm like the first pair — SHIN-Z straight into
+// his generated route, DoraEmon into his own story — so all four take an
+// automated direct choice, each to its expected battle HUD.
+test('bosses: SHIN-Z starts B.R. straight off, DoraEmon his own story', async ({
   page,
 }) => {
-  test.setTimeout(120_000);
-  const { errors, press, lum, boards } = await openArena(page);
+  test.setTimeout(300_000);
+  const {
+    errors,
+    boot,
+    player,
+    opponent,
+    health,
+    press,
+    lum,
+    boards,
+    tap,
+    confirmDirect,
+    skipToBattle,
+  } = await openArena(page);
 
   // Title → SINGLE → SHIN-Z (cell 1,4): one right, four downs, pick.
   await press('g');
@@ -450,16 +534,53 @@ test('bosses: SHIN-Z and DoraEmon reach the same first-step signs', async ({
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
 
-  // Escape back to the select screen, proven by the next pick landing:
-  // DoraEmon sits four rights and one down of SHIN-Z's remembered cell,
-  // and a stray key in a still-open selector would confirm a mode and
-  // close it instead of reopening these boards.
-  await press('Escape');
-  for (const key of ['d', 'd', 'd', 'd', 's']) await press(key);
+  // B.R. confirmed straight to the route's stage 1: SHIN-Z native (800)
+  // over the drawn pair's first fighter feng at twice her native 470 —
+  // 940 — and the donor header's time 0 runs untimed.
+  await confirmDirect(() => tap(720, 300, 0), false);
+  await expect(player).toBeVisible();
+  await expect(opponent).toBeVisible();
+  await expect(player).toHaveAttribute('aria-valuemax', '800');
+  await expect(opponent).toHaveAttribute('aria-valuemax', '940', {
+    timeout: 30_000,
+  });
+  await expect(health).toContainText('Time: Unlimited');
+
+  // DoraEmon on a fresh session — the reload drops the first leg's
+  // selector memory and cursor with the page load. Title → SINGLE →
+  // his cell (5,5): five rights, five downs, pick.
+  await boot();
+  await press('g');
+  await press('g');
+  for (const key of ['d', 'd', 'd', 'd', 'd', 's', 's', 's', 's', 's'])
+    await press(key);
   await press('g');
   await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
   await expect
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
+
+  // Set the pick explicitly instead of trusting the fresh-page default —
+  // right to B.R., back to STORY, lit again — then Enter confirms.
+  await press('d');
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await press('a');
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
+
+  // STORY confirmed straight to his story's opening demo — the selector
+  // proven gone before the demo-skip presses — and his own story opens
+  // on GIANT at native 550 over DoraEmon's native 600, timed, where a
+  // boss B.R. stage would seat doubles and read Unlimited.
+  await confirmDirect(() => press('Enter'), true);
+  await skipToBattle();
+  await expect(player).toHaveAttribute('aria-valuemax', '600');
+  await expect(opponent).toHaveAttribute('aria-valuemax', '550', {
+    timeout: 30_000,
+  });
+  await expect(health).toContainText(/Time: \d/);
   expect(errors).toEqual([]);
 });
