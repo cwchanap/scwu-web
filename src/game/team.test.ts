@@ -1347,7 +1347,7 @@ describe('boss B.R. ANOTHER', () => {
 
   it('runs Story over exactly three battles then the title, and a continue replays the very battle it lost', () => {
     for (const who of BOSSES) {
-      const story = new Story(who, bossBrAnotherStory(who));
+      const story = new Story(who, 'boss-br');
       const stages: number[] = [];
       for (
         let next = story.next();
@@ -1358,7 +1358,7 @@ describe('boss B.R. ANOTHER', () => {
         stages.push(next.battle.stage);
       }
       expect(stages, who).toEqual([9, 3, battlesOf(who)[2]!.stage]);
-      const loser = new Story(who, bossBrAnotherStory(who));
+      const loser = new Story(who, 'boss-br');
       const lost = loser.next();
       if (lost.kind !== 'battle') throw new Error(lost.kind);
       const again = loser.retry();
@@ -1567,5 +1567,21 @@ describe('boss B.R. ANOTHER', () => {
       'regular B.R.',
       Match.story('masa', brAnotherStages('masa').stage2!),
     );
+  });
+
+  it('derives enemy cheat HP from the seat base rather than compounding on repeat cheatSeat calls', () => {
+    const match = Match.story('zenka', battlesOf('zenka')[0]!);
+    match.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 3,
+    });
+    const enemy = match.fighters[1]!;
+    expect(enemy.maxHp).toBe(6 * lifeOf(enemy.who));
+    (match as unknown as { cheatSeat(f: Fighter, i: number): void }).cheatSeat(
+      enemy,
+      1,
+    );
+    expect(enemy.maxHp).toBe(6 * lifeOf(enemy.who));
   });
 });

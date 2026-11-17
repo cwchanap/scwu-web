@@ -33,11 +33,17 @@ const STAGE_TWO_PAIRS: readonly (readonly [number, number])[] = [
   [26, 27],
 ];
 const BOSS_SEATS: readonly number[] = BOSSES.map((who) => ROSTER.indexOf(who));
-const BOSS_ARENAS: Record<number, number> = {
-  30: 12,
-  32: 14,
-  33: 15,
-  45: 18,
+const BOSS_ARENAS: Record<(typeof BOSSES)[number], number> = {
+  zenka: 12,
+  alpha: 14,
+  shinz: 15,
+  dora: 18,
+};
+const bossArena = (seat: number): number => {
+  const who = ROSTER[seat];
+  if (who && who in BOSS_ARENAS)
+    return BOSS_ARENAS[who as (typeof BOSSES)[number]];
+  throw new Error(`No boss arena for seat ${seat}`);
 };
 
 const FOLDED_START = 44;
@@ -86,7 +92,7 @@ const assemble = (
         player,
         enemies,
         watch: n - 1,
-        x: 450,
+        x: i % 2 === 0 ? 850 : 450,
         below: desperationOf(ROSTER[players[n - 2]!]!),
       };
     return {
@@ -139,7 +145,7 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     finale,
     bosses,
     false,
-    BOSS_ARENAS[bosses.at(-1)!],
+    bossArena(bosses.at(-1)!),
     ally,
   );
   return { stage1, stage2, stage3 };
@@ -179,7 +185,7 @@ export const bossBrAnotherStory = (who: Who): readonly Step[] => {
     finale,
     bosses,
     false,
-    BOSS_ARENAS[bosses.at(-1)!],
+    bossArena(bosses.at(-1)!),
   );
   for (const battle of [stage1, stage2])
     for (const slot of battle.slots) slot!.tough = true;

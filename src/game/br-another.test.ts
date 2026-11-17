@@ -654,11 +654,7 @@ describe('boss B.R. ANOTHER route', () => {
         expect(
           battle.slots.map((s) => s!.x),
           who,
-        ).toEqual(
-          players.map((_, i) =>
-            i === players.length - 1 ? 450 : i % 2 === 0 ? 850 : 450,
-          ),
-        );
+        ).toEqual(players.map((_, i) => (i % 2 === 0 ? 850 : 450)));
       }
   });
 
