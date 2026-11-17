@@ -194,9 +194,9 @@ const openArena = async (page: Page) => {
     expect(await lum('h', HEADER), 'boss header before confirm').toBeLessThan(
       160,
     );
-    await send();
     const deadline = Date.now() + 120_000;
     if (!demo) {
+      await send();
       while ((await pad.count()) <= 8 && Date.now() < deadline) {
         const header = await lum('h', HEADER);
         if ((await pad.count()) > 8) break;
@@ -208,18 +208,36 @@ const openArena = async (page: Page) => {
         .toBeGreaterThan(8);
       return;
     }
-    let exited = false;
-    while (Date.now() < deadline) {
-      const s = await sample({ h: HEADER, l: MODE_LEFT });
-      if (s.l.lum <= 170) {
-        exited = true;
-        break;
+    let demoLoaded = false;
+    const onResponse = (res: { url(): string; ok(): boolean }) => {
+      if (res.url().includes('demo-3.bin') && res.ok()) demoLoaded = true;
+    };
+    page.on('response', onResponse);
+    try {
+      await send();
+      let exited = false;
+      while (Date.now() < deadline) {
+        if (demoLoaded) {
+          exited = true;
+          break;
+        }
+        const s = await sample({ h: HEADER, l: MODE_LEFT });
+        if (demoLoaded || s.l.lum <= 170) {
+          exited = true;
+          break;
+        }
+        expect(s.h.lum, 'boss header while the mode boards draw').toBeLessThan(
+          160,
+        );
+        await page.waitForTimeout(150);
       }
-      expect(s.h.lum, 'boss header while the mode boards draw').toBeLessThan(
-        160,
-      );
+      expect(exited, 'mode boards leave after a boss STORY confirm').toBe(true);
+      await expect
+        .poll(() => lum('l', MODE_LEFT), VIEW)
+        .toBeLessThanOrEqual(170);
+    } finally {
+      page.off('response', onResponse);
     }
-    expect(exited, 'mode boards leave after a boss STORY confirm').toBe(true);
   };
   // A route's opening demo skips on a fresh button once armed; keep
   // pressing until the battle's own pad shows (an early press queueing

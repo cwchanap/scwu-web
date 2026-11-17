@@ -1605,10 +1605,10 @@ describe('mode select (HPA-858 bosses)', () => {
       mode.done = 'story';
       stepSelect(view);
       const story = view.story as Story;
-      // The fighter's default story: no generated steps, no route.
+      // The fighter's default story: no route.
       expect(story.who).toBe(who);
-      expect(story.steps).toBeUndefined();
       expect(story.route).toBeNull();
+      expect(story.br).toBe(false);
       // All four open on their own demo 3.
       expect(story.step).toBe(0);
       await vi.waitFor(() => expect(completes).toHaveLength(1));
@@ -1625,11 +1625,11 @@ describe('mode select (HPA-858 bosses)', () => {
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true; // the sign pack and stage are resident
     const mode = openBossPick(view, 'shinz');
-    mode.done = 'br-another';
+    mode.done = 'boss-br';
     stepSelect(view);
     const story = view.story as Story;
-    expect(story.route).toBe('br-another');
-    expect(story.steps).toEqual(bossBrAnotherStory('shinz'));
+    expect(story.route).toBe('boss-br');
+    expect(story.br).toBe(true);
     // The generated route's own first battle starts directly: no
     // routeLife take (the generated path has no Chii-sign jumps) and no
     // ordinary story runner call.
@@ -1640,7 +1640,7 @@ describe('mode select (HPA-858 bosses)', () => {
     // six enemies.
     expect(view.select).toBeNull();
     expect(scene.match.br).toBe(true);
-    expect(scene.match.battle).toBe(story.steps![0]);
+    expect(scene.match.battle).toEqual(bossBrAnotherStory('shinz')[0]);
     expect(scene.match.stage).toBe('sakura');
     expect(scene.match.fighters[0].who).toBe('shinz');
     expect(scene.match.fighters).toHaveLength(7);
@@ -1703,26 +1703,56 @@ describe('mode select (HPA-858 bosses)', () => {
     expect(scene.match.br).toBe(false);
   });
 
-  it('Escape over a stage-0 boss confirmation cancels the pending battle load', async () => {
+  it('Escape over a stage-0 boss confirmation cancels the pending battle load and restores the cheated mark', async () => {
     vi.stubGlobal('HTMLElement', class {});
-    const { scene, view, finishLoad } = boot();
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+
     const mode = openBossPick(view, 'shinz');
-    mode.done = 'br-another';
+    mode.done = 'boss-br';
     stepSelect(view);
     // The generated battle's stage and fighters load while the selector
     // stays up.
     expect(view.loading).toBe(true);
     expect(view.select).toBe(mode);
     esc(view);
-    // The cancelled pick steps back to the mode sign, still at stage 0.
+    // The cancelled pick steps back to the mode sign, still at stage 0,
+    // and keeps the previous run's cheated mark since no new run started.
     expect(view.loading).toBe(false);
     expect(view.select).toBe(mode);
     expect(mode.stage).toBe(0);
     expect(mode.done).toBeNull();
+    expect(statuses.at(-1)?.cheated).toBe(true);
     // The load lands cancelled: no battle starts, the pick is not replayed.
     finishLoad();
     expect(view.select).toBe(mode);
     expect(view.wanted).toBeUndefined();
     expect(scene.match.mode).toBe('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+  });
+
+  it('Escape over a regular route load restores the cheated mark too', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+
+    const mode = openBossPick(view, 'ryuko');
+    mode.stage = 1;
+    mode.done = 'br-zero';
+    stepSelect(view);
+    expect(view.loading).toBe(true);
+    esc(view);
+    expect(view.loading).toBe(false);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    finishLoad();
+    expect(statuses.at(-1)?.cheated).toBe(true);
   });
 });

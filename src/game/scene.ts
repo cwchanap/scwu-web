@@ -15,7 +15,6 @@ import selectData from './generated/select.json';
 import t2 from './generated/t2.json';
 import {
   battlePalettes,
-  BOSSES,
   CharacterSelect,
   Continue,
   ModeSelect,
@@ -25,9 +24,8 @@ import {
   TITLE,
 } from './select';
 import type { Demo, SelectObject } from './select';
-import { opensOnModeSelect, routeLife, Story } from './story';
+import { hasModeSelect, routeLife, Story } from './story';
 import type { Battle, Next } from './story';
-import { bossBrAnotherStory } from './br-another';
 import {
   createHud,
   depthOf,
@@ -273,8 +271,10 @@ export class TrainingScene extends Phaser.Scene {
   // start or a newer request supersedes it — `wanted`'s twin for screens.
   private demoRequest?: object;
   // The load request started by ModeSelect's route confirmation, so Escape
-  // cancels only the route's own in-flight load.
+  // cancels only the route's own in-flight load, restoring the previous
+  // run's cheated mark if no new run began.
   private routeLoad?: object;
+  private cheatedBeforeRoute?: boolean;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -391,8 +391,13 @@ export class TrainingScene extends Phaser.Scene {
           this.wanted = undefined;
           this.demoRequest = undefined;
           this.loading = false;
+          if (this.cheatedBeforeRoute !== undefined) {
+            this.runCheated = this.cheatedBeforeRoute;
+            this.report();
+          }
         }
         this.routeLoad = undefined;
+        this.cheatedBeforeRoute = undefined;
       } else if (this.select.stage === 1) {
         if (!this.loading) {
           this.select.back();
@@ -554,6 +559,7 @@ export class TrainingScene extends Phaser.Scene {
     this.wanted = undefined;
     this.demoRequest = undefined;
     this.routeLoad = undefined;
+    this.cheatedBeforeRoute = undefined;
     this.loading = false;
     this.report();
   }
@@ -600,23 +606,24 @@ export class TrainingScene extends Phaser.Scene {
     // story, B.R. the generated route a new Story owns, whose first step
     // is a plain battle with no Chii-sign jumps to feed.
     if (select instanceof ModeSelect) {
-      const { who } = select;
-      const { done } = select;
+      const { who, done } = select;
+      const cheated = this.runCheated;
       this.runCheated = false;
       this.storyHeld = [...select.background.drawn];
       this.teams = null;
       this.routeLoad = undefined;
-      this.story = new Story(who);
-      if (done === 'br-another' && BOSSES.includes(who)) {
-        this.story = new Story(who, bossBrAnotherStory(who), 'br-another');
-        this.runStory(this.story.next());
-      } else if (done === 'story') {
+      this.cheatedBeforeRoute = undefined;
+      this.story = new Story(who, done === 'boss-br' ? 'boss-br' : null);
+      if (done === 'boss-br' || done === 'story') {
         this.runStory(this.story.next());
       } else {
         [this.storyLife, this.storyLost] = [routeLife(who, done), 0];
         this.runStory(this.story.startOnRoute(done));
       }
-      if (this.loading) this.routeLoad = this.wanted ?? this.demoRequest;
+      if (this.loading) {
+        this.routeLoad = this.wanted ?? this.demoRequest;
+        this.cheatedBeforeRoute = cheated;
+      }
       return;
     }
     // The story's first step (0x4069b0), its counter reset by the title.
@@ -624,8 +631,7 @@ export class TrainingScene extends Phaser.Scene {
       // A story the mode select opens for offers it first (authored,
       // HPA-765; HPA-858 adds the four bosses): the finished select shows
       // underneath it once its sign pack is resident.
-      if (opensOnModeSelect(select.done[0]) || BOSSES.includes(select.done[0]))
-        return this.openModeSelect(select);
+      if (hasModeSelect(select.done[0])) return this.openModeSelect(select);
       // A story route picked starts a fresh run for its cheated mark.
       this.runCheated = false;
       this.story = new Story(select.done[0]);
@@ -691,7 +697,7 @@ export class TrainingScene extends Phaser.Scene {
       randomSeed(),
       this.storyHeld,
       this.globals,
-      this.story!.route === 'br-zero' || this.story!.route === 'br-another',
+      this.story!.br,
     );
     const wasPaused = this.paused;
     this.whenReady(match, () => this.begin(match, this.paused && !wasPaused));
@@ -1033,6 +1039,7 @@ export class TrainingScene extends Phaser.Scene {
     this.match.useCheats(this.pendingCheats);
     // A non-story match is a run of its own; a story battle ORs into the
     // route's mark, which the route's selection reset.
+    this.cheatedBeforeRoute = undefined;
     if (!match.battle) this.runCheated = false;
     this.runCheated ||= this.match.cheats.enabled;
     // A match starting clears every sound the screen or the old match left.

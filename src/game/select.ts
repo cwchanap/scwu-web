@@ -12,7 +12,7 @@ import { ART_SCALE } from './match';
 import type { Input } from './match';
 import { rand } from './standing';
 import type { Frame } from './standing';
-import type { Route } from './story';
+import type { Route, SignRoute } from './story';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -106,7 +106,7 @@ export const selectable = (index: number, bit = 2) =>
 // The quick mode selector opens them for STORY or B.R. MODE, and their B.R.
 // ANOTHER route is generated (br-another.ts), which imports this list —
 // never the reverse, which would cycle through story.ts.
-export const BOSSES: readonly Who[] = ['zenka', 'alpha', 'shinz', 'dora'];
+export const BOSSES = ['zenka', 'alpha', 'shinz', 'dora'] as const;
 
 export interface SelectObject {
   container: SelectContainer;
@@ -808,7 +808,7 @@ export const MODE_BOARDS: readonly ModeBoard[] = [
   { who: 'pachelo', image: 8001 },
 ];
 export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
-  route: Route;
+  route: SignRoute;
 })[])[] = [
   [
     { who: 'zaku', image: 8005, route: 'story-easy' },
@@ -929,10 +929,10 @@ export class ModeSelect extends Screen {
   private confirm() {
     this.latch = true;
     // A boss's first sign confirms the mode outright (authored, HPA-858):
-    // STORY, or B.R.'s generated ANOTHER route.
-    if (BOSSES.includes(this.who)) {
+    // STORY, or B.R.'s generated ANOTHER route ('boss-br').
+    if ((BOSSES as readonly Who[]).includes(this.who)) {
       modePlace = this.choice;
-      this.done = this.choice ? 'br-another' : 'story';
+      this.done = this.choice ? 'boss-br' : 'story';
       return;
     }
     if (!this.stage) {

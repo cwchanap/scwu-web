@@ -866,18 +866,18 @@ describe('mode select (authored, HPA-858 bosses)', () => {
     }
   });
 
-  it('confirms a boss’s B.R. sign straight to br-another, by key and by tap', () => {
+  it('confirms a boss’s B.R. sign straight to boss-br, by key and by tap', () => {
     for (const who of BOSSES) {
       const mode = new ModeSelect(bossPicked(who));
       mode.step();
       mode.choice = 1;
       press(mode, { punch: true });
-      expect([mode.stage, mode.done]).toEqual([0, 'br-another']);
+      expect([mode.stage, mode.done]).toEqual([0, 'boss-br']);
       // A tap on the right board lands the same pick on the first step.
       const tapped = new ModeSelect(bossPicked(who));
       tapped.step();
       expect(tapped.tap(720, 394)).toBe(true);
-      expect([tapped.stage, tapped.done]).toEqual([0, 'br-another']);
+      expect([tapped.stage, tapped.done]).toEqual([0, 'boss-br']);
     }
   });
 
@@ -886,13 +886,13 @@ describe('mode select (authored, HPA-858 bosses)', () => {
     mode.step();
     mode.choice = 1;
     press(mode, { punch: true });
-    expect(mode.done).toBe('br-another');
+    expect(mode.done).toBe('boss-br');
     mode.back();
     expect([mode.stage, mode.done, mode.choice]).toEqual([0, null, 1]);
     expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
     // The same sign confirms again.
     press(mode, { punch: true });
-    expect(mode.done).toBe('br-another');
+    expect(mode.done).toBe('boss-br');
   });
 });
 
