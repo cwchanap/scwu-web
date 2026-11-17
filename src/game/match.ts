@@ -3651,7 +3651,10 @@ export class Match {
       case 'stock':
         if ('clip' in actor || actor.action !== 'script') break;
         if (event.atLeast) {
-          if (self.stock >= event.min)
+          if (
+            self.stock >= event.min &&
+            !(this.koReloadBlocked(self) && event.target === 72)
+          )
             return this.branchTo(actor, sourceKey(event.target, event.offset));
           break;
         }
@@ -4466,6 +4469,14 @@ export class Match {
     target.pending = { action, stop, attackerStop, power, own };
   }
 
+  // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) outside a
+  // B.R. route takes the ordinary KO, never KO RELOAD (72) — whichever of
+  // its two entries (KO Normal's check, PC 775, or the lose action's 77)
+  // the source reaches first.
+  private koReloadBlocked(f: Fighter) {
+    return f.who === 'dora' && !this.br && this.fighters.indexOf(f) === 0;
+  }
+
   // 0x412327: a step first enters the action queued for it, stopped or not,
   // and runs its first records (0x412564) instead of the CPU, the landing
   // check and the commands. A reaction's are its op 0x20 (roll), the op 0x01
@@ -4505,13 +4516,13 @@ export class Match {
       // Authored (HPA-858): outside a B.R. route, a player-controlled
       // DoraEmon (fighter 0) skips KO RELOAD's stock test (PC 775, action
       // 72) and takes the ordinary KO; in B.R. he reloads as player, enemy
-      // or ally, and every other fighter's checks stand.
-      const plainKo = !this.br && this.fighters.indexOf(f) === 0;
+      // or ally, and every other fighter's checks stand. The same restriction
+      // guards the stock handler itself, because the lose action's global-0
+      // jump (68 into 77) runs its own stock test past this loop.
+      const plainKo = this.koReloadBlocked(f);
       const check = checks.find((e) =>
         e.op === 'stock'
-          ? e.atLeast &&
-            f.stock >= e.min &&
-            !(plainKo && f.who === 'dora' && e.target === 72)
+          ? e.atLeast && f.stock >= e.min && !(plainKo && e.target === 72)
           : e.op === 'test' && this.passes(f, f, e),
       );
       const again = check?.op === 'test' && check.selector === 0x43;

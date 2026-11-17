@@ -1062,6 +1062,77 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     ]);
   });
 
+  it('keeps the global-0 KO path (77) from reloading player DoraEmon outside B.R. only', () => {
+    // His lose action (68) jumps on global 0 at 10 — which LIZARD's, HISO's,
+    // SEAN's and G Suneo's lethal blows hold for their strike's tick —
+    // straight into 77, whose own three-stock op 0x10 enters KO RELOAD (72)
+    // through the generic stock handler, past enterPending's guarded check
+    // (PC 775). The authored restriction covers that entry too; the global
+    // stands in for the striker's tick, as the source test reads it.
+    const run = (br: boolean, player: boolean) => {
+      const match = br
+        ? Match.story(
+            'dora',
+            bossBrAnotherStory('dora').find((s): s is Battle => s.type === 1)!,
+            0,
+            undefined,
+            undefined,
+            true,
+          )
+        : new Match(
+            'practice',
+            false,
+            3,
+            player ? ['dora', 'ryuko'] : ['ryuko', 'dora'],
+          );
+      match.globals[0] = 10;
+      const dora = match.fighters[player ? 0 : 1];
+      driveCpus(match, player ? 0 : 1, {});
+      settle(match);
+      dora.stock = 4;
+      knockOut(match, dora);
+      const path: unknown[] = [];
+      for (
+        let t = 0;
+        t < 2000 && (br ? dora.hp < lifeOf('dora') : match.winner === null);
+        t++
+      ) {
+        match.step({});
+        const action = now(dora);
+        if (path.at(-1) !== action) path.push(action);
+      }
+      return {
+        path,
+        hp: dora.hp,
+        stock: dora.stock,
+        downed: dora.downed,
+        winner: match.winner,
+      };
+    };
+    // Outside B.R. the player's stocks buy no reload through 77 either: the
+    // jump itself still plays its ordinary fall, and he stays down.
+    const solo = run(false, true);
+    expect(solo.path).toContain(77);
+    expect(solo.path.some((a) => a === 72 || a === 74)).toBe(false);
+    expect(solo).toMatchObject({
+      hp: 0,
+      stock: 4,
+      downed: true,
+      winner: 'opponent',
+    });
+    // In B.R., and for a non-B.R. CPU, the same path still reloads him.
+    for (const [br, player] of [
+      [true, true],
+      [false, false],
+    ] as const) {
+      const kept = run(br, player);
+      const reload = kept.path.indexOf(72);
+      expect(reload).toBeGreaterThanOrEqual(0);
+      expect(kept.path.indexOf(74)).toBeGreaterThan(reload);
+      expect(kept).toMatchObject({ hp: lifeOf('dora'), stock: 1 });
+    }
+  });
+
   it('blocks the real CPU’s EN command (421) in B.R. — seed 4 — and the CPU still attacks', () => {
     // The Vs. CPU table run (seed 4) enters 421 outside B.R. Here the same
     // table runs for real against a grounded opponent inside its EN entry's
