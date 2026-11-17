@@ -1,84 +1,84 @@
-# HPA-973 — KO revival and DoraEmon move retuning — implementation plan
+# HPA-973 — KO recovery, DoraEmon moves and late-arrival intro — implementation plan
 
-**Ticket:** https://linear.app/cwchanap/issue/HPA-973/fix-revive-after-kill-hp-and-retune-doraemons-invincible-moves  
+**Linear:** https://linear.app/cwchanap/issue/HPA-973  
 **Design:** `docs/superpowers/specs/2026-11-14-ko-revival-dora-moves-design.md`  
-**Status:** Planning-only draft; **no implementation or test execution has happened yet**.  
-**Delivery:** **One PR** per HPA-973. Add implementation, tests and verification commits to **this same branch/PR** after design review. No art/SFX work is needed.
+**Draft PR:** https://github.com/cwchanap/scwu-web/pull/19 — **one PR** for specification, implementation, tests and verification; do not create a second PR for this ticket.  
+**Revision:** 2026-11-17, reviewed latest `main` commit `7546518bdccd25af948ce0b9e3607a5830061d41`; planning only. No implementation or tests have been run in this PR.
 
-## Baseline and constraints
+## Updated baseline / scope owner
 
-- Merged into `main`: HPA-767 cheat-mode `Match` snapshot (#14), HPA-765 mode selector (#17), HPA-766 three-stage BR Another and ten-seat setup (#18).
-- `Match.knockOut()` pays slot HP bonuses; its `koLand` path leaves a healed fighter down; `downed` is deliberately the brawl-elimination marker and **must remain true after recovery**.
-- Source KO landing `KO_SCRIPTS` is currently scoped to ZAKU/PAC-HELO. Source HP-test branches exist for six more characters, while **all fighters** need a fallback.
-- DoraEmon invincibility is authored through `scripts/export_assets.py` frame-body transformation, checked by `src/game/dora.test.ts`. Input uses `buttonsOf('dora')` and existing guard checks.
-- `docs/evidence.md` and `src/instructions/moves.ts` currently describe the supers and Counter Hit's **old** rules; change both.
-- Keep YAGNI: no generalized recovery framework, new status flags if existing states suffice, new image/SFX, new frontend component, or new multi-browser test runner.
+- The original branch was created just after HPA-766/PR #18. Main has **26 new commits**; **HPA-858/PR #22 is merged** and added boss B.R. ANOTHER routes, tough enemies, `Match.br` route context, DoraEmon's command charge gate and player-controlled KO RELOAD block. Work from those current paths, not the old line numbers or old HPA-858 assumptions.
+- **Linear HPA-973 now has three fixes**: KO with bonus HP (outside B.R.), four move rules, and waiting-seat DoraEmon intro parity. Do all three here.
+- **Linear HPA-1035, not merged**, owns prohibiting all *native* revives in all B.R. modes, along with B.R. LONG and lineup/loading changes. HPA-973's new bonus-HP get-up must **skip `match.br`** but **must not preempt** HPA-1035's wider switch. Existing CPU Dora B.R. KO RELOAD test remains a baseline until that ticket lands.
+- Minimize scope: reuse `Match` / `src/game/commands.ts` / `scripts/export_assets.py` and existing tests. No state machine, new BR flag, additional framework, new assets/SFX, API/backend, or compatibility handling.
 
-## Phase 0 — Capture current behavior with focused tests
+## Phase 0 — Record regressions against latest main
 
-**Read/test:** `src/game/match.ts`, `src/game/team.test.ts`, `src/game/dora.test.ts`, `src/game/commands.ts`, `src/game/animations.ts`, `scripts/export_assets.py`.
+**Inspect/test:** `src/game/match.ts`, `src/game/team.test.ts`, `src/game/dora.test.ts`, `src/game/br-another.ts`, `src/game/animations.ts`, `src/game/commands.ts`, `scripts/export_assets.py`.
 
-- [ ] Add one table-driven KO-recovery test over **every member of `CHARACTERS`**. Create a small story battle that actually invokes `knockOut`, rewards the knocked-out 1P/striker through `slot.life`, lets the KO land and asserts the fighter has positive HP and can return to a playable get-up, without changing `downed`. Use existing test helpers and real `Match.step`, not a screenshot fixture or new simulation engine.
-- [ ] Cover each source-special case (GOLF, ASURA, TTRO, ASTROMAN, Z-MEGA, RARIO) and ZAKU/PAC-HELO, confirming their branch entry and no duplicated scripted BR refill. Add a no-bonus / no-HP negative case.
-- [ ] Reproduce post-result suppression: after `picking` or `winner` has committed, no KO wake; ensure a healed player does not force a loss while battle is still active.
-- [ ] Identify the existing 225 front guard box, exported Dora action 327/338/250/252/254 frame PCs, and guard counter source command. Record the original conflicting `dora.test.ts` expectations before changing them.
+- [ ] Table-drive **all `CHARACTERS` in a non-B.R. story**, KO a fighter who should receive `slot.life` for a defeated enemy, then run real `Match.step` until landed. Assert the fighter's HP is positive but stranded in the initial repro; pin `downed` and the pending/winner state. Include zero-HP/no-bonus and a picked-result case.
+- [ ] Reproduce the **B.R. exclusion**: `Match.story(..., br=true)` receives the same bonus but must not gain HPA-973's new common get-up. Assert current native CPU Dora/ALPHA revival is not accidentally removed; HPA-1035 will change that separately. Confirm HPA-858 player-controlled Dora still cannot enter source KO RELOAD 72/74.
+- [ ] Pin GOLF→131, ASURA→130, TTRO→145, ASTROMAN→143, Z-MEGA→157, RARIO→27 stand-up targets; preserve ZAKU/PAC-HELO variable-11/KO BR HP paths. Identify source 225's frontal kind-3 box, the Dora 327/338/250/252/254 protected frame PCs and guard 172/174 input check.
+- [ ] Reproduce **DoraEmon's late entrance** via a deterministic seeded `brAnotherStages(...).stage3` with a waiting DoraEmon. In `arrive()` it gets `action='intro'`; when it enters after `fightTick`, contrast the active `move()` branch with pre-fight `run()`'s 337-tick `doraFall` + `enter`. Pin first-seat 337-tick/4-stock intro as a control.
 
-**Checkpoint:** Narrow tests reproduce the KO bug and pin the existing Dora rules. No gameplay changes yet.
+**Checkpoint:** All three defects and their boundaries are reproduced without changing production behavior.
 
-## Phase 1 — Shared KO recovery in Match
+## Phase 1 — Fix HP-bonus KO recovery (outside B.R. only)
 
-**Modify:** `src/game/match.ts`, focused `Match` tests.
+**Modify:** `src/game/match.ts`, existing KO/story/team tests.
 
-- [ ] Add a **single** recovery gate on a fighter's KO-landed/settled path, with `f.downed && f.hp > 0`, present fighter and active encounter checks. Run only after ordinary KO flight/landing; do not steal pending actions or disrupt source-scripted BR revival.
-- [ ] Route six source stand-up cases to their known action targets (GOLF 131; ASURA 130; TTRO 145; ASTROMAN 143; Z-MEGA 157; RARIO 27), verifying the actual target semantics in source fixtures. For ZAKU/PAC-HELO, preserve their variable-11 BR route and use existing generic get-up only when healed and still stranded. Use `action(f, 'getUp')` for the remainder of the roster.
-- [ ] Keep `f.downed` set. A KO already counted for brawl elimination is not invalidated when the fighter rises. Ensure recovery fires once, does not restart on future frames, and uses existing round-reset behavior.
-- [ ] Add focused tests for duel, story brawl, timed/settled result, and BR/Continue behavior where affected. Do not change `Story`, route generation or the whole results state machine.
+- [ ] Add one narrow transition for **present settled KO**: `!this.br && f.downed && f.hp > 0` while neither `picking` nor `winner` has committed. Do not interrupt an airborne KO, a pending action or an already-running source recovery. Reuse `action(f, 'getUp')` for fighters without a source branch. Do not introduce a new `reviving` state or make all `KO_SCRIPTS` run as source.
+- [ ] For six source-specific fighters enter tested stand-up targets; for ZAKU/PAC-HELO preserve their source script/refill and use ordinary get-up only if otherwise stranded. Do not award additional HP or power in the transition.
+- [ ] Preserve `f.downed = true` for brawl elimination, once-only recovery and ordinary next-round reset. Add tests for non-B.R. duel/story brawl, high/low stock, last-hostile elimination, timed result, retry/Continue, positive HP without recovery after result.
+- [ ] Assert in `br=true` that bonus HP **does not** trigger the new recovery, while the already merged HPA-858 player-Dora restriction and existing CPU Dora native outside-B.R. behavior hold. Mark HPA-1035's wider no-revive tests as that ticket's responsibility.
 
-**Checkpoint:** Full roster loop passes; previously passed KO/brawl/Continue tests stay green.
+**Checkpoint:** Whole-roster non-B.R. test passes; no new B.R. get-up; existing HPA-858/KO regressions remain green.
 
-## Phase 2 — DoraEmon-only move rules in the exporter/input path
+## Phase 2 — Share DoraEmon's full intro progression with late arrivals
 
-**Modify:** `scripts/export_assets.py`, only the narrow `src/game/commands.ts` / `src/game/match.ts` region if required by input or elapsed-cast timing; update `src/game/dora.test.ts`.
+**Modify:** `src/game/match.ts`, focused `dora.test.ts` and `team.test.ts`.
 
-- [ ] **Fists:** remove its invincibility suppression (327 and cast-follow-up PCs); restore body hurtboxes. Reuse dash-in kick 225's zero-damage frontal clash box without copying its branching handler. Verify enemy attack boxes can be cancelled by collision while a body hit damages DoraEmon.
-- [ ] **Pierce:** limit suppression to elapsed cast ticks **0..99** from 338's start, including early fragments, but not later fragments or shared landing. Cover first protected tick, tick 99, tick 100, remaining follow-up and post-landing vulnerability. Do not refresh the timer at a subaction boundary.
-- [ ] **Twin Hammer:** protect 250/252 and their inline swing PCs, but not follow-up 254's unique frames; keep pushboxes throughout. Update both gap scenarios and frame-based assertions.
-- [ ] **Counter Hit:** map only DoraEmon's guard check to the physical K (existing B+C source bits), retaining reaction 197 and the one-stock cost. Prove K-only works during the guard window, not outside, and cannot trigger without stock; replace the obsolete two-key test expectations.
-- [ ] Keep Cannon 296, Gadgets 305 and all unaffected moves' invincibility, cancellation, stock and hit behavior. Do not edit extracted `.PLAYER` files or check generated JSON into Git. Regenerate with `bun run assets` when the verified handoff is available.
+- [ ] The current `arrive(f,i)` already calls `opening(f)`; **do not change the watch/seat path**. Factor pre-fight Dora `intro` stepping into a small helper reusable by the active-fight loop rather than inventing a scene animation or a general intro state machine.
+- [ ] Advance `age`, `doraFall(age-1)`, `enter` events and the 337-tick completion/landing in the active branch, starting **at actual arrival**; ensure CPU/keyboard commands do not replace the intro before its last frame. Preserve hit-stop and normal first-seat behavior.
+- [ ] Assert first/late parity: exact **337 ticks**, established image samples `[0,149,150,177,257,266,267,276,336]`, rise/hold/fall then `y=0`, and OP super Charge's **360 power → four stocks exactly once**. This intro reward still works in B.R.; HPA-858 blocks the EN-charge *command*, not this intro.
+- [ ] Exercise Dora as second/middle/last waiting stage-3 boss and first-seated control; ensure other bosses still arrive when watched thresholds cross, regular fighters' intro scripts remain unchanged, stage/Continue result unchanged. Use seeded `brAnotherStages` fixtures; no full tournament browser run.
 
-**Checkpoint:** Focused DoraEmon tests pass with exact timing, clash-versus-hurt and guard-input behavior.
+**Checkpoint:** Late DoraEmon enters with exactly the original visual sequence/power and then resumes ordinary CPU combat.
 
-## Phase 3 — Text and evidence
+## Phase 3 — DoraEmon-only move changes
+
+**Modify:** `scripts/export_assets.py` and only narrow `src/game/commands.ts` / `src/game/match.ts` changes if needed. Update focused `dora.test.ts`.
+
+- [ ] **Fists:** stop suppressing cast 327/332 hurtboxes. Add forward, zero-damage kind-3 clash box like dash kick 225 without its branch-to-226 handler. Test frontal box-vs-box cancellation **and** vulnerable body contact; no extra damaging hit.
+- [ ] **Pierce:** protect cast-relative ticks **0–99** from 338; restore hurtboxes at 100 and in later 340/341/342 fragments and landing 270. Do not restart timer when branch changes. If exporter PC reuse makes this impossible, use a single Dora-only elapsed-cast check in the current combat/hurtbox path rather than a new subsystem. Test 99/100 and post-cast.
+- [ ] **Twin Hammer:** protect 250/252 plus inlined 251/253, not hit follow-up 254-only frames; keep pushboxes. Update former all-frames-invincible assertions and both distance cases.
+- [ ] **Counter Hit:** change Dora-only guard command to **K alone** (physical Hit Up/B+C), same window and one-stock cost; test success, out-of-window, no-stock, other fighters' unchanged controls.
+- [ ] Preserve Cannon 296, Gadgets 305, Hug, FK之意思, all unmodified stock rules and new HPA-858 charge/KO RELOAD tests. Exporter needs verified extracted handoff; **never commit generated source JSON**. Run `bun run assets` if source is available and record inability otherwise.
+
+**Checkpoint:** Four altered moves have direct deterministic assertions, untouched move/input/charge cases remain green.
+
+## Phase 4 — Instructions and evidence
 
 **Modify:** `src/instructions/moves.ts`, `docs/evidence.md`.
 
-- [ ] Update Fists, Pierce, Twin Hammer and Counter Hit labels/descriptions and remove the old conflicting claims.
-- [ ] In `docs/evidence.md`, append HPA-973 authored corrections under the DoraEmon section, citing source action numbers and behavior differences. Note the all-roster KO revive and preserved brawl `downed` semantics.
-- [ ] Preserve existing guide layout and styles. There is no new Linear UI mockup for this issue and no art to generate.
+- [ ] Fists describes frontal clash with vulnerable body; Pierce says invincible for first second; Twin Hammer notes vulnerable hit follow-up; Counter Hit input reads **K while blocking**. Leave HPA-858's separate EN availability text correct.
+- [ ] Record the authored KO get-up rule and `downed` brawl semantics, `!br` boundary/HPA-1035 ownership, Dora source action IDs, and late intro 337-tick four-stock parity in `docs/evidence.md`. No new UI or assets.
+- [ ] Reuse existing instructions layout; HPA-973 has no new Linear mockup.
 
-**Checkpoint:** Instructions and evidence agree with the tested rules.
+**Checkpoint:** Guide text, source evidence and tests agree.
 
-## Phase 4 — Verification and draft PR update
+## Phase 5 — Automated end-to-end acceptance and verification
 
-- [ ] Run `bun run validate`, `bun run build`, and `bun run e2e` using the available macOS/Chromium environment; record exact results and failures in this PR. If source handoff is missing, record `bun run assets` as **not run**, not passed.
-- [ ] Keep existing browser route/guide smoke working and make the minimal text assertion or visual inspection possible with existing Playwright controls. Do not build a full combat tournament browser suite for deterministic `Match` rules.
-- [ ] Recheck the PR diff: design, implementation, tests and documentation for **HPA-973 only**. Keep the same PR draft until changes and available automated checks are verified; do not split the ticket across PRs.
-- [ ] Record unavailable Windows/iOS runs as **unverified**, not failures to be solved by a new browser farm. Android and Linux are CI-only.
+- [ ] `bun run validate` including format/lint/type/Vitest, `bun run build`, `bun run e2e`; record actual outcomes on PR #19. CI on drafts may skip certain jobs, so a successful preview **does not count as tests passing**.
+- [ ] **MCP-driven product E2E on macOS Chromium (single-platform suffices)**: start app, navigate to a story/B.R. match, verify visible HUD and functioning controls, open DoraEmon's instructions and assert all four revised text rows and absence of browser exceptions. Reuse the Playwright `e2e/unconfigured/mode-select.spec.ts` smoke; do not add a multi-platform test farm.
+- [ ] **Visual screenshot check:** automated browser/MCP screenshot of actual guide layout and a reproducible **waiting-seat DoraEmon entrance** + arena/HUD where current test hooks allow. Compare against the established first-seat sprite sequence/arena UI (no HPA-973 mockup). Use deterministic `Match` tests for precise 337-tick and stock assertions; do not drive an entire 4-boss CPU tournament in the browser merely to count ticks.
+- [ ] Windows Edge/iOS Safari are optional additional coverage and can be explicitly marked **not run**; no human acceptance. Existing Linux CI remains; Android has no separate acceptance target.
+- [ ] Review the PR diff for **HPA-973 only**; leave HPA-1035 B.R. source-revive switch, new B.R. LONG/sign, evenly seeded lineups/loading screens, HPA-770/972 and art/SFX outside. Keep **this one PR** draft until implementation and available automated acceptance are recorded.
 
-## Product-level E2E acceptance criteria
+## Ready-for-review acceptance checklist
 
-Unit/integration tests above are the **deterministic gameplay correctness evidence**; the following are lightweight product-level acceptance checks using existing runners/controls, without human sign-off:
-
-- [ ] **macOS / Chromium:** Automated game startup → choose a fighter → run a practice/story match → verify arena/HUD is present and match controls remain responsive after KO/recovery as exercised by the deterministic `Match` test; open DoraEmon's instructions page and assert Fists/Pierce/Twin Hammer/Counter Hit text shows the new rules, with no browser errors.
-- [ ] **Windows / Edge:** When an existing Edge runner is available, run the same short entry, control and instructions-page E2E check and assert visible move text/HUD; otherwise explicitly mark **not run (runner unavailable)**. Do not add new test infrastructure solely for this ticket.
-- [ ] **iOS / Safari or WebKit:** When an existing device/runner is available, use touch navigation to enter a match and open DoraEmon's instructions, assert text and HUD remain visible at phone portrait and landscape; distinguish WebKit emulation from actual iOS Safari and mark unsupported runs **not run**.
-- [ ] **Visual check:** Compare existing guide typography/row alignment and arena HUD against their established UI, including the four revised Dora descriptions. **HPA-973 has no Linear UI mockup**, so there is no new mockup to match.
-- [ ] **CI only:** Android/Linux coverage relies on existing CI; no separate Android/Linux acceptance or human acceptance is required.
-
-## Ready-for-review definition
-
-- [ ] All roster fighters with post-KO bonus HP can recover before the fight ends; existing source-specific routes are preserved; KO'd fighters with zero HP and finished results stay down.
-- [ ] `downed` remains the brawl elimination marker; no premature wins, losses or repeated wake transitions.
-- [ ] Fists is vulnerable with a *frontal attack-box clash*; Pierce is invincible **only for the first 100 ticks**; Twin Hammer's hit follow-up is vulnerable; Counter Hit is **K while guarding**, one stock.
-- [ ] Other DoraEmon moves, fighter input controls and original game routes remain unaffected; all four instructions and `docs/evidence.md` updated.
-- [ ] Exact validation/build/E2E outcomes recorded accurately; cross-platform unsupported checks not misrepresented. One HPA-973 PR, no unrelated art/SFX or feature work.
+- [ ] **Every roster fighter outside B.R.** with KO + earned HP can resume; source-specific get-ups and fallback match, zero-HP/picked-result don't wake, `downed` remains true and brawl win/Continue are correct.
+- [ ] `br=true` **never runs HPA-973's new** bonus-HP get-up; HPA-858's already merged player-Dora KO RELOAD/EN restrictions remain, no HPA-1035 behavior accidentally duplicated.
+- [ ] Fists frontal clash but body vulnerable; Pierce protected **only first 100 ticks from cast**; Twin Hammer follow-up vulnerable; Counter Hit **K only while blocking for one stock**; unchanged other moves and source files.
+- [ ] Waiting-stage-3 DoraEmon plays **337-tick** first-seat-equivalent intro, exactly four 90-EN stocks, full rise/fall/landing, with normal input/AI afterwards; first-seat unchanged.
+- [ ] `bun run validate`, `bun run build`, `bun run e2e` outcomes recorded honestly; **MCP E2E and screenshot visual check** accepted on one platform without human sign-off. All implementation remains in draft **PR #19**.
