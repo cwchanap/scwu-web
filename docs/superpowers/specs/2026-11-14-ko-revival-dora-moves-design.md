@@ -1,73 +1,63 @@
-# HPA-973 — KO revival and DoraEmon move retuning — design
+# HPA-973 — KO recovery, DoraEmon moves and late-arrival intro — design
 
-**Ticket:** https://linear.app/cwchanap/issue/HPA-973/fix-revive-after-kill-hp-and-retune-doraemons-invincible-moves  
-**Status:** Design proposal. This PR contains documentation only until implementation is added on the **same branch**.  
-**Dependencies:** HPA-765, HPA-766 and HPA-767 are merged; HPA-858 is a separate follow-up.
+**Linear:** https://linear.app/cwchanap/issue/HPA-973  
+**Draft PR:** https://github.com/cwchanap/scwu-web/pull/19  
+**Status:** Revised design (2026-11-17). Planning only; implementation/tests not started in this PR.  
+**Reviewed `main` baseline:** `7546518bdccd25af948ce0b9e3607a5830061d41`, 26 commits after this PR's original base. HPA-858/PR #22 is **merged**. HPA-1035 is **not merged**.
 
-## Goal and scope
+## Scope and boundaries
 
-Fix a source-compatible-looking but broken KO/HP interaction across the **whole roster**, then adjust four DoraEmon moves to the latest authored rules. Keep the current `Match` tick engine, source-script interpreter, `scripts/export_assets.py` exporter, input mapping, and instructions UI. No new game state machine, rendering system, UI page, art, sounds, backend, or compatibility layer.
+The updated Linear ticket contains **three fixes in one PR**: (1) revive a KO'd fighter with HP gained from a kill **outside B.R.**; (2) retune four DoraEmon moves; (3) restore DoraEmon's complete 337-tick intro when he enters as a waiting boss during an ongoing battle. Retain `Match`'s existing combat loop, the exporter, the source script runner and the instructions page. The first two are authored changes, not Windows-original parity claims.
 
-These are **authored behavior changes**, not a claim that the Windows original behaved this way. The two fixes share one ticket and **one draft PR**, as requested in Linear.
+**HPA-858 already changed `main`.** The merged engine exposes `Match.br` via `TrainingScene.startBattle() → Match.story(..., br)`. Its `SEAT_GATES` prevent DoraEmon's voluntary/CPU EN charge for player-controlled DoraEmon and any DoraEmon in B.R.; its `koReloadBlocked()` suppresses source KO RELOAD 72/74 for **player-controlled** DoraEmon in all modes. CPU DoraEmon outside B.R. retains native behavior. Preserve all of these restrictions and the regression tests added in `dora.test.ts` and `team.test.ts`.
 
-## A. KO'd fighters with restored HP stand up
+**HPA-1035 owns the broader B.R. ban.** At this baseline, CPU DoraEmon can still KO RELOAD in B.R. (the existing `team.test.ts` asserts it), as can other source revivers. Item 4 of HPA-1035 will disable *every* B.R. revive (ZERO, ANOTHER, CHAOS, LONG) for all roles. **HPA-973 only ensures its new bonus-HP get-up cannot run in B.R.; do not preempt HPA-1035 or change its seeded stages/loading screens/B.R. LONG.** After HPA-1035 merges, rerun the joint B.R. matrix, but don't create a second PR for HPA-973.
 
-### Existing path and failure
+## 1. KO'd fighters who earn HP from a kill
 
-- `Match.knockOut()` marks `f.downed = true`, queues `down`, and may pay a defeated story seat's `slot.life` and `slot.power` to the 1P/striker via `gainLife()` and `addPower()`.
-- `land()` enters a KO-down source script for `KO_SCRIPTS` (notably ZAKU and PAC-HELO), but ordinarily enters `koLand`; `moveKO()` continues that landed KO pose indefinitely. Six other characters have source HP-test stand-ups, but the `life` opcode is only evaluated in an executed script and the non-script `koLand` never executes it.
-- Hence the bar can show restored HP while its fighter remains stuck on the floor. This affects anyone who receives the KO bonus, not only fighters whose data contains a special recovery.
-- Brawl survival deliberately counts `f.downed`, not current HP: a previously defeated hostile remains defeated even if it stands again. **Do not reset `downed` during recovery.**
+### Root cause
 
-### Proposed behavior
+`Match.knockOut()` sets `f.downed` and queues `down`. In a story it pays a defeated seat's `slot.life` / `slot.power` to 1P or the striker through `gainLife()` / `addPower()`. `land()` normally converts a KO flight into `koLand`, which `moveKO()` holds indefinitely. The source `life` opcode only runs in active scripts/objects; most `koLand` fighters never execute their source HP-test stand-up even after their bar is refilled. `KO_SCRIPTS` covers ZAKU/PAC-HELO's variable-11 scripts, not the other six source HP revivers.
 
-1. Introduce **one narrow KO-recovery transition** in the existing `Match` combat tick path. A *present*, landed or settled KO fighter with `f.downed` and `f.hp > 0` is eligible to stand up **only while the encounter is undecided**. Do not run recovery during the result/round transition (including an already-picked/pending result), and do not interrupt airborne KO motion, a queued reaction or source-driven revival.
-2. For **GOLF, ASURA, TTRO, ASTROMAN, Z-MEGA and RARIO**, reuse the appropriate source stand-up target reached by that fighter's own KO HP test, with `enterSource()` where the source path is appropriate. Linear identifies GOLF→131, ASURA→130, TTRO→145, ASTROMAN→143, Z-MEGA→157 and RARIO→27; confirm the actual entry branches in focused tests.
-3. For **ZAKU and PAC-HELO**, preserve their existing variable-11 / KO Down BR / KO BR HP scripted path when it is running. If a kill bonus has already given them positive HP and that path does not recover them, transition to their ordinary get-up after they have landed; do not duplicate their delayed refill or interrupt BR-specific scripted revival.
-4. **Everyone else** uses `this.action(f, 'getUp')`, as in `recoverKnockdown()`. Reuse existing animations, event execution and state clearing; do not invent a generic `reviving` state or expand `KO_SCRIPTS` to all fighters.
-5. The trigger should be idempotent: once the fighter leaves the KO-landed state it cannot re-enter the get-up on each tick. Leave `f.downed` true for the remainder of that encounter, so existing brawl scoring and Continue rules still work. Normal future rounds already reset fighter state via current round setup.
+### Proposed narrow transition
 
-**Where:** `src/game/match.ts`; focused tests in the existing `src/game/team.test.ts` or a small adjacent KO test if that makes the roster loop clearer. No broad changes to `Fighter` or `Story` APIs.
+- During an *undecided, non-B.R.* encounter, a **present, settled KO** with `f.downed && f.hp > 0` can recover. Use a single scoped check in the existing `Match` tick/KO path, gated by `!this.br`, not a new state machine or global flag. Do not interrupt pending actions, KO flight, scripted revives, a committed `picking` result or `winner`.
+- For source HP-revive fighters use their existing stand-up path: GOLF → 131, ASURA → 130, TTRO → 145, ASTROMAN → 143, Z-MEGA → 157, RARIO → 27. Verify the exact branch/offset and expected source pose with tests before wiring; `enterSource()` where appropriate.
+- For ZAKU/PAC-HELO preserve existing scripted variable-11 → KO Down BR → KO BR HP behavior. A kill HP bonus must not trigger a second scripted refill; use their ordinary get-up if a settled fighter is otherwise stranded. The other roster fighters fall back to `this.action(f, 'getUp')` (as in `recoverKnockdown()`).
+- Leave `f.downed` **true** so a revived hostile still counts as previously defeated for brawl survival and scoring; the recovery happens once and does not restart each tick. A player-controlled DoraEmon without bonus HP still takes HPA-858's ordinary KO rather than KO RELOAD. The HP-bonus recovery (when non-B.R.) and stock-based source KO RELOAD are different rules.
+- Use the existing `run()` ordering to avoid reviving after result selection or incorrectly committing a healed 1P defeat. Tests must pin the transition tick, no-HP case, already-ended case, brawl win/Continue and `br=true` gate.
 
-**Critical result boundary:** `run()` computes the encounter result after all fighter steps, including brawl elimination based on `downed`. A healed 1P should not be counted as dead before a pending round result is decided, but a completed or already-selected result must never be undone by waking the fighter. Test the order explicitly rather than adding timer-specific exceptions.
+## 2. DoraEmon's authored move changes
 
-## B. DoraEmon's four changed moves
+DoraEmon only. Keep original `*.PLAYER` source hash checks, and make any source-data transformations in `scripts/export_assets.py` rather than committing generated JSON. Current export suppresses hurtbox bits (`kind &= ~6`) by protected source frame PC while retaining pushboxes.
 
-All move changes are **DoraEmon-only**; retain Cannon, Gadgets, Hug, FK之意思 and the rest of the roster unchanged. Keep source files hash-checked; author asset transformations in `scripts/export_assets.py`, not by editing extracted source or committing generated JSON.
-
-| Move | Authored behavior | Smallest suitable change |
+| Move | Desired rule | Implementation constraint |
 | --- | --- | --- |
-| **Fists** — ↓←↓← G (source 327, hit follow-up 332) | **Not invincible.** Forward-facing fists cancel opposing strike boxes that clash with them, like the dash-in kick (source 225); direct hits to his body still land. | Remove Fists' PCs from the exporter hurtbox-suppression set; introduce a forward zero-damage clash/guard box modeled on 225 while its flurry is active, preserving hurtboxes, pushboxes and normal continuation. Do not reuse 225's branching follow-up handler. |
-| **Pierce** — ↓→↓← H (338, subsequent fragments 340/341/342) | Invincible for **the first 100 engine ticks (1.0 s) counted from the original cast of 338**, then vulnerable even if a later subaction is still running. | Scope exporter protection by cast-relative frames/PCs, including fragments of the same early cast; do not restart the 100-tick window for each subaction. Keep shared landing 270 and other reused tails vulnerable. |
-| **Counter Hit** — K while blocking (guard reactions 172/174 → 197) | One press of **K** in the existing guard counter window, spending one stock; no simultaneous G+H / G+K requirement. | Author the DoraEmon-only guard command check against the already mapped K/Hit Up input (DoraEmon B+C bits in `buttonsOf`), retaining the shared command recognizer and stock cost. Verify K alone works and the old two-key-only requirement is gone. |
-| **Twin Hammer** — ↓← G (250/252, inlined swings 251/253, follow-up 254) | Invincible throughout the dashing punch + uppercut cast, **not** the separate hit follow-up 254. | Keep suppression on 250/252 and their inlined swing PCs; exclude 254-only frames/PCs while preserving shared frames' intended semantics and all pushboxes. |
+| **Fists** (↓←↓← G; 327, follow-up 332) | **No full invincibility.** Fists clash with and cancel head-on opposing strike boxes like dash-in kick 225; his body can still be hit. | Restore Fists' hurtboxes and use a **front-facing zero-damage kind-3 clash box** based on 225. Preserve Fists continuation rather than 225's branch-to-226 handler. Test box-on-box cancellation and separate body hit. |
+| **Pierce** (↓→↓← H; 338 → 340/341/342) | Invincible for **first 100 ticks (1.0 s) from action 338's cast**, then vulnerable until exit. | Protect only cast-relative ticks 0–99, including early fragments; don't restart at nested action or protect shared landing 270. If exporter PC sharing can't represent elapsed time, use one localized Dora cast-age rule in the existing collision/hurtbox path. Test 99→100 precisely. |
+| **Counter Hit** (guard 172/174 → 197) | **K alone while blocking**, existing guard window and one-stock cost. | Dora-only guard command check using already mapped K / Hit Up (source B+C bits) in the current recognizer. Don't change other characters' controls. Test K alone, wrong timing and insufficient stock. |
+| **Twin Hammer** (↓← G; 250/252, inlined 251/253, follow-up 254) | Invincible through both cast swings, **not** the separate hit follow-up 254. | Exclude 254-only frame PCs from exporter protection; retain 250/252 cast protection and pushboxes. Test cast and follow-up separately. |
 
-### Exporter design details and tests
+Cannon, Gadgets, Hug, FK之意思, the other one-stock supers, and the rest of the input system remain unchanged. Update the obsolete `dora.test.ts` assumptions and the four move-list rows in `src/instructions/moves.ts`; preserve newly merged HPA-858 tests and EN description.
 
-The current `export_assets.py` DoraEmon patch constructs a `protected` action set (which currently includes 250, 252, **254**, 296/305/**327**/**338** and relevant follow-ups), collects their frame PCs, and strips body kind bits 1/2 of `0b110` (`body['kind'] &= ~6`) while retaining pushboxes. This is the existing correct place to adjust **which frame PCs** get invincibility; avoid a general-purpose new runtime invincibility subsystem.
+## 3. DoraEmon's late-arrival intro (new ticket item, 2026-11-17)
 
-For Pierce, calculate/verify elapsed time from the originating 338 cast; do not rely on each nested script's local `frame.t` as if it were a global timer. If flattened PC reuse makes exporter-only time discrimination unsafe, use **one localized DoraEmon cast-age rule** in the existing hurtbox/combat path instead of suppressing later frames globally; no broad refactor. Regression tests must prove the exact 99→100 tick boundary and that no later fragment extends it.
+**Current route:** `Match.arrive(f, i)` activates a waiting slot when its watched fighter drops below the entry threshold; it calls `takeSeat(i)` and `opening(f)`. For DoraEmon, `opening(f)` sets `action = 'intro'`.
 
-For Fists, use the existing source-225 zero-damage `kind: 3` box and the existing `clashBoxes()` behavior, not damage immunity or an uninterruptible animation. Test box-versus-box cancellation **and** a direct body hit; the distinction is the feature. Ensure the new box is actually placed for the flurry and does not accidentally add hits, change damage or steal 225's action branch.
+**Probable cause confirmed by code:** The **pre-fight-only** branch of `Match.run()` advances that intro with `f.age++`, `doraFall()`, `enter()` and completion at `animationDuration('intro', 'dora') === 337`. When a waiting boss enters **after** `fightTick`, the active branch calls `move()` instead, which does not perform the same authored `intro` progression. The late entrance therefore cannot be assumed equivalent to the first-seat one.
 
-The current input mapping in `src/game/commands.ts` already maps DoraEmon's physical K/Hit Up to source B+C. Prefer a scoped Dora guard-record change over changing the controls for other fighters. Test K-only entry, one-stock spend, no-stock refusal, and unchanged guard windows and other fighters' counters.
+**Smallest fix:** Reuse the **same intro-step logic in both phases** (a small helper rather than a second renderer/scene animation). Start the 337-tick sequence when the watched seat *actually arrives*, keep DoraEmon from reading normal attack/CPU input until it completes, and then resume ordinary `Match` behavior. Preserve the authored 50-tick opening, rise/hold/fall sequence, landing at y=0, and original OP super Charge (source 46) that sets four 90-EN stocks (360 power). This **intro grant is not the charge command** blocked by HPA-858 in B.R. Do not duplicate the charge, skip the final pose, or alter other reinforcement entries.
 
-Regenerated data remains a build artifact. Export requires the separately supplied verified source handoff (`bun run assets`); document if unavailable rather than checking in generated JSON or asserting unrun tests passed.
+**Parity tests:** Compare seeded `brAnotherStages(...).stage3` cases with DoraEmon arriving second/middle/last against the already-tested **first-seat** DoraEmon intro (`src/game/dora.test.ts`: 337 ticks, four stocks, age-indexed sprite images, landed y=0). Assert triggered *at entry*, not battle start; active-phase animations finish and CPU may act afterwards. Keep existing boss lineup/arena/Continue and HPA-858 charge gates unchanged. No new SFX or art.
 
-## C. Documentation and UI
+## Documentation, acceptance and exclusions
 
-Update the four DoraEmon entries in `src/instructions/moves.ts` and the *Authored Doraemon and control update (2026-11-01)* evidence section in `docs/evidence.md` (append an HPA-973 change note to make the history clear). The input display must say **K while blocking**; Twin Hammer must not promise follow-up invincibility; Fists should explain front-of-fists clash versus vulnerable body; Pierce should say *first second*.
+- Update `docs/evidence.md` with HPA-973's non-B.R. KO recovery and `downed` retention, the four move changes, and late-intro timing/charge/landing. Update only the four relevant `src/instructions/moves.ts` rows; no new screen or layout.
+- Deterministic Vitest covers **the whole roster outside B.R.**, the B.R. **new-get-up prohibition**, source KO routes, all four moves, and first/late boss intro parity. Keep HPA-858 player Dora + CPU Dora tests. Never claim HPA-1035's no-source-revival rule is already implemented.
+- Run available `bun run validate`, `bun run build`, `bun run e2e`; `bun run assets` needs the verified extracted handoff and should be recorded as not run if unavailable, not assumed passed.
+- **Product E2E acceptance:** one existing macOS Chromium platform with browser **MCP** is sufficient (no platform-specific change). Verify arena/HUD, revised guide text and late-entry intro; collect an actual browser screenshot/visual check against established guide/arena UI. The ticket has **no new Linear UI mockup**. Windows Edge and iOS Safari can be optional/unverified; no human sign-off, new browser farm or full-tournament browser suite.
+- Out of scope: HPA-1035 B.R. no-revive switch, B.R. LONG, stage draw/loading changes; HPA-770 CHAOS; HPA-972 menu/cheats; reimplementation of merged HPA-858; art/SFX, generated source files, new backend, new state machine, or compatibility shims.
 
-The ticket has **no new UI mockup**; these are text changes to the existing instructions page. Reuse its current layout/styling; no UI redesign or new images.
+## Issue interpretation
 
-## D. Verification and constraints
-
-- Deterministic `Match` tests cover **every roster fighter** through an actual KO → story kill HP bonus → landed revival path, including source-specific routes and fallback, with no post-result wake, repeat wake or brawl-score regression.
-- Focused `dora.test.ts` tests replace obsolete invincibility/counter assertions and test each of the four changes; preserve the other two one-stock supers and untouched moves.
-- Reuse `bun run validate`, `bun run build`, and existing `bun run e2e`; no new infrastructure or broad suite. `bun run assets` requires the verified handoff.
-- Product-level E2E/visual acceptance on **macOS Chromium, Windows Edge and iOS Safari/WebKit** where available; compare the rendered DoraEmon move text and existing HUD to the established UI (there is **no Linear mockup**). Do not claim unsupported Windows/iOS checks ran; keep Android/Linux CI-only. No human acceptance or sign-off criteria.
-- Out of scope: HPA-858 DoraEmon BR restrictions, HPA-972 menu/cheat revamp, HPA-770 BR CHAOS, any art/SFX, generated-source edits, new backend or runtime systems, and backward compatibility.
-
-## Decisions to verify during design review
-
-The Linear issue calls out four readings. This design implements them as explicit assumptions: Fists blocks only a **frontal box clash**; Twin Hammer's follow-up is **254**; Counter Hit is **K alone during the existing window**; and fighters without a source revive use the **ordinary knockdown get-up**. Any revision stays in **this PR**, not a second planning PR.
+Adopt the six issue readings: Fists' guard box is frontal, Twin Hammer follow-up is 254, K is the only Counter Hit key during the existing window, generic revival uses `getUp`, late intro means full *first-seat parity*, and it starts **on arrival**. Any further revisions stay on this PR.
