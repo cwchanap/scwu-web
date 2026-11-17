@@ -24,7 +24,7 @@ import {
   TITLE,
 } from './select';
 import type { Demo, SelectObject } from './select';
-import { opensOnModeSelect, routeLife, Story } from './story';
+import { hasModeSelect, routeLife, Story } from './story';
 import type { Battle, Next } from './story';
 import {
   createHud,
@@ -271,8 +271,10 @@ export class TrainingScene extends Phaser.Scene {
   // start or a newer request supersedes it — `wanted`'s twin for screens.
   private demoRequest?: object;
   // The load request started by ModeSelect's route confirmation, so Escape
-  // cancels only the route's own in-flight load.
+  // cancels only the route's own in-flight load, restoring the previous
+  // run's cheated mark if no new run began.
   private routeLoad?: object;
+  private cheatedBeforeRoute?: boolean;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -368,29 +370,36 @@ export class TrainingScene extends Phaser.Scene {
       e.preventDefault();
       this.pressed.set('punch', (this.pressed.get('punch') ?? 0) + 1);
     }
-    // Esc on the mode select's route step goes back to the mode pick —
-    // cancelling a route's start still loading — and on the mode step to
-    // the story select, which remembers its cell (authored, HPA-765).
+    // Esc over a confirmed pick cancels the start it began (HPA-765;
+    // HPA-858 lets a boss confirm on stage 0 too) and steps back to the
+    // mode signs. On the route step it goes back to the mode pick, and
+    // on the mode step to the story select, which remembers its cell
+    // (authored, HPA-765).
     if (!e.repeat && e.code === 'Escape' && this.select instanceof ModeSelect) {
       e.preventDefault();
       if (this.frozen()) {
         if (!this.modal) this.togglePause();
         return;
       }
-      if (this.select.stage === 1) {
-        if (this.select.done) {
-          this.select.back();
-          if (
-            this.routeLoad &&
-            (this.wanted === this.routeLoad ||
-              this.demoRequest === this.routeLoad)
-          ) {
-            this.wanted = undefined;
-            this.demoRequest = undefined;
-            this.loading = false;
+      if (this.select.done) {
+        this.select.back();
+        if (
+          this.routeLoad &&
+          (this.wanted === this.routeLoad ||
+            this.demoRequest === this.routeLoad)
+        ) {
+          this.wanted = undefined;
+          this.demoRequest = undefined;
+          this.loading = false;
+          if (this.cheatedBeforeRoute !== undefined) {
+            this.runCheated = this.cheatedBeforeRoute;
+            this.report();
           }
-          this.routeLoad = undefined;
-        } else if (!this.loading) {
+        }
+        this.routeLoad = undefined;
+        this.cheatedBeforeRoute = undefined;
+      } else if (this.select.stage === 1) {
+        if (!this.loading) {
           this.select.back();
         }
       } else if (!this.loading) {
@@ -550,6 +559,7 @@ export class TrainingScene extends Phaser.Scene {
     this.wanted = undefined;
     this.demoRequest = undefined;
     this.routeLoad = undefined;
+    this.cheatedBeforeRoute = undefined;
     this.loading = false;
     this.report();
   }
@@ -589,27 +599,39 @@ export class TrainingScene extends Phaser.Scene {
       return select.done === 'yes'
         ? this.runStory(this.story!.retry())
         : this.openTitle();
-    // The mode select's route pick (authored, HPA-765): the runner enters
+    // The mode select's pick (authored, HPA-765): a regular route enters
     // as if the 1P struck its Chii sign — the skipped battle's life left
-    // for its jumps — and a fresh run for the cheated mark.
+    // for its jumps — and a fresh run for the cheated mark. A boss's
+    // first sign picks outright (authored, HPA-858): STORY their default
+    // story, B.R. the generated route a new Story owns, whose first step
+    // is a plain battle with no Chii-sign jumps to feed.
     if (select instanceof ModeSelect) {
-      const { who } = select;
+      const { who, done } = select;
+      const cheated = this.runCheated;
       this.runCheated = false;
-      this.story = new Story(who);
       this.storyHeld = [...select.background.drawn];
       this.teams = null;
-      [this.storyLife, this.storyLost] = [routeLife(who, select.done), 0];
       this.routeLoad = undefined;
-      this.runStory(this.story.startOnRoute(select.done));
-      if (this.loading) this.routeLoad = this.wanted ?? this.demoRequest;
+      this.cheatedBeforeRoute = undefined;
+      this.story = new Story(who, done === 'boss-br' ? 'boss-br' : null);
+      if (done === 'boss-br' || done === 'story') {
+        this.runStory(this.story.next());
+      } else {
+        [this.storyLife, this.storyLost] = [routeLife(who, done), 0];
+        this.runStory(this.story.startOnRoute(done));
+      }
+      if (this.loading) {
+        this.routeLoad = this.wanted ?? this.demoRequest;
+        this.cheatedBeforeRoute = cheated;
+      }
       return;
     }
     // The story's first step (0x4069b0), its counter reset by the title.
     if (select.story) {
       // A story the mode select opens for offers it first (authored,
-      // HPA-765); the finished select shows underneath it once its sign
-      // pack is resident.
-      if (opensOnModeSelect(select.done[0])) return this.openModeSelect(select);
+      // HPA-765; HPA-858 adds the four bosses): the finished select shows
+      // underneath it once its sign pack is resident.
+      if (hasModeSelect(select.done[0])) return this.openModeSelect(select);
       // A story route picked starts a fresh run for its cheated mark.
       this.runCheated = false;
       this.story = new Story(select.done[0]);
@@ -665,7 +687,9 @@ export class TrainingScene extends Phaser.Scene {
     this.startBattle(next.battle);
   }
 
-  // A story battle on its stage, once its images load.
+  // A story battle on its stage, once its images load. The active story
+  // route marks the match B.R. (authored, HPA-858): either B.R. sign
+  // route, or the bosses' generated B.R. ANOTHER.
   private startBattle(battle: Battle) {
     const match = Match.story(
       this.story!.who,
@@ -673,6 +697,7 @@ export class TrainingScene extends Phaser.Scene {
       randomSeed(),
       this.storyHeld,
       this.globals,
+      this.story!.br,
     );
     const wasPaused = this.paused;
     this.whenReady(match, () => this.begin(match, this.paused && !wasPaused));
@@ -1014,6 +1039,7 @@ export class TrainingScene extends Phaser.Scene {
     this.match.useCheats(this.pendingCheats);
     // A non-story match is a run of its own; a story battle ORs into the
     // route's mark, which the route's selection reset.
+    this.cheatedBeforeRoute = undefined;
     if (!match.battle) this.runCheated = false;
     this.runCheated ||= this.match.cheats.enabled;
     // A match starting clears every sound the screen or the old match left.

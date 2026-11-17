@@ -2,14 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_CHEATS } from './cheats';
 import { DRESS_TICK, letteringSounds } from './hud';
 import { CPU_TABLES } from './cpu';
-import { desperationOf, lifeOf } from './characters';
-import { firstStrike, LIFE, Match } from './match';
+import { desperationOf, lifeOf, stocksOf } from './characters';
+import type { Who } from './characters';
+import { addPower, firstStrike, LIFE, Match } from './match';
 import type { Fighter } from './match';
-import { ROSTER } from './select';
+import { BOSSES, ROSTER } from './select';
 import { scenarioOf, Story } from './story';
 import { enter, playing, RYUKO } from './testing';
 import type { Battle, Slot } from './story';
-import { brAnotherStages } from './br-another';
+import { bossBrAnotherStory, brAnotherStages } from './br-another';
 
 // A third player borrowed from another match: a story battle seats up to
 // eight.
@@ -1274,8 +1275,17 @@ describe('BR Another stages', () => {
     }
   });
 
-  it('keeps DoraEmon’s EN charge and KO RELOAD unchanged as a stage-3 boss', () => {
-    const match = Match.story('kiki', brAnotherStages('kiki').stage3);
+  it('denies stage-3 boss DoraEmon his EN charge but keeps his KO RELOAD in a B.R. stage 3', () => {
+    // Authored (HPA-858): on a B.R. route the charge is dead for any
+    // DoraEmon seat, CPU included, while the KO RELOAD stocks stay live.
+    const match = Match.story(
+      'kiki',
+      brAnotherStages('kiki').stage3,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
     expect(match.fighters.map((f) => f.who)).toEqual([
       'kiki',
       'alpha',
@@ -1300,12 +1310,12 @@ describe('BR Another stages', () => {
     }
     dora.stock = 0;
     const seen = new Set<unknown>();
-    for (let t = 0; t < 120 && dora.stock < 3; t++) {
+    for (let t = 0; t < 120; t++) {
       match.step();
       if (dora.action === 'script') seen.add(dora.branch);
     }
-    expect([...seen].some((b) => b === 239 || b === '240+3')).toBe(true);
-    expect(dora.stock).toBeGreaterThanOrEqual(3);
+    expect([...seen].some((b) => b === 239 || b === '240+3')).toBe(false);
+    expect(dora.stock).toBe(0);
     dora.stock = 4;
     knockOut(match, dora, one);
     const path: unknown[] = [];
@@ -1328,5 +1338,250 @@ describe('BR Another stages', () => {
     }
     for (let t = 0; t < 3; t++) match.step();
     expect(match.winner).toBe('player');
+  });
+});
+
+describe('boss B.R. ANOTHER', () => {
+  const battlesOf = (who: Who) =>
+    bossBrAnotherStory(who).filter((s): s is Battle => s.type === 1);
+
+  it('runs Story over exactly three battles then the title, and a continue replays the very battle it lost', () => {
+    for (const who of BOSSES) {
+      const story = new Story(who, 'boss-br');
+      const stages: number[] = [];
+      for (
+        let next = story.next();
+        next.kind === 'battle';
+        next = story.next()
+      ) {
+        expect(next.battle.flags & 1, who).toBe(1);
+        stages.push(next.battle.stage);
+      }
+      expect(stages, who).toEqual([9, 3, battlesOf(who)[2]!.stage]);
+      const loser = new Story(who, 'boss-br');
+      const lost = loser.next();
+      if (lost.kind !== 'battle') throw new Error(lost.kind);
+      const again = loser.retry();
+      if (again.kind !== 'battle') throw new Error(again.kind);
+      expect(again.battle, who).toBe(lost.battle);
+      expect(again.battle, who).toEqual(lost.battle);
+    }
+  });
+
+  it('seats stages 1 and 2 as the boss plus three allied pairs and no ally', () => {
+    const mate = (k: number) => (k % 2 ? k + 1 : k - 1);
+    for (const who of BOSSES)
+      for (const [i, stage] of ['sakura', 'sakuranight'].entries()) {
+        const battle = battlesOf(who)[i]!;
+        const match = Match.story(who, battle);
+        expect(match.stage, `${who} ${i + 1}`).toBe(stage);
+        expect(match.fighters, `${who} ${i + 1}`).toHaveLength(7);
+        expect(match.fighters[0]!.who, `${who} ${i + 1}`).toBe(who);
+        expect(
+          match.fighters.slice(1).map((f) => f.who),
+          `${who} ${i + 1}`,
+        ).toEqual(battle.slots.map((s) => ROSTER[s!.player]!));
+        const all = (1 << 7) - 1;
+        expect(
+          match.fighters.map((f) => f.enemies),
+          `${who} ${i + 1}`,
+        ).toEqual(
+          match.fighters.map((_, k) =>
+            k === 0 ? all & ~1 : all & ~(1 << k) & ~(1 << mate(k)),
+          ),
+        );
+        expect(
+          match.fighters.map((f) => f.present),
+          `${who} ${i + 1}`,
+        ).toEqual([true, true, false, false, false, false, false]);
+      }
+  });
+
+  it('brings each later stage-1 enemy in below the mark of the fighter it watches', () => {
+    const match = Match.story('zenka', battlesOf('zenka')[0]!);
+    fight(match);
+    for (let k = 2; k <= 6; k++) {
+      const watched = match.fighters[k - 1]!;
+      const next = match.fighters[k]!;
+      expect(next.present, `enemy ${k} waits`).toBe(false);
+      // The route toughens every watched seat to twice the life, so its
+      // desperation mark reads at the doubled maximum.
+      watched.hp = 2 * desperationOf(watched.who);
+      match.step();
+      expect(next.present, `enemy ${k} at the mark`).toBe(false);
+      watched.hp = 2 * desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present, `enemy ${k} below the mark`).toBe(true);
+    }
+  });
+
+  it('seats the three other bosses in seeded order on the last boss’s arena and wins the brawl', () => {
+    for (const [who, names, stage] of [
+      ['zenka', ['dora', 'shinz', 'alpha'], 'office2'],
+      ['alpha', ['dora', 'zenka', 'shinz'], 'brboss'],
+      ['shinz', ['alpha', 'zenka', 'dora'], 'streetnight'],
+      ['dora', ['zenka', 'shinz', 'alpha'], 'office2'],
+    ] as const) {
+      const match = Match.story(who, battlesOf(who)[2]!);
+      expect(match.stage, who).toBe(stage);
+      expect(match.fighters, who).toHaveLength(4);
+      expect(match.fighters[0]!.who, who).toBe(who);
+      expect(
+        match.fighters.slice(1).map((f) => f.who),
+        who,
+      ).toEqual([...names]);
+      const all = (1 << 4) - 1;
+      expect(
+        match.fighters.map((f) => f.enemies),
+        who,
+      ).toEqual(
+        match.fighters.map((_, k) => (k === 0 ? all & ~1 : all & ~(1 << k))),
+      );
+      fight(match);
+      expect(
+        match.fighters.map((f) => f.present),
+        who,
+      ).toEqual([true, true, false, false]);
+      const [one] = match.fighters;
+      for (const boss of match.fighters.slice(1)) {
+        knockOut(match, boss, one);
+        match.step();
+      }
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, who).toBe('player');
+    }
+  });
+
+  it('toughens every stage-1/2 enemy seat at construction, waiting ones included, the player native', () => {
+    for (const who of BOSSES)
+      for (const i of [0, 1]) {
+        const match = Match.story(who, battlesOf(who)[i]!);
+        const [one, ...enemies] = match.fighters;
+        expect(one, `${who} ${i + 1} 1P`).toMatchObject({
+          hp: lifeOf(who),
+          maxHp: lifeOf(who),
+          maxStock: stocksOf(who),
+          enGainMultiplier: 1,
+        });
+        for (const f of enemies)
+          expect(f, `${who} ${i + 1} ${f.who}`).toMatchObject({
+            hp: 2 * lifeOf(f.who),
+            maxHp: 2 * lifeOf(f.who),
+            maxStock: 5,
+            enGainMultiplier: 2,
+          });
+        // The five waiting seats carry the stats before they enter.
+        expect(
+          match.fighters.slice(2).map((f) => f.present),
+          `${who} ${i + 1} waits`,
+        ).toEqual([false, false, false, false, false]);
+      }
+  });
+
+  it('keeps stage 3 and every fighter on it native', () => {
+    for (const who of BOSSES) {
+      const match = Match.story(who, battlesOf(who)[2]!);
+      for (const f of match.fighters)
+        expect(f, `${who} ${f.who}`).toMatchObject({
+          hp: lifeOf(f.who),
+          maxHp: lifeOf(f.who),
+          maxStock: stocksOf(f.who),
+          enGainMultiplier: 1,
+        });
+    }
+  });
+
+  it('re-seats the same tough stats after a drawn round instead of doubling them', () => {
+    // The route's battles run a single round; two make the reset reachable.
+    // A brawl drawn by survival — the 1P and every enemy fall in the same
+    // tick — scores a draw and moves both sides' win counters on.
+    const match = Match.story('zenka', {
+      ...battlesOf('zenka')[0]!,
+      rounds: 2,
+    });
+    fight(match);
+    for (const f of match.fighters) f.hp = 0;
+    const { round } = match;
+    for (let t = 0; t < 5000 && match.round === round; t++) match.step();
+    expect(match.round).toBe(2);
+    expect(match.wins).toEqual([1, 1]);
+    const [one, ...enemies] = match.fighters;
+    expect(one).toMatchObject({
+      hp: lifeOf('zenka'),
+      maxHp: lifeOf('zenka'),
+      maxStock: stocksOf('zenka'),
+      enGainMultiplier: 1,
+    });
+    for (const f of enemies)
+      expect(f, f.who).toMatchObject({
+        hp: 2 * lifeOf(f.who),
+        maxHp: 2 * lifeOf(f.who),
+        maxStock: 5,
+        enGainMultiplier: 2,
+      });
+  });
+
+  it("doubles only a tough enemy's positive EN into five 100-EN stocks, paying natively", () => {
+    const match = Match.story('zenka', battlesOf('zenka')[0]!);
+    const [one, enemy] = match.fighters;
+    // KIKI's 100 per stock gains doubled: one native stock's worth fills two.
+    addPower(enemy, 100);
+    expect(enemy).toMatchObject({ stock: 2, power: 0 });
+    // The cap is five stocks — KIKI's native three overridden — and the
+    // surplus past it is discarded.
+    addPower(enemy, 100 * 4);
+    expect(enemy).toMatchObject({ stock: 5, power: 0 });
+    // A negative cost borrows stock back at the native 100, not doubled.
+    [enemy.stock, enemy.power] = [1, 0];
+    addPower(enemy, -1);
+    expect(enemy).toMatchObject({ stock: 0, power: 99 });
+    // The player gains at the native rate.
+    addPower(one, 100);
+    expect(one).toMatchObject({ stock: 1, power: 0 });
+  });
+
+  it('leaves normal story, VS single, TEAM VS and regular B.R. ANOTHER native', () => {
+    const native = (label: string, match: Match) => {
+      fight(match);
+      for (const f of match.fighters)
+        expect(f, `${label} ${f.who}`).toMatchObject({
+          hp: lifeOf(f.who),
+          maxHp: lifeOf(f.who),
+          maxStock: stocksOf(f.who),
+          enGainMultiplier: 1,
+        });
+    };
+    native('story', Match.story('ryuko', FIRST));
+    native('vs', new Match('cpu', true, 0, ['ryuko', 'zaku'], 'court', true));
+    native(
+      'team',
+      Match.team(
+        [
+          ['ryuko', 'zoma'],
+          ['zaku', 'zaku'],
+        ],
+        'court',
+      ),
+    );
+    native(
+      'regular B.R.',
+      Match.story('masa', brAnotherStages('masa').stage2!),
+    );
+  });
+
+  it('derives enemy cheat HP from the seat base rather than compounding on repeat cheatSeat calls', () => {
+    const match = Match.story('zenka', battlesOf('zenka')[0]!);
+    match.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 3,
+    });
+    const enemy = match.fighters[1]!;
+    expect(enemy.maxHp).toBe(6 * lifeOf(enemy.who));
+    (match as unknown as { cheatSeat(f: Fighter, i: number): void }).cheatSeat(
+      enemy,
+      1,
+    );
+    expect(enemy.maxHp).toBe(6 * lifeOf(enemy.who));
   });
 });

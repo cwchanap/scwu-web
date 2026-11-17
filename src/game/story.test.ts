@@ -13,8 +13,8 @@ import {
   scenarioOf,
   TAKES,
 } from './story';
-import type { Battle, Next, Route, Step } from './story';
-import { brAnotherStages } from './br-another';
+import type { Battle, Next, SignRoute, Step } from './story';
+import { bossBrAnotherStory, brAnotherStages } from './br-another';
 
 const at = (story: Story) => story.step;
 
@@ -126,7 +126,7 @@ describe('story runner', () => {
         excluded.push(who);
         continue;
       }
-      const steps = (Object.keys(TAKES) as Route[]).map((route) => {
+      const steps = (Object.keys(TAKES) as SignRoute[]).map((route) => {
         const story = new Story(who);
         expect(story.startOnRoute(route).kind, `${who} ${route}`).not.toBe(
           'title',
@@ -167,6 +167,35 @@ describe('story runner', () => {
     expect(battle.kind).toBe('battle');
     expect(at(story)).toBe(22);
     expect(story.retry()).toEqual(battle);
+  });
+
+  it('keeps the mode-select predicate to its 34 regular fighters', () => {
+    // The bosses (30, 32, 33, 45) join the selector through BOSSES in
+    // scene.ts, never through this predicate, whose callers build the
+    // source-specific B.R. stories (authored, HPA-858).
+    expect(
+      (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+        opensOnModeSelect(who),
+      ),
+    ).toHaveLength(34);
+  });
+
+  it('records the active route: null on an ordinary story, a picked sign route, or boss-br', () => {
+    const story = new Story('ryuko');
+    expect([story.route, story.br]).toEqual([null, false]);
+    // The route a route sign picked stays on the story (HPA-858), which
+    // marks the battles it starts B.R.
+    story.startOnRoute('br-zero');
+    expect([story.route, story.br]).toEqual(['br-zero', true]);
+    story.startOnRoute('story-easy');
+    expect([story.route, story.br]).toEqual(['story-easy', false]);
+    // The bosses' generated B.R. ANOTHER route caches its steps by route (HPA-858).
+    const boss = new Story('shinz', 'boss-br');
+    expect([boss.route, boss.br]).toEqual(['boss-br', true]);
+    expect(boss.next()).toEqual({
+      kind: 'battle',
+      battle: bossBrAnotherStory('shinz')[0],
+    });
   });
 
   it('rejects a one-sign battle as the mode select', () => {
@@ -211,8 +240,8 @@ describe('story runner', () => {
 });
 
 describe('source route reachability', () => {
-  const routes = Object.keys(TAKES) as Route[];
-  const sharedRoutes: Route[] = ['story-easy', 'story-hard', 'br-zero'];
+  const routes = Object.keys(TAKES) as SignRoute[];
+  const sharedRoutes: SignRoute[] = ['story-easy', 'story-hard', 'br-zero'];
   const parsed = new Map<Who, readonly Step[]>();
   const source = (who: Who) => {
     let steps = parsed.get(who);
@@ -321,7 +350,7 @@ describe('source route reachability', () => {
         route,
         reach(steps, enter(steps, routeLife(who, route))),
       ]),
-    ) as Record<Route, ReturnType<typeof reach>>;
+    ) as Record<SignRoute, ReturnType<typeof reach>>;
 
   const demoId = (steps: readonly Step[], i: number) => {
     const step: Step | undefined = steps[i];
@@ -1311,7 +1340,7 @@ describe('source route reachability', () => {
     });
 
     it('keeps RARIO’s steps 50–54 reachable on its other routes only', () => {
-      const run = (route: Route) => {
+      const run = (route: SignRoute) => {
         const story = new Story('rario');
         const path: number[] = [];
         for (let next = story.startOnRoute(route); ; next = story.next()) {
@@ -1346,7 +1375,7 @@ describe('source route reachability', () => {
 
     it('plays RARIO’s three staged battles only, while his other routes still seat the DoraEmon tail', () => {
       const tail = CHARACTERS['rario'].scenario[52] as Battle;
-      const battlesOf = (route: Route) => {
+      const battlesOf = (route: SignRoute) => {
         const story = new Story('rario');
         const battles: { step: number; battle: Battle }[] = [];
         for (
@@ -1364,7 +1393,7 @@ describe('source route reachability', () => {
       expect(another.map((b) => b.step)).toEqual([45, 47, 48]);
       for (const { step, battle } of another)
         expect(battle, `step ${step}`).toBe(scenarioOf('rario')[step]);
-      for (const route of ['story-easy', 'br-zero'] as Route[]) {
+      for (const route of ['story-easy', 'br-zero'] as SignRoute[]) {
         const hit = battlesOf(route).find((b) => b.step === 52);
         expect(hit?.battle, route).toBe(tail);
         expect(
@@ -1377,7 +1406,7 @@ describe('source route reachability', () => {
     it('seats the battles its STORY and BR ZERO routes keep, unchanged from their source steps', () => {
       for (const who of ['ryuko', 'rario'] as Who[]) {
         const chars = CHARACTERS[who].scenario as readonly Step[];
-        for (const route of ['story-easy', 'br-zero'] as Route[]) {
+        for (const route of ['story-easy', 'br-zero'] as SignRoute[]) {
           const story = new Story(who);
           for (
             let next = story.startOnRoute(route), yields = 1;

@@ -309,3 +309,19 @@ export function twin(who: Who, index: number) {
 // The Ryuko action whose rules a player's victim action follows, if any.
 export const twinOf = (who: Who, index: number) =>
   who === 'ryuko' ? index : twins[who].ryuko.get(index);
+
+// Authored (HPA-858): per-fighter seat rules (DoraEmon's EN-charge actions,
+// CPU EN command id, and KO RELOAD target action), replacing hard-coded
+// action/command numbers in shared engine paths.
+export interface SeatGate {
+  readonly enChargeActions: ReadonlySet<number>;
+  readonly enChargeCpuCommands: ReadonlySet<number>;
+  readonly koReload: number;
+}
+export const SEAT_GATES: Partial<Record<Who, SeatGate>> = {
+  dora: {
+    enChargeActions: new Set([239, 240, 421]),
+    enChargeCpuCommands: new Set([42]),
+    koReload: 72,
+  },
+};

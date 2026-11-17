@@ -8,6 +8,7 @@ import type { CheatOptions } from './cheats';
 import { Match, LIFE } from './match';
 import { MODE_SELECT_SIGN_KEYS, parsePack } from './packs';
 import {
+  BOSSES,
   CharacterSelect,
   Continue,
   ModeSelect,
@@ -15,8 +16,9 @@ import {
   Title,
 } from './select';
 import type { Demo } from './select';
-import { scenarioOf, Story } from './story';
+import { scenarioOf, Story, TAKES } from './story';
 import type { Battle } from './story';
+import { bossBrAnotherStory } from './br-another';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { itWithArt } from './testing';
@@ -276,11 +278,12 @@ it('starts the pair a select picked after Escape left a story, not the battle it
 it('cancels a story demo still loading when Escape returns to the title', async () => {
   vi.stubGlobal('HTMLElement', class {});
   const { view, finishLoad } = boot();
-  // SHIN-Z's story select confirmed: his opening demo (3) starts loading
-  // while the select screen stays.
+  // GOLF's story select confirmed: his opening demo (6) starts loading
+  // while the select screen stays. A still-excluded non-boss story, since
+  // the four bosses open the mode select instead (HPA-858).
   const select = new CharacterSelect(undefined, true);
   view.select = select;
-  select.done = ['shinz', 'shinz'];
+  select.done = ['golf', 'golf'];
   stepSelect(view);
   expect(view.loading).toBe(true);
   // Escape opens the title before the demo's module lands.
@@ -297,7 +300,7 @@ it('drops a story demo whose art lands after Escape to the title', async () => {
   const { view, completes, finishLoad } = boot();
   const select = new CharacterSelect(undefined, true);
   view.select = select;
-  select.done = ['shinz', 'shinz'];
+  select.done = ['golf', 'golf'];
   stepSelect(view);
   // The demo's module landed and its art is loading; then Escape.
   await vi.waitFor(() => expect(completes).toHaveLength(1));
@@ -311,7 +314,7 @@ it('opens a story demo once its records and art finish loading', async () => {
   const { view, completes, finishLoad } = boot();
   const select = new CharacterSelect(undefined, true);
   view.select = select;
-  select.done = ['shinz', 'shinz'];
+  select.done = ['golf', 'golf'];
   stepSelect(view);
   await vi.waitFor(() => expect(completes).toHaveLength(1));
   finishLoad();
@@ -376,7 +379,7 @@ it('drops a playing story demo once a menu pick’s match begins', async () => {
   const { scene, view, completes, finishLoad } = boot();
   const select = new CharacterSelect(undefined, true);
   view.select = select;
-  select.done = ['shinz', 'shinz'];
+  select.done = ['golf', 'golf'];
   stepSelect(view);
   await vi.waitFor(() => expect(completes).toHaveLength(1));
   finishLoad();
@@ -438,11 +441,11 @@ it('leaves the next story battle alone on R while it loads', () => {
 it('starts a menu reset over a finished select, not the screen it replays', () => {
   const { scene, view, artIn } = boot();
   artIn();
-  // SHIN-Z's story select confirmed: his opening demo starts loading while
+  // GOLF's story select confirmed: his opening demo starts loading while
   // the finished screen stays.
   const select = new CharacterSelect(undefined, true);
   view.select = select;
-  select.done = ['shinz', 'shinz'];
+  select.done = ['golf', 'golf'];
   stepSelect(view);
   expect(view.loading).toBe(true);
   // Vs. CPU picked in the Menu: the demo load drops and the finished select
@@ -1033,9 +1036,12 @@ describe('mode select (HPA-765)', () => {
 
   it('keeps an excluded story on its direct start', () => {
     const { view } = boot();
+    // GOLF opens no mode select and starts his story directly (HPA-858:
+    // only the 34 regular Chii openers and the four bosses take the
+    // selector).
     const select = new CharacterSelect(undefined, true);
     view.select = select;
-    select.done = ['shinz', 'shinz'];
+    select.done = ['golf', 'golf'];
     stepSelect(view);
     expect(view.select).toBe(select);
     expect(view.loading).toBe(true);
@@ -1558,5 +1564,195 @@ describe('mode select (HPA-765)', () => {
     (view.openTitle as () => void)();
     expect(removed).toEqual([...MODE_SELECT_SIGN_KEYS]);
     expect(loaded.size).toBe(0);
+  });
+});
+
+// HPA-858: the four bosses join the selector, and each of their signs
+// starts its own story path — STORY their default story, B.R. the
+// generated route a new Story owns.
+describe('mode select (HPA-858 bosses)', () => {
+  // A finished story select whose pick is the given fighter, with the
+  // selector's sign pack resident, for the menu to sit over.
+  const openBossPick = (view: { [key: string]: unknown }, who: Who) => {
+    const textures = view.textures as { exists: (key: string) => boolean };
+    const origExists = textures.exists;
+    textures.exists = () => true;
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = [who, who];
+    stepSelect(view);
+    textures.exists = origExists;
+    return view.select as ModeSelect;
+  };
+
+  it('opens the selector for each of the four bosses instead of a direct start', () => {
+    const { view } = boot();
+    for (const who of BOSSES) {
+      const mode = openBossPick(view, who);
+      expect(mode).toBeInstanceOf(ModeSelect);
+      expect(mode.background.done).toEqual([who, who]);
+      // No story starts and no demo loads until a sign confirms.
+      expect(view.story).toBeNull();
+      expect(view.loading).toBe(false);
+      expect(view.wanted).toBeUndefined();
+    }
+  });
+
+  it('STORY starts each boss’s own default story, on its opening demo', async () => {
+    const { view, completes, finishLoad } = boot();
+    for (const who of BOSSES) {
+      const mode = openBossPick(view, who);
+      mode.done = 'story';
+      stepSelect(view);
+      const story = view.story as Story;
+      // The fighter's default story: no route.
+      expect(story.who).toBe(who);
+      expect(story.route).toBeNull();
+      expect(story.br).toBe(false);
+      // All four open on their own demo 3.
+      expect(story.step).toBe(0);
+      await vi.waitFor(() => expect(completes).toHaveLength(1));
+      finishLoad();
+      expect(view.select).toBeInstanceOf(StoryDemo);
+      expect((view.select as StoryDemo).index).toBe(3);
+      completes.length = 0;
+    }
+  });
+
+  it('B.R. starts a boss on the generated route a new Story owns, marked B.R.', () => {
+    const { scene, view, artIn, statuses } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true; // the sign pack and stage are resident
+    const mode = openBossPick(view, 'shinz');
+    mode.done = 'boss-br';
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('boss-br');
+    expect(story.br).toBe(true);
+    // The generated route's own first battle starts directly: no
+    // routeLife take (the generated path has no Chii-sign jumps) and no
+    // ordinary story runner call.
+    expect(story.step).toBe(0);
+    expect(view.storyLife).toBe(0);
+    expect(view.storyLost).toBe(0);
+    // The battle is on, marked B.R., on Sakura Street with the 1P and its
+    // six enemies.
+    expect(view.select).toBeNull();
+    expect(scene.match.br).toBe(true);
+    expect(scene.match.battle).toEqual(bossBrAnotherStory('shinz')[0]);
+    expect(scene.match.stage).toBe('sakura');
+    expect(scene.match.fighters[0].who).toBe('shinz');
+    expect(scene.match.fighters).toHaveLength(7);
+    // The route's own hardening seats without cheats: every enemy at the
+    // route's ×2 with five stocks, and the run stays unmarked.
+    expect(scene.match.cheats).toEqual(DEFAULT_CHEATS);
+    expect(statuses.at(-1)?.cheated).toBe(false);
+    for (const f of scene.match.fighters.slice(1))
+      expect(f, f.who).toMatchObject({
+        hp: 2 * lifeOf(f.who),
+        maxHp: 2 * lifeOf(f.who),
+        maxStock: 5,
+      });
+  });
+
+  it('marks an ordinary fighter’s B.R. ZERO route B.R. too', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
+    artIn();
+    const mode = openBossPick(view, 'ryuko');
+    mode.stage = 1;
+    mode.done = 'br-zero';
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('br-zero');
+    // Ryuko br-zero: the runner lands on step 47's demo, then the route's
+    // battle follows marked B.R.
+    expect(view.storyLife).toBe(lifeOf('ryuko') - 1 - TAKES['br-zero']);
+    await vi.waitFor(() => expect(completes).toHaveLength(1));
+    finishLoad();
+    const demo = view.select as StoryDemo;
+    expect(demo).toBeInstanceOf(StoryDemo);
+    demo.done = true;
+    stepSelect(view);
+    expect(view.select).toBeNull();
+    expect(scene.match.br).toBe(true);
+    expect(scene.match.fighters[0].who).toBe('ryuko');
+  });
+
+  it('keeps an ordinary route’s battles unmarked', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
+    artIn();
+    const mode = openBossPick(view, 'ryuko');
+    mode.stage = 1;
+    mode.done = 'story-easy';
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('story-easy');
+    await vi.waitFor(() => expect(completes).toHaveLength(1));
+    finishLoad();
+    const demo = view.select as StoryDemo;
+    demo.done = true;
+    stepSelect(view);
+    expect(scene.match.br).toBe(false);
+  });
+
+  it('practice matches stay unmarked', () => {
+    const { scene, artIn } = boot();
+    artIn();
+    scene.reset('practice');
+    expect(scene.match.br).toBe(false);
+  });
+
+  it('Escape over a stage-0 boss confirmation cancels the pending battle load and restores the cheated mark', async () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+
+    const mode = openBossPick(view, 'shinz');
+    mode.done = 'boss-br';
+    stepSelect(view);
+    // The generated battle's stage and fighters load while the selector
+    // stays up.
+    expect(view.loading).toBe(true);
+    expect(view.select).toBe(mode);
+    esc(view);
+    // The cancelled pick steps back to the mode sign, still at stage 0,
+    // and keeps the previous run's cheated mark since no new run started.
+    expect(view.loading).toBe(false);
+    expect(view.select).toBe(mode);
+    expect(mode.stage).toBe(0);
+    expect(mode.done).toBeNull();
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    // The load lands cancelled: no battle starts, the pick is not replayed.
+    finishLoad();
+    expect(view.select).toBe(mode);
+    expect(view.wanted).toBeUndefined();
+    expect(scene.match.mode).toBe('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+  });
+
+  it('Escape over a regular route load restores the cheated mark too', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+
+    const mode = openBossPick(view, 'ryuko');
+    mode.stage = 1;
+    mode.done = 'br-zero';
+    stepSelect(view);
+    expect(view.loading).toBe(true);
+    esc(view);
+    expect(view.loading).toBe(false);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    finishLoad();
+    expect(statuses.at(-1)?.cheated).toBe(true);
   });
 });

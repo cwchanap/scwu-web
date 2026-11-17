@@ -41,6 +41,7 @@ import {
   perStockOf,
   responseEffectsOf,
   responsesOf,
+  SEAT_GATES,
   STAGES,
   stocksOf,
   twin,
@@ -82,6 +83,13 @@ import {
 import { ROSTER, takePalette } from './select';
 import ui from './generated/ui.json';
 import type { Battle, Slot } from './story';
+const toughSeat = (slot: Slot | null | undefined) =>
+  Boolean(slot?.tough && !(slot.flags & 0x200));
+const EMPTY_COMMANDS: ReadonlySet<number> = new Set();
+const blockedCpuCommands = (who: Who, br: boolean) =>
+  br
+    ? (SEAT_GATES[who]?.enChargeCpuCommands ?? EMPTY_COMMANDS)
+    : EMPTY_COMMANDS;
 export const SUPER_CONTROLS = [
   'getterBeam',
   'musashi',
@@ -1159,6 +1167,9 @@ export interface Fighter {
   // `stocksOf(who)` natively, 1P's `playerEnLimit` under cheats.
   maxHp: number;
   maxStock: number;
+  // Authored (HPA-858): the boss B.R. ANOTHER route's tough seats gain EN
+  // doubly (addPower); every native path is 1.
+  enGainMultiplier: number;
   // +0xdf25: life a loss took that a story's life bar still shows in red,
   // and +0xdf29, the steps before it drains (lifeBars).
   lost: number;
@@ -1585,6 +1596,7 @@ const fighter = (x: number, facing: -1 | 1, who: Who = 'ryuko'): Fighter => ({
   hp: lifeOf(who),
   maxHp: lifeOf(who),
   maxStock: stocksOf(who),
+  enGainMultiplier: 1,
   lost: 0,
   lostDelay: 0,
   bar: { x, y: 0 },
@@ -1699,7 +1711,10 @@ function walkSpeed(who: Who, back: boolean) {
 // cap (its effective `maxStock`, HPA-767), and borrows stock back; none at
 // the start (+0x7cc2).
 export function addPower(f: Fighter, amount: number) {
-  f.power += amount;
+  // Authored (HPA-858): a route-tough seat's positive gain doubles; costs
+  // and drains pass through native, as do the direct op-0x10 stock adds
+  // that never come through here.
+  f.power += amount > 0 ? amount * f.enGainMultiplier : amount;
   while (f.power < 0) {
     if (f.stock === 0) f.power = 0;
     else {
@@ -1893,12 +1908,21 @@ export class Match {
     // (export_stage), and KGT 13 holds it at 10 for each round's first 10
     // ticks (`step`).
     readonly globals = selected(vs ? 50 : 0),
+    // Authored (HPA-858): the story runs a B.R. route (br-zero,
+    // br-another or a generated one), which seat rules gate on.
+    readonly br = false,
   ) {
     this.layers = stageObjects(stage);
     const cpu = characters[1];
     this.cpus = [
       null,
-      new CpuVM(CPU_TABLES[cpu], CPU_LEVEL, seed, CPU_CONTROLS[cpu]),
+      new CpuVM(
+        CPU_TABLES[cpu],
+        CPU_LEVEL,
+        seed,
+        CPU_CONTROLS[cpu],
+        blockedCpuCommands(cpu, br),
+      ),
     ];
     this.calls = intro;
     if (battle) {
@@ -1941,6 +1965,8 @@ export class Match {
     seed = 0,
     held?: number[],
     globals?: number[],
+    // Authored (HPA-858): whether the active story route is a B.R. one.
+    br = false,
   ) {
     return new Match(
       'story',
@@ -1952,6 +1978,7 @@ export class Match {
       battle,
       held,
       globals,
+      br,
     );
   }
 
@@ -1983,7 +2010,13 @@ export class Match {
       if (!slot) return;
       const who = ROSTER[slot.player]!;
       const level = Math.max(0, Math.min(100, slot.level));
-      const vm = new CpuVM(CPU_TABLES[who], level, seed, CPU_CONTROLS[who]);
+      const vm = new CpuVM(
+        CPU_TABLES[who],
+        level,
+        seed,
+        CPU_CONTROLS[who],
+        blockedCpuCommands(who, this.br),
+      );
       if (this.seats.length > 1) vm.shared = this.cpus[1]!;
       this.cpus[this.seats.length] = vm;
       this.seats.push(i + 1);
@@ -2020,6 +2053,17 @@ export class Match {
       const who = slot ? ROSTER[slot.player]! : this.characters[0];
       const ally = !slot || slot.flags & 0x200;
       const f = fighter((slot ?? battle).x * 1.5, ally ? 1 : -1, who);
+      // Authored (HPA-858): the boss B.R. ANOTHER route marks its regular
+      // enemy seats tough — twice the life, five 100-EN stocks and doubled
+      // positive EN gain. The stats seat on every rebuild of the round's
+      // fighters (nextRound shares this path), never accumulating, and
+      // compose with the Cheats snapshot in cheatSeat.
+      if (toughSeat(slot)) {
+        f.maxHp = 2 * lifeOf(f.who);
+        f.hp = f.maxHp;
+        f.maxStock = 5;
+        f.enGainMultiplier = 2;
+      }
       f.enemies = bits(slot ? slot.enemies : ~1 & ~allies);
       const entry = slot ? (slot.flags >> 1) & 3 : 0;
       if (entry === 2) {
@@ -2274,7 +2318,11 @@ export class Match {
         this.teams[1][this.members[1]],
       ];
       const who = this.characters[1];
-      this.cpu.reset(CPU_TABLES[who], CPU_CONTROLS[who]);
+      this.cpu.reset(
+        CPU_TABLES[who],
+        CPU_CONTROLS[who],
+        blockedCpuCommands(who, this.br),
+      );
     }
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
@@ -2377,11 +2425,12 @@ export class Match {
         Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
       );
       f.maxStock = this.cheats.playerEnLimit;
-    } else if (this.hostile(0, i))
-      f.maxHp = Math.max(
-        1,
-        Math.round(lifeOf(f.who) * this.cheats.enemyHpMultiplier),
-      );
+    } else if (this.hostile(0, i)) {
+      // Authored (HPA-858): derive from the seat's route base — 2× on a
+      // tough seat, 1× otherwise — so re-seating never compounds.
+      const base = (toughSeat(this.slots[i]) ? 2 : 1) * lifeOf(f.who);
+      f.maxHp = Math.max(1, Math.round(base * this.cheats.enemyHpMultiplier));
+    }
     f.hp = f.maxHp;
   }
 
@@ -3624,7 +3673,13 @@ export class Match {
       case 'stock':
         if ('clip' in actor || actor.action !== 'script') break;
         if (event.atLeast) {
-          if (self.stock >= event.min)
+          if (
+            self.stock >= event.min &&
+            !(
+              this.koReloadBlocked(self) &&
+              event.target === SEAT_GATES[self.who]?.koReload
+            )
+          )
             return this.branchTo(actor, sourceKey(event.target, event.offset));
           break;
         }
@@ -4384,6 +4439,14 @@ export class Match {
     // Each entry enters its stance's action, which plays from its own
     // timeline; a window passes it by that action's level.
     const index = entriesOf(f.who)[found.entry - 1][found.stance];
+    // Authored (HPA-858): only a CPU-driven fighter outside B.R. enters
+    // its EN-charge actions (DoraEmon's ex press 239, held EN 240 -> 240+3,
+    // and CPU EN command 421); fighter 0, non-CPU practice dummies, and
+    // any seat in a B.R. route enter nothing. His other commands and every
+    // other EN path (scripts, addPower) stand.
+    const gate = SEAT_GATES[f.who];
+    if (gate?.enChargeActions.has(index) && (!this.driven(f) || this.br))
+      return false;
     if (!ok(LEVELS[f.who][index], index)) return false;
     this.enterSource(f, index);
     const i = this.fighters.indexOf(f);
@@ -4427,6 +4490,16 @@ export class Match {
     target.pending = { action, stop, attackerStop, power, own };
   }
 
+  // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) takes the
+  // ordinary KO in every mode, B.R. included, never KO RELOAD (72) —
+  // whichever of its two entries (KO Normal's check, PC 775, or the lose
+  // action's 77) the source reaches first.
+  private koReloadBlocked(f: Fighter) {
+    return (
+      Boolean(SEAT_GATES[f.who]?.koReload) && this.fighters.indexOf(f) === 0
+    );
+  }
+
   // 0x412327: a step first enters the action queued for it, stopped or not,
   // and runs its first records (0x412564) instead of the CPU, the landing
   // check and the commands. A reaction's are its op 0x20 (roll), the op 0x01
@@ -4463,9 +4536,18 @@ export class Match {
         0,
         ko.findIndex((e) => e.t || (e.op !== 'stock' && e.op !== 'test')),
       );
+      // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) skips
+      // KO RELOAD's stock test (PC 775, action 72) and takes the ordinary
+      // KO in every mode, B.R. included; a CPU DoraEmon still reloads, and
+      // every other fighter's checks stand (HPA-1035 owns switching revival
+      // off for all of them in B.R.). The same restriction guards the stock
+      // handler itself, because the lose action's global-0 jump (68 into
+      // 77) runs its own stock test past this loop.
+      const plainKo = this.koReloadBlocked(f);
+      const koReload = SEAT_GATES[f.who]?.koReload;
       const check = checks.find((e) =>
         e.op === 'stock'
-          ? e.atLeast && f.stock >= e.min
+          ? e.atLeast && f.stock >= e.min && !(plainKo && e.target === koReload)
           : e.op === 'test' && this.passes(f, f, e),
       );
       const again = check?.op === 'test' && check.selector === 0x43;

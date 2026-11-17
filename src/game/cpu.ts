@@ -201,6 +201,7 @@ const DIRECTIONS = [
 ];
 type Body = Pick<Fighter, 'x' | 'y'>;
 const airborne = (f: Body) => f.y < 0;
+const EMPTY_COMMANDS: ReadonlySet<number> = new Set();
 
 export class CpuVM {
   // Player +0xdf7d (decision timer), +0xdf75 (active entry), +0xdf81 (step)
@@ -216,6 +217,10 @@ export class CpuVM {
     public level = CPU_LEVEL,
     public seed = 0,
     private controls = CONTROLS,
+    // Authored (HPA-858): command numbers suppressed in the current match
+    // (DoraEmon's EN command 42 in B.R.), skipped during the slot scan
+    // while still drawing every slot's random roll.
+    public blockedCommands: ReadonlySet<number> = EMPTY_COMMANDS,
   ) {}
 
   // Authored: the engine shares one rand seed with everything; the CPU keeps
@@ -244,7 +249,8 @@ export class CpuVM {
           distance >= entry.min &&
           distance <= entry.max &&
           Boolean(entry.flags & 1) === airborne(self) &&
-          Boolean(entry.flags & 2) === airborne(opponent)
+          Boolean(entry.flags & 2) === airborne(opponent) &&
+          !entry.steps.some((s) => this.blockedCommands.has(s.command))
         ) {
           this.entry = entry;
           this.step = -1;
@@ -274,8 +280,16 @@ export class CpuVM {
   // entry and step timer, so a CPU draws on its first fighting tick of every
   // round; the step (+0xdf81) stays, as each entry starts it afresh. VS
   // multi's player 2 takes its new member's table.
-  reset(entries = this.entries, controls = this.controls) {
-    [this.entries, this.controls] = [entries, controls];
+  reset(
+    entries = this.entries,
+    controls = this.controls,
+    blockedCommands = this.blockedCommands,
+  ) {
+    [this.entries, this.controls, this.blockedCommands] = [
+      entries,
+      controls,
+      blockedCommands,
+    ];
     this.timer = this.stepTimer = 0;
     this.entry = null;
     this.last = {};

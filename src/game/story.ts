@@ -3,8 +3,8 @@
 // after the last until one starts a battle or a demo.
 import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
-import { brAnotherStory } from './br-another';
-import { ROSTER } from './select';
+import { brAnotherStory, bossBrAnotherStory } from './br-another';
+import { BOSSES, ROSTER } from './select';
 
 export interface Slot {
   flags: number;
@@ -21,6 +21,10 @@ export interface Slot {
   power: number;
   scorer: number;
   timeUp: number;
+  // Authored (HPA-858): marks one of the generated boss B.R. ANOTHER's
+  // regular enemy seats, whose stats Match toughens (match.ts). Native
+  // exported slots never set it.
+  tough?: boolean;
 }
 export interface Battle {
   type: 1;
@@ -95,9 +99,11 @@ export const scenarioOf = (who: Who) =>
 // The routes a mode-select battle's Chii signs offer (docs/evidence.md,
 // Globals): striking a sign KO's it into taking the 1P's life by its take —
 // 100 for Easy, 346 for Hard, 347 for BR ZERO and 348 for BR Another —
-// which steps 1–3's jumps read.
-export type Route = 'story-easy' | 'story-hard' | 'br-zero' | 'br-another';
-export const TAKES: Record<Route, number> = {
+// which steps 1–3's jumps read. The four bosses' generated B.R. ANOTHER
+// route ('boss-br') carries no Chii-sign take.
+export type SignRoute = 'story-easy' | 'story-hard' | 'br-zero' | 'br-another';
+export type Route = SignRoute | 'boss-br';
+export const TAKES: Record<SignRoute, number> = {
   'story-easy': 100,
   'story-hard': 346,
   'br-zero': 347,
@@ -105,7 +111,7 @@ export const TAKES: Record<Route, number> = {
 };
 // Native 1P life left after the skipped Chii sign battle: 1P's max less the
 // Single Start's 1 and the chosen sign's take.
-export const routeLife = (who: Who, route: Route) =>
+export const routeLife = (who: Who, route: SignRoute) =>
   lifeOf(who) - 1 - TAKES[route];
 
 // Whether a step is the mode-select battle: the Chii, whose seats hold only
@@ -123,9 +129,14 @@ export const isModeSelectBattle = (step: Step | undefined) =>
   step.slots.filter((s) => s !== null && !(s.flags & 0x200)).length >= 2;
 
 // Whether the story opens on its mode select: the first step is the Chii
-// battle.
+// battle (the 34 regular fighters).
 export const opensOnModeSelect = (who: Who) =>
   isModeSelectBattle(scenarioOf(who)[0]);
+
+// Whether picking the fighter in story mode opens ModeSelect (the 34 Chii
+// fighters plus the four bosses).
+export const hasModeSelect = (who: Who) =>
+  opensOnModeSelect(who) || (BOSSES as readonly Who[]).includes(who);
 
 const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
   (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
@@ -135,21 +146,44 @@ const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
   ),
 );
 
+const BOSS_BR_STORIES = new Map<Who, readonly Step[]>(
+  BOSSES.map((who) => [who, bossBrAnotherStory(who)]),
+);
+
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
+  // Authored (HPA-858): the route this run is on — the picked sign route,
+  // or the bosses' generated B.R. ANOTHER ('boss-br') — which marks the
+  // battles it starts B.R.; null on an ordinary story.
+  route: Route | null;
 
-  constructor(readonly who: Who) {}
+  constructor(
+    readonly who: Who,
+    route: Route | null = null,
+  ) {
+    this.route = route;
+  }
+
+  get br() {
+    return (
+      this.route === 'br-zero' ||
+      this.route === 'br-another' ||
+      this.route === 'boss-br'
+    );
+  }
 
   // The runner reads the 1P's life (+0xdf05) and the rounds it lost or drew
   // in the last battle (0x424e64) for its jumps.
   next(life = 0, lost = 0): Next {
-    const steps = scenarioOf(this.who);
+    const scenario =
+      (this.route === 'boss-br' ? BOSS_BR_STORIES.get(this.who) : undefined) ??
+      scenarioOf(this.who);
     // More than 200 steps in one run, a step out of 0–99, an empty step
     // (type 0) or the end (4) return to the title (0x406b75–0x406bcb).
     for (let runs = 1; runs <= 200; runs++) {
       if (++this.step < 0 || this.step >= 100) break;
-      const step = steps[this.step] ?? { type: 0 };
+      const step = scenario[this.step] ?? { type: 0 };
       if (step.type === 1) {
         // A battle without a stage (+1) or a demo without an index runs on.
         if (step.stage) return { kind: 'battle', battle: step };
@@ -175,8 +209,10 @@ export class Story {
   // Enter the story as if the 1P struck the route's Chii sign: the skipped
   // sign battle is step 0's, and next() reads the life it left — the 1P's
   // less its take and the Single Start's 1 — through the usual jumps, whose
-  // branches (YINAN's/AYA's and RARIO's included) stay the runner's.
-  startOnRoute(route: Route): Next {
+  // branches (YINAN's/AYA's and RARIO's included) stay the runner's. The
+  // route stays on the story (authored, HPA-858).
+  startOnRoute(route: SignRoute): Next {
+    this.route = route;
     this.step = 0;
     return this.next(routeLife(this.who, route), 0);
   }

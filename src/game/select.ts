@@ -12,7 +12,7 @@ import { ART_SCALE } from './match';
 import type { Input } from './match';
 import { rand } from './standing';
 import type { Frame } from './standing';
-import type { Route } from './story';
+import type { Route, SignRoute } from './story';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -101,6 +101,12 @@ export const selectable = (index: number, bit = 2) =>
   LAYOUT.named[index] &&
   (index === 45 || (LAYOUT.flags[index] & bit) !== 0) &&
   ROSTER[index] !== null;
+
+// Authored (HPA-858): the four boss characters, seated at 30, 32, 33 and 45.
+// The quick mode selector opens them for STORY or B.R. MODE, and their B.R.
+// ANOTHER route is generated (br-another.ts), which imports this list —
+// never the reverse, which would cycle through story.ts.
+export const BOSSES = ['zenka', 'alpha', 'shinz', 'dora'] as const;
 
 export interface SelectObject {
   container: SelectContainer;
@@ -802,7 +808,7 @@ export const MODE_BOARDS: readonly ModeBoard[] = [
   { who: 'pachelo', image: 8001 },
 ];
 export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
-  route: Route;
+  route: SignRoute;
 })[])[] = [
   [
     { who: 'zaku', image: 8005, route: 'story-easy' },
@@ -865,8 +871,12 @@ let modePlace = 0;
 const routePlace = [0, 0];
 
 export class ModeSelect extends Screen {
-  done: Route | null = null;
-  // 0 picks STORY or B.R., 1 that mode's route.
+  // The route a route sign picked (authored, HPA-765) — or, for a boss
+  // (authored, HPA-858), the mode its first sign picked: bosses have no
+  // route step, and B.R. is their generated ANOTHER route.
+  done: Route | 'story' | null = null;
+  // 0 picks STORY or B.R., 1 that mode's route. A boss confirms on the
+  // first sign, so stage never leaves 0.
   stage = 0;
   // The fighter the finished select took.
   readonly who: Who;
@@ -905,7 +915,8 @@ export class ModeSelect extends Screen {
     this.place();
   }
 
-  // Escape on the route step comes back here, the picks kept.
+  // Escape over a confirmed pick (or a route step) comes back here, the
+  // picks kept.
   back() {
     this.stage = 0;
     this.choice = modePlace;
@@ -917,6 +928,13 @@ export class ModeSelect extends Screen {
 
   private confirm() {
     this.latch = true;
+    // A boss's first sign confirms the mode outright (authored, HPA-858):
+    // STORY, or B.R.'s generated ANOTHER route ('boss-br').
+    if ((BOSSES as readonly Who[]).includes(this.who)) {
+      modePlace = this.choice;
+      this.done = this.choice ? 'boss-br' : 'story';
+      return;
+    }
     if (!this.stage) {
       modePlace = this.choice;
       this.stage = 1;
