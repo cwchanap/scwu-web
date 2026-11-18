@@ -3502,7 +3502,8 @@ export class Match {
         // arms its cancel counter by kind bit 0 (0x412d24): ERUS's K3 (196)
         // strikes with kind 0 (PC 2729), so its hit never opens its window (PC
         // 2708).
-        if (box && !('clip' in actor)) {
+        // Authored collision-only Fists shadows do not alter attack bookkeeping.
+        if (box && !(box.kind & 0x100) && !('clip' in actor)) {
           actor.contact = box.kind & 1;
           if (box.kind & 2) actor.connected = false;
         }

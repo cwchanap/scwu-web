@@ -19,7 +19,7 @@ import {
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, fighterPose, firstStrike, Match } from './match';
-import type { Fighter, Input } from './match';
+import type { Effect, Fighter, Input } from './match';
 import { CharacterSelect, StoryDemo } from './select';
 import type { Demo } from './select';
 import { StandingVM } from './standing';
@@ -350,6 +350,50 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
           .filter((e) => e.op === 'box' && e.slot === 1 && !e.w)
           .map((e) => e.t),
       ).toEqual(punches.map((e) => e.t + 1));
+    },
+  );
+
+  it.each([false, true])(
+    'does not super-cancel Fists after its kind-6 punches meet guard %s',
+    (guard) => {
+      const { match, dora, other } = doraPlayer(180);
+      const defense = guard ? { right: true } : {};
+      dora.stock = 5;
+      match.step({ changeAttack: true }, defense);
+      expect(dora.branch).toBe(327);
+      let blocked = false;
+      for (let t = 0; t < 2000 && dora.branch === 327 && dora.age < 188; t++) {
+        other.x = dora.x + 180;
+        match.step({}, defense);
+        blocked ||= other.action === 'timeStopGuard';
+      }
+      expect([dora.branch, dora.age]).toEqual([327, 188]);
+      expect(dora.hits > 0).toBe(!guard);
+      expect(blocked).toBe(guard);
+      expect(dora.contact).toBe(0);
+      match.step({ blackRush: true }, defense);
+      expect([dora.branch, dora.stock, dora.contact]).toEqual([327, 4, 0]);
+    },
+  );
+
+  it.each([false, true])(
+    'still super-cancels a real normal punch after %s guard',
+    (guard) => {
+      const { match, dora, other } = doraPlayer(120);
+      dora.stock = 5;
+      const defense = guard ? { right: true } : {};
+      match.step({ punch: true }, defense);
+      expect(dora.branch).toBe(203);
+      for (let t = 0; t < 100 && dora.contact !== 2; t++)
+        match.step({}, defense);
+      expect(dora.contact).toBe(2);
+      expect(dora.hits > 0).toBe(!guard);
+      match.step({ blackRush: true }, defense);
+      for (let t = 0; t < 100 && dora.branch === 203; t++)
+        match.step({}, defense);
+      expect(dora.branch).toBe(338);
+      expect(dora.stock).toBe(4);
+      expect(other.hp < lifeOf('ryuko')).toBe(!guard);
     },
   );
 
@@ -1228,10 +1272,11 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     const match = new Match('cpu', true, 0, ['dora', 'zoma']);
     const dora = match.fighters[0];
     let ticks = 0;
-    while (dora.action === 'intro') {
+    while (dora.action === 'intro' && ticks < 400) {
       match.step({});
       ticks++;
     }
+    expect(dora.action).not.toBe('intro');
     // OP super Charge (46) clears his power and adds 360 (PCs 573–574).
     expect([ticks, dora.stock, dora.y]).toEqual([337, 4, 0]);
     // 開始時 BR's display and Round 1's pocket pose (image 263, PC 365),
@@ -1706,7 +1751,8 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     }
     // The late entrance still plays his authored intro — its own charge
     // stocks him — before the CPU ever thinks.
-    while (dora.action === 'intro') match.step();
+    for (let t = 0; t < 400 && dora.action === 'intro'; t++) match.step();
+    expect(dora.action).not.toBe('intro');
     expect(dora.stock).toBe(4);
     // One grounded target inside the EN entry's distance window; every
     // other fighter stands beyond it, so the nearest is always that one.
@@ -1800,7 +1846,9 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     for (const f of [alpha, shinz, zenka]) f.x = x + 1500;
     const ages = [0, 149, 150, 177, 257, 266, 267, 276, 336];
     const poses = new Map<number, [number, number]>();
-    const spawned = new Set<unknown>();
+    const black = new Set<Effect>();
+    const charge = new Set<Effect>();
+    let landing = false;
     let ticks = 0;
     let gauge = 0;
     do {
@@ -1809,11 +1857,17 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       kiki.x = x - 90;
       match.step();
       ticks++;
-      for (const e of match.effects) if (e.owner === 4) spawned.add(e.clip);
+      for (const e of match.effects) {
+        if (e.owner !== 4) continue;
+        if (e.clip === 50) black.add(e);
+        if (e.clip === 46) charge.add(e);
+        if (e.clip === 407) landing = true;
+      }
       gauge = Math.max(gauge, dora.power + dora.stock * perStockOf('dora'));
       if (dora.action === 'intro')
         expect([dora.hp, dora.hitStop, dora.x]).toEqual([dora.maxHp, 0, x]);
-    } while (dora.action === 'intro');
+    } while (dora.action === 'intro' && ticks < 400);
+    expect(dora.action).not.toBe('intro');
     // The first-seat test's 337 ticks, sampled sprite ids and landing.
     expect(ticks).toBe(337);
     expect(ages.map((a) => poses.get(a)![0])).toEqual([
@@ -1830,9 +1884,9 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     // B.R. seat's dead voluntary EN command (HPA-858) never gated it.
     expect([gauge, dora.stock, dora.power]).toEqual([360, 4, 0]);
     // Black (50), OP super Charge (46) and the landing's object (407).
-    expect(spawned.has(50)).toBe(true);
-    expect(spawned.has(46)).toBe(true);
-    expect(spawned.has(407)).toBe(true);
+    expect(black.size).toBe(1);
+    expect(charge.size).toBe(1);
+    expect(landing).toBe(true);
     // The CPU never thought during the intro; the ally's own watch never
     // tripped, and the battle still offers Continue.
     expect(thinks).toBe(0);
