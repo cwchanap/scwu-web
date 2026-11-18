@@ -18,13 +18,14 @@ import {
 } from './animations';
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import { faceImage, gaugeCrop } from './hud';
-import { addPower, Match } from './match';
+import { addPower, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { CharacterSelect, StoryDemo } from './select';
 import type { Demo } from './select';
 import { StandingVM } from './standing';
 import { Story, scenarioOf } from './story';
 import type { Battle } from './story';
+import { strike } from './testing';
 
 // DoraEmon as player 1, `gap` from Ryuko as player 2.
 function doraPlayer(gap = 90) {
@@ -1184,6 +1185,10 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
       expect(next.present).toBe(true);
       watched.hp = watched.maxHp;
     }
+    // The late entrance still plays his authored intro — its own charge
+    // stocks him — before the CPU ever thinks.
+    while (dora.action === 'intro') match.step();
+    expect(dora.stock).toBe(4);
     // One grounded target inside the EN entry's distance window; every
     // other fighter stands beyond it, so the nearest is always that one.
     for (const f of match.fighters)
@@ -1233,6 +1238,98 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     }
     expect(entered.slice(injectStart).some(([, b]) => b === 421)).toBe(false);
     expect(total()).toBe(hold);
+  });
+
+  it('plays his whole Br. intro from a waiting seat in B.R., untouchable, before the CPU wakes', () => {
+    // kiki's stage-3 brawl seats DoraEmon last, watching ZENKA's seat:
+    // arrive → opening enters the authored Br. intro mid-fight, as a first
+    // seat's does before the fight.
+    const battle = brAnotherStages('kiki').stage3;
+    const match = Match.story('kiki', battle, 0, undefined, undefined, true);
+    expect(match.br).toBe(true);
+    const dora = match.fighters[4];
+    expect(dora.who).toBe('dora');
+    const ally = match.fighters[5];
+    driveCpus(match, 4, {});
+    while (match.roundTicks <= match.fightTick) match.step();
+    const [kiki, alpha, shinz, zenka] = match.fighters;
+    for (const [watched, next] of [
+      [alpha, shinz],
+      [shinz, zenka],
+      [zenka, dora],
+    ] as const) {
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present).toBe(true);
+      watched.hp = watched.maxHp;
+    }
+    // The 337 ticks start on his actual entry, long after the fight began.
+    expect([dora.action, dora.age]).toEqual(['intro', 0]);
+    expect(match.roundTicks).toBeGreaterThan(match.fightTick);
+    const vm = match.cpus[4]!;
+    const real = vm.input.bind(vm);
+    let thinks = 0;
+    vm.input = (self: Fighter, opponent: Fighter) => (
+      thinks++,
+      real(self, opponent)
+    );
+    // The intro poses carry no body boxes, so a hostile strike neither hits
+    // nor pushes him: kiki punches at him for the whole intro.
+    const x = dora.x;
+    kiki.x = x - 90;
+    kiki.facing = 1;
+    for (const f of [alpha, shinz, zenka]) f.x = x + 1500;
+    const ages = [0, 149, 150, 177, 257, 266, 267, 276, 336];
+    const poses = new Map<number, [number, number]>();
+    const spawned = new Set<unknown>();
+    let ticks = 0;
+    let gauge = 0;
+    do {
+      poses.set(dora.age, [fighterPose(dora).image, dora.y]);
+      if (kiki.action !== 'script') strike(match, kiki, 177);
+      kiki.x = x - 90;
+      match.step();
+      ticks++;
+      for (const e of match.effects) if (e.owner === 4) spawned.add(e.clip);
+      gauge = Math.max(gauge, dora.power + dora.stock * perStockOf('dora'));
+      if (dora.action === 'intro')
+        expect([dora.hp, dora.hitStop, dora.x]).toEqual([dora.maxHp, 0, x]);
+    } while (dora.action === 'intro');
+    // The first-seat test's 337 ticks, sampled sprite ids and landing.
+    expect(ticks).toBe(337);
+    expect(ages.map((a) => poses.get(a)![0])).toEqual([
+      263, 263, 264, 268, 268, 125, 124, 124, 184,
+    ]);
+    const ys = ages.map((a) => poses.get(a)![1]);
+    expect([ys[0], ys[1], ys[2]]).toEqual([0, 0, 0]);
+    expect(ys[3]).toBeLessThan(0);
+    expect(ys[4]).toBe(ys[3]);
+    expect(ys[5]).toBeLessThan(0);
+    expect(ys[5]).toBeGreaterThan(ys[4]);
+    expect([ys[6], ys[7], ys[8]]).toEqual([0, 0, 0]);
+    // OP super Charge's 360 power buys four 90-EN stocks exactly once; the
+    // B.R. seat's dead voluntary EN command (HPA-858) never gated it.
+    expect([gauge, dora.stock, dora.power]).toEqual([360, 4, 0]);
+    // Black (50), OP super Charge (46) and the landing's object (407).
+    expect(spawned.has(50)).toBe(true);
+    expect(spawned.has(46)).toBe(true);
+    expect(spawned.has(407)).toBe(true);
+    // The CPU never thought during the intro; the ally's own watch never
+    // tripped, and the battle still offers Continue.
+    expect(thinks).toBe(0);
+    expect(ally.present).toBe(false);
+    expect(battle.flags & 1).toBe(1);
+    // Ordinary CPU input resumes only once the intro ends (a strike that
+    // met him on the change tick queues its reaction first).
+    for (let t = 0; t < 60 && !thinks; t++) match.step();
+    expect(thinks).toBeGreaterThan(0);
+    // The same strike lands once ordinary control resumes.
+    for (let t = 0; t < 60 && dora.hp === dora.maxHp; t++) {
+      if (kiki.action !== 'script') strike(match, kiki, 177);
+      kiki.x = dora.x - 90;
+      match.step();
+    }
+    expect(dora.hp).toBeLessThan(dora.maxHp);
   });
 
   it('pins SEAT_GATES.dora to DoraEmon’s exported command entries and KO RELOAD stock op', () => {
