@@ -4283,6 +4283,21 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 if frame["pc"] in casting:
                     for body in frame.get("body", []):
                         body["kind"] &= ~6
+        # Authored (HPA-973): 332 clears its body at PC 5656 and restores
+        # only a pushbox at 5673. Use 330/331's matching pose bodies as
+        # hurtboxes while retaining exactly the follow-up's own pushboxes.
+        fists_bodies = {frame["image"]: frame["body"] for frame in scripts["327"]["frames"]
+                        if frame["pc"] in (5615, 5617, 5628, 5635, 5641, 5652)}
+        for name, script in scripts.items():
+            if int(name.split("+")[0]) != 332:
+                continue
+            for frame in script["frames"]:
+                reference = fists_bodies[frame["image"]]
+                if frame["body"]:
+                    frame["body"][0]["kind"] |= 2
+                    frame["body"].extend(dict(body) for body in reference[1:])
+                else:
+                    frame["body"] = [dict(body, kind=body["kind"] & ~1) for body in reference]
         # Authored (HPA-973): COUNTER HIT takes K alone (B+C, 0x2060), not the
         # source's B+E pair — only his two guard reactions.
         for name, script in scripts.items():

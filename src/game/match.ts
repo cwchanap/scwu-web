@@ -2687,6 +2687,7 @@ export class Match {
       this.passes(f, f, e),
     );
     if (test) return this.enterSource(f, test.action, test.offset);
+    if (f.who === 'dora' && action !== 'script') f.pierceCastTick = undefined;
     if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
     if (action === 'down') this.pauseOthers(f, 10);
@@ -3253,14 +3254,19 @@ export class Match {
       if (!this.runOut(f)) this.action(f, 'idle');
       return;
     }
-    this.action(f, 'script', true);
-    f.branch = key;
-    // Authored (HPA-973): the casts stamp the tick their guard runs from;
-    // 340–342 entered through the handlers keep it, anything else drops it.
+    // Authored (HPA-973): retain a cast's tick across all in-family entries.
     if (f.who === 'dora')
-      if (!offset && (index === 338 || index === 339))
+      if (
+        !offset &&
+        (index === 338 || index === 339) &&
+        (f.action !== 'script' ||
+          !DORA_PIERCE.has(Number(String(f.branch).split('+')[0])) ||
+          f.pierceCastTick === undefined)
+      )
         f.pierceCastTick = this.roundTicks;
       else if (!DORA_PIERCE.has(index)) f.pierceCastTick = undefined;
+    this.action(f, 'script', true);
+    f.branch = key;
     this.fireEvents(f);
     // One with no display runs on through its last op 0x0a in the same step:
     // GIGI's 技名11 (285), his Air Bike K's landing (slot 1, PC 4353), spawns
@@ -3319,6 +3325,11 @@ export class Match {
       )
         this.branchTo(actor, actor.stage.home);
     } else {
+      if (
+        actor.who === 'dora' &&
+        !DORA_PIERCE.has(Number(String(key).split('+')[0]))
+      )
+        actor.pierceCastTick = undefined;
       actor.branch = key;
       actor.fired = -1;
       this.fireEvents(actor);
