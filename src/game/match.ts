@@ -2831,6 +2831,21 @@ export class Match {
         )
           continue;
         if (event.resume) f.resume = { clip: key, ...event.resume };
+        // A KO down's names the fighter's own get-up action — ZIRO's 70
+        // at 60 enters his 161 — not a result branch, so enter it as
+        // koRecovery does, under its same authored gate; closed, the
+        // rolled records still run.
+        if (f.action === 'koLand') {
+          if (
+            this.br ||
+            this.picking ||
+            this.winner ||
+            this.globals[15] === 100
+          )
+            continue;
+          this.enterSource(f, event.target, event.offset);
+          return true;
+        }
         if (this.enterResult(f, sourceKey(event.target, event.offset)))
           return true;
         continue;
@@ -2895,6 +2910,39 @@ export class Match {
       if (event.op === 'freeze') this.freeze += event.add;
   }
 
+  // KO DOWN's own records: an op 0x1f test of global 15 finds the round
+  // over and jumps into the down past the check (Ryuko's PC 645), else a
+  // life test (op 0x11, HP ≥ 1) at its own tick — 60 for most players,
+  // AMIRO's at 62, DoraEmon's at 61 and 62, ASTROMAN's at 130, RARIO's at
+  // 66, TRAINING's at the landing itself (0) — enters the fighter's own
+  // get-up, which in a story a slot's KO bonus can have restored
+  // (0x40e863). ZAKU's and PAC-HELO's downs test variable 11 instead
+  // (KO_SCRIPTS). Authored (HPA-973): the check stands down once the loss
+  // is being picked or the result is set, and on a B.R. route — the last
+  // the source's own test reads, but TRAINING's, which has none, needs
+  // the gate's picking and winner too.
+  private koRecovery(f: Fighter) {
+    const events = eventsAt(twin(f.who, KO_DOWN), f.age, f.who);
+    if (
+      this.br ||
+      this.picking ||
+      this.winner ||
+      this.globals[15] === 100 ||
+      events.some((event) => event.op === 'test' && this.passes(f, f, event))
+    )
+      return false;
+    const life = events.find(
+      (event) =>
+        event.op === 'life' &&
+        (event.below
+          ? f.hp <= lifeMark(f, event.value)
+          : f.hp >= lifeMark(f, event.value)),
+    );
+    if (life?.op !== 'life') return false;
+    this.enterSource(f, life.target, life.offset);
+    return true;
+  }
+
   // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
   // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
@@ -2908,7 +2956,7 @@ export class Match {
       return true;
     }
     if (f.action === 'koLand') {
-      this.slideDown(f);
+      if (!this.koRecovery(f)) this.slideDown(f);
       return true;
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
@@ -4071,7 +4119,10 @@ export class Match {
       const timeline = KO_TIMELINES.has(f.who) && twin(f.who, KO_DOWN);
       this.action(f, 'koLand', false, timeline || undefined);
       if (f.branch) this.rollResult(f);
-      this.slideDown(f);
+      // TRAINING's check sits at the landing tick itself (38's t = 0),
+      // before the first moveKO step ages it past — enter it now; a life
+      // target it enters (his knockdown, 113) skips the down slide.
+      else if (!this.koRecovery(f)) this.slideDown(f);
       return true;
     }
     f.variables[1] = 0;
