@@ -5156,7 +5156,7 @@ export const GUIDES_DATA = {
           {
             name: 'Twin Hammer',
             input: '<span class="motion">↓←</span><kbd>G</kbd>',
-            desc: 'A dashing punch into an uppercut. Invincible during casting and the follow-up.',
+            desc: 'A dashing punch into an uppercut. Protected during casting, but vulnerable during the hit follow-up.',
             cost: 0,
           },
           {
@@ -5193,13 +5193,13 @@ export const GUIDES_DATA = {
           {
             name: 'Fists',
             input: '<span class="motion">↓←↓←</span><kbd>G</kbd>',
-            desc: 'A punch flurry into a dash and uppercut. Invincible during casting.',
+            desc: 'A punch flurry into a dash and uppercut. Active punches clash with strikes up front, but his body remains vulnerable.',
             cost: 1,
           },
           {
             name: 'Pierce',
             input: '<span class="motion">↓→↓←</span><kbd>H</kbd>',
-            desc: 'A flying multi-hit rush. Invincible during casting.',
+            desc: 'A flying multi-hit rush. Protected from strikes and grabs for the first second of the move only.',
             cost: 1,
           },
           {
@@ -5223,9 +5223,8 @@ export const GUIDES_DATA = {
           },
           {
             name: 'Counter Hit',
-            input:
-              '<kbd>G</kbd>+<kbd>H</kbd> or <kbd>G</kbd>+<kbd>K</kbd> while blocking',
-            desc: 'Spend a stock while guarding — two keys at once, one of G, J or E and one of H or K.',
+            input: '<kbd>K</kbd> while blocking',
+            desc: 'Press K during an ordinary standing or crouching block to spend a stock and counter.',
             cost: 1,
           },
         ],

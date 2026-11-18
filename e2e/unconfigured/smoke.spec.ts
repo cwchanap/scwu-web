@@ -167,7 +167,9 @@ test('profile shows sign-in unavailable when unconfigured', async ({
   expect(errors).toEqual([]);
 });
 
-test('guide keeps the shared backdrop and back link', async ({ page }) => {
+test('guide keeps the backdrop, back link and DoraEmon move descriptions', async ({
+  page,
+}) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/instructions.html');
@@ -177,6 +179,29 @@ test('guide keeps the shared backdrop and back link', async ({ page }) => {
       page.evaluate(() => getComputedStyle(document.body).backgroundImage),
     )
     .toContain('select/15.png');
+  await page.getByRole('link', { name: 'DoraEmon', exact: true }).click();
+  const row = (name: string) =>
+    page.getByRole('row').filter({
+      has: page.getByRole('cell', { name, exact: true }),
+    });
+  await expect(row('Twin Hammer')).toContainText(
+    'Protected during casting, but vulnerable during the hit follow-up.',
+  );
+  await expect(row('Fists')).toContainText(
+    'Active punches clash with strikes up front, but his body remains vulnerable.',
+  );
+  await expect(row('Pierce')).toContainText(
+    'Protected from strikes and grabs for the first second of the move only.',
+  );
+  await expect(row('Counter Hit').locator('.input')).toHaveText(
+    'K while blocking',
+  );
+  await expect(row('Counter Hit')).toContainText(
+    'Press K during an ordinary standing or crouching block to spend a stock and counter.',
+  );
+  await expect(row('EN')).toContainText(
+    'Unavailable to you in every mode, and to any DoraEmon in a B.R. route — only a CPU DoraEmon elsewhere charges.',
+  );
   expect(errors).toEqual([]);
 });
 
