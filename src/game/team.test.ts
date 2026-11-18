@@ -8,7 +8,7 @@ import { addPower, firstStrike, LIFE, Match } from './match';
 import type { Fighter } from './match';
 import { BOSSES, ROSTER } from './select';
 import { scenarioOf, Story } from './story';
-import { enter, playing, RYUKO } from './testing';
+import { enter, playing, RYUKO, strike } from './testing';
 import type { Battle, Slot } from './story';
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
 
@@ -733,6 +733,137 @@ describe('story battles', () => {
         return match.fighters[0].variables[12];
       }),
     ).toEqual([undefined, 1, 1]);
+  });
+
+  describe('KO Down life checks (HPA-973)', () => {
+    // A slot's bit-7 bonus pays its KO's life to a seat (0x40e863);
+    // caught mid-air or lying in the KO down, a fighter with any life
+    // again gets up at its KO down's own check. Striking the 1P and a
+    // paying seat in the same hitTest makes the payer the striker's KO
+    // the very tick the 1P falls: the bonus lands before the next step's
+    // KO check reads the 1P at 0, so no loss is picked and its `downed`
+    // mark stands for the brawl.
+    const trade = (who: Who, br = false) => {
+      const match = Match.story(
+        who,
+        battle({
+          slots: [slot({ enemies: 5 }), slot({ flags: 0x80, life: 50 }), null],
+        }),
+        0,
+        undefined,
+        undefined,
+        br,
+      );
+      fight(match);
+      const [one, striker, paying] = match.fighters;
+      one.hp = paying.hp = 1;
+      // ZAKU's 186 sweep meets both at its first box (t = 23), which its
+      // facing +1 spans about 90–255 arena px out; felling the paying
+      // seat pays its slot's bonus to the 1P the same tick.
+      striker.facing = 1;
+      paying.x = striker.x + 150;
+      one.x = striker.x + 230;
+      strike(match, striker, 186);
+      match.step();
+      return { match, one, striker, paying };
+    };
+    const path = (match: Match, f: Fighter) => {
+      const seen: [number, Fighter['action']][] = [];
+      for (let t = 0; t < 400 && f.action !== 'idle'; t++) {
+        match.step();
+        expect(match.winner).toBeNull();
+        if (seen.at(-1)?.[1] !== f.action) seen.push([t, f.action]);
+      }
+      return seen;
+    };
+
+    it('restores a 1P KO’d the tick a slot’s life pays, getting up at its KO down’s own check', () => {
+      const { match, one, paying } = trade('ryuko');
+      expect(one).toMatchObject({ hp: 50, downed: true });
+      expect(paying).toMatchObject({ hp: 0, downed: true });
+      expect(match.winner).toBeNull();
+      const seen = path(match, one);
+      expect(seen).toEqual([
+        [0, 'down'],
+        [expect.any(Number), 'koLand'],
+        [expect.any(Number), 'getUp'],
+        [expect.any(Number), 'idle'],
+      ]);
+      // Action 62's op 0x11 (HP ≥ 1) at its own tick 60, its get-up the
+      // target — the op 0x1f of global 15 passed (PC 645).
+      expect(seen[2][0] - seen[1][0]).toBe(60);
+      expect(one.downed).toBe(true);
+      // The seat it felled at 0 life never rose.
+      expect(paying.action).not.toBe('getUp');
+    });
+
+    it('gets DoraEmon up at his KO down’s first check (76: t = 61, before t = 62)', () => {
+      const { match, one } = trade('dora');
+      const seen = path(match, one);
+      expect(seen).toEqual([
+        [0, 'down'],
+        [expect.any(Number), 'koLand'],
+        [expect.any(Number), 'getUp'],
+        [expect.any(Number), 'idle'],
+      ]);
+      expect(seen[2][0] - seen[1][0]).toBe(61);
+    });
+
+    it('checks TRAINING’s at the landing itself: its t = 0 target is the knockdown (113)', () => {
+      const { match, one } = trade('training');
+      const seen = path(match, one);
+      expect(seen).toEqual([
+        [0, 'down'],
+        [expect.any(Number), 'knockdown'],
+        [expect.any(Number), 'getUp'],
+        [expect.any(Number), 'idle'],
+      ]);
+    });
+
+    it('enters ZIRO’s get-up through his rolled KO down’s life branch (70)', () => {
+      const { match, one } = trade('ziro');
+      const seen = path(match, one);
+      expect(seen).toEqual([
+        [0, 'down'],
+        [expect.any(Number), 'koLand'],
+        [expect.any(Number), 'getUp'],
+        [expect.any(Number), 'idle'],
+      ]);
+      expect(seen[2][0] - seen[1][0]).toBe(60);
+    });
+
+    it('wakes no paid 1P on a B.R. route, where the authored !br gate stands', () => {
+      const { match, one } = trade('ryuko', true);
+      expect(one).toMatchObject({ hp: 50, downed: true });
+      for (let t = 0; t < 200; t++) {
+        match.step();
+        expect(match.winner).toBeNull();
+        expect(one.action).not.toBe('getUp');
+      }
+      expect(one).toMatchObject({ action: 'koLand', hp: 50, downed: true });
+    });
+
+    it('lets no bonus a tick late undo a picked loss', () => {
+      // run() latches `picking` on the first step it sees the 1P at 0;
+      // the recovered KO Down check stands down behind it and `winner`,
+      // and TRAINING's — the only check with no round-over test — is no
+      // hole in that gate.
+      const match = Match.story(
+        'ryuko',
+        battle({ slots: [slot(), slot(), null] }),
+      );
+      fight(match);
+      const [ryuko, zaku] = match.fighters;
+      knockOut(match, ryuko, zaku);
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match).toMatchObject({ winner: 'opponent', lost: 1 });
+      ryuko.hp = 50;
+      for (let t = 0; t < 200; t++) {
+        match.step();
+        expect(ryuko.action).not.toBe('getUp');
+      }
+      expect(ryuko).toMatchObject({ downed: true });
+    });
   });
 });
 

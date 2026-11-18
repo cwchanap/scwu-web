@@ -25,12 +25,15 @@ import type { Battle, Slot } from './story';
 import {
   animationDuration,
   animationFrame,
+  exported,
   hurtboxes,
   NORMAL_COLOR,
   RESPONSE_EFFECTS,
+  script,
 } from './animations';
 import { rand } from './standing';
-import { STAGES, type Stage, type Who } from './characters';
+import { CHARACTERS, STAGES, twin, twinOf } from './characters';
+import type { Stage, Who } from './characters';
 import {
   base,
   brIntro,
@@ -842,6 +845,159 @@ describe('recovered neutral and round animations', () => {
       expect(match.resultReady).toBe(true);
       expect(match.round).toBe(3);
     });
+  });
+});
+
+describe('KO Down life checks', () => {
+  it("carries each player's own life test at its source age (op 0x11, HP ≥ 1), ZAKU's and PAC-HELO's testing variable 11", () => {
+    // 43 source life tests: every player's KO down but ZAKU's and
+    // PAC-HELO's checks op 0x11 (HP ≥ 1) once at its own tick — at 60
+    // for most, AMIRO's at 62, DoraEmon's at 61 and again at 62,
+    // ASTROMAN's at 130, RARIO's at 66 and TRAINING's at the landing
+    // itself (0) — each jumping to its own get-up unless its op 0x1f of
+    // global 15 finds the round over (Ryuko's PC 645), a test TRAINING's
+    // KO down has none of.
+    const expected: Record<Who, [number, number][]> = {
+      ryuko: [[60, 145]],
+      zoma: [[60, 145]],
+      kiki: [[60, 145]],
+      chung: [[60, 148]],
+      amiro: [[62, 149]],
+      anmc: [[60, 146]],
+      giant: [[60, 151]],
+      suneo: [[60, 156]],
+      yo: [[60, 147]],
+      sin: [[60, 150]],
+      lizard: [[60, 147]],
+      kay: [[60, 150]],
+      dido: [[60, 151]],
+      sakuya: [[60, 164]],
+      alex: [[60, 154]],
+      sou: [[60, 155]],
+      hiso: [[60, 153]],
+      erus: [[60, 153]],
+      feng: [[60, 161]],
+      sean: [[60, 151]],
+      gon: [[60, 159]],
+      kate: [[60, 152]],
+      remu: [[60, 155]],
+      rear: [[60, 149]],
+      gigi: [[60, 149]],
+      sww: [[60, 148]],
+      ogi: [[60, 152]],
+      ziro: [[60, 161]],
+      masa: [[60, 190]],
+      times: [[60, 187]],
+      zenka: [[60, 166]],
+      zmega: [[60, 157]],
+      alpha: [[60, 182]],
+      shinz: [[60, 159]],
+      zaku: [],
+      pachelo: [],
+      golf: [[60, 131]],
+      asura: [[60, 130]],
+      ttro: [[60, 145]],
+      astroman: [[130, 143]],
+      yinan: [[60, 179]],
+      aya: [[60, 175]],
+      dora: [
+        [61, 167],
+        [62, 167],
+      ],
+      rario: [[66, 27]],
+      training: [[0, 113]],
+    };
+    for (const who of Object.keys(CHARACTERS) as Who[]) {
+      const { events } = script(twin(who, 62), who);
+      const life = events.filter((e) => e.op === 'life');
+      expect(
+        life.map((e) => (e.op === 'life' ? [e.t, e.target] : null)),
+        who,
+      ).toEqual(expected[who]);
+      for (const e of life)
+        expect(e).toMatchObject({ below: false, value: 1, offset: 0 });
+      // All but TRAINING's keep the round-over test of global 15 at the
+      // check's own tick, jumping into their KO down past it.
+      const roundOver = events.filter(
+        (e) => e.op === 'test' && e.selector === 0x8f,
+      );
+      expect(
+        roundOver.map((e) => (e.op === 'test' ? e.t : -1)),
+        who,
+      ).toEqual(who === 'training' ? [] : expected[who].map(([t]) => t));
+      for (const e of roundOver)
+        expect(e).toMatchObject({
+          value: who === 'ryuko' ? 99 : 100,
+          action: twin(who, 62),
+        });
+      // Each target is the fighter's own exported action: its get-up
+      // (Down Get up's twin), TRAINING's its knockdown and RARIO's its
+      // own 27, which no Ryuko action twins.
+      for (const [, target] of expected[who]) {
+        expect(exported(target, who), `${who}:${target}`).toBe(true);
+        expect(twinOf(who, target), `${who}:${target}`).toBe(
+          who === 'training' ? 146 : who === 'rario' ? undefined : 145,
+        );
+      }
+    }
+    // ZAKU's and PAC-HELO's instead test variable 11 for their B.R.
+    // scripts (PCs 535, 545): at 2 into KO Down BR (62) at once, at 1
+    // once the 2000-tick pose has run (+ 10), and lie on at 0.
+    for (const who of ['zaku', 'pachelo'] as const)
+      expect(
+        script(twin(who, 62), who).events.filter((e) => e.op === 'test'),
+        who,
+      ).toMatchObject([
+        { t: 0, selector: 0x4b, compare: 1, value: 2, action: 62, offset: 0 },
+        {
+          t: 2010,
+          selector: 0x4b,
+          compare: 1,
+          value: 1,
+          action: 62,
+          offset: 10,
+        },
+      ]);
+  });
+
+  it('wakes a lying fighter at restored life only before the result (authored gate, HPA-973)', () => {
+    // The recovered check: a fighter in koLand with any life gets up at
+    // its KO down's own tick, which in a story a slot's KO bonus can
+    // reach (team.test.ts).
+    const risen = new Match('cpu', false, 0, ['ryuko', 'zoma']);
+    const [ryuko] = risen.fighters;
+    ryuko.hp = 100;
+    ryuko.action = 'koLand';
+    const actions = new Set<Fighter['action']>();
+    for (let t = 0; t < 80; t++) {
+      risen.step();
+      actions.add(ryuko.action);
+    }
+    expect(actions.has('getUp')).toBe(true);
+    // At 0 life the same check never passes: it lies on.
+    const flat = new Match('cpu', false, 0, ['ryuko', 'zoma']);
+    const [down] = flat.fighters;
+    down.hp = 0;
+    down.action = 'koLand';
+    for (let t = 0; t < 80; t++) flat.step();
+    expect(down.action).toBe('koLand');
+    // And none wakes once the result is picked or set, or under global
+    // 15: the source's own round-over test reads the last, the gate the
+    // port authors around TRAINING's check — which has none.
+    for (const end of ['picking', 'winner', 'global 15'] as const) {
+      const match = new Match('cpu', false, 0, ['ryuko', 'zoma']);
+      const [f] = match.fighters;
+      f.hp = 100;
+      f.action = 'koLand';
+      if (end === 'picking')
+        (match as unknown as { picking: { winner: null } }).picking = {
+          winner: null,
+        };
+      else if (end === 'winner') match.winner = 'player';
+      else match.globals[15] = 100;
+      for (let t = 0; t < 80; t++) match.step();
+      expect(f.action, end).toBe('koLand');
+    }
   });
 });
 
