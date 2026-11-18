@@ -845,9 +845,10 @@ describe('story battles', () => {
 
     it('lets no bonus a tick late undo a picked loss', () => {
       // run() latches `picking` on the first step it sees the 1P at 0;
-      // the recovered KO Down check stands down behind it and `winner`,
-      // and TRAINING's — the only check with no round-over test — is no
-      // hole in that gate.
+      // here the payout lands after `winner` is already set — the same
+      // restore inside the pick's window is TRAINING's case below, and
+      // its check, the only one with no round-over test, is no hole in
+      // that gate either.
       const match = Match.story(
         'ryuko',
         battle({ slots: [slot(), slot(), null] }),
@@ -864,6 +865,112 @@ describe('story battles', () => {
       }
       expect(ryuko).toMatchObject({ downed: true });
     });
+
+    // TRAINING's check sits at the landing tick itself and has no
+    // round-over test of its own, so each authored blocker is tried
+    // alone at the moment its get-up is due — the control first proving
+    // the same fall does recover when the round is still open.
+    const falling = (br = false) => {
+      const match = Match.story(
+        'training',
+        battle({ slots: [slot({ enemies: 0 }), null] }),
+        0,
+        undefined,
+        undefined,
+        br,
+      );
+      fight(match);
+      return { match, one: match.fighters[0] };
+    };
+
+    it('gets TRAINING up at its landing check while the round is still open', () => {
+      const { match, one } = falling();
+      Object.assign(one, { hp: 50, action: 'down', y: 0, vy: 1 });
+      match.step();
+      expect(one.action).toBe('knockdown');
+    });
+
+    it('leaves TRAINING down landing on the pick itself, the latch a late bonus cannot undo', () => {
+      const { match, one } = falling();
+      // KO'd and still falling when the fight state reads it at 0: the
+      // pick latches at that step's end, so the landing step is the
+      // real picking window — winner and global 15 not yet set.
+      Object.assign(one, {
+        hp: 0,
+        downed: true,
+        action: 'down',
+        age: 15,
+        y: -1,
+        vy: 1,
+      });
+      match.step();
+      expect(
+        (match as unknown as { picking: { winner: unknown } | null }).picking,
+      ).toEqual({ winner: null });
+      // The bonus a tick late pays before the landing's check.
+      one.hp = 50;
+      match.step();
+      expect(one.action).toBe('koLand');
+    });
+
+    it.each(['winner', 'global 15', 'B.R.'] as const)(
+      'leaves TRAINING down landing under %s alone',
+      (blocker) => {
+        const { match, one } = falling(blocker === 'B.R.');
+        if (blocker === 'winner') match.winner = 'opponent';
+        if (blocker === 'global 15') match.globals[15] = 100;
+        Object.assign(one, { hp: 50, action: 'down', y: 0, vy: 1 });
+        match.step();
+        expect(one.action).toBe('koLand');
+      },
+    );
+
+    it('gets ZIRO up through his rolled down’s life record while the round is open', () => {
+      const match = Match.story(
+        'ziro',
+        battle({ slots: [slot({ enemies: 0 }), null] }),
+      );
+      fight(match);
+      const [one] = match.fighters;
+      Object.assign(one, {
+        hp: 50,
+        action: 'koLand',
+        branch: 70,
+        age: 59,
+      });
+      match.step();
+      expect(one.action).toBe('getUp');
+    });
+
+    it.each(['picking', 'winner', 'global 15', 'B.R.'] as const)(
+      'keeps ZIRO lying at his rolled down’s life record under %s alone',
+      (blocker) => {
+        const match = Match.story(
+          'ziro',
+          battle({ slots: [slot({ enemies: 0 }), null] }),
+          0,
+          undefined,
+          undefined,
+          blocker === 'B.R.',
+        );
+        fight(match);
+        const [one] = match.fighters;
+        if (blocker === 'picking')
+          (match as unknown as { picking: { winner: null } }).picking = {
+            winner: null,
+          };
+        if (blocker === 'winner') match.winner = 'opponent';
+        if (blocker === 'global 15') match.globals[15] = 100;
+        Object.assign(one, {
+          hp: 50,
+          action: 'koLand',
+          branch: 70,
+          age: 59,
+        });
+        match.step();
+        expect(one.action).toBe('koLand');
+      },
+    );
   });
 });
 

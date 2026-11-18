@@ -982,8 +982,9 @@ describe('KO Down life checks', () => {
     for (let t = 0; t < 80; t++) flat.step();
     expect(down.action).toBe('koLand');
     // And none wakes once the result is picked or set, or under global
-    // 15: the source's own round-over test reads the last, the gate the
-    // port authors around TRAINING's check — which has none.
+    // 15 — a stacked check: Ryuko's own round-over test and the late
+    // latch share the keeping here, so each authored blocker is isolated
+    // on TRAINING's and ZIRO's landings in team.test.ts instead.
     for (const end of ['picking', 'winner', 'global 15'] as const) {
       const match = new Match('cpu', false, 0, ['ryuko', 'zoma']);
       const [f] = match.fighters;
