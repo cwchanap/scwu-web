@@ -18,14 +18,14 @@ import {
 } from './animations';
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import { faceImage, gaugeCrop } from './hud';
-import { addPower, fighterPose, Match } from './match';
+import { addPower, fighterPose, firstStrike, Match } from './match';
 import type { Fighter, Input } from './match';
 import { CharacterSelect, StoryDemo } from './select';
 import type { Demo } from './select';
 import { StandingVM } from './standing';
 import { Story, scenarioOf } from './story';
 import type { Battle } from './story';
-import { strike } from './testing';
+import { base, enter, strike } from './testing';
 
 // DoraEmon as player 1, `gap` from Ryuko as player 2.
 function doraPlayer(gap = 90) {
@@ -168,41 +168,36 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(byKey({ command: 2 }, { stock: 2 }).mine).toEqual([290, 'idle']);
   });
 
-  it.each([296, 305, 327, 338])(
-    'cannot be hit during one-stock super %i',
-    (action) => {
-      const key = (
-        {
-          296: 'getterBeam',
-          305: 'musashi',
-          327: 'changeAttack',
-          338: 'blackRush',
-        } as const
-      )[action as 296 | 305 | 327 | 338];
-      const { match, dora, other, steps } = doraPlayer(90);
-      dora.stock = 1;
-      steps({}, 2);
-      steps({ [key]: true });
-      expect(dora.stock).toBe(0);
-      for (
-        let t = 0;
-        t < 800 &&
-        dora.action === 'script' &&
-        dora.branch !== 270 &&
-        dora.branch !== '305+46';
-        t++
-      ) {
-        expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
-        other.x = dora.x + 50;
-        match.step({}, { punch: t % 60 === 0 });
-        expect(dora.hp).toBe(600);
-      }
-      // The shared landing recoveries (270; 305+46, which 356 lands through
-      // too) end casting and can be hit.
-      steps({}, 30);
-      expect(dora.action).toBe('idle');
-    },
-  );
+  it.each([296, 305])('cannot be hit during one-stock super %i', (action) => {
+    const key = (
+      {
+        296: 'getterBeam',
+        305: 'musashi',
+      } as const
+    )[action as 296 | 305];
+    const { match, dora, other, steps } = doraPlayer(90);
+    dora.stock = 1;
+    steps({}, 2);
+    steps({ [key]: true });
+    expect(dora.stock).toBe(0);
+    for (
+      let t = 0;
+      t < 800 &&
+      dora.action === 'script' &&
+      dora.branch !== 270 &&
+      dora.branch !== '305+46';
+      t++
+    ) {
+      expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
+      other.x = dora.x + 50;
+      match.step({}, { punch: t % 60 === 0 });
+      expect(dora.hp).toBe(600);
+    }
+    // The shared landing recoveries (270; 305+46, which 356 lands through
+    // too) end casting and can be hit.
+    steps({}, 30);
+    expect(dora.action).toBe('idle');
+  });
 
   it.each([90, 1000])(
     'keeps Twin Hammer invincible through its cast (gap %i)',
@@ -215,20 +210,25 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       match.step({ punch: true }, { punch: true });
       expect(dora.branch).toBe(252);
       const entered = new Set();
+      let open = 0;
       for (let t = 0; t < 1000 && dora.action === 'script'; t++) {
         entered.add(dora.branch);
-        expect(hurtboxes(dora.branch!, dora.age, 'dora')).toEqual([]);
+        const bodies = hurtboxes(dora.branch!, dora.age, 'dora');
+        // The follow-up (254) swings no hammer: it is open to strikes now.
+        if (base(dora.branch) === 254) open += bodies.length;
+        else expect(bodies).toEqual([]);
         match.step({}, {});
         expect(dora.hp).toBe(lifeOf('dora'));
       }
       expect(entered.has(254)).toBe(gap === 90);
+      if (gap === 90) expect(open).toBeGreaterThan(0);
       expect(dora.action).toBe('idle');
       expect(hurtboxes('idle', dora.age, 'dora').length).toBeGreaterThan(0);
     },
   );
 
-  it.each([250, 252, 254])(
-    'protects every Twin Hammer frame of action %i without losing its pushbox',
+  it.each([250, 252])(
+    'protects every Twin Hammer swing frame of action %i without losing its pushbox',
     (action) => {
       for (const frame of script(action, 'dora').frames)
         expect(hurtboxes(action, frame.t, 'dora')).toEqual([]);
@@ -236,43 +236,372 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     },
   );
 
-  it.each([
-    { punch: true, kick: true }, // G with H
-    { punch: true, hitUp: true }, // G with K
-    { throw: true, hitUp: true }, // J with K
-  ])(
-    'spends a stock on COUNTER HIT from a block with two keys (%s)',
-    (keys) => {
-      const { match, dora } = doraPlayer(90);
-      dora.stock = 2;
-      const seen: unknown[] = [];
-      for (let t = 0; t < 500 && dora.branch !== 197; t++) {
-        const input: Input = { left: true };
-        // The guard reaction's checks (172's at ages 0, 8 and 18) take a
-        // fresh B+E press — one E key and one B key — inside their window.
-        if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
-          Object.assign(input, keys);
-        match.step(input, { punch: t % 60 === 0 });
-        const now = dora.action === 'script' ? dora.branch : dora.action;
-        if (seen.at(-1) !== now) seen.push(now);
-      }
-      expect(seen).toEqual(['backwalk', 'block', 197]);
-      expect(dora.stock).toBe(1);
-    },
-  );
+  it('lets the Twin Hammer follow-up 254 be struck, its pushbox kept', () => {
+    expect(pushboxes(254, 0, 'dora').length).toBeGreaterThan(0);
+    expect(
+      script(254, 'dora').frames.some(
+        (frame) => hurtboxes(254, frame.t, 'dora').length,
+      ),
+    ).toBe(true);
+    const { match, dora, other } = doraPlayer();
+    enter(match, dora, 254);
+    strike(match, other, 246);
+    other.x = dora.x + firstStrike('ryuko', 246, 'dora').reach - 15;
+    other.facing = -1;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
 
-  it('takes no counter pair from two keys without an E button', () => {
+  it('spends a stock on COUNTER HIT from a block on K alone', () => {
     const { match, dora } = doraPlayer(90);
     dora.stock = 2;
-    for (let t = 0; t < 500; t++) {
+    const seen: unknown[] = [];
+    for (let t = 0; t < 500 && dora.branch !== 197; t++) {
       const input: Input = { left: true };
-      // H and K both hold B but neither holds E.
+      // The guard reaction's checks (172's at ages 0, 8 and 18) take a
+      // fresh B+C press — K alone — inside their window.
       if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
-        Object.assign(input, { hitUp: true, kick: true });
+        input.hitUp = true;
+      match.step(input, { punch: t % 60 === 0 });
+      const now = dora.action === 'script' ? dora.branch : dora.action;
+      if (seen.at(-1) !== now) seen.push(now);
+    }
+    expect(seen).toEqual(['backwalk', 'block', 197]);
+    expect(dora.stock).toBe(1);
+  });
+
+  it.each([
+    { punch: true, kick: true }, // the old two-key pair, G with H
+    { kick: true }, // H alone
+    { punch: true }, // G alone
+    { throw: true }, // J alone
+    { ex: true }, // E alone
+  ])('takes no counter from %s', (keys) => {
+    const { match, dora } = doraPlayer(90);
+    dora.stock = 2;
+    for (let t = 0; t < 500 && dora.branch !== 197; t++) {
+      const input: Input = { left: true };
+      if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
+        Object.assign(input, keys);
       match.step(input, { punch: t % 60 === 0 });
     }
     expect(dora.branch).not.toBe(197);
     expect(dora.stock).toBe(2);
+  });
+
+  it('takes no counter with no stock', () => {
+    const { match, dora } = doraPlayer(90);
+    dora.stock = 0;
+    dora.maxStock = 0;
+    for (let t = 0; t < 500 && dora.branch !== 197; t++) {
+      const input: Input = { left: true };
+      if (dora.action === 'block' && dora.age >= 3 && dora.age <= 6)
+        input.hitUp = true;
+      match.step(input, { punch: t % 60 === 0 });
+    }
+    expect(dora.branch).not.toBe(197);
+    expect(dora.stock).toBe(0);
+  });
+
+  it('retimes only his own counter commands — K alone, B+C (0x2060)', () => {
+    for (const index of [172, 174] as const) {
+      const commands = script(index, 'dora').events.filter(
+        (e) => e.op === 'command',
+      );
+      expect(commands.map((e) => e.t)).toEqual([0, 8, 18]);
+      for (const event of commands)
+        if (event.op === 'command') {
+          expect(event.steps).toEqual([0x2060]);
+          expect([event.action, event.window]).toEqual([197, 10]);
+        }
+    }
+    // Everyone else's keep theirs: Ryuko's guard reactions take a fresh
+    // Hit Up (0x2020) as before.
+    for (const event of script(149, 'ryuko').events)
+      if (event.op === 'command') expect(event.steps).toEqual([0x2020]);
+  });
+
+  it.each([327, 328, 332] as const)(
+    'shadows each damaging punch of %i with a one-tick guard box',
+    (index) => {
+      const events = script(index, 'dora').events.filter((e) => e.op === 'box');
+      const punches = events.filter(
+        (e) => e.op === 'box' && e.slot === 0 && e.damage > 0,
+      );
+      expect(punches.length).toBeGreaterThan(0);
+      const guards = events.filter(
+        (e) => e.op === 'box' && e.slot === 1 && e.w > 0,
+      );
+      expect(guards.map((e) => e.t)).toEqual(punches.map((e) => e.t));
+      for (const [i, guard] of guards.entries()) {
+        const punch = punches[i];
+        if (guard.op !== 'box' || punch.op !== 'box') continue;
+        expect([guard.x, guard.y, guard.w, guard.h]).toEqual([
+          punch.x,
+          punch.y,
+          punch.w,
+          punch.h,
+        ]);
+        expect([guard.kind, guard.damage]).toEqual([0x103, 0]);
+      }
+      // Each shadow closes on the punch's next tick.
+      expect(
+        events
+          .filter((e) => e.op === 'box' && e.slot === 1 && !e.w)
+          .map((e) => e.t),
+      ).toEqual(punches.map((e) => e.t + 1));
+    },
+  );
+
+  it.each([0, 1])(
+    'cancels a strike that meets a Fists punch, DoraEmon as holder %i, then re-arms',
+    (seat) => {
+      const match = new Match(
+        'practice',
+        false,
+        3,
+        seat ? ['ryuko', 'dora'] : ['dora', 'ryuko'],
+      );
+      const dora = match.fighters[seat];
+      const other = match.fighters[1 - seat];
+      dora.stock = 5;
+      enter(match, dora, 327, 21);
+      strike(match, other, 246);
+      other.x = dora.x + 240;
+      other.facing = -1;
+      dora.facing = 1;
+      // The super's cast flash stops both; let the punch tick run free.
+      dora.hitStop = 0;
+      other.hitStop = 0;
+      match.step({}, {});
+      // Both sides lose every box at once: nobody is hit, no clash handler
+      // is queued, and his script runs on into the next punch at 28.
+      expect([dora.hp, other.hp]).toEqual([lifeOf('dora'), lifeOf('ryuko')]);
+      expect(dora.box).toBeNull();
+      expect(dora.boxes.every((b) => !b)).toBe(true);
+      expect(other.box).toBeNull();
+      expect(dora.pending).toBeNull();
+      expect(other.pending).toBeNull();
+      expect(dora.action).toBe('script');
+      for (let t = 0; t < 6 && dora.age < 28; t++) match.step({}, {});
+      expect(dora.age).toBe(28);
+      expect(dora.box).toMatchObject({ kind: 6, damage: 6 });
+      expect(dora.boxes[1]).toMatchObject({
+        x: 103,
+        y: -149,
+        w: 77,
+        h: 73,
+        kind: 0x103,
+        damage: 0,
+      });
+      // The shadow lives one tick: at 29 it is gone while he swings on.
+      match.step({}, {});
+      expect(dora.boxes[1] ?? null).toBeNull();
+    },
+  );
+
+  it.each([21, 99, 177])(
+    'cancels a strike at the first and later punch ticks (%i)',
+    (age) => {
+      const { match, dora, other } = doraPlayer();
+      dora.stock = 5;
+      enter(match, dora, 327, age);
+      strike(match, other, 246);
+      other.x = dora.x + 240;
+      other.facing = -1;
+      dora.facing = 1;
+      dora.hitStop = 0;
+      other.hitStop = 0;
+      match.step({}, {});
+      expect([dora.hp, other.hp]).toEqual([lifeOf('dora'), lifeOf('ryuko')]);
+      expect(dora.action).toBe('script');
+      expect(dora.pending).toBeNull();
+    },
+  );
+
+  it('lets a strike through in the gap between punches', () => {
+    const { match, dora, other } = doraPlayer();
+    dora.stock = 5;
+    enter(match, dora, 327, 24);
+    strike(match, other, 246);
+    other.x = dora.x + 240;
+    other.facing = -1;
+    dora.facing = 1;
+    dora.hitStop = 0;
+    other.hitStop = 0;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
+
+  it('lets a strike that misses the fist box through during a punch', () => {
+    const { match, dora, other } = doraPlayer();
+    dora.stock = 5;
+    enter(match, dora, 327, 21);
+    strike(match, other, 246);
+    // From behind: his punch box never meets the forward guard's, while
+    // the punch pose's body still reaches back this far.
+    other.x = dora.x - 180;
+    other.facing = 1;
+    dora.facing = 1;
+    dora.hitStop = 0;
+    other.hitStop = 0;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
+
+  it('keeps SP2 6LK (225) without a guard box, its clash handler intact', () => {
+    const boxes = script(225, 'dora').events.filter((e) => e.op === 'box');
+    expect(boxes.every((e) => e.op === 'box' && e.slot === 0)).toBe(true);
+    const { match, dora, other } = doraPlayer();
+    enter(match, dora, 225, 29);
+    strike(match, other, 246);
+    other.x = dora.x + 240;
+    other.facing = -1;
+    dora.facing = 1;
+    match.step({}, {});
+    match.step({}, {});
+    // An ordinary unflagged clash: slot 5 enters 226, both boxes spent.
+    expect(base(dora.branch)).toBe(226);
+  });
+
+  it('lets ordinary unflagged boxes pass through a meet', () => {
+    const { match, dora, other } = doraPlayer();
+    // 231's kind-1 punch carries no flag and no slot-5 handler: Ryuko's
+    // box passes it and strikes him.
+    enter(match, dora, 231, 14);
+    strike(match, other, 246);
+    other.x = dora.x + 240;
+    other.facing = -1;
+    dora.facing = 1;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
+
+  it("skips 突進's strike and grab contacts for 100 match ticks from the cast", () => {
+    const { match, dora, other, steps } = doraPlayer();
+    dora.stock = 5;
+    steps({}, 2);
+    steps({ blackRush: true });
+    expect(dora.pierceCastTick).toBe(match.roundTicks);
+    expect([338, 339]).toContain(base(dora.branch));
+    // Keep Ryuko unstruck while the rush crosses the stage.
+    other.bare = true;
+    for (let t = 0; t < 98; t++) match.step({}, {});
+    expect(dora.action).toBe('script');
+    // `strike` re-enters him mid-punch, so its box opens this very tick:
+    // elapsed 99 — still guarded. It meets his back: the 340 rush keeps a
+    // box out in front that would only clash a frontal strike away.
+    strike(match, other, 246);
+    other.bare = false;
+    other.x = dora.x - 240;
+    other.facing = 1;
+    match.step({}, {});
+    expect(dora.hp).toBe(lifeOf('dora'));
+    // Elapsed 100 — open, the same reach lands.
+    strike(match, other, 246);
+    other.x = dora.x - 240;
+    other.facing = 1;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
+
+  it('counts hit-stop ticks toward the 100', () => {
+    const { match, dora, other } = doraPlayer();
+    dora.stock = 5;
+    enter(match, dora, 338);
+    // The clock is the match's, not his script age's: 50 stopped ticks
+    // still count, and at the window's edge he is back in the cast's
+    // standing frames, where a rear reach meets his body with no rush box
+    // out front to clash it.
+    dora.hitStop = 50;
+    for (let t = 0; t < 99; t++) match.step({}, {});
+    expect(dora.age).toBeLessThan(99);
+    strike(match, other, 246);
+    other.x = dora.x - 160;
+    other.facing = 1;
+    match.step({}, {});
+    expect(dora.hp).toBeLessThan(lifeOf('dora'));
+  });
+
+  it('keeps the cast tick through the follow-up handlers', () => {
+    const { match, dora, other } = doraPlayer();
+    dora.stock = 5;
+    enter(match, dora, 338);
+    const cast = dora.pierceCastTick;
+    for (const [index, offset] of [
+      [339, 0],
+      [340, 0],
+      [340, 3],
+      [341, 0],
+      [342, 0],
+    ] as const) {
+      enter(match, dora, index, 0, offset);
+      expect(dora.pierceCastTick).toBe(cast);
+    }
+    strike(match, other, 246);
+    other.x = dora.x + 240;
+    other.facing = -1;
+    match.step({}, {});
+    expect(dora.hp).toBe(lifeOf('dora'));
+  });
+
+  it.each([270, 269, 327])(
+    'drops the 突進 guard entering %i — landing, loop and another super',
+    (index) => {
+      const { match, dora, other } = doraPlayer();
+      dora.stock = 5;
+      enter(match, dora, 338);
+      expect(dora.pierceCastTick).not.toBeUndefined();
+      // 327's early frames carry only a pushbox; enter it far enough in
+      // that a hurtbox stands.
+      enter(match, dora, index, index === 327 ? 9 : 0);
+      expect(dora.pierceCastTick).toBeUndefined();
+      strike(match, other, 246);
+      // The casts' flashes stop both; let the punch open at once.
+      dora.hitStop = 0;
+      other.hitStop = 0;
+      other.x = dora.x + 240;
+      other.facing = -1;
+      match.step({}, {});
+      expect(dora.hp).toBeLessThan(lifeOf('dora'));
+    },
+  );
+
+  it('guards grabs inside the window and takes them after it', () => {
+    const { match, dora, other } = doraPlayer();
+    dora.stock = 5;
+    enter(match, dora, 338);
+    other.hitStop = 0;
+    // Held through the cast, the match's clock carries him past the window
+    // while his tall cast frames — the only ones a low grab box meets —
+    // still stand (340's rush crouches under them).
+    dora.hitStop = 44;
+    for (let t = 0; t < 98; t++) match.step({}, {});
+    // Elapsed 99, his cast frame 55: the grab box meets his back body (his
+    // own front box would only clash it away) but no contact is made.
+    strike(match, other, 196);
+    other.x = dora.x - firstStrike('ryuko', 196, 'dora').reach + 30;
+    other.facing = 1;
+    match.step({}, {});
+    expect(dora.action).toBe('script');
+    // Elapsed 100: the same grab catches him.
+    strike(match, other, 196);
+    other.x = dora.x - firstStrike('ryuko', 196, 'dora').reach + 30;
+    other.facing = 1;
+    match.step({}, {});
+    for (let t = 0; t < 20 && dora.action === 'script'; t++) match.step({}, {});
+    expect(dora.action).not.toBe('script');
+  });
+
+  it('leaves other fighters open during their own casts', () => {
+    const { match, dora, other } = doraPlayer();
+    enter(match, other, 246);
+    strike(match, dora, 231);
+    other.x = dora.x + 100;
+    other.facing = -1;
+    dora.facing = 1;
+    match.step({}, {});
+    expect(other.hp).toBeLessThan(lifeOf('ryuko'));
   });
 
   it("pairs every victim action with Ryuko's", () => {

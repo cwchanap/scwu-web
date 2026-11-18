@@ -4271,7 +4271,10 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
         # follow-ups. A fragment replays the casting only while its frames are the
         # protected action's own records: the shared landing tail 305+46, which
         # 356+43 also lands through, is not — nor is 356's wind-up.
-        protected = {250, 252, 254, 296, 297, 305, 306, 327, 328, 330, 331, 332, 338, 339, 340, 341, 342}
+        # Authored (HPA-973): Twin Hammer's follow-up 254 is open again; the Fists
+        # (327–332) take the one-tick guard boxes below, and 突進 (338–342) its own
+        # 100-tick contact window instead of blanket protection.
+        protected = {250, 252, 296, 297, 305, 306}
         casting = {frame["pc"] for name, script in scripts.items()
                    if "+" not in name and int(name) in protected
                    for frame in script["frames"]}
@@ -4280,6 +4283,35 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 if frame["pc"] in casting:
                     for body in frame.get("body", []):
                         body["kind"] &= ~6
+        # Authored (HPA-973): COUNTER HIT takes K alone (B+C, 0x2060), not the
+        # source's B+E pair — only his two guard reactions.
+        for name, script in scripts.items():
+            if int(name.split("+")[0]) in (172, 174):
+                for event in script["events"]:
+                    if event["op"] == "command":
+                        event["steps"] = [0x2060 if step == 0x2120 else step
+                                          for step in event["steps"]]
+        # Authored (HPA-973): each damaging Fists punch opens a one-tick guard
+        # shadow with its exact geometry in a free box slot (kind 0x103, no
+        # damage): a strike box meeting it cancels both sides with no clash
+        # handler, while his body between punches stays open. 225's own torso
+        # box is not a template — the shadow copies each punch.
+        for name, script in scripts.items():
+            if int(name.split("+")[0]) not in (327, 328, 330, 331, 332):
+                continue
+            used = {event["slot"] for event in script["events"]
+                    if event["op"] == "box"}
+            guard = next(slot for slot in range(1, 20) if slot not in used)
+            shadows = [event for event in script["events"]
+                       if event["op"] == "box" and event["damage"]]
+            for event in shadows:
+                script["events"].append(
+                    dict(op="box", slot=guard, x=event["x"], y=event["y"],
+                         w=event["w"], h=event["h"], kind=0x103, damage=0,
+                         t=event["t"]))
+                script["events"].append(
+                    dict(op="box", slot=guard, x=0, y=0, w=0, h=0, kind=0,
+                         damage=0, t=event["t"] + 1))
     images = export_images(c, key, image_ids, {140, 247} if key == "dora" else ())
     if key == "dora":
         # A standard-height select portrait from his muscular pose; gameplay sprites stay native.
