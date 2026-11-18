@@ -4703,6 +4703,17 @@ export class Match {
     if (striker) addPower(striker, attackerPower + power);
   }
 
+  // DoraEmon's authored Br. intro clip, stepped the same wherever it plays:
+  // the pre-fight branch's first seats or a waiting seat mid-fight (arrive
+  // entered it through opening, 0x411e7e), aging once per tick.
+  private stepIntro(f: Fighter) {
+    f.age++;
+    // Past the floor, the fall lands (0x41187f).
+    f.y = Math.min(0, f.y + doraFall(f.age - 1));
+    this.enter(f, this.fighters.indexOf(f));
+    if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
+  }
+
   private move(f: Fighter, input: Input, previous: Input, history: number[]) {
     if (f.pending) this.enterPending(f);
     else {
@@ -4714,6 +4725,12 @@ export class Match {
         stepBar(f);
         f.shown = true;
         this.retarget(f);
+        // A waiting-seat DoraEmon's Br. intro steps as it does before the
+        // fight, before the CPU, landing and cancels read him.
+        if (f.action === 'intro') {
+          this.stepIntro(f);
+          return;
+        }
         if (this.driven(f)) input = this.think(f);
         // An op 0x1a stop adds to the -1 (0x4136fb), as a struck holder's
         // reaction does to its victim, which counts it down and then runs on
@@ -5305,11 +5322,7 @@ export class Match {
         }
         // DoraEmon's Br. intro clip.
         if (f.action !== 'intro') continue;
-        f.age++;
-        // Past the floor, the fall lands (0x41187f).
-        f.y = Math.min(0, f.y + doraFall(f.age - 1));
-        this.enter(f, i);
-        if (f.age >= animationDuration('intro', f.who)) this.action(f, 'idle');
+        this.stepIntro(f);
       }
       // History keeps recording, so a button held through the intro must be
       // pressed again once control begins.
