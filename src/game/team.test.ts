@@ -1548,7 +1548,8 @@ describe('BR Another stages', () => {
     }
     // His late entrance still plays the authored intro, whose own charge
     // (not the gated command) fills his stocks once.
-    while (dora.action === 'intro') match.step();
+    for (let t = 0; t < 400 && dora.action === 'intro'; t++) match.step();
+    expect(dora.action).not.toBe('intro');
     expect(dora.stock).toBe(4);
     dora.stock = 0;
     const seen = new Set<unknown>();
