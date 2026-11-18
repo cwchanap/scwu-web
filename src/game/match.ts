@@ -1043,6 +1043,11 @@ export function firstStrike(who: Who, index: number, victim: Who) {
   const [body] = hurtboxes('idle', 0, victim);
   return { from: box.t, reach: (box.x + box.w + body.w + body.x) * 1.5 };
 }
+// Authored (HPA-973): 突進's cast (338, 339) and the branches its handlers
+// reach (340–342, landing 270 excluded) share one guard on the match clock:
+// strike and grab contacts skip him for 100 ticks from the cast.
+const DORA_PIERCE = new Set([338, 339, 340, 341, 342]);
+const DORA_PIERCE_TICKS = 100;
 const blocks = new Set<Action>([
   'block',
   'blockHeavy',
@@ -1245,6 +1250,10 @@ export interface Fighter {
   // clip, or the op 0x16 branch EX Fire's charge took, run instead of its
   // timeline.
   branch: ObjectKey | null;
+  // Authored (HPA-973): the match tick DoraEmon's 突進 cast (338 or 339)
+  // entered, while its 100-tick strike-and-grab guard still runs; the
+  // follow-up handler branches keep it and any other action drops it.
+  pierceCastTick?: number;
   // The victim's own copy this reaction plays (copyOf): drawn, rolled and
   // entered in place of its clip.
   copy: number | null;
@@ -3246,6 +3255,12 @@ export class Match {
     }
     this.action(f, 'script', true);
     f.branch = key;
+    // Authored (HPA-973): the casts stamp the tick their guard runs from;
+    // 340–342 entered through the handlers keep it, anything else drops it.
+    if (f.who === 'dora')
+      if (!offset && (index === 338 || index === 339))
+        f.pierceCastTick = this.roundTicks;
+      else if (!DORA_PIERCE.has(index)) f.pierceCastTick = undefined;
     this.fireEvents(f);
     // One with no display runs on through its last op 0x0a in the same step:
     // GIGI's 技名11 (285), his Air Bike K's landing (slot 1, PC 4353), spawns
@@ -4219,6 +4234,16 @@ export class Match {
 
   private contact(source: Fighter | Effect, owner: number, target: Fighter) {
     const attacker = this.fighters[owner];
+    // Authored (HPA-973): 突進's guard is timed by the match clock, so its
+    // hit-stop ticks count too — strike and grab boxes never reach him.
+    if (
+      target.who === 'dora' &&
+      target.action === 'script' &&
+      target.pierceCastTick !== undefined &&
+      this.roundTicks - target.pierceCastTick < DORA_PIERCE_TICKS &&
+      DORA_PIERCE.has(Number(String(target.branch).split('+')[0]))
+    )
+      return [];
     const box = [source.box, ...source.boxes].find(
       (box) =>
         box &&
@@ -4333,6 +4358,16 @@ export class Match {
                 (box.h + met.h) * 1.5
             )
               continue;
+            // Authored (HPA-973): a Fists guard box (0x100) meeting a
+            // damaging box spends both sides' boxes at once — no clash
+            // handler, and a's own captured box meets nothing more.
+            if (
+              (box.kind | met.kind) & 0x100 &&
+              (box.damage > 0 || met.damage > 0)
+            ) {
+              strip(a, b);
+              return;
+            }
             if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
             if (!box.damage && !met.damage) {
               strip(a, b);
