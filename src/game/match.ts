@@ -35,6 +35,7 @@ import {
   CHARACTERS,
   countersOf,
   desperationOf,
+  superGateOf,
   twinOf,
   lifeOf,
   neutralTestsOf,
@@ -59,7 +60,7 @@ import {
   scan,
 } from './commands';
 import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
-import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
+import { DEFAULT_CHEATS, enGainOf, normalizeCheats } from './cheats';
 import type { CheatOptions } from './cheats';
 import { lifeAmountOf, lifeMarkOf, lifeShareOf } from './life';
 import { dummyInput } from './dummy';
@@ -606,21 +607,6 @@ const lifeAmount = (f: Fighter, amount: number) =>
 const lifeShare = (f: Fighter, amount: number) =>
   lifeShareOf(amount, f.maxHp, lifeOf(f.who));
 
-// A loss's low-HP reduction keeps at least `floor` whole points: hit and
-// outgoing damage keep the source's 1; a self-transfer's caller passes its
-// scaled share (0 for a balanced drain pair under a shrink, so the pair
-// keeps its native net; 1 for a take-only drain, so it still reaches 1).
-function loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
-  if (loss && f.hp <= lifeMark(f, desperationOf(f.who)))
-    loss = Math.max(floor, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
-  if (guardOne) loss = Math.min(loss, Math.max(0, f.hp - 1));
-  f.hp = Math.max(0, f.hp - loss);
-  if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
-  // A loss that leaves no life drops the player to priority 0x3c (0x40e8cd),
-  // behind the other.
-  if (f.hp === 0) f.z = 0x3c;
-  return loss;
-}
 // A gain, up to full life (0x40ea9f) — the effective maximum — takes from
 // what the bar shows lost, even one of 0.
 function gainLife(f: Fighter, life: number) {
@@ -1890,7 +1876,9 @@ export class Match {
   constructor(
     public mode: Mode = 'practice',
     intro = false,
-    seed = 0,
+    // Kept for the B.R. No partner re-seat (HPA-972): the CPUs rebuild on
+    // the constructor's shared seed.
+    private readonly seed = 0,
     // Player 1's and player 2's characters: in VS multi, the round's members.
     public characters: [Who, Who] = ['ryuko', 'ryuko'],
     readonly stage: Stage = 'court',
@@ -2275,10 +2263,17 @@ export class Match {
 
   // 0x404e2d: in a story, a life bar under each player past the 1P whose
   // slot sets bit 0 (+0xdf0d), the allies, once it has entered and shown a
-  // display, while it has life.
+  // display, while it has life. Authored (HPA-972): the Enemy HP bars
+  // option adds the present, shown living hostiles in every mode — a
+  // session option, no cheats needed.
   get lifeBars() {
     return this.fighters.filter(
-      (f, i) => (this.slots[i]?.flags ?? 0) & 1 && f.present && f.shown && f.hp,
+      (f, i) =>
+        ((this.slots[i]?.flags ?? 0) & 1 ||
+          (this.practice.enemyBars && this.hostile(0, i))) &&
+        f.present &&
+        f.shown &&
+        f.hp,
     );
   }
 
@@ -2418,19 +2413,54 @@ export class Match {
   // only ever the first call, which the scene makes before the battle's
   // first tick (step seals installation) — so no later call can seat or
   // disable cheats mid-battle (fresh values wait for the next battle).
+  // Authored (HPA-972): a B.R. battle's No partner omits the native ally
+  // here, at snapshot installation — the constructor had seated before the
+  // scene could pass the pending values.
   useCheats(options: CheatOptions) {
     if (this.cheatsInstalled) return;
     this.cheatsInstalled = true;
     this.cheatsSnapshot = Object.freeze(normalizeCheats(options));
     if (!this.cheatsSnapshot.enabled) return;
+    if (this.battle && this.br && this.cheatsSnapshot.brNoPartner)
+      this.reseatWithoutAlly();
     this.fighters.forEach((f, i) => this.cheatSeat(f, i));
+  }
+
+  // Authored (HPA-972): re-runs the constructor's seating once with every
+  // ally slot (bit 9) left empty on the existing null-slot path, then
+  // rebuilds the seat's CPUs, inputs and opening objects so none of the old
+  // seating's pre-fight objects remain. The story's slot indices keep
+  // their places — a slot is dropped, not renumbered — and the session's
+  // held palettes stay as asset loading left them.
+  private reseatWithoutAlly() {
+    const battle = this.battle!;
+    this.cpus = [null];
+    this.seat(
+      {
+        ...battle,
+        slots: battle.slots.map((slot) =>
+          slot && slot.flags & 0x200 ? null : slot,
+        ),
+      },
+      this.seed,
+    );
+    this.effects = [];
+    this.freeing = [];
+    this.kgt = [];
+    this.fighters = this.storyFighters();
+    if (this.calls) this.hold(0x65, openingLife(this));
+    this.clearInput();
   }
 
   // Authored (HPA-767): seats a fighter under the effective snapshot: the 1P
   // by the Player HP multiplier and the EN limit, every hostile of the 1P
-  // (the passive practice partner included) by the Enemy HP multiplier —
-  // allies stay native — with life at the effective maximum. Freshly created
-  // fighters start native, so an enabled-off battle never passes here.
+  // (the passive practice partner included) by the Enemy HP multiplier and
+  // the Enemy EN stocks × cap, and every other ally by the Partner HP
+  // multiplier (HPA-972) — each derived from the seat's route base, so
+  // re-seating never compounds. Freshly created fighters start native, so
+  // an enabled-off battle never passes here. Positive EN gain follows each
+  // fighter's final cap (HPA-972), assigned — never multiplied onto a
+  // route's own ×2.
   private cheatSeat(f: Fighter, i: number) {
     if (!i) {
       f.maxHp = Math.max(
@@ -2439,11 +2469,26 @@ export class Match {
       );
       f.maxStock = this.cheats.playerMaxEn / 100;
     } else if (this.hostile(0, i)) {
-      // Authored (HPA-858): derive from the seat's route base — 2× on a
-      // tough seat, 1× otherwise — so re-seating never compounds.
-      const base = (toughSeat(this.slots[i]) ? 2 : 1) * lifeOf(f.who);
-      f.maxHp = Math.max(1, Math.round(base * this.cheats.enemyHpMultiplier));
+      // Authored (HPA-858): derive from the seat's route base — 2× life on
+      // a tough seat with its five stocks, native otherwise.
+      const tough = toughSeat(this.slots[i]);
+      f.maxHp = Math.max(
+        1,
+        Math.round(
+          (tough ? 2 : 1) * lifeOf(f.who) * this.cheats.enemyHpMultiplier,
+        ),
+      );
+      f.maxStock = Math.min(
+        10,
+        (tough ? 5 : stocksOf(f.who)) * this.cheats.enemyStocksMultiplier,
+      );
+    } else {
+      f.maxHp = Math.max(
+        1,
+        Math.round(lifeOf(f.who) * this.cheats.partnerHpMultiplier),
+      );
     }
+    f.enGainMultiplier = enGainOf(f.maxStock);
     f.hp = f.maxHp;
   }
 
@@ -2612,6 +2657,52 @@ export class Match {
     return target;
   }
 
+  // A loss's low-HP reduction keeps at least `floor` whole points: hit and
+  // outgoing damage keep the source's 1; a self-transfer's caller passes
+  // its scaled share (0 for a balanced drain pair under a shrink, so the
+  // pair keeps its native net; 1 for a take-only drain, so it still
+  // reaches 1). Authored (HPA-972): 1P's reduction follows the Low HP line
+  // and the Damage cut × over the fighter's native scale; every other
+  // fighter, and 1P with the master off, stays native.
+  private loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
+    if (loss && f.hp <= this.lifeLineMark(f)) {
+      const kept = this.lossKeptPercent(f);
+      loss = kept === 0 ? 0 : Math.max(floor, Math.trunc((loss * kept) / 100));
+    }
+    if (guardOne) loss = Math.min(loss, Math.max(0, f.hp - 1));
+    f.hp = Math.max(0, f.hp - loss);
+    if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
+    // A loss that leaves no life drops the player to priority 0x3c
+    // (0x40e8cd), behind the other.
+    if (f.hp === 0) f.z = 0x3c;
+    return loss;
+  }
+
+  // Authored (HPA-972): the low-life line in effective-HP units — 1P under
+  // cheats reads the Low HP line percent off its own effective maximum,
+  // everyone else the native 30% (desperationOf).
+  private lifeLineMark(f: Fighter): number {
+    if (f !== this.fighters[0] || !this.cheats.enabled)
+      return lifeMark(f, desperationOf(f.who));
+    return lifeMark(
+      f,
+      Math.trunc((lifeOf(f.who) * this.cheats.lowHpLine) / 100),
+    );
+  }
+
+  // Authored (HPA-972): the percent a loss keeps under the line — 1P under
+  // cheats keeps its native reduction (100 − scale) scaled by the Damage
+  // cut ×, floored at none and capped at all; native whole-point flooring
+  // otherwise, so only the full 100% reduces a loss to nothing.
+  private lossKeptPercent(f: Fighter): number {
+    const scale = CHARACTERS[f.who].scale;
+    if (f !== this.fighters[0] || !this.cheats.enabled) return scale;
+    return Math.max(
+      0,
+      Math.min(100, 100 - (100 - scale) * this.cheats.damageCutMultiplier),
+    );
+  }
+
   // 0x40e7c0 queues the lose action as a loss empties life (0x40e84b), and in
   // a story scores the step's points (0x40e863): the 1P's KO gives its +0x13
   // to +0x12's player (0 the striker, +0xdef9's, n seat n − 1), another's its
@@ -2634,9 +2725,27 @@ export class Match {
       n === 0 ? striker : n <= 8 ? this.bySeat(n - 1) : null;
     const scorer = pick(slot ? slot.scorer : battle.koScorer);
     if (scorer) scorer.points += slot ? slot.points : battle.koPoints;
-    const bonus =
-      slot && [null, this.fighters[0], striker][(slot.flags >> 7) & 3];
+    const award = slot ? (slot.flags >> 7) & 3 : 0;
+    const bonus = slot && [null, this.fighters[0], striker][award];
     if (!bonus) return;
+    // Authored (HPA-972): a B.R. battle's award to the 1P itself can be
+    // replaced by the per-kill overrides — null keeps the source amounts, a
+    // positive HP award scales by lifeAmount, and 0 skips the gain
+    // (lifeAmountOf(0) would force 1); the EN 0 skips addPower. Every other
+    // recipient — the striker even when the 1P struck it —, every other
+    // battle and the master-off path keep the source award.
+    if (award === 1 && this.br && this.cheats.enabled) {
+      const { brHpPerKill, brEnPerKill } = this.cheats;
+      if (brHpPerKill === null) gainLife(bonus, lifeAmount(bonus, slot.life));
+      else if (brHpPerKill > 0)
+        gainLife(
+          bonus,
+          lifeAmountOf(brHpPerKill, bonus.maxHp, lifeOf(bonus.who)),
+        );
+      if (brEnPerKill === null) addPower(bonus, slot.power);
+      else if (brEnPerKill > 0) addPower(bonus, brEnPerKill);
+      return;
+    }
     // The life, a signed byte (0x40e984), goes through the life routine
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
     // 0, but every paid story bonus is 30 to 100: a gain. Authored (HPA-767): like
@@ -3098,7 +3207,7 @@ export class Match {
       if (event.t !== end) continue;
       if (event.op === 'test' && this.passes(f, f, event)) break;
       if (event.op !== 'power') continue;
-      const damage = loseLife(
+      const damage = this.loseLife(
         f,
         this.outgoingDamage(striker, f, -event.selfLife),
       );
@@ -3714,7 +3823,7 @@ export class Match {
             : pairedTake(actor)
               ? lifeShare(self, 1)
               : lifeAmount(self, 1);
-          loseLife(
+          this.loseLife(
             self,
             take
               ? this.outgoingDamage(this.met(self), self, -event.selfLife)
@@ -3731,7 +3840,7 @@ export class Match {
         if (event.otherLife > 0)
           gainLife(other, lifeAmount(other, event.otherLife));
         if (event.otherLife < 0) {
-          const damage = loseLife(
+          const damage = this.loseLife(
             other,
             this.outgoingDamage(self, other, -event.otherLife),
           );
@@ -3787,16 +3896,40 @@ export class Match {
         );
         if (self.stock === self.maxStock) self.power = 0;
         break;
-      case 'life':
+      case 'life': {
+        // Authored (HPA-972): 1P's tabled super gates (superGateOf) follow
+        // the Low HP line — their marks scale by line / 30 — and, with
+        // Low-HP supers on, a below:true gate always jumps for the super
+        // while a below:false one never jumps away to the normal move.
+        // Unrelated life checks, the HP0 sentinels and every other
+        // fighter's checks stay native; SIN's and SOU's idle op 0x11s are
+        // the StandingVM's stance changes and are never bypassed.
+        const gate =
+          !('clip' in actor) &&
+          actor === self &&
+          self === this.fighters[0] &&
+          actor.action === 'script' &&
+          this.cheats.enabled &&
+          superGateOf(self.who, String(actor.branch ?? ''));
+        if (gate && this.cheats.lowHpSupers) {
+          if (gate.below)
+            return this.branchTo(actor, sourceKey(event.target, event.offset));
+          break;
+        }
+        const mark = gate
+          ? lifeMark(
+              self,
+              Math.trunc((gate.value * this.cheats.lowHpLine) / 30),
+            )
+          : lifeMark(self, event.value);
         if (
           ('clip' in actor || actor.action === 'script') &&
           event.target &&
-          (event.below
-            ? self.hp <= lifeMark(self, event.value)
-            : self.hp >= lifeMark(self, event.value))
+          (event.below ? self.hp <= mark : self.hp >= mark)
         )
           return this.branchTo(actor, sourceKey(event.target, event.offset));
         break;
+      }
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
         // actor's colour, and flag 2 (0x41336c) that of the player whatever
@@ -5430,6 +5563,16 @@ export class Match {
       return;
     }
     if (!this.winner && !this.picking) this.ticks++;
+    // Authored (HPA-972): round 1's first active tick grants 1P its
+    // starting EN — one stock under the cap and no stored power — after
+    // the intro's phase 0 has returned, which no-intro practice reaches on
+    // its first step. Unlimited EN below refills over it; later rounds
+    // keep the native carryover.
+    if (this.cheats.enabled && this.round === 1 && this.ticks === 1) {
+      const one = this.fighters[0];
+      one.stock = one.maxStock - 1;
+      one.power = 0;
+    }
     // Authored (HPA-767): Unlimited EN tops the 1P up to its effective cap
     // every active tick, before the tick's inputs — the source's pays and
     // deductions still run, so a spend within the tick stands until the
@@ -5445,14 +5588,15 @@ export class Match {
           f.stock = f.maxStock;
           f.power = 0;
         }
-      // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
-      // Spark, G Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300
-      // enter their desperation forms only below it (op 0x11 at 153, 147,
-      // 150, 144, 165 and 141 or more; the rest at it or below). Authored
+      // Authored: just under the low-life line — the native 30%, or 1P's
+      // HPA-972 Low HP line — as Ryuko's hidden super, Zoma's Shin Spark, G
+      // Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300 enter
+      // their desperation forms only below it (op 0x11 at 153, 147, 150,
+      // 144, 165 and 141 or more; the rest at it or below). Authored
       // (HPA-767): the mark scales with the effective maximum.
       if (this.practice.lowHealth) {
         const one = this.fighters[0];
-        one.hp = Math.min(one.hp, lifeMark(one, desperationOf(one.who)) - 1);
+        one.hp = Math.min(one.hp, this.lifeLineMark(one) - 1);
       }
     }
     const inputs = this.fighters.map((_, i) =>
@@ -5640,7 +5784,7 @@ export class Match {
         target,
         boxDamage(box, taken, blocked, f.who, target.struck),
       );
-      const loss = loseLife(target, strength);
+      const loss = this.loseLife(target, strength);
       if (!blocked && strength) target.struck++;
       f.damage += loss;
       if (!blocked) f.hits++;

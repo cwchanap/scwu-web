@@ -1417,6 +1417,11 @@ export class TrainingScene extends Phaser.Scene {
             if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
+            // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's
+            // idle stance marks (a stance change, never the supers bypass).
+            const { enabled, lowHpLine } = this.match.cheats;
+            this.idle[i].lifeLineScale =
+              i === 0 && enabled ? lowHpLine / 30 : 1;
             this.idle[i].tick();
             for (const index of this.idle[i].sounds.splice(0))
               this.play(`${f.who}-sound-${index}`, i);

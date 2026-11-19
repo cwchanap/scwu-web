@@ -92,6 +92,10 @@ export class StandingVM {
   // truncated. Equal maxima keep every mark native.
   lifeMax = 1;
   lifeNative = 1;
+  // Authored (HPA-972): 1P's Low HP line over the native 30, which scales
+  // SIN's and SOU's op 0x11 stance marks — a stance change the scene
+  // moves; the Low-HP supers bypass never touches it.
+  lifeLineScale = 1;
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
   // Op 0x03 cues (0x4132c8) since the scene last played them: GIGI's idle
@@ -268,9 +272,13 @@ export class StandingVM {
         // Authored (HPA-767): the mark is native life, so it scales with
         // the effective maximum as lifeMark does — every mark but the exact
         // 1-HP sentinel and nonpositive ones, floored at 1 — reading the
-        // scaled `life` against the same share of the bar.
-        const mark = lifeMarkOf(u16(r, 6), this.lifeMax, this.lifeNative);
-        if (r[5] & 1 ? this.life <= mark : this.life >= mark && u16(r, 2)) {
+        // scaled `life` against the same share of the bar. Authored
+        // (HPA-972): the Low HP line scales it further, in proportion.
+        const mark =
+          lifeMarkOf(u16(r, 6), this.lifeMax, this.lifeNative) *
+          this.lifeLineScale;
+        const line = Math.trunc(mark);
+        if (r[5] & 1 ? this.life <= line : this.life >= line && u16(r, 2)) {
           this.target(u16(r, 2), r[4]);
           continue;
         }
