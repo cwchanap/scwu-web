@@ -80,7 +80,7 @@ In a story brawl, a KO bonus can restore life to a fighter who has fallen. Outsi
 
 ## DoraEmon's move protection and entrance
 
-Twin Hammer protects him from strikes and grabs during the cast, but its hit follow-up is vulnerable. Fists' active punches clash with opposing strikes, clearing that exchange; the next punch can clash again, while his body remains vulnerable to attacks that miss the punch. Pierce protects against strikes and grabs for the first second from casting, including time spent in hit-stop, while he remains in the move. Leaving or super-cancelling out ends that protection. For Counter Hit, press K during an ordinary standing or crouching block with a stock; an air guard cannot counter. Other ground guard reactions retain their source B+E pair, entered with G, J or E and H or K together.
+Twin Hammer protects him from strikes and grabs during the cast, but its hit follow-up is vulnerable. Fists' active punches clash with opposing strikes and projectiles, clearing that exchange; the next punch can clash again, while his body remains vulnerable to attacks that miss the punch. Pierce protects against strikes and grabs for the first second from casting, including time spent in hit-stop, while he remains in the move. Leaving or super-cancelling out ends that protection. For Counter Hit, press K during any standing or crouching block with a stock; an air guard cannot counter.
 
 When DoraEmon uses his Br. entrance, a waiting-seat arrival plays the same 337-tick sequence as a first-seat entrance: he rises, falls and lands, gains four 90-power stocks once, and cannot be hit or pushed while in the intro. His CPU resumes after the entrance. This intro charge is separate from the voluntary EN command's existing availability restrictions.
 

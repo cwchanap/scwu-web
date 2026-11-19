@@ -25,7 +25,7 @@ import type { Demo } from './select';
 import { StandingVM } from './standing';
 import { Story, scenarioOf } from './story';
 import type { Battle } from './story';
-import { base, enter, strike } from './testing';
+import { base, enter, spawn, strike } from './testing';
 
 // DoraEmon as player 1, `gap` from Ryuko as player 2.
 function doraPlayer(gap = 90) {
@@ -303,16 +303,17 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(dora.stock).toBe(0);
   });
 
-  it('retimes only his own counter commands — K alone, B+C (0x2060)', () => {
-    for (const index of [172, 174] as const) {
+  it('retimes only his own ground counter commands — K alone, B+C (0x2060)', () => {
+    for (const index of [172, 174, 177, 179, 182, 184, 186, 188, 191, 193]) {
       const commands = script(index, 'dora').events.filter(
         (e) => e.op === 'command',
       );
-      expect(commands.map((e) => e.t)).toEqual([0, 8, 18]);
+      expect(commands.length, String(index)).toBeGreaterThan(0);
       for (const event of commands)
         if (event.op === 'command') {
           expect(event.steps).toEqual([0x2060]);
-          expect([event.action, event.window]).toEqual([197, 10]);
+          expect(event.action).toBe(197);
+          expect(event.window).toBeGreaterThanOrEqual(10);
         }
     }
     // Everyone else's keep theirs: Ryuko's guard reactions take a fresh
@@ -321,13 +322,23 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       if (event.op === 'command') expect(event.steps).toEqual([0x2020]);
   });
 
+  it('spends a stock on COUNTER HIT from a heavy ground block on K alone', () => {
+    const { match, dora } = doraPlayer(90);
+    dora.stock = 2;
+    enter(match, dora, 177);
+    dora.action = 'blockHeavy';
+    dora.hitStop = 0;
+    dora.age = 2;
+    match.step({ left: true, hitUp: true }, {});
+    expect(dora).toMatchObject({ action: 'script', branch: 197, stock: 1 });
+  });
+
   it.each([327, 328, 332] as const)(
-    'shadows each damaging punch of %i with a one-tick guard box',
+    'shadows each damaging punch of %i until the punch slot closes or reopens',
     (index) => {
       const events = script(index, 'dora').events.filter((e) => e.op === 'box');
-      const punches = events.filter(
-        (e) => e.op === 'box' && e.slot === 0 && e.damage > 0,
-      );
+      const slot0 = events.filter((e) => e.op === 'box' && e.slot === 0);
+      const punches = slot0.filter((e) => e.op === 'box' && e.damage > 0);
       expect(punches.length).toBeGreaterThan(0);
       const guards = events.filter(
         (e) => e.op === 'box' && e.slot === 1 && e.w > 0,
@@ -344,12 +355,20 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
         ]);
         expect([guard.kind, guard.damage]).toEqual([0x103, 0]);
       }
-      // Each shadow closes on the punch's next tick.
+      const expectedCloses = slot0.flatMap((e, i) => {
+        const next = slot0[i + 1];
+        return e.op === 'box' &&
+          e.damage > 0 &&
+          next?.op === 'box' &&
+          !next.damage
+          ? [next.t]
+          : [];
+      });
       expect(
         events
           .filter((e) => e.op === 'box' && e.slot === 1 && !e.w)
           .map((e) => e.t),
-      ).toEqual(punches.map((e) => e.t + 1));
+      ).toEqual(expectedCloses);
     },
   );
 
@@ -533,11 +552,140 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       other.hitStop = 0;
       match.step({}, {});
       expect(dora.age).toBe(age);
-      if (age === 99) expect(dora.boxes[1]).toMatchObject({ kind: 0x103 });
-      if (age === 100) expect(dora.boxes[1] ?? null).toBeNull();
+      if (age === 99 || age === 100)
+        expect(dora.boxes[1]).toMatchObject({ kind: 0x103 });
+      if (age === 112) expect(dora.boxes[1] ?? null).toBeNull();
       expect(dora.hp).toBeLessThan(lifeOf('dora'));
     },
   );
+
+  it.each([
+    [327, 202],
+    [327, 230],
+    [328, 192],
+    [328, 220],
+    [332, 105],
+  ] as const)(
+    'keeps Fists guard active past the opening tick of %i at age %i',
+    (index, age) => {
+      const { match, dora, other } = doraPlayer();
+      dora.stock = 5;
+      enter(match, dora, index, age - 1);
+      strike(match, other, 246);
+      other.x = dora.x + 180;
+      other.facing = -1;
+      dora.facing = 1;
+      dora.hitStop = 0;
+      other.hitStop = 0;
+      match.step({}, {});
+      expect(dora.age).toBe(age);
+      expect([dora.hp, other.hp]).toEqual([lifeOf('dora'), lifeOf('ryuko')]);
+      expect(dora.box).toBeNull();
+      expect(dora.boxes.every((b) => !b)).toBe(true);
+      expect(other.box).toBeNull();
+    },
+  );
+
+  it('does not let rearm() reset connected on Fists uppercut via the 0x103 guard box', () => {
+    const { match, dora, other } = doraPlayer();
+    enter(match, dora, 332, 98);
+    other.x = dora.x + 120;
+    other.facing = -1;
+    dora.facing = 1;
+    dora.hitStop = 0;
+    other.hitStop = 0;
+    match.step({}, {});
+    expect(dora.age).toBe(99);
+    const afterFirstHit = other.hp;
+    expect(afterFirstHit).toBeLessThan(lifeOf('ryuko'));
+    expect(dora.connected).toBe(true);
+    // Frames 101, 103, 105, 107 run while the 0x103 guard box is still active;
+    // the single-hit kind-0x4 uppercut must stay connected and hit only once.
+    for (let t = 0; t < 15; t++) {
+      dora.hitStop = 0;
+      other.hitStop = 0;
+      match.step({}, {});
+    }
+    expect(other.hp).toBe(afterFirstHit);
+  });
+
+  it.each([0, 1])(
+    'does not strip a zero-damage opponent clash box via Fists guard, holder %i',
+    (seat) => {
+      const match = new Match(
+        'practice',
+        false,
+        3,
+        seat ? ['ttro', 'dora'] : ['dora', 'ttro'],
+      );
+      const dora = match.fighters[seat];
+      const ttro = match.fighters[1 - seat];
+      dora.stock = 5;
+      enter(match, dora, 327, 21);
+      enter(match, ttro, 166, 2);
+      ttro.x = dora.x + 160;
+      ttro.facing = -1;
+      dora.facing = 1;
+      dora.hitStop = 0;
+      ttro.hitStop = 0;
+      match.step({}, {});
+      // TTRO's slot-5 clash handler 167 must still trigger against Dora's punch.
+      expect(ttro.pending).toEqual({ key: 167 });
+      expect(dora.box).toBeNull();
+      expect(ttro.box).toBeNull();
+    },
+  );
+
+  it('marks the story HUD enemy when Fists guard clashes on seat 0', () => {
+    const first = scenarioOf('ryuko')[0] as Battle;
+    const foe = { ...first.slots[0]!, player: 0, delay: 0, watch: 0 };
+    const match = Match.story('dora', {
+      ...first,
+      slots: [
+        { ...foe, x: 900 },
+        { ...foe, x: 540 },
+      ],
+    });
+    const [dora, , other] = match.fighters;
+    expect(match.enemy).toBe(-1);
+    dora.stock = 5;
+    enter(match, dora, 327, 21);
+    strike(match, other, 246);
+    other.x = dora.x + 240;
+    other.facing = -1;
+    dora.facing = 1;
+    dora.hitStop = 0;
+    other.hitStop = 0;
+    match.step({}, {});
+    expect([dora.hp, other.hp]).toEqual([lifeOf('dora'), lifeOf('ryuko')]);
+    expect(match.enemy).toBe(2);
+    expect((match as unknown as { enemyTicks: number }).enemyTicks).toBe(1000);
+  });
+
+  it('cancels projectiles on Fists guard while running projectile onClash handlers', () => {
+    const match = new Match('practice', false, 3, ['dora', 'kiki']);
+    const [dora] = match.fighters;
+    dora.stock = 5;
+    enter(match, dora, 327, 21);
+    dora.facing = 1;
+    dora.hitStop = 0;
+    const potato = spawn(match, 1, 189, {
+      x: dora.x + 150,
+      y: -130,
+      facing: -1,
+    });
+    match.step({}, {});
+    // Kiki's potato runs its slot-5 clash handler (194) and loses its boxes,
+    // while Dora keeps continuing Fists with no handler queued.
+    expect(dora.hp).toBe(lifeOf('dora'));
+    expect(dora.pending).toBeNull();
+    expect(dora.action).toBe('script');
+    expect(potato.box).toBeNull();
+    expect(potato.boxes.every((b) => !b)).toBe(true);
+    expect(potato.pending).toBe(194);
+    match.step({}, {});
+    expect(potato.clip).toBe(194);
+  });
 
   it.each([0, 1])(
     'strips both holders without handlers when Fists follow-up 332 uppercut clashes, holder %i',
@@ -574,6 +722,18 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       expect(dora.age).toBe(100);
       expect(dora.boxes[1] ?? null).toBeNull();
       expect(dora.hp).toBeLessThan(lifeOf('dora'));
+      // On a fresh uppercut without a prior clash, age 100 still guards.
+      const fresh = doraPlayer();
+      enter(fresh.match, fresh.dora, 332, 99);
+      strike(fresh.match, fresh.other, 246);
+      fresh.other.x = fresh.dora.x + 180;
+      fresh.other.facing = -1;
+      fresh.dora.facing = 1;
+      fresh.dora.hitStop = 0;
+      fresh.other.hitStop = 0;
+      fresh.match.step({}, {});
+      expect(fresh.dora.age).toBe(100);
+      expect(fresh.dora.hp).toBe(lifeOf('dora'));
     },
   );
 
@@ -681,7 +841,6 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     enter(match, dora, 338);
     const cast = dora.pierceCastTick;
     for (const [index, offset] of [
-      [339, 0],
       [340, 0],
       [340, 3],
       [341, 0],
@@ -698,14 +857,16 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
     expect(dora.hp).toBe(lifeOf('dora'));
   });
 
-  it('expires Pierce 100 ticks after 338 even after a later 339 entry', () => {
+  it('expires Pierce 100 ticks after 338 even after a 339 jump', () => {
     const { match, dora, other } = doraPlayer(500);
     dora.stock = 5;
+    dora.variables[6] = 100;
     enter(match, dora, 338);
-    for (let t = 0; t < 12; t++) match.step({}, {});
-    enter(match, dora, 339, 35);
+    expect(dora.branch).toBe(339);
+    expect(dora.pierceCastTick).toBe(0);
+    for (let t = 0; t < 47; t++) match.step({}, {});
     dora.hitStop = 50;
-    for (let t = 0; t < 86; t++) match.step({}, {});
+    for (let t = 0; t < 51; t++) match.step({}, {});
     strike(match, other, 246);
     other.x = dora.x - 160;
     other.facing = 1;
@@ -733,8 +894,12 @@ describe('DoraEmon (46 B6.PLAYER)', () => {
       for (let t = 0; t < 12; t++) match.step({}, {});
       enter(match, dora, index);
       expect(dora.pierceCastTick).toBe(match.roundTicks);
+      for (let t = 0; t < 6; t++) match.step({}, {});
+      enter(match, dora, index);
+      expect(dora.pierceCastTick).toBe(match.roundTicks);
       enter(match, dora, 327, 9);
       expect(dora.pierceCastTick).toBeUndefined();
+      dora.stock = 5;
       for (let t = 0; t < 12; t++) match.step({}, {});
       enter(match, dora, index);
       expect(dora.pierceCastTick).toBe(match.roundTicks);
