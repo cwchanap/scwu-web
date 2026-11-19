@@ -2953,6 +2953,28 @@ export class Match {
     return true;
   }
 
+  // ZAKU's and PAC-HELO's downs test variable 11 instead of life
+  // (KO_SCRIPTS), so a same-tick KO bonus's restored HP finds no life
+  // event to name their get-up: while no variable-11 revival is armed,
+  // the fighter gets up under the down check's same gate (HPA-973).
+  private koDownGetUp(f: Fighter) {
+    if (
+      !KO_SCRIPTS.has(f.who) ||
+      f.branch !== twin(f.who, KO_DOWN) ||
+      this.br ||
+      this.picking ||
+      this.winner ||
+      this.globals[15] === 100 ||
+      f.hp <= 0 ||
+      script(f.branch, f.who).events.some(
+        (event) => event.op === 'test' && this.passes(f, f, event),
+      )
+    )
+      return false;
+    this.action(f, 'getUp');
+    return true;
+  }
+
   // KO Normal (60) holds both fighters 40 ticks at age 5 (PC 611) and
   // launches at age 14 (PC 617); KO NORMAL 2nd (61) launches at age 6 (PC
   // 631). Each lands into KO DOWN (62), which slides back for ten ticks
@@ -4179,6 +4201,7 @@ export class Match {
     const branch = f.branch;
     this.fireEvents(f);
     if (f.action !== 'script' || f.branch !== branch) return true;
+    if (this.koDownGetUp(f)) return true;
     const { end, next, offset = 0 } = script(timeline(f), f.who);
     if (
       end === 'hold' ||

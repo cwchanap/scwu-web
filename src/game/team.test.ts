@@ -980,6 +980,23 @@ describe('story battles', () => {
         expect(one.action).toBe('koLand');
       },
     );
+
+    // ZAKU's and PAC-HELO's downs test variable 11, not life (KO_SCRIPTS):
+    // the paid 1P's restored HP finds no life event, so their get-up is
+    // the engine's while no variable-11 revival is armed.
+    it.each(['zaku', 'pachelo'] as const)(
+      'gets %s up through its scripted KO down on the same-tick bonus',
+      (who) => {
+        const { match, one } = trade(who);
+        const seen = path(match, one);
+        expect(seen).toEqual([
+          [0, 'down'],
+          [expect.any(Number), 'script'],
+          [expect.any(Number), 'getUp'],
+          [expect.any(Number), 'idle'],
+        ]);
+      },
+    );
   });
 });
 
