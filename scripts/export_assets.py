@@ -4299,34 +4299,41 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
                 else:
                     frame["body"] = [dict(body, kind=body["kind"] & ~1) for body in reference]
         # Authored (HPA-973): COUNTER HIT takes K alone (B+C, 0x2060), not the
-        # source's B+E pair — only his two guard reactions.
+        # source's B+E pair, across every ground guard reaction.
         for name, script in scripts.items():
-            if int(name.split("+")[0]) in (172, 174):
+            if int(name.split("+")[0]) in (172, 174, 177, 179, 182, 184, 186, 188, 191, 193):
                 for event in script["events"]:
                     if event["op"] == "command":
                         event["steps"] = [0x2060 if step == 0x2120 else step
                                           for step in event["steps"]]
-        # Authored (HPA-973): each damaging Fists punch opens a one-tick guard
-        # shadow with its exact geometry in a free box slot (kind 0x103, no
-        # damage): a strike box meeting it cancels both sides with no clash
-        # handler, while his body between punches stays open. 225's own torso
-        # box is not a template — the shadow copies each punch.
+        # Authored (HPA-973): each damaging Fists punch opens a guard shadow
+        # with its exact geometry in a free box slot (kind 0x103, no damage)
+        # until that punch slot's next box event: a strike box meeting it
+        # cancels both sides, while his body between or outside punches stays
+        # open. 225's own torso box is not a template — the shadow copies each
+        # punch.
         for name, script in scripts.items():
             if int(name.split("+")[0]) not in (327, 328, 330, 331, 332):
                 continue
-            used = {event["slot"] for event in script["events"]
-                    if event["op"] == "box"}
+            boxes = [event for event in script["events"]
+                     if event["op"] == "box"]
+            used = {event["slot"] for event in boxes}
             guard = next(slot for slot in range(1, 20) if slot not in used)
-            shadows = [event for event in script["events"]
-                       if event["op"] == "box" and event["damage"]]
-            for event in shadows:
+            for i, event in enumerate(boxes):
+                if not event["damage"]:
+                    continue
                 script["events"].append(
                     dict(op="box", slot=guard, x=event["x"], y=event["y"],
                          w=event["w"], h=event["h"], kind=0x103, damage=0,
                          t=event["t"]))
-                script["events"].append(
-                    dict(op="box", slot=guard, x=0, y=0, w=0, h=0, kind=0,
-                         damage=0, t=event["t"] + 1))
+                following = next(
+                    (b for b in boxes[i + 1:] if b["slot"] == event["slot"]),
+                    None,
+                )
+                if following and not following["damage"]:
+                    script["events"].append(
+                        dict(op="box", slot=guard, x=0, y=0, w=0, h=0, kind=0,
+                             damage=0, t=following["t"]))
     images = export_images(c, key, image_ids, {140, 247} if key == "dora" else ())
     if key == "dora":
         # A standard-height select portrait from his muscular pose; gameplay sprites stay native.

@@ -885,9 +885,18 @@ describe('story battles', () => {
 
     it('gets TRAINING up at its landing check while the round is still open', () => {
       const { match, one } = falling();
+      match.fighters[1].x = 1200;
+      one.facing = 1;
+      const startX = one.x;
       Object.assign(one, { hp: 50, action: 'down', y: 0, vy: 1 });
       match.step();
       expect(one.action).toBe('knockdown');
+      // Tick 0 of knockdown 113 slides on the landing tick too, for 10 ticks
+      // total — matching a normal launch landing's slide distance.
+      const tickSlide = (655 / 65536) * 1.5 * 200;
+      expect(one.x).toBeCloseTo(startX - tickSlide, 3);
+      for (let t = 1; t < 15 && one.action === 'knockdown'; t++) match.step();
+      expect(one.x).toBeCloseTo(startX - 10 * tickSlide, 3);
     });
 
     it('leaves TRAINING down landing on the pick itself, the latch a late bonus cannot undo', () => {

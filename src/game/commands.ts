@@ -179,9 +179,9 @@ const BUTTONS: Partial<Record<Control, number>> = {
 // 34, retargeted to this pair); H LK and HK (A, B), the HK ending winning
 // in table order; K his HK normals (B, C), whose grounded entry plays that
 // same launch — Hit Up on K; J his chuck (C, D, E); and E, held, EN (E,
-// F). His guard reactions' counter pair (B, E, reactions 172, 174 →
-// COUNTER HIT 197) takes two keys: one with E (G, J or E) and one with B
-// (H or K).
+// F). His ground guard reactions' counter (172, 174, 177, 179, 182, 184,
+// 186, 188, 191, 193 → COUNTER HIT 197) is retargeted to K alone (B, C,
+// 0x2060) in export.
 // The light pair (C, D) has no key: LP normals and the light endings play
 // through the CPU only.
 const OWN_BUTTONS: Partial<Record<Who, Partial<Record<Control, number>>>> = {

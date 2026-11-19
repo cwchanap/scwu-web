@@ -1015,7 +1015,7 @@ function toNeutral(f: Fighter) {
 // from its hit handler (PC 3573).
 function rearm(actor: Fighter | Effect, index: ObjectKey, age: number) {
   const kinds = [actor.box, ...actor.boxes].reduce(
-    (kinds, box) => kinds | (box?.kind ?? 0),
+    (kinds, box) => kinds | (box && !(box.kind & 0x100) ? box.kind : 0),
     0,
   );
   const t = scriptTick(index, age, actor.who);
@@ -3254,15 +3254,10 @@ export class Match {
       if (!this.runOut(f)) this.action(f, 'idle');
       return;
     }
-    // Authored (HPA-973): retain a cast's tick across all in-family entries.
+    // Authored (HPA-973): retain a cast's tick across follow-ups while
+    // resetting on any fresh 338/339 entry at offset 0.
     if (f.who === 'dora')
-      if (
-        !offset &&
-        (index === 338 || index === 339) &&
-        (f.action !== 'script' ||
-          !DORA_PIERCE.has(Number(String(f.branch).split('+')[0])) ||
-          f.pierceCastTick === undefined)
-      )
+      if (!offset && (index === 338 || index === 339))
         f.pierceCastTick = this.roundTicks;
       else if (!DORA_PIERCE.has(index)) f.pierceCastTick = undefined;
     this.action(f, 'script', true);
@@ -4147,9 +4142,12 @@ export class Match {
       this.action(f, 'koLand', false, timeline || undefined);
       if (f.branch) this.rollResult(f);
       // TRAINING's check sits at the landing tick itself (38's t = 0),
-      // before the first moveKO step ages it past — enter it now; a life
-      // target it enters (his knockdown, 113) skips the down slide.
-      else if (!this.koRecovery(f)) this.slideDown(f);
+      // before the first moveKO step ages it past — enter it now; if it
+      // enters his knockdown (113), slideDown still runs its tick-0 slide.
+      else {
+        this.koRecovery(f);
+        this.slideDown(f);
+      }
       return true;
     }
     f.variables[1] = 0;
@@ -4371,12 +4369,15 @@ export class Match {
             )
               continue;
             // Authored (HPA-973): a Fists guard box (0x100) meeting a
-            // damaging box spends both sides' boxes at once — no clash
-            // handler, and a's own captured box meets nothing more.
-            if (
-              (box.kind | met.kind) & 0x100 &&
-              (box.damage > 0 || met.damage > 0)
-            ) {
+            // damaging box cancels both sides' boxes at once; ignore a
+            // zero-damage pair so the real punch slot handles it normally.
+            // Projectiles run their own clash handler; fighters queue none.
+            if ((box.kind | met.kind) & 0x100) {
+              if (!box.damage && !met.damage) continue;
+              if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
+              for (const o of [a, b])
+                if ('clip' in o && o.onClash)
+                  [o.pending, o.onClash] = [o.onClash, undefined];
               strip(a, b);
               return;
             }

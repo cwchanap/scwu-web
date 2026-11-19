@@ -5224,7 +5224,7 @@ export const GUIDES_DATA = {
           {
             name: 'Counter Hit',
             input: '<kbd>K</kbd> while blocking',
-            desc: 'Press K during an ordinary standing or crouching block to spend a stock and counter.',
+            desc: 'Press K during any standing or crouching block to spend a stock and counter.',
             cost: 1,
           },
         ],

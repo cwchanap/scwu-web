@@ -197,7 +197,7 @@ test('guide keeps the backdrop, back link and DoraEmon move descriptions', async
     'K while blocking',
   );
   await expect(row('Counter Hit')).toContainText(
-    'Press K during an ordinary standing or crouching block to spend a stock and counter.',
+    'Press K during any standing or crouching block to spend a stock and counter.',
   );
   await expect(row('EN')).toContainText(
     'Unavailable to you in every mode, and to any DoraEmon in a B.R. route — only a CPU DoraEmon elsewhere charges.',
