@@ -739,9 +739,9 @@
             >×<input
               type="number"
               class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="0.5"
-              max="5"
-              step="0.1"
+              min="1"
+              max="100"
+              step="1"
               value={cheats.playerHpMultiplier}
               disabled={!cheats.enabled}
               onchange={cheatNumber('playerHpMultiplier')}
@@ -754,9 +754,9 @@
             >×<input
               type="number"
               class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="0.1"
-              max="5"
-              step="0.1"
+              min="1"
+              max="100"
+              step="1"
               value={cheats.enemyHpMultiplier}
               disabled={!cheats.enabled}
               onchange={cheatNumber('enemyHpMultiplier')}
@@ -769,9 +769,9 @@
             >×<input
               type="number"
               class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="0.5"
-              max="10"
-              step="0.1"
+              min="1"
+              max="100"
+              step="1"
               value={cheats.playerDamageMultiplier}
               disabled={!cheats.enabled}
               onchange={cheatNumber('playerDamageMultiplier')}

@@ -795,11 +795,11 @@ describe('cheats (HPA-767)', () => {
     const { scene, artIn, statuses } = boot();
     artIn();
     scene.setCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, enemyHpMultiplier: 0.5 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, enemyHpMultiplier: 2 }),
     );
     scene.reset('practice');
-    expect(statuses.at(-1)?.hp).toEqual([1020, 245]);
-    expect(statuses.at(-1)?.life).toEqual([1020, 245]);
+    expect(statuses.at(-1)?.hp).toEqual([1020, 980]);
+    expect(statuses.at(-1)?.life).toEqual([1020, 980]);
   });
 
   it('divides the world life bars by the effective maximum', () => {
@@ -849,16 +849,16 @@ describe('cheats (HPA-767)', () => {
       },
       0,
     );
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
     while (!match.lifeBars.length) match.step();
     const bar = match.lifeBars[0];
-    bar.hp = 50;
+    bar.hp = 200;
     view.match = match;
     (view.drawLifeBars as () => void)();
     const backing = drawn.find((r) => r.color === 0 && r.h === 15)!;
     const green = drawn.find((r) => r.color === 0x00ff00)!;
     // The green row is 25 of the bar's 50 source pixels — half life against
-    // the halved maximum, where the native maximum would fill all 50
+    // the doubled maximum, where the native maximum would fill all 50
     // (1.5× art scale, ±1px for the two rounded edges).
     expect(green.h).toBe(12);
     expect(backing.w - green.w).toBeGreaterThanOrEqual(37);
@@ -903,13 +903,13 @@ describe('cheats (HPA-767)', () => {
       finishLoad();
       return { kind: 'demo' as const, demo: (view.select as StoryDemo).index };
     };
-    // ×0.5 (maximum 255): 81 and 80 scaled read as native 162 and 160 —
-    // the tight pair’s lower edge and the route below it; 82 and 125 land
+    // ×4 (maximum 2040): 648 and 640 scaled read as native 162 and 160 —
+    // the tight pair's lower edge and the route below it; 656 and 1000 land
     // in the middle and top bands.
-    expect(await route(0.5, 81)).toEqual(native(162));
-    expect(await route(0.5, 80)).toEqual(native(160));
-    expect(await route(0.5, 82)).toEqual(native(164));
-    expect(await route(0.5, 125)).toEqual(native(250));
+    expect(await route(4, 648)).toEqual(native(162));
+    expect(await route(4, 640)).toEqual(native(160));
+    expect(await route(4, 656)).toEqual(native(164));
+    expect(await route(4, 1000)).toEqual(native(250));
     // ×2 (maximum 1020): 325 reads as native 162, and 500 keeps the full-
     // life route.
     expect(await route(2, 325)).toEqual(native(162));

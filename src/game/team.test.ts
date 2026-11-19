@@ -513,7 +513,7 @@ describe('story battles', () => {
       return ryuko.hp;
     };
     expect(bonus(5)).toBe(350);
-    expect(bonus(0.5)).toBe(125);
+    expect(bonus(4)).toBe(300);
   });
 
   it("pays a KO again for each hit that takes life from a KO'd player, but not for one without damage (0x40f747)", () => {
@@ -717,9 +717,9 @@ describe('story battles', () => {
     match.useCheats({
       ...DEFAULT_CHEATS,
       enabled: true,
-      playerHpMultiplier: 0.5,
+      playerHpMultiplier: 2,
     });
-    expect(match.fighters[0].maxHp).toBe(255);
+    expect(match.fighters[0].maxHp).toBe(1020);
   });
 
   it("makes the 1P's HUD face, where SWW's sets variable 12 above global 3 = 1", () => {
