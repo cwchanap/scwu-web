@@ -120,7 +120,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
     await expect(dialog.getByLabel(name)).toBeEnabled();
   }
   const enemyHp = dialog.getByLabel('Enemy HP');
-  await enemyHp.fill('0.5');
+  await enemyHp.fill('2');
   await enemyHp.blur();
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
@@ -130,7 +130,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
         playerHpMultiplier: 1,
         playerMaxEn: 300,
         unlimitedEn: false,
-        enemyHpMultiplier: 0.5,
+        enemyHpMultiplier: 2,
         playerDamageMultiplier: 1,
         partnerHpMultiplier: 1,
         enemyStocksMultiplier: 1,
@@ -144,26 +144,26 @@ test('cheats settings live in the menu, persist and leave identity alone', async
     );
 
   // An out-of-range entry normalizes to the bound and the field shows the
-  // clamped value, not the raw entry: 9 over a held 5 reads back 5.
+  // clamped value, not the raw entry: 150 over a held 5 reads back 100.
   const playerHp = dialog.getByLabel('Player HP');
   await playerHp.fill('5');
   await playerHp.blur();
-  await playerHp.fill('9');
+  await playerHp.fill('150');
   await playerHp.blur();
-  await expect(playerHp).toHaveValue('5');
+  await expect(playerHp).toHaveValue('100');
   // Clearing the field keeps the held value instead of saving the default.
   await playerHp.fill('');
   await playerHp.blur();
-  await expect(playerHp).toHaveValue('5');
+  await expect(playerHp).toHaveValue('100');
   await expect
     .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
     .toBe(
       JSON.stringify({
         enabled: true,
-        playerHpMultiplier: 5,
+        playerHpMultiplier: 100,
         playerMaxEn: 300,
         unlimitedEn: false,
-        enemyHpMultiplier: 0.5,
+        enemyHpMultiplier: 2,
         playerDamageMultiplier: 1,
         partnerHpMultiplier: 1,
         enemyStocksMultiplier: 1,
@@ -206,7 +206,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await menu.click();
   await expect(dialog).toBeVisible();
   await expect(cheatSwitch).toBeChecked();
-  await expect(dialog.getByLabel('Enemy HP')).toHaveValue('0.5');
+  await expect(dialog.getByLabel('Enemy HP')).toHaveValue('2');
   await expect(row).toContainText('Ryuko');
   await expect.poll(() => meCalls).toBe(3);
   expect(errors).toEqual([]);

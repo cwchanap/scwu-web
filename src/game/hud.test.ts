@@ -102,10 +102,10 @@ it('crops the HUD life bar by the battle’s effective maximum', () => {
     ...DEFAULT_CHEATS,
     enabled: true,
     playerHpMultiplier: 2,
-    enemyHpMultiplier: 0.5,
+    enemyHpMultiplier: 2,
   });
   update(cheated);
-  // Both bars full at their scaled maxima: 1020/1020 and 245/245.
+  // Both bars full at their scaled maxima: 1020/1020 each.
   expect(hud.lifeBars().map((bar) => bar.crop)).toEqual([
     { x: 0, width: 254 },
     { x: 0, width: 254 },

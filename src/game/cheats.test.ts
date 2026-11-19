@@ -54,7 +54,7 @@ describe('cheat options (HPA-767, HPA-972)', () => {
           playerHpMultiplier: 2.5,
           playerMaxEn: 600,
           unlimitedEn: true,
-          enemyHpMultiplier: 0.1,
+          enemyHpMultiplier: 5,
           playerDamageMultiplier: 10,
           partnerHpMultiplier: 100,
           enemyStocksMultiplier: 5,
@@ -71,7 +71,7 @@ describe('cheat options (HPA-767, HPA-972)', () => {
       playerHpMultiplier: 2.5,
       playerMaxEn: 600,
       unlimitedEn: true,
-      enemyHpMultiplier: 0.1,
+      enemyHpMultiplier: 5,
       playerDamageMultiplier: 10,
       partnerHpMultiplier: 100,
       enemyStocksMultiplier: 5,
@@ -97,35 +97,39 @@ describe('cheat options (HPA-767, HPA-972)', () => {
     });
   });
 
-  it('bounds finite out-of-range numbers to their range', () => {
+  it('bounds every multiplier to 1–100 (HPA-972)', () => {
     expect(
       readCheats(
-        '{"playerHpMultiplier":100,"enemyHpMultiplier":0.01,' +
-          '"playerDamageMultiplier":-5,"playerMaxEn":2000,' +
-          '"partnerHpMultiplier":0,"enemyStocksMultiplier":9,' +
+        '{"playerHpMultiplier":1000,"enemyHpMultiplier":1000,' +
+          '"playerDamageMultiplier":1000,"partnerHpMultiplier":1000,' +
+          '"playerMaxEn":2000,"enemyStocksMultiplier":9,' +
           '"lowHpLine":120,"damageCutMultiplier":8}',
       ),
     ).toEqual({
       ...DEFAULT_CHEATS,
-      playerHpMultiplier: 5,
-      enemyHpMultiplier: 0.1,
-      playerDamageMultiplier: 0.5,
+      playerHpMultiplier: 100,
+      enemyHpMultiplier: 100,
+      playerDamageMultiplier: 100,
+      partnerHpMultiplier: 100,
       playerMaxEn: 1000,
-      partnerHpMultiplier: 1,
       enemyStocksMultiplier: 5,
       lowHpLine: 100,
       damageCutMultiplier: 5,
     });
     expect(
       readCheats(
-        '{"playerHpMultiplier":-2,"playerMaxEn":9,"partnerHpMultiplier":-1,' +
-          '"enemyStocksMultiplier":0,"lowHpLine":-3,"damageCutMultiplier":-1}',
+        '{"playerHpMultiplier":-2,"enemyHpMultiplier":0.01,' +
+          '"playerDamageMultiplier":0.5,"partnerHpMultiplier":0,' +
+          '"playerMaxEn":9,"enemyStocksMultiplier":0,' +
+          '"lowHpLine":-3,"damageCutMultiplier":-1}',
       ),
     ).toEqual({
       ...DEFAULT_CHEATS,
-      playerHpMultiplier: 0.5,
-      playerMaxEn: 100,
+      playerHpMultiplier: 1,
+      enemyHpMultiplier: 1,
+      playerDamageMultiplier: 1,
       partnerHpMultiplier: 1,
+      playerMaxEn: 100,
       enemyStocksMultiplier: 1,
       lowHpLine: 0,
       damageCutMultiplier: 0,

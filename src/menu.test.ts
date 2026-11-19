@@ -86,7 +86,7 @@ describe('cheats storage', () => {
     playerHpMultiplier: 2,
     playerMaxEn: 600,
     unlimitedEn: true,
-    enemyHpMultiplier: 0.1,
+    enemyHpMultiplier: 5,
     playerDamageMultiplier: 10,
     partnerHpMultiplier: 100,
     enemyStocksMultiplier: 5,

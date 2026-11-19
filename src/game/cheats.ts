@@ -7,16 +7,19 @@ export interface CheatOptions {
   // The master switch: an enabled switch marks a battle as cheated even
   // with neutral multipliers.
   enabled: boolean;
-  // 1P's maximum and starting life, ×0.5–×5.
+  // 1P's maximum and starting life, ×1–×100 (HPA-972 re-bounds the old
+  // ×0.5–×5 to the design table's shared multiplier range).
   playerHpMultiplier: number;
   // 1P's maximum EN in hundreds of a stock, 100–1000 by 100: the stock
   // cap is the value / 100 (authored, HPA-972).
   playerMaxEn: number;
   // Refills 1P's stock to the cap every active tick.
   unlimitedEn: boolean;
-  // The maximum and starting life of every fighter hostile to 1P, ×0.1–×5.
+  // The maximum and starting life of every fighter hostile to 1P, ×1–×100
+  // (HPA-972).
   enemyHpMultiplier: number;
-  // 1P's positive outgoing attack damage to hostile targets, ×0.5–×10.
+  // 1P's positive outgoing attack damage to hostile targets, ×1–×100
+  // (HPA-972).
   playerDamageMultiplier: number;
   // The maximum and starting life of every 1P ally, ×1–×100 (HPA-972).
   partnerHpMultiplier: number;
@@ -90,8 +93,8 @@ export function normalizeCheats(value: unknown): CheatOptions {
     enabled: flagOf(raw.enabled, DEFAULT_CHEATS.enabled),
     playerHpMultiplier: bounded(
       raw.playerHpMultiplier,
-      0.5,
-      5,
+      1,
+      100,
       DEFAULT_CHEATS.playerHpMultiplier,
     ),
     playerMaxEn:
@@ -101,14 +104,14 @@ export function normalizeCheats(value: unknown): CheatOptions {
     unlimitedEn: flagOf(raw.unlimitedEn, DEFAULT_CHEATS.unlimitedEn),
     enemyHpMultiplier: bounded(
       raw.enemyHpMultiplier,
-      0.1,
-      5,
+      1,
+      100,
       DEFAULT_CHEATS.enemyHpMultiplier,
     ),
     playerDamageMultiplier: bounded(
       raw.playerDamageMultiplier,
-      0.5,
-      10,
+      1,
+      100,
       DEFAULT_CHEATS.playerDamageMultiplier,
     ),
     partnerHpMultiplier: bounded(
