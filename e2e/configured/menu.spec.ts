@@ -128,10 +128,18 @@ test('cheats settings live in the menu, persist and leave identity alone', async
       JSON.stringify({
         enabled: true,
         playerHpMultiplier: 1,
-        playerEnLimit: 3,
+        playerMaxEn: 300,
         unlimitedEn: false,
         enemyHpMultiplier: 0.5,
         playerDamageMultiplier: 1,
+        partnerHpMultiplier: 1,
+        enemyStocksMultiplier: 1,
+        lowHpLine: 30,
+        damageCutMultiplier: 1,
+        lowHpSupers: false,
+        brNoPartner: false,
+        brHpPerKill: null,
+        brEnPerKill: null,
       }),
     );
 
@@ -153,10 +161,18 @@ test('cheats settings live in the menu, persist and leave identity alone', async
       JSON.stringify({
         enabled: true,
         playerHpMultiplier: 5,
-        playerEnLimit: 3,
+        playerMaxEn: 300,
         unlimitedEn: false,
         enemyHpMultiplier: 0.5,
         playerDamageMultiplier: 1,
+        partnerHpMultiplier: 1,
+        enemyStocksMultiplier: 1,
+        lowHpLine: 30,
+        damageCutMultiplier: 1,
+        lowHpSupers: false,
+        brNoPartner: false,
+        brHpPerKill: null,
+        brEnPerKill: null,
       }),
     );
   // Reset it for the assertions below.
