@@ -61,8 +61,6 @@ PY
 fi
 version=$(head -n1 <<<"$published")
 actual=$(sed -n 2p <<<"$published")
-includes=()
-while IFS= read -r file; do includes+=(--include "$file"); done < <(tail -n +3 <<<"$published")
 
 # The version must still describe the bytes on disk: an export that stopped
 # after rewriting packs but before writing the manifest would otherwise put
@@ -72,9 +70,11 @@ if [ "$actual" != "$version" ]; then
   exit 1
 fi
 
-# Only the listed files: exclude everything, then include each one. No --delete.
-aws s3 sync public/assets "s3://$R2_BUCKET/$version/" --endpoint-url "$endpoint" --only-show-errors \
-  --cache-control "public, max-age=31536000, immutable" --exclude '*' "${includes[@]}"
+# Only the listed files, one PUT each, no --delete: `s3 sync`'s filters would
+# still walk and pattern-match all ~29k files under public/assets to find them.
+tail -n +3 <<<"$published" | xargs -P 8 -I {} aws s3 cp "public/assets/{}" \
+  "s3://$R2_BUCKET/$version/{}" --endpoint-url "$endpoint" --only-show-errors \
+  --cache-control "public, max-age=31536000, immutable"
 
 # The generated JSON is the Cloudflare build's input (build.sh) and the
 # fixtures are the unit tests' (CI: .github/scripts/fetch-generated.sh), since
