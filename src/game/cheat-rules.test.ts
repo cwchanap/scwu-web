@@ -377,6 +377,29 @@ describe('low-life line and damage cut (HPA-972)', () => {
     // 60% of 1020 is 612; the native line would hold 305.
     expect(match.fighters[0].hp).toBe(611);
   });
+
+  it('holds practice Low health at 1 HP when the line is 0%', () => {
+    const match = new Match();
+    match.practice.lowHealth = true;
+    match.useCheats(cheats({ enabled: true, lowHpLine: 0 }));
+    match.step();
+    // The 0% mark is 0: the hold clamps at 1 instead of writing a negative,
+    // truthy life.
+    expect(match.fighters[0].hp).toBe(1);
+  });
+
+  it('reads a non-divisible percent off the scaled maximum exactly', () => {
+    const match = new Match();
+    match.practice.lowHealth = true;
+    match.useCheats(
+      cheats({ enabled: true, playerHpMultiplier: 100, lowHpLine: 1 }),
+    );
+    match.step();
+    // 1% of the ×100 bar is 510 — the percent reaches the effective
+    // maximum whole, so the hold keeps 509 (a mark truncated before
+    // scaling would read 500 and hold 499).
+    expect(match.fighters[0].hp).toBe(509);
+  });
 });
 
 describe('low-HP super gates (HPA-972)', () => {
@@ -473,6 +496,22 @@ describe('low-HP super gates (HPA-972)', () => {
     expect(run(400, 60)).toBe('axeThrow');
     // The native line keeps the native threshold.
     expect(run(300, 30)).toBe('axeThrow');
+  });
+
+  it('keeps a non-divisible gate threshold exact at a high maximum', () => {
+    const run = (hp: number) => {
+      const { match, ryuko } = superMatch();
+      match.useCheats(
+        cheats({ enabled: true, playerHpMultiplier: 100, lowHpLine: 1 }),
+      );
+      ryuko.hp = hp;
+      match.step({ blackRush: true });
+      return named(ryuko);
+    };
+    // 153 × 1/30 of the ×100 bar scales to 510 whole (a mark truncated
+    // before scaling would read 500): 505 is under the super, 511 past it.
+    expect(run(505)).toBe('blackRush');
+    expect(run(511)).toBe('axeThrow');
   });
 
   it('leaves untabled life checks native under the option', () => {

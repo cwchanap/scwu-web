@@ -2684,9 +2684,24 @@ export class Match {
   private lifeLineMark(f: Fighter): number {
     if (f !== this.fighters[0] || !this.cheats.enabled)
       return lifeMark(f, desperationOf(f.who));
-    return lifeMark(
-      f,
-      Math.trunc((lifeOf(f.who) * this.cheats.lowHpLine) / 100),
+    return this.lineScaledMark(f, lifeOf(f.who), 100);
+  }
+
+  // Authored (HPA-972): `value` native HP scaled by the Low HP line over
+  // the native share it replaces (`lineOver`: 100 for the percent line, 30
+  // for a 30% gate). The percent keeps full precision through the
+  // effective-maximum scaling and truncates once, at the threshold — 1% of
+  // a ×100 bar reads 510, not the 500 a mark truncated before scaling
+  // gives — while the native sentinels (nonpositive, exact 1) stay
+  // un-scaled, exactly as lifeMark treats them.
+  private lineScaledMark(f: Fighter, value: number, lineOver: number): number {
+    const native = (value * this.cheats.lowHpLine) / lineOver;
+    if (native <= 0 || native === 1) return native;
+    return Math.max(
+      1,
+      Math.trunc(
+        (value * this.cheats.lowHpLine * f.maxHp) / (lineOver * lifeOf(f.who)),
+      ),
     );
   }
 
@@ -3917,10 +3932,7 @@ export class Match {
           break;
         }
         const mark = gate
-          ? lifeMark(
-              self,
-              Math.trunc((gate.value * this.cheats.lowHpLine) / 30),
-            )
+          ? this.lineScaledMark(self, gate.value, 30)
           : lifeMark(self, event.value);
         if (
           ('clip' in actor || actor.action === 'script') &&
@@ -5596,7 +5608,9 @@ export class Match {
       // (HPA-767): the mark scales with the effective maximum.
       if (this.practice.lowHealth) {
         const one = this.fighters[0];
-        one.hp = Math.min(one.hp, this.lifeLineMark(one) - 1);
+        // A 0% line's mark is 0: the hold keeps 1 HP instead of writing a
+        // negative, truthy life.
+        one.hp = Math.min(one.hp, Math.max(1, this.lifeLineMark(one) - 1));
       }
     }
     const inputs = this.fighters.map((_, i) =>
