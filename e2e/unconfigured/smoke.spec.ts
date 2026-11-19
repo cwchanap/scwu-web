@@ -108,10 +108,18 @@ test('boots into a ready arena', async ({ page }) => {
       JSON.stringify({
         enabled: true,
         playerHpMultiplier: 2,
-        playerEnLimit: 3,
+        playerMaxEn: 300,
         unlimitedEn: false,
         enemyHpMultiplier: 1,
         playerDamageMultiplier: 1,
+        partnerHpMultiplier: 1,
+        enemyStocksMultiplier: 1,
+        lowHpLine: 30,
+        damageCutMultiplier: 1,
+        lowHpSupers: false,
+        brNoPartner: false,
+        brHpPerKill: null,
+        brEnPerKill: null,
       }),
     );
   await expect(player).toHaveText('510');

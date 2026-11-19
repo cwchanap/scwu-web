@@ -125,6 +125,9 @@ export interface PracticeOptions {
   partner: DummyBehavior;
   maxStock: boolean;
   lowHealth: boolean;
+  // Live enemy HP bars (authored, HPA-972): a session option, off by
+  // default, applied through TrainingScene.setPractice in every mode.
+  enemyBars: boolean;
 }
 export const TICK_MS = 10;
 export const WIDTH = 960;
@@ -1169,7 +1172,7 @@ export interface Fighter {
   hp: number;
   // Authored (HPA-767 cheats): the fighter's maximum life — `lifeOf(who)`
   // natively, scaled by the effective cheat snapshot — and its stock cap,
-  // `stocksOf(who)` natively, 1P's `playerEnLimit` under cheats.
+  // `stocksOf(who)` natively, 1P's `playerMaxEn / 100` under cheats.
   maxHp: number;
   maxStock: number;
   // Authored (HPA-858): the boss B.R. ANOTHER route's tough seats gain EN
@@ -1838,6 +1841,7 @@ export class Match {
     partner: 'stand',
     maxStock: false,
     lowHealth: false,
+    enemyBars: false,
   };
   // Authored (HPA-767): this battle's Cheats settings, the frozen snapshot
   // `useCheats` installs once, before the first step. With `enabled` off
@@ -2433,7 +2437,7 @@ export class Match {
         1,
         Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
       );
-      f.maxStock = this.cheats.playerEnLimit;
+      f.maxStock = this.cheats.playerMaxEn / 100;
     } else if (this.hostile(0, i)) {
       // Authored (HPA-858): derive from the seat's route base — 2× on a
       // tough seat, 1× otherwise — so re-seating never compounds.

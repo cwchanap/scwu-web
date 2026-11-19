@@ -84,10 +84,18 @@ describe('cheats storage', () => {
   const saved: CheatOptions = {
     enabled: true,
     playerHpMultiplier: 2,
-    playerEnLimit: 6,
+    playerMaxEn: 600,
     unlimitedEn: true,
     enemyHpMultiplier: 0.1,
     playerDamageMultiplier: 10,
+    partnerHpMultiplier: 100,
+    enemyStocksMultiplier: 5,
+    lowHpLine: 0,
+    damageCutMultiplier: 5,
+    lowHpSupers: true,
+    brNoPartner: true,
+    brHpPerKill: 1000,
+    brEnPerKill: 0,
   };
 
   it('reads the saved settings as one JSON object under one key', () => {

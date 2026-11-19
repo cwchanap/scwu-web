@@ -1387,6 +1387,15 @@ describe('practice partner', () => {
     return { match, ryuko, target };
   }
 
+  it('defaults the live Enemy HP bars session option off (HPA-972)', () => {
+    const match = new Match();
+    expect(match.practice.enemyBars).toBe(false);
+    // The option rides the practice settings that App passes through
+    // TrainingScene.setPractice, session-local and not persisted.
+    match.practice = { ...match.practice, enemyBars: true };
+    expect(match.practice.enemyBars).toBe(true);
+  });
+
   it('plays the original CPU, guard roll included', () => {
     const { match, ryuko, target } = partner('cpu');
     match.cpu = new CpuVM([], 100);
@@ -1582,7 +1591,7 @@ describe('cheat options (HPA-767)', () => {
       cheats({
         playerHpMultiplier: 5,
         enemyHpMultiplier: 0.1,
-        playerEnLimit: 6,
+        playerMaxEn: 600,
       }),
     );
     for (const f of match.fighters)
@@ -1596,7 +1605,7 @@ describe('cheat options (HPA-767)', () => {
       cheats({
         enabled: true,
         playerHpMultiplier: 2,
-        playerEnLimit: 6,
+        playerMaxEn: 600,
         enemyHpMultiplier: 0.1,
       }),
     );
@@ -1619,7 +1628,7 @@ describe('cheat options (HPA-767)', () => {
   it('installs once: a second call before the first step changes nothing', () => {
     const match = new Match();
     match.useCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, playerMaxEn: 600 }),
     );
     // A later disabled call must not undo the installed seating.
     match.useCheats(cheats({ enabled: false }));
@@ -1638,7 +1647,7 @@ describe('cheat options (HPA-767)', () => {
     const match = new Match();
     match.step();
     match.useCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, playerMaxEn: 600 }),
     );
     // The battle already ran native; a late first call seats no one.
     expect(match.cheats).toEqual(DEFAULT_CHEATS);
@@ -1759,7 +1768,7 @@ describe('cheat options (HPA-767)', () => {
       }),
     );
     match.useCheats(
-      cheats({ enabled: true, enemyHpMultiplier: 3, playerEnLimit: 6 }),
+      cheats({ enabled: true, enemyHpMultiplier: 3, playerMaxEn: 600 }),
     );
     const [one, tough, plain, ally, waiting] = match.fighters;
     // ZAKU's native 200: the route's ×2 under ×3 seats 1200, full, at the
@@ -1975,7 +1984,7 @@ describe('cheat options (HPA-767)', () => {
       cheats({
         enabled: true,
         playerHpMultiplier: 2,
-        playerEnLimit: 2,
+        playerMaxEn: 200,
         enemyHpMultiplier: 0.1,
       }),
     );
@@ -2150,7 +2159,7 @@ describe('cheat options (HPA-767)', () => {
   it("caps the 1P's gauge at the EN limit, native-1 and native-6 fighters alike", () => {
     const cap = (who: Who, limit: number) => {
       const match = new Match('practice', false, 0, [who, 'ryuko']);
-      match.useCheats(cheats({ enabled: true, playerEnLimit: limit }));
+      match.useCheats(cheats({ enabled: true, playerMaxEn: limit * 100 }));
       const f = match.fighters[0];
       addPower(f, 650);
       return f;
@@ -2171,7 +2180,7 @@ describe('cheat options (HPA-767)', () => {
 
   it('borrows back below the EN limit as the source does', () => {
     const match = new Match();
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 2 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 200 }));
     const f = match.fighters[0];
     addPower(f, 250);
     expect(f).toMatchObject({ stock: 2, power: 0 });
@@ -2185,7 +2194,7 @@ describe('cheat options (HPA-767)', () => {
 
   it('keeps every hostile gauge capped natively', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 600 }));
     const zaku = match.fighters[1];
     expect(zaku.maxStock).toBe(1);
     addPower(zaku, 650);
@@ -2195,7 +2204,7 @@ describe('cheat options (HPA-767)', () => {
   it("refills the 1P to its cap every active tick, before the tick's inputs", () => {
     const match = new Match();
     match.useCheats(
-      cheats({ enabled: true, playerEnLimit: 3, unlimitedEn: true }),
+      cheats({ enabled: true, playerMaxEn: 300, unlimitedEn: true }),
     );
     const [one, dummy] = match.fighters;
     [one.stock, one.power, dummy.stock] = [0, 37, 0];
@@ -2214,7 +2223,7 @@ describe('cheat options (HPA-767)', () => {
   it('tops practice Max stock to the EN limit and the partner to its cap', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
     match.practice.maxStock = true;
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 600 }));
     match.step();
     expect(match.fighters[0].stock).toBe(6);
     expect(match.fighters[1].stock).toBe(1);
@@ -2229,7 +2238,7 @@ describe('cheat options (HPA-767)', () => {
       'court',
     );
     match.useCheats(
-      cheats({ enabled: true, playerEnLimit: 2, unlimitedEn: true }),
+      cheats({ enabled: true, playerMaxEn: 200, unlimitedEn: true }),
     );
     toFight(match);
     expect(match.fighters[0]).toMatchObject({ stock: 2, power: 0 });

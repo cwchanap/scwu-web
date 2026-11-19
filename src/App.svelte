@@ -28,6 +28,7 @@
     partner: 'stand',
     maxStock: false,
     lowHealth: false,
+    enemyBars: false,
   });
   let cheats = $state<CheatOptions>({ ...DEFAULT_CHEATS });
   let fighter = $state<Who>('ryuko');
@@ -352,7 +353,7 @@
       | 'playerHpMultiplier'
       | 'enemyHpMultiplier'
       | 'playerDamageMultiplier'
-      | 'playerEnLimit',
+      | 'playerMaxEn',
   ) {
     return (event: Event) => {
       const input = event.currentTarget as HTMLInputElement;
@@ -782,14 +783,14 @@
           <span class="flex items-center gap-1 text-[#ffd24a]"
             ><input
               type="number"
-              class="w-9 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="1"
-              max="6"
-              step="1"
-              value={cheats.playerEnLimit}
+              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
+              min="100"
+              max="1000"
+              step="100"
+              value={cheats.playerMaxEn}
               disabled={!cheats.enabled}
-              onchange={cheatNumber('playerEnLimit')}
-            />stocks</span
+              onchange={cheatNumber('playerMaxEn')}
+            />EN</span
           ></label
         >
         <label class="col-span-2 flex items-center gap-1.5"
