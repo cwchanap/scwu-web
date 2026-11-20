@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import type { Who } from '../game/characters';
 import { itWithArt } from '../game/testing';
-import { ROSTER } from './fighters';
+import { NAMEPLATES, ROSTER } from './fighters';
 import { GRID, GUIDES_DATA, FACES, SHARED, STOCKS, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
@@ -213,5 +213,12 @@ describe('instructions page', () => {
     expect(readFileSync(here + '../App.svelte', 'utf8')).not.toMatch(
       /instructions\/(guides|moves)/,
     );
+  });
+
+  it('keeps the Menu nameplate table identical to the guide’s', () => {
+    for (const entry of ROSTER)
+      expect(NAMEPLATES[entry.id], entry.id).toBe(
+        GUIDES_DATA[entry.id].nameplate,
+      );
   });
 });

@@ -8,16 +8,15 @@
   import type { Control, Mode, PracticeOptions } from './game/match';
   import type { Stage, Who } from './game/characters';
   import { DUMMY_BEHAVIORS } from './game/dummy';
-  import type { DummyBehavior } from './game/dummy';
   import type { GameStatus, createGame } from './game/scene';
-  import { ROSTER } from './instructions/fighters';
+  import Menu from './Menu.svelte';
   import {
     applyMe,
     identityRefresher,
     loadCheats,
-    opponentChoiceOf,
     profileConfigured,
     resetModeOf,
+    STAGE_LABELS,
     saveCheats,
     type MenuIdentity,
   } from './menu';
@@ -34,35 +33,6 @@
   let fighter = $state<Who>('ryuko');
   let opponent = $state<Who>('zoma');
   let stage = $state<Stage>('court');
-  const stageLabels: Record<Stage, string> = {
-    court: 'Sport Court',
-    train: 'Train Morning',
-    sakuranight: 'Sakura Night',
-    trainnight: 'Train Night',
-    dojin: 'Dojin BKG',
-    japan: 'Japan Street',
-    park: 'Park Morning',
-    parknight: 'Park Night',
-    sakura: 'Sakura Street',
-    greek: 'Greek',
-    space: 'Space',
-    boss: 'Boss Base',
-    office: 'ZM Office',
-    office2: 'ZM Office T2',
-    brboss: 'BR Boss Base',
-    gi: 'GI Stage',
-    spacenight: 'Space Night',
-    streetnight: 'Street Night',
-  };
-  const partnerLabels: Record<DummyBehavior, string> = {
-    stand: 'Stand',
-    guard: 'Guard',
-    crouchGuard: 'Crouch guard',
-    airGuard: 'Air guard',
-    attack: 'Attack',
-    jumpIn: 'Jump in',
-    cpu: 'CPU partner',
-  };
   let status = $state<GameStatus>({
     ready: false,
     paused: false,
@@ -81,6 +51,9 @@
     cheated: false,
   });
   let menuOpen = $state(false);
+  // Which content the open dialog shows: the tabs, or the Summon grid its
+  // Ctrl+Backquote shortcut opens (HPA-972).
+  let menuView = $state<'match' | 'cheats' | 'summon'>('match');
   let identity = $state<MenuIdentity>({
     user: null,
     loaded: false,
@@ -103,7 +76,7 @@
         },
       )
     : null;
-  let dialog: HTMLDialogElement;
+  // The dialog element lives in Menu.svelte now.
   const asset = ASSET_BASE;
   const touchControls: { control: Control; label: string; symbol: string }[] = [
     { control: 'left', label: 'Move left', symbol: '←' },
@@ -348,31 +321,7 @@
   // out-of-range text in the field (Svelte sees no change to re-apply), so
   // each numeric field rewrites itself from the normalized value. A cleared
   // field (NaN) keeps the value it had instead of saving the default.
-  function cheatNumber(
-    field:
-      | 'playerHpMultiplier'
-      | 'enemyHpMultiplier'
-      | 'playerDamageMultiplier'
-      | 'playerMaxEn',
-  ) {
-    return (event: Event) => {
-      const input = event.currentTarget as HTMLInputElement;
-      if (Number.isFinite(input.valueAsNumber))
-        setCheats({ [field]: input.valueAsNumber });
-      input.value = String(cheats[field]);
-    };
-  }
-  // The one Opponent select: its value comes from status.mode, which takes
-  // 'story' while a story battle runs.
-  const opponentChoice = $derived(
-    opponentChoiceOf(status.mode, practice.partner),
-  );
-  const pairDisabled = $derived(
-    !status.ready || status.selecting || status.story,
-  );
-  const optionsDisabled = $derived(
-    !status.ready || opponentChoice === 'vsCpu' || opponentChoice === 'story',
-  );
+  // (The fields live in Menu.svelte now; the normalization is menu.ts's.)
   function setOpponentChoice(value: string) {
     const partner = DUMMY_BEHAVIORS.find((b) => b === value);
     if (partner) setPractice({ partner });
@@ -401,10 +350,27 @@
   function openMenu() {
     // The scene holds the modal's freeze, so a reset's unpause can't slip a
     // tick through and a select screen after a match freezes too.
+    menuView = 'match';
     session?.scene.setModal(true);
     menuOpen = true;
-    dialog.showModal();
     void refreshIdentity?.();
+  }
+  // Ctrl+Backquote in an active, ready, unfinished, non-selecting match
+  // opens the Summon view — only with the Menu's master cheat switch on.
+  // The same dialog, no scene→App callback.
+  const summonOpenable = $derived(
+    cheats.enabled && status.ready && !status.winner && !status.selecting,
+  );
+  function openSummon() {
+    menuView = 'summon';
+    session?.scene.setModal(true);
+    menuOpen = true;
+  }
+  function summonInto(who: Who, side: -1 | 1): Promise<void> {
+    return (
+      session?.scene.summon(who, side) ??
+      Promise.reject(new Error('The arena is not running.'))
+    );
   }
   // close fires on every path (Close button, Character select, native Esc).
   function menuClosed() {
@@ -430,6 +396,14 @@
 </script>
 
 <svelte:head><title>SCWU — Training</title></svelte:head>
+<svelte:window
+  onkeydown={(event) => {
+    if (event.ctrlKey && event.code === 'Backquote' && summonOpenable) {
+      event.preventDefault();
+      openSummon();
+    }
+  }}
+/>
 
 <main class="app-shell" id="main">
   <section class="cabinet" aria-label="SCWU training match">
@@ -481,7 +455,7 @@
         {:else if !status.ready}
           <div class="stage-overlay">
             <h2>Loading SCWU…</h2>
-            <p>Opening {stageLabels[stage]}.</p>
+            <p>Opening {STAGE_LABELS[stage]}.</p>
           </div>
         {:else if status.paused && !menuOpen}
           <!-- status.paused includes the modal's freeze; the open dialog
@@ -555,282 +529,30 @@
     {/each}
   </div>
 
-  <dialog
-    class="menu-dialog m-auto w-[min(92vw,400px)] max-h-[86svh] overflow-auto border border-[#6b4e1f] bg-[#0d0b08] p-5 text-xs text-[#f2e6c8] open:flex open:flex-col open:gap-3"
-    bind:this={dialog}
-    aria-label="Menu"
-    tabindex="-1"
-    onkeydown={(event) => event.stopPropagation()}
+  <Menu
+    open={menuOpen}
+    view={menuView}
+    {status}
+    {practice}
+    {cheats}
+    {fighter}
+    {opponent}
+    {stage}
+    {identity}
+    {mePending}
+    {profileRow}
     onclose={menuClosed}
-  >
-    <div>
-      <div class="flex items-baseline justify-between">
-        <span
-          class="text-lg font-black italic tracking-[1px] text-[#ffd24a] [text-shadow:2px_2px_0_#7a2d00]"
-          >SCWU MENU</span
-        >
-        <span class="text-[10px] text-[#8a7a5a]">Esc to close</span>
-      </div>
-      <div
-        class="mt-2 h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
-      ></div>
-    </div>
-    {#if profileRow}
-      <div class="flex items-center justify-between gap-3">
-        <div
-          class="flex min-w-0 items-center gap-2"
-          class:opacity-60={mePending}
-        >
-          {#if identity.user?.avatarUrl}
-            <img
-              class="size-6 shrink-0 rounded-full object-cover [image-rendering:auto]"
-              src={identity.user.avatarUrl}
-              alt=""
-              referrerpolicy="no-referrer"
-            />
-          {/if}
-          <span class="truncate font-bold italic"
-            >{!identity.loaded
-              ? 'Checking…'
-              : identity.user
-                ? identity.user.name
-                : identity.failed
-                  ? "Couldn't check sign-in"
-                  : 'Not signed in'}</span
-          >
-        </div>
-        <a
-          class="shrink-0 text-[11px] italic text-[#ffd24a] hover:text-[#ffe08a]"
-          href="profile.html"
-          target="_blank"
-          rel="noopener">Profile ↗</a
-        >
-      </div>
-    {/if}
-    <label class="block"
-      ><span
-        class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
-        >Opponent</span
-      >
-      <select
-        class="mt-1.5 w-full border border-[#8a6a2f] border-l-4 border-l-[#ffd24a] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
-        value={opponentChoice}
-        disabled={!status.ready}
-        onchange={(event) => setOpponentChoice(event.currentTarget.value)}
-      >
-        {#if opponentChoice === 'story'}
-          <option value="story" disabled>Story mode</option>
-        {/if}
-        <optgroup label="Practice partner">
-          {#each DUMMY_BEHAVIORS as behavior (behavior)}
-            <option value={behavior}>{partnerLabels[behavior]}</option>
-          {/each}
-        </optgroup>
-        <optgroup label="Match">
-          <option value="vsCpu">Vs. CPU</option>
-        </optgroup>
-      </select></label
-    >
-    <div class="flex gap-2">
-      <label class="min-w-0 flex-1"
-        ><span
-          class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
-          >1P</span
-        >
-        <select
-          class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
-          value={fighter}
-          disabled={pairDisabled}
-          onchange={(event) => setFighter(event.currentTarget.value as Who)}
-        >
-          {#each ROSTER as { id, name } (id)}
-            <option value={id}>{name}</option>
-          {/each}
-        </select></label
-      >
-      <label class="min-w-0 flex-1"
-        ><span
-          class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
-          >2P</span
-        >
-        <select
-          class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
-          value={opponent}
-          disabled={pairDisabled}
-          onchange={(event) => setOpponent(event.currentTarget.value as Who)}
-        >
-          {#each ROSTER as { id, name } (id)}
-            <option value={id}>{name}</option>
-          {/each}
-        </select></label
-      >
-    </div>
-    <label class="block"
-      ><span
-        class="text-[11px] font-bold italic uppercase tracking-[1.5px] text-[#ffb84a]"
-        >Stage</span
-      >
-      <select
-        class="mt-1.5 w-full border border-[#8a6a2f] bg-[#241a0c] px-2.5 py-2 font-bold disabled:opacity-40"
-        value={stage}
-        disabled={!status.ready || status.story}
-        onchange={(event) => setStage(event.currentTarget.value as Stage)}
-      >
-        {#each Object.entries(stageLabels) as [value, label] (value)}
-          <option {value}>{label}</option>
-        {/each}
-      </select></label
-    >
-    <label class="flex items-center justify-between font-bold italic"
-      >Music
-      <input
-        type="checkbox"
-        class="size-4 accent-[#ffd24a] disabled:opacity-40"
-        checked={status.music}
-        disabled={!status.ready}
-        onchange={(event) => {
-          session?.scene.setMusic(event.currentTarget.checked);
-          focusArena();
-        }}
-      /></label
-    >
-    <div class="flex gap-3.5 font-bold">
-      <label class="flex items-center gap-1.5"
-        ><input
-          type="checkbox"
-          class="size-4 accent-[#ffd24a] disabled:opacity-40"
-          checked={practice.maxStock}
-          disabled={optionsDisabled}
-          onchange={(event) =>
-            setPractice({ maxStock: event.currentTarget.checked })}
-        />
-        Max stock</label
-      >
-      <label class="flex items-center gap-1.5"
-        ><input
-          type="checkbox"
-          class="size-4 accent-[#ffd24a] disabled:opacity-40"
-          checked={practice.lowHealth}
-          disabled={optionsDisabled}
-          onchange={(event) =>
-            setPractice({ lowHealth: event.currentTarget.checked })}
-        />
-        Low health</label
-      >
-    </div>
-    <div
-      class="h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
-    ></div>
-    <div class="flex flex-col gap-1.5">
-      <label class="flex items-center justify-between font-bold italic"
-        >Cheat mode
-        <input
-          type="checkbox"
-          class="size-4 accent-[#ffd24a]"
-          checked={cheats.enabled}
-          onchange={(event) =>
-            setCheats({ enabled: event.currentTarget.checked })}
-        /></label
-      >
-      <div class="grid grid-cols-2 gap-x-3 gap-y-1.5 font-bold">
-        <label class="flex items-center justify-between gap-1.5"
-          >Player HP
-          <span class="flex items-center gap-0.5 text-[#ffd24a]"
-            >×<input
-              type="number"
-              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="1"
-              max="100"
-              step="1"
-              value={cheats.playerHpMultiplier}
-              disabled={!cheats.enabled}
-              onchange={cheatNumber('playerHpMultiplier')}
-            /></span
-          ></label
-        >
-        <label class="flex items-center justify-between gap-1.5"
-          >Enemy HP
-          <span class="flex items-center gap-0.5 text-[#ffd24a]"
-            >×<input
-              type="number"
-              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="1"
-              max="100"
-              step="1"
-              value={cheats.enemyHpMultiplier}
-              disabled={!cheats.enabled}
-              onchange={cheatNumber('enemyHpMultiplier')}
-            /></span
-          ></label
-        >
-        <label class="flex items-center justify-between gap-1.5"
-          >Player damage
-          <span class="flex items-center gap-0.5 text-[#ffd24a]"
-            >×<input
-              type="number"
-              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="1"
-              max="100"
-              step="1"
-              value={cheats.playerDamageMultiplier}
-              disabled={!cheats.enabled}
-              onchange={cheatNumber('playerDamageMultiplier')}
-            /></span
-          ></label
-        >
-        <label class="flex items-center justify-between gap-1.5"
-          >Player EN limit
-          <span class="flex items-center gap-1 text-[#ffd24a]"
-            ><input
-              type="number"
-              class="w-11 border border-[#8a6a2f] bg-[#241a0c] px-1 py-0.5 text-right disabled:opacity-40"
-              min="100"
-              max="1000"
-              step="100"
-              value={cheats.playerMaxEn}
-              disabled={!cheats.enabled}
-              onchange={cheatNumber('playerMaxEn')}
-            />EN</span
-          ></label
-        >
-        <label class="col-span-2 flex items-center gap-1.5"
-          ><input
-            type="checkbox"
-            class="size-4 accent-[#ffd24a] disabled:opacity-40"
-            checked={cheats.unlimitedEn}
-            disabled={!cheats.enabled}
-            onchange={(event) =>
-              setCheats({ unlimitedEn: event.currentTarget.checked })}
-          />
-          Unlimited EN</label
-        >
-      </div>
-      <p class="text-[10px] italic text-[#8a7a5a]">
-        Changes apply from the next match or battle.
-      </p>
-    </div>
-    <div
-      class="h-[3px] bg-[repeating-linear-gradient(90deg,#ffd24a_0_8px,transparent_8px_12px)]"
-    ></div>
-    <div class="flex items-center justify-between gap-3">
-      <button
-        class="border-0 bg-transparent p-0 text-[11px] font-bold italic text-[#ffd24a] hover:text-[#ffe08a] disabled:opacity-40"
-        disabled={!status.ready || status.selecting}
-        onclick={() => {
-          dialog.close();
-          openSelect();
-        }}>Character select</button
-      >
-      <a
-        class="text-[11px] italic text-[#ffd24a] hover:text-[#ffe08a]"
-        href={`instructions.html#${fighter}`}
-        target="_blank"
-        rel="noopener">Controls guide</a
-      >
-      <button
-        class="rounded-[2px] border-0 bg-linear-to-b from-[#ffd24a] to-[#e8a91f] px-4 py-1.5 text-[12px] font-black italic text-[#241a0c] hover:from-[#ffe08a] hover:to-[#f2b93a] active:from-[#c88d17] active:to-[#a87610]"
-        onclick={() => dialog.close()}>Close</button
-      >
-    </div>
-  </dialog>
+    onopponentchoice={setOpponentChoice}
+    onpractice={setPractice}
+    oncheats={setCheats}
+    onfighter={setFighter}
+    onopponent={setOpponent}
+    onstage={setStage}
+    onmusic={(on) => {
+      session?.scene.setMusic(on);
+      focusArena();
+    }}
+    onselect={openSelect}
+    onsummon={summonInto}
+  />
 </main>

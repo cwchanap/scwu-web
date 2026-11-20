@@ -1,19 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import type { ProfileUser } from './auth/api';
-import { DEFAULT_CHEATS } from './game/cheats';
+import { DEFAULT_CHEATS, normalizeCheats } from './game/cheats';
 import type { CheatOptions } from './game/cheats';
+import { GRID } from './instructions/moves';
+import { ROSTER } from './instructions/fighters';
 import {
   applyMe,
   CHEATS_KEY,
+  CHEAT_GROUPS,
+  CHEAT_ROWS,
   identityRefresher,
   loadCheats,
   opponentChoiceOf,
   profileConfigured,
+  resetCheats,
   resetModeOf,
   saveCheats,
+  stepCheat,
+  SUMMON_COLUMNS,
+  summonStep,
+  summonables,
+  tileOf,
+  toggleSide,
   type MenuIdentity,
 } from './menu';
-
 describe('opponent select', () => {
   it('maps the match mode and partner to its value', () => {
     expect(opponentChoiceOf('practice', 'guard')).toBe('guard');
@@ -205,5 +215,137 @@ describe('identityRefresher', () => {
     pending.resolve(user);
     await read;
     expect(applied).toEqual([]);
+  });
+});
+
+describe('cheat groups (HPA-972)', () => {
+  it('groups every parameter row once, under the design table’s four groups', () => {
+    expect(CHEAT_GROUPS.map((group) => group.name)).toEqual([
+      'You · 1P',
+      'Low HP · 1P',
+      'Partners & enemies',
+      'B.R. modes',
+    ]);
+    expect(CHEAT_ROWS.map((row) => row.field)).toEqual([
+      'playerHpMultiplier',
+      'playerDamageMultiplier',
+      'playerMaxEn',
+      'unlimitedEn',
+      'lowHpLine',
+      'damageCutMultiplier',
+      'lowHpSupers',
+      'partnerHpMultiplier',
+      'enemyHpMultiplier',
+      'enemyStocksMultiplier',
+      'brNoPartner',
+      'brHpPerKill',
+      'brEnPerKill',
+    ]);
+  });
+
+  it('bounds each stepper to the normalization range at its step', () => {
+    for (const row of CHEAT_ROWS) {
+      if (row.kind !== 'stepper') continue;
+      let value = normalizeCheats({
+        ...DEFAULT_CHEATS,
+        [row.field]: row.max!,
+      })[row.field];
+      expect(value, `${row.field} max`).toBe(row.max);
+      // One step past the top clamps back to it.
+      value = stepCheat(
+        normalizeCheats({ ...DEFAULT_CHEATS, [row.field]: row.max! }),
+        row.field,
+        1,
+      )[row.field];
+      expect(value, `${row.field} over max`).toBe(row.max);
+      value = stepCheat(
+        normalizeCheats({ ...DEFAULT_CHEATS, [row.field]: row.min! }),
+        row.field,
+        -1,
+      )[row.field];
+      expect(value, `${row.field} under min`).toBe(row.min);
+    }
+  });
+
+  it('steps each stepper by its own increment', () => {
+    expect(stepCheat(DEFAULT_CHEATS, 'playerMaxEn', 1).playerMaxEn).toBe(400);
+    expect(stepCheat(DEFAULT_CHEATS, 'playerMaxEn', -1).playerMaxEn).toBe(200);
+    expect(
+      stepCheat(DEFAULT_CHEATS, 'enemyStocksMultiplier', 1)
+        .enemyStocksMultiplier,
+    ).toBe(2);
+    expect(stepCheat(DEFAULT_CHEATS, 'lowHpLine', -1).lowHpLine).toBe(20);
+    // Switch rows only toggle, whichever way the arrows push.
+    expect(stepCheat(DEFAULT_CHEATS, 'unlimitedEn', 1).unlimitedEn).toBe(true);
+    expect(stepCheat(DEFAULT_CHEATS, 'unlimitedEn', -1).unlimitedEn).toBe(true);
+    // The two nullable per-kill amounts are typed inputs, not steppers.
+    for (const row of CHEAT_ROWS) {
+      if (row.field === 'brHpPerKill' || row.field === 'brEnPerKill')
+        expect(row.kind, row.field).toBe('input');
+    }
+  });
+
+  it('shows the Max EN row with the stock digit art', () => {
+    const maxEn = CHEAT_ROWS.find((row) => row.field === 'playerMaxEn');
+    expect(maxEn?.digits).toBe(true);
+    for (const row of CHEAT_ROWS)
+      if (row.field !== 'playerMaxEn')
+        expect(row.digits, row.field).toBeFalsy();
+  });
+
+  it('resets every parameter to the defaults, master switch included', () => {
+    expect(resetCheats()).toEqual(DEFAULT_CHEATS);
+    expect(Object.keys(resetCheats()).length).toBe(
+      Object.keys(DEFAULT_CHEATS).length,
+    );
+  });
+});
+
+describe('summon grid (HPA-972)', () => {
+  it('offers every fighter but TRAINING, in roster order', () => {
+    expect(summonables.map((entry) => entry.id)).toEqual(
+      ROSTER.filter((entry) => entry.id !== 'training').map(
+        (entry) => entry.id,
+      ),
+    );
+    expect(summonables.length).toBe(44);
+  });
+
+  it('places each summonable fighter on its select-sheet tile', () => {
+    for (const entry of summonables) {
+      const tile = tileOf(entry.id)!;
+      const grid = GRID.indexOf(entry.id);
+      expect(tile.x).toBe((grid % 8) * 26);
+      expect(tile.y).toBe(Math.floor(grid / 8) * 70 + (grid % 2 ? 7 : 0));
+      expect(tile.x).toBeLessThanOrEqual(206 - 24);
+      expect(tile.y).toBeLessThanOrEqual(417 - 60);
+    }
+  });
+
+  it('walks the grid with WASD and arrows, clamped at the edges', () => {
+    const count = summonables.length;
+    // Down a row and back up; the last row is partial.
+    expect(summonStep(0, count, 's')).toBe(SUMMON_COLUMNS);
+    expect(summonStep(SUMMON_COLUMNS, count, 'w')).toBe(0);
+    expect(summonStep(40, count, 's')).toBe(43);
+    expect(summonStep(43, count, 's')).toBe(43);
+    expect(summonStep(0, count, 'w')).toBe(0);
+    // Sideways never wraps between rows.
+    expect(summonStep(0, count, 'a')).toBe(0);
+    expect(summonStep(8, count, 'a')).toBe(8);
+    expect(summonStep(7, count, 'd')).toBe(7);
+    expect(summonStep(43, count, 'd')).toBe(43);
+    expect(summonStep(5, count, 'd')).toBe(6);
+    // Arrow keys step the same cells; other keys change nothing.
+    expect(summonStep(3, count, 'ArrowRight')).toBe(4);
+    expect(summonStep(3, count, 'ArrowLeft')).toBe(2);
+    expect(summonStep(3, count, 'ArrowDown')).toBe(3 + SUMMON_COLUMNS);
+    expect(summonStep(3, count, 'ArrowUp')).toBe(0);
+    expect(summonStep(3, count, 'Enter')).toBe(3);
+  });
+
+  it('switches the summon side', () => {
+    expect(toggleSide(-1)).toBe(1);
+    expect(toggleSide(1)).toBe(-1);
   });
 });

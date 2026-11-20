@@ -49,7 +49,7 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
 
   // A failed read keeps the verified identity rather than signing it out.
   meStatus = 503;
-  await dialog.getByRole('button', { name: 'Close' }).click();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
   await menu.click();
   await expect(dialog).toBeVisible();
@@ -58,7 +58,7 @@ test('configured menu reads /api/me on each open', async ({ page }) => {
 
   meStatus = 200;
   user = null;
-  await dialog.getByRole('button', { name: 'Close' }).click();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
   await menu.click();
   await expect(dialog).toBeVisible();
@@ -88,22 +88,24 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   });
   await expect(failed).toBeHidden();
 
-  // The Cheats block (HPA-767): a master switch, five values it keeps but
-  // disables while off, and the hint that nothing applies mid-battle.
+  // The Cheats tab (HPA-767, HPA-972): a master switch, the values it
+  // keeps but disables while off, and the hint that nothing applies
+  // mid-battle.
   await menu.click();
   const dialog = page.getByRole('dialog', { name: 'Menu' });
   await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
   const cheatSwitch = dialog.getByLabel('Cheat mode');
   await expect(cheatSwitch).toBeVisible();
   await expect(cheatSwitch).not.toBeChecked();
   for (const name of [
-    'Player HP',
-    'Enemy HP',
-    'Player damage',
-    'Player EN limit',
+    'HP ×',
+    'Enemy HP ×',
+    'Damage ×',
+    'Max EN',
     'Unlimited EN',
   ]) {
-    await expect(dialog.getByLabel(name)).toBeDisabled();
+    await expect(dialog.getByLabel(name, { exact: true })).toBeDisabled();
   }
   await expect(
     dialog.getByText('Changes apply from the next match or battle.'),
@@ -111,15 +113,15 @@ test('cheats settings live in the menu, persist and leave identity alone', async
 
   await cheatSwitch.check();
   for (const name of [
-    'Player HP',
-    'Enemy HP',
-    'Player damage',
-    'Player EN limit',
+    'HP ×',
+    'Enemy HP ×',
+    'Damage ×',
+    'Max EN',
     'Unlimited EN',
   ]) {
-    await expect(dialog.getByLabel(name)).toBeEnabled();
+    await expect(dialog.getByLabel(name, { exact: true })).toBeEnabled();
   }
-  const enemyHp = dialog.getByLabel('Enemy HP');
+  const enemyHp = dialog.getByLabel('Enemy HP ×', { exact: true });
   await enemyHp.fill('2');
   await enemyHp.blur();
   await expect
@@ -145,7 +147,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
 
   // An out-of-range entry normalizes to the bound and the field shows the
   // clamped value, not the raw entry: 150 over a held 5 reads back 100.
-  const playerHp = dialog.getByLabel('Player HP');
+  const playerHp = dialog.getByLabel('HP ×', { exact: true });
   await playerHp.fill('5');
   await playerHp.blur();
   await playerHp.fill('150');
@@ -181,7 +183,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
 
   // Keys stay contained to the dialog: a leaked Escape would pause, an R
   // reset; the close still behaves and nothing errors.
-  await dialog.getByRole('button', { name: 'Close' }).focus();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).focus();
   await page.keyboard.press('r');
   await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');
@@ -194,7 +196,7 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   const row = profile.locator('..');
   await expect(row).toContainText('Ryuko');
   await expect.poll(() => meCalls).toBe(2);
-  await dialog.getByRole('button', { name: 'Close' }).click();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
 
   // A reload restores the saved cheats; the identity still reads the same.
@@ -205,8 +207,11 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await expect(failed).toBeHidden();
   await menu.click();
   await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
   await expect(cheatSwitch).toBeChecked();
-  await expect(dialog.getByLabel('Enemy HP')).toHaveValue('2');
+  await expect(dialog.getByLabel('Enemy HP ×', { exact: true })).toHaveValue(
+    '2',
+  );
   await expect(row).toContainText('Ryuko');
   await expect.poll(() => meCalls).toBe(3);
   expect(errors).toEqual([]);

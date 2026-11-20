@@ -54,17 +54,20 @@ test('boots into a ready arena', async ({ page }) => {
   await page.keyboard.up('d');
   const dialog = page.getByRole('dialog', { name: 'Menu' });
   await expect(dialog).toBeVisible();
-  // m-auto centers the modal at desktop and mobile sizes rather than
-  // trusting the UA margin, which a base reset would zero.
-  const centered = async () => {
+  // The Menu is a full-window overlay of the paused arena (HPA-972), not a
+  // centered small dialog: it covers the viewport at desktop and mobile
+  // sizes.
+  const covers = async () => {
     const box = (await dialog.boundingBox())!;
     const { width, height } = page.viewportSize()!;
-    expect(Math.abs(box.x + box.width / 2 - width / 2)).toBeLessThan(2);
-    expect(Math.abs(box.y + box.height / 2 - height / 2)).toBeLessThan(2);
+    expect(box.x).toBeLessThanOrEqual(1);
+    expect(box.y).toBeLessThanOrEqual(1);
+    expect(Math.abs(box.width - width)).toBeLessThan(2);
+    expect(Math.abs(box.height - height)).toBeLessThan(2);
   };
-  await centered();
+  await covers();
   await page.setViewportSize({ width: 390, height: 844 });
-  await centered();
+  await covers();
   await page.setViewportSize({ width: 1280, height: 720 });
 
   const opponent = dialog.getByLabel('Opponent');
@@ -75,30 +78,31 @@ test('boots into a ready arena', async ({ page }) => {
   // A partner pick while practice runs doesn't reset, keeping 'walk'.
   await opponent.selectOption('guard');
 
-  // The Cheats block (HPA-767) sits under the practice settings: a master
-  // switch, five values it keeps but disables while off, and the hint that
-  // nothing applies mid-battle.
+  // The Cheats live on their own tab (HPA-972): a master switch, the ten
+  // values it keeps but disables while off, and the hint that nothing
+  // applies mid-battle.
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
   const cheatSwitch = dialog.getByLabel('Cheat mode');
   await expect(cheatSwitch).not.toBeChecked();
   for (const name of [
-    'Player HP',
-    'Enemy HP',
-    'Player damage',
-    'Player EN limit',
+    'HP ×',
+    'Enemy HP ×',
+    'Damage ×',
+    'Max EN',
     'Unlimited EN',
   ]) {
-    await expect(dialog.getByLabel(name)).toBeDisabled();
+    await expect(dialog.getByLabel(name, { exact: true })).toBeDisabled();
   }
   await expect(
     dialog.getByText('Changes apply from the next match or battle.'),
   ).toBeVisible();
   // A switch flipped over a running battle changes nothing in it: turning
-  // cheats on and doubling Player HP leaves the live meter native — the
+  // cheats on and setting HP × to 2 leaves the live meter native — the
   // next match's begin (below) is what seats them.
   const player = page.getByLabel('Player health');
   await expect(player).toHaveText('510');
   await cheatSwitch.check();
-  const playerHp = dialog.getByLabel('Player HP');
+  const playerHp = dialog.getByLabel('HP ×', { exact: true });
   await expect(playerHp).toBeEnabled();
   await playerHp.fill('2');
   await playerHp.blur();
@@ -129,7 +133,7 @@ test('boots into a ready arena', async ({ page }) => {
   // the window handler from. A leaked R resets the match; a leaked P or
   // Escape pauses it, which the close keeps since the match was unpaused
   // when the dialog opened — either leak shows after it.
-  await dialog.getByRole('button', { name: 'Close' }).focus();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).focus();
   await page.keyboard.press('r');
   await expect(health).toContainText(/Action: (back)?walk/);
   await page.keyboard.press('p');
@@ -159,8 +163,9 @@ test('boots into a ready arena', async ({ page }) => {
   await expect(failed).toBeHidden();
   await menu.click();
   await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
   await expect(cheatSwitch).toBeChecked();
-  await expect(dialog.getByLabel('Player HP')).toHaveValue('2');
+  await expect(dialog.getByLabel('HP ×', { exact: true })).toHaveValue('2');
   expect(errors).toEqual([]);
 });
 
