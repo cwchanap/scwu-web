@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { animationFrame } from './animations';
 import type { Action, ObjectKey } from './animations';
+import { CHARACTERS, lifeOf, stocksOf } from './characters';
 import type { Stage, Who } from './characters';
+import { DEFAULT_CHEATS, enGainOf } from './cheats';
+import type { CheatOptions } from './cheats';
+import { DUMMY_BEHAVIORS } from './dummy';
 import { FIGHT_TICK } from './hud';
 import { EX_MODE, exMode, Match } from './match';
 import type { Fighter, Input } from './match';
@@ -3156,5 +3160,181 @@ describe('the round over (global 15)', () => {
       [0, 2, 1],
     ]);
     expect(charges).toEqual(['38+9', '38+9']);
+  });
+});
+
+describe('summoned fighters (HPA-972)', () => {
+  const toFight = (match: Match) => {
+    while (match.roundTicks <= match.fightTick) match.step();
+  };
+  const arrays = (match: Match) =>
+    match as unknown as {
+      history: number[][];
+      previous: Input[];
+      inputs: Input[];
+      keyed: boolean[];
+      spent: number[];
+      slots: unknown[];
+      waits: unknown[];
+      seats: number[];
+      cpus: unknown[];
+      nativeCount: number;
+    };
+  const PER_FIGHTER = [
+    'history',
+    'previous',
+    'inputs',
+    'keyed',
+    'spent',
+    'slots',
+    'waits',
+    'seats',
+  ];
+  const cheats = (fields: Partial<CheatOptions> = {}): CheatOptions => ({
+    ...DEFAULT_CHEATS,
+    ...fields,
+  });
+
+  it('summons both sides into Vs. CPU with side masks, arrays, charges and palette 0', () => {
+    const match = vsMatch('ryuko', 0);
+    toFight(match);
+    const [one, two] = match.fighters;
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    expect(match.fighters).toEqual([one, two, ally, foe]);
+    expect(match.natives).toEqual([one, two]);
+    // The ally enters beside the 1P facing out; the enemy takes the far
+    // side, past the farthest native.
+    expect(ally.x).toBe(one.x - 135);
+    expect(ally.facing).toBe(1);
+    expect(foe.x).toBe(two.x + 135);
+    expect(foe.facing).toBe(-1);
+    // Side hostility, both directions: the ally fights the opponent and
+    // the summoned enemy; the enemy fights the 1P and the summoned ally;
+    // each side's natives agree.
+    expect(ally.enemies).toBe((1 << 1) | (1 << 3));
+    expect(foe.enemies).toBe((1 << 0) | (1 << 2));
+    expect((one.enemies >> 2) & 1).toBe(0);
+    expect((one.enemies >> 3) & 1).toBe(1);
+    expect((two.enemies >> 2) & 1).toBe(1);
+    expect((two.enemies >> 3) & 1).toBe(0);
+    // Every per-fighter array grew, with null slots for the summons, and a
+    // tick stays aligned.
+    const arr = arrays(match);
+    for (const key of PER_FIGHTER) expect(arr[key as never]).toHaveLength(4);
+    expect(arr.slots[2]).toBeNull();
+    expect(arr.slots[3]).toBeNull();
+    match.step();
+    for (const key of PER_FIGHTER) expect(arr[key as never]).toHaveLength(4);
+    // Palette 0 in the Vs. modes; the story seat logic is team.test's.
+    expect(match.palettes).toEqual([0, 0, 0, 0]);
+    // Each summon spawns its normal VS CHARGE for the sensors.
+    expect(
+      match.effects.some(
+        (e) => e.owner === 2 && base(e.clip) === CHARACTERS.shinz.charge,
+      ),
+    ).toBe(true);
+    expect(
+      match.effects.some(
+        (e) => e.owner === 3 && base(e.clip) === CHARACTERS.zoma.charge,
+      ),
+    ).toBe(true);
+  });
+
+  it('drives a summoned CPU beside a human 2P', () => {
+    const match = vsMatch('ryuko', 0);
+    toFight(match);
+    const [, two] = match.fighters;
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    // The 2P followed the human's input, and the summon's CPU still played.
+    while (two.action === 'script' || two.action === 'intro')
+      match.step({}, { left: true });
+    const twoX = two.x;
+    for (let t = 0; t < 10; t++) match.step({}, { left: true });
+    expect(two.x).toBeLessThan(twoX);
+    const arr = arrays(match);
+    expect(Object.keys(arr.inputs[2]).length).toBeGreaterThan(0);
+    expect(ally.target).toBe(two);
+  });
+
+  it.each(DUMMY_BEHAVIORS)(
+    'drives a summon in practice against the %s partner',
+    (partner) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+      match.practice.partner = partner;
+      match.step();
+      const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+      foe.x = match.fighters[1].x + 300;
+      const arr = arrays(match);
+      let acted = false;
+      for (let t = 0; t < 30 && !acted; t++) {
+        match.step();
+        acted = Object.keys(arr.inputs[2]).length > 0;
+      }
+      expect(acted).toBe(true);
+      // The summon enemy sides with the partner against the 1P.
+      expect(foe.target).toBe(match.fighters[0]);
+    },
+  );
+
+  it('caps the fighters at ten: the tenth summon enters, an eleventh is refused', () => {
+    const match = new Match('practice', false, 0);
+    match.step();
+    for (let n = 2; n < 10; n++)
+      expect(match.summon('zoma', -1, DEFAULT_CHEATS)).not.toBeNull();
+    expect(match.fighters).toHaveLength(10);
+    expect(match.natives).toHaveLength(2);
+    expect(match.summon('shinz', 1, DEFAULT_CHEATS)).toBeNull();
+    expect(match.fighters).toHaveLength(10);
+    const arr = arrays(match);
+    for (const key of PER_FIGHTER) expect(arr[key as never]).toHaveLength(10);
+    match.step();
+    expect(arr.history).toHaveLength(10);
+  });
+
+  it('clears the summons and their arrays at the next native round', () => {
+    const match = vsMatch('ryuko', 0);
+    toFight(match);
+    match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    match.fighters[1].hp = 0;
+    const { round } = match;
+    for (let t = 0; t < 5000 && match.round === round; t++) match.step();
+    expect(match.round).toBe(round + 1);
+    expect(match.fighters).toHaveLength(2);
+    expect(match.natives).toHaveLength(2);
+    const arr = arrays(match);
+    for (const key of PER_FIGHTER) expect(arr[key as never]).toHaveLength(2);
+    expect(arr.seats).toEqual([0, 1]);
+    expect(arr.cpus).toHaveLength(2);
+    expect(arr.slots).toEqual([null, null]);
+    expect(arr.waits).toEqual([null, null]);
+    expect(match.palettes).toEqual([0, 0]);
+    expect(match.effects.some((e) => e.owner === 2)).toBe(false);
+  });
+
+  it('scales only the summoned fighter by the effective summon cheats', () => {
+    const match = new Match('practice', false, 0);
+    expect(match.cheated).toBe(false);
+    const foe = match.summon(
+      'zoma',
+      -1,
+      cheats({ enabled: true, enemyHpMultiplier: 3, enemyStocksMultiplier: 2 }),
+    )!;
+    expect(foe.maxHp).toBe(lifeOf('zoma') * 3);
+    expect(foe.hp).toBe(foe.maxHp);
+    expect(foe.maxStock).toBe(Math.min(10, stocksOf('zoma') * 2));
+    expect(foe.enGainMultiplier).toBe(enGainOf(foe.maxStock));
+    expect(match.fighters[0].maxHp).toBe(lifeOf('ryuko'));
+    expect(match.cheated).toBe(true);
+    const allyMatch = new Match('practice', false, 0);
+    const ally = allyMatch.summon(
+      'shinz',
+      1,
+      cheats({ enabled: true, partnerHpMultiplier: 5 }),
+    )!;
+    expect(ally.maxHp).toBe(lifeOf('shinz') * 5);
+    expect(ally.maxStock).toBe(stocksOf('shinz'));
+    expect(allyMatch.fighters[0].maxHp).toBe(lifeOf('ryuko'));
+    expect(allyMatch.cheated).toBe(true);
   });
 });
