@@ -4,7 +4,17 @@
 // pass), so they skip on CI like the art tests.
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STAGES } from './game/characters';
 import { bytesOf, parsePack } from './game/packs';
@@ -79,6 +89,93 @@ describe('exporter fingerprint', () => {
     for (const name of ['scripts/export_assets.py', 'art/dora/name.png'])
       legacy.update(readFileSync(new URL(`../${name}`, import.meta.url)));
     expect(legacy.digest('hex')).not.toBe(want);
+  });
+
+  itWithArt('moves when an authored PNG is edited, in an isolated copy', () => {
+    // The art-edit invalidation experiment: edit a copy of the checkout, not
+    // the real art. export_assets.py needs the handoff parsers at import and
+    // dom_art()'s scanned sources for inputs(), so the copy carries exactly
+    // those; the fingerprints read nothing else.
+    const realEn700 = readFileSync(
+      new URL('../art/hud/en-700.png', import.meta.url),
+    );
+    const root = mkdtempSync(join(tmpdir(), 'exporter-art-edit-'));
+    try {
+      for (const name of [
+        'scripts/export_assets.py',
+        'scripts/build.sh',
+        'art/hud/en-700.png',
+        'art/hud/en-800.png',
+        'art/hud/en-900.png',
+        'art/hud/en-1000.png',
+        'art/dora/name.png',
+        'src/App.svelte',
+        'src/Menu.svelte',
+        'src/instructions/Instructions.svelte',
+        'src/instructions/moves.ts',
+        'src/instructions/page.ts',
+        'src/profile/Profile.svelte',
+        'src/profile/main.ts',
+        'scwu-web-handoff/research/tools/scwu_images.py',
+        'scwu-web-handoff/research/tools/scwu_animation.py',
+      ]) {
+        const target = join(root, name);
+        mkdirSync(dirname(target), { recursive: true });
+        copyFileSync(new URL(`../${name}`, import.meta.url), target);
+      }
+      const fingerprints = () => {
+        const [inputs, exporter] = execFileSync(
+          'python3',
+          [
+            '-B',
+            '-c',
+            'import sys; sys.path.insert(0, "scripts"); import export_assets; print(export_assets.inputs(), export_assets.exporter())',
+          ],
+          { encoding: 'utf8', cwd: root },
+        )
+          .trim()
+          .split(' ');
+        const shell = spawnSync(
+          'bash',
+          [
+            '-c',
+            'eval "$(sed -n \'/^script_sha()/,/^}/p\' scripts/build.sh)"; script_sha',
+          ],
+          { encoding: 'utf8', cwd: root },
+        );
+        expect(shell.status).toBe(0);
+        return {
+          inputs: inputs!,
+          exporter: exporter!,
+          shell: shell.stdout.trim(),
+        };
+      };
+
+      const before = fingerprints();
+      // The copy is faithful: its exporter() matches the real checkout's.
+      expect(before.exporter).toBe(exporterSha());
+      expect(before.shell).toBe(before.exporter);
+
+      // Edit the authored PNG in the copy only.
+      const victim = join(root, 'art/hud/en-700.png');
+      writeFileSync(
+        victim,
+        Buffer.concat([readFileSync(victim), Buffer.from('art-edit')]),
+      );
+
+      const after = fingerprints();
+      expect(after.exporter, 'python exporter()').not.toBe(before.exporter);
+      expect(after.inputs, 'python inputs()').not.toBe(before.inputs);
+      expect(after.shell, 'shell script_sha').not.toBe(before.shell);
+      expect(after.shell).toBe(after.exporter);
+
+      // The real art was only ever read.
+      expect(
+        readFileSync(new URL('../art/hud/en-700.png', import.meta.url)),
+      ).toEqual(realEn700);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 
