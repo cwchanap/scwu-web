@@ -1970,6 +1970,34 @@ describe('scene summon (HPA-972)', () => {
     expect(scene.match.fighters).toHaveLength(2);
   });
 
+  it('a cancelled summon failing later leaves the scene intact', async () => {
+    const { scene, loadErrors, finishLoad, preload } = boot();
+    preload();
+    scene.togglePause();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The cancelled pack is still outstanding; its failure must not
+    // poison the preserved match with the global scene error.
+    loadErrors[0]!({ key: 'golf-419' });
+    await Promise.resolve();
+    expect((scene as unknown as { error: string }).error).toBe('');
+    expect(scene.match.fighters).toHaveLength(2);
+    expect(scene.paused).toBe(true);
+    // A later COMPLETE spawns nothing either.
+    finishLoad();
+    expect(scene.match.fighters).toHaveLength(2);
+    // Tracking settles with the pack: a fresh summon still owns its own
+    // failure alone, and an unrelated key still fails the scene.
+    const second = scene.summon('golf', 1);
+    loadErrors[0]!({ key: 'golf-401' });
+    await expect(second).rejects.toThrow('Could not load golf');
+    expect((scene as unknown as { error: string }).error).toBe('');
+    loadErrors[0]!({ key: 'court-3' });
+    expect((scene as unknown as { error: string }).error).toContain('court-3');
+  });
+
   it('leaves a stale summon unmatched when the match was replaced', async () => {
     const { scene, view, finishLoad } = boot();
     const pending = scene.summon('golf', 1);

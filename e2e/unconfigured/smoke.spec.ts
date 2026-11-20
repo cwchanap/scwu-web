@@ -169,6 +169,185 @@ test('boots into a ready arena', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('arrow keys walk menu rows; summon Enter follows the highlight', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  // Into a practice battle, as the boot journey above: buttons skip T2,
+  // pick VS single, both cursors rest on Ryuko and start.
+  const health = page.locator('[aria-label="Match health"]');
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  // Where focus sits, named by its control's accessible label.
+  const focusName = () =>
+    page.evaluate(() => {
+      const el = document.activeElement as HTMLElement | null;
+      return (
+        el?.getAttribute('aria-label') ??
+        el?.closest('label')?.textContent?.trim() ??
+        el?.tagName.toLowerCase()
+      );
+    });
+
+  // ↑/↓ walk the Match tab's rows and land on an enabled control each
+  // time; ←/→ adjusts the row focus sits on (HPA-972 review: the cards,
+  // checkbox labels and cheat rows are real navigation targets).
+  await dialog.getByRole('checkbox', { name: 'Music' }).click();
+  await page.keyboard.press('ArrowDown');
+  expect(await focusName()).toBe('Enemy HP bars');
+  await page.keyboard.press('ArrowUp');
+  expect(await focusName()).toBe('Music');
+  await page.keyboard.press('ArrowUp');
+  expect(await focusName()).toBe('Previous stage');
+  await page.keyboard.press('ArrowRight');
+  await expect(dialog.locator('.card.stage .pickname')).toHaveText(
+    'Train Morning',
+  );
+
+  // The Cheats tab: the walk starts at the master row, ←/→ flips the
+  // switch and steps the steppers, and ↑/↓ still moves off a number
+  // input instead of being swallowed by it.
+  await page.keyboard.press('e');
+  await page.keyboard.press('ArrowDown');
+  expect(await focusName()).toBe('Cheat mode');
+  await page.keyboard.press('ArrowRight');
+  await expect(dialog.getByLabel('Cheat mode')).toBeChecked();
+  await page.keyboard.press('ArrowDown');
+  expect(await focusName()).toBe('Decrease HP ×');
+  await page.keyboard.press('ArrowRight');
+  await expect(dialog.getByLabel('HP ×', { exact: true })).toHaveValue('2');
+  await page.keyboard.press('ArrowDown');
+  expect(await focusName()).toBe('Decrease Damage ×');
+  await dialog.getByLabel('HP ×', { exact: true }).focus();
+  await page.keyboard.press('ArrowDown');
+  expect(await focusName()).toBe('Decrease Damage ×');
+
+  // Summon (Ctrl+Backquote, cheats now on): navigating the grid rides
+  // focus with the cursor, so Enter confirms the highlighted fighter,
+  // not whichever tile focus happened to sit on (HPA-972 review).
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  const tiles = dialog.getByRole('option');
+  await expect(tiles).toHaveCount(44);
+  // Even with another button focused — the side switch — the first arrow
+  // hands focus to the cursor's tile, so Enter confirms the highlight,
+  // not the focused button.
+  await dialog.getByRole('button', { name: 'Partner' }).focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(tiles.nth(8)).toHaveAttribute('aria-selected', 'true');
+  expect(
+    await tiles.nth(8).evaluate((el) => document.activeElement === el),
+  ).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(dialog.locator('.note')).toContainText('Yo joined the fight.', {
+    timeout: 30_000,
+  });
+  // From the settled cursor a later arrow still rides focus with it, and
+  // its Enter confirms the new highlight.
+  await page.keyboard.press('ArrowRight');
+  await expect(tiles.nth(9)).toHaveAttribute('aria-selected', 'true');
+  expect(
+    await tiles.nth(9).evaluate((el) => document.activeElement === el),
+  ).toBe(true);
+  await page.keyboard.press('Enter');
+  await expect(dialog.locator('.note')).toContainText('SIN joined the fight.', {
+    timeout: 30_000,
+  });
+  // Desktop's rendered grid is the stylesheet's 8 columns: one ↓ is one
+  // source row.
+  await page.keyboard.press('ArrowDown');
+  await expect(tiles.nth(17)).toHaveAttribute('aria-selected', 'true');
+
+  // Phone width renders four columns (≤700px): one ↓ becomes one
+  // displayed row — the walk reads the rendered tracks, and the
+  // scrollable grid keeps the pick in view.
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.keyboard.press('ArrowDown');
+  const rowDown = tiles.nth(21);
+  await expect(rowDown).toHaveAttribute('aria-selected', 'true');
+  expect(await rowDown.evaluate((el) => document.activeElement === el)).toBe(
+    true,
+  );
+  for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
+  const last = tiles.nth(43);
+  await expect(last).toHaveAttribute('aria-selected', 'true');
+  expect(await last.evaluate((el) => document.activeElement === el)).toBe(true);
+  await expect(last).toBeInViewport();
+  expect(errors).toEqual([]);
+});
+
+test('a close event arriving after a reopen cannot close the menu', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  const health = page.locator('[aria-label="Match health"]');
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  // close() queues its close event as a task, so a reopen that runs
+  // before it — a fast Ctrl+Backquote, whose input Chrome may dispatch
+  // ahead of queued tasks — leaves the stale close to fire on the open
+  // dialog. Replaying that window in one turn makes the race
+  // deterministic: without the Menu's guard the late close tears the
+  // reopened dialog down (and releases the frozen match with it).
+  await page.evaluate(() => {
+    const d = document.querySelector<HTMLDialogElement>('dialog.menu')!;
+    d.close();
+    d.showModal();
+  });
+  await page.waitForTimeout(250);
+  await expect(dialog).toBeVisible();
+  // The dialog still owns its keys, and a real close afterwards still
+  // hands the arena back its focus and its pause.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.arena canvas')).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test('profile shows sign-in unavailable when unconfigured', async ({
   page,
 }) => {

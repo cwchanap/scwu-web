@@ -344,6 +344,23 @@ describe('summon grid (HPA-972)', () => {
     expect(summonStep(3, count, 'Enter')).toBe(3);
   });
 
+  it('steps by the rendered column count at phone width', () => {
+    const count = summonables.length;
+    // Phone width renders four columns: down from the first tile is one
+    // displayed row, not two.
+    expect(summonStep(0, count, 's', 4)).toBe(4);
+    expect(summonStep(4, count, 'w', 4)).toBe(0);
+    expect(summonStep(40, count, 's', 4)).toBe(43);
+    expect(summonStep(43, count, 's', 4)).toBe(43);
+    expect(summonStep(0, count, 'w', 4)).toBe(0);
+    // Sideways still never wraps between rows.
+    expect(summonStep(0, count, 'a', 4)).toBe(0);
+    expect(summonStep(4, count, 'a', 4)).toBe(4);
+    expect(summonStep(3, count, 'd', 4)).toBe(3);
+    expect(summonStep(5, count, 'd', 4)).toBe(6);
+    expect(summonStep(3, count, 'ArrowDown', 4)).toBe(7);
+  });
+
   it('switches the summon side', () => {
     expect(toggleSide(-1)).toBe(1);
     expect(toggleSide(1)).toBe(-1);

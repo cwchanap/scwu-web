@@ -64,6 +64,7 @@
     stepCheat,
     summonables,
     summonStep,
+    SUMMON_COLUMNS,
     tileOf,
     toggleSide,
     type MenuIdentity,
@@ -145,6 +146,57 @@
     }
   });
 
+  // Every row takes programmatic focus so ↑/↓ can land on one whose
+  // controls are all disabled; otherwise the walk sits on the row's
+  // first enabled control. Re-runs as each tab mounts its rows.
+  $effect(() => {
+    void tab;
+    void view;
+    for (const row of dialog?.querySelectorAll<HTMLElement>('[data-row]') ?? [])
+      row.tabIndex = -1;
+  });
+
+  // A tab switch unmounts the panel focus sat in, dropping focus to the
+  // body — outside the dialog, where the keydown model cannot hear it.
+  // Pull it back to the bare dialog when it escaped.
+  $effect(() => {
+    void tab;
+    if (dialog?.open && !dialog.contains(document.activeElement))
+      dialog.focus();
+  });
+
+  // ↑/↓ land a row's first enabled control — a stepper's ◀, a checkbox,
+  // an input — or the row itself when everything it holds is disabled.
+  function focusRow(row: HTMLElement | undefined) {
+    if (!row) return;
+    const control =
+      row.querySelector<HTMLElement>('[data-step] button:not([disabled])') ??
+      row.querySelector<HTMLElement>(
+        'input:not([disabled]), select:not([disabled]), button:not([disabled])',
+      );
+    (control ?? row).focus();
+  }
+
+  // The rendered grid's columns: the stylesheet holds 8 desktop, 4 at
+  // phone width — read the computed tracks so navigation matches what is
+  // drawn.
+  function gridColumns() {
+    const grid = dialog?.querySelector<HTMLElement>('.grid');
+    return grid
+      ? getComputedStyle(grid).gridTemplateColumns.split(' ').length
+      : SUMMON_COLUMNS;
+  }
+
+  // Focus the cursor's cell, scrolling the scrollable grid (phone widths)
+  // so the pick stays visible. Focus rides with the cursor so a focused
+  // tile's native Enter activation confirms the highlighted fighter.
+  function focusCell(index: number) {
+    const cell =
+      dialog?.querySelectorAll<HTMLElement>('[role="option"]')[index];
+    cell?.focus();
+    cell?.scrollIntoView({ block: 'nearest' });
+  }
+
   const nameOf = (who: Who) => ROSTER.find((entry) => entry.id === who)!.name;
   // Left/right roster stepping wraps; the seat keeps a fighter always.
   const rosterStep = (who: Who, delta: 1 | -1): Who => {
@@ -217,6 +269,21 @@
         return;
       }
     }
+    // ↑/↓ walk the rows — from a control, a disabled row or a bare field.
+    // They run before the input early-return, so navigation never strands
+    // once an edit field is focused; the summon view's arrows walk the
+    // grid instead.
+    if ((key === 'ArrowDown' || key === 'ArrowUp') && view !== 'summon') {
+      event.preventDefault();
+      const rows = [
+        ...(dialog?.querySelectorAll<HTMLElement>('[data-row]') ?? []),
+      ];
+      const at = rows.findIndex((row) => row.contains(document.activeElement));
+      const next =
+        rows[(at + (key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length];
+      focusRow(next);
+      return;
+    }
     if (target.closest?.('input, select, textarea')) return;
     if (view === 'summon') {
       // Tab flips the side; WASD and the arrows walk the grid; G/Enter
@@ -228,16 +295,20 @@
         event.preventDefault();
         void confirmSummon();
       } else if (key === 'Enter') {
-        // A focused tile or side button clicks natively; only the bare
-        // dialog confirm runs here.
+        // A focused tile or side button clicks natively — and focus rides
+        // the cursor below, so that activation is the confirm. Only the
+        // bare dialog confirm runs here.
         if (target === dialog) {
           event.preventDefault();
           void confirmSummon();
         }
       } else {
-        const step = summonStep(cursor, summonables.length, key);
-        if (step !== cursor) event.preventDefault();
-        cursor = step;
+        const step = summonStep(cursor, summonables.length, key, gridColumns());
+        if (step !== cursor) {
+          event.preventDefault();
+          cursor = step;
+          focusCell(step);
+        }
       }
       return;
     }
@@ -248,20 +319,24 @@
     } else if (key === 'e' || key === 'E') {
       event.preventDefault();
       tab = 'cheats';
-    } else if (key === 'ArrowDown' || key === 'ArrowUp') {
-      event.preventDefault();
-      const rows = [
-        ...(dialog?.querySelectorAll<HTMLElement>('[data-row]') ?? []),
-      ];
-      const at = rows.findIndex((row) => row.contains(document.activeElement));
-      const next =
-        rows[(at + (key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length];
-      next?.focus();
     }
   }
 </script>
 
-<dialog class="menu" bind:this={dialog} aria-label="Menu" {onkeydown} {onclose}>
+<dialog
+  class="menu"
+  bind:this={dialog}
+  aria-label="Menu"
+  {onkeydown}
+  onclose={() => {
+    // A close event fires only once the open attribute is gone — so one
+    // arriving while the dialog is open again is the previous close,
+    // delivered late (Chrome queues it as a task, and an immediate
+    // Ctrl+Backquote reopen can outrun it). Dropping it keeps the stale
+    // close from closing the reopened dialog.
+    if (!dialog?.open) onclose();
+  }}
+>
   <div class="page" style="--face-sheet: url({ASSET_BASE}select/13.png)">
     <header class="top">
       <button

@@ -292,6 +292,11 @@ export class TrainingScene extends Phaser.Scene {
   // opening, match replacement or scene shutdown drops it before it can
   // spawn.
   private summonRequest?: SummonRequest;
+  // Summon packs still loading, tracked apart from the active request:
+  // a close cancels the request but leaves the pack in flight, and its
+  // late loaderror must still fail alone instead of poisoning the live
+  // scene. An entry settles when its pack completes or errors.
+  private summonLoads = new Set<Who>();
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -314,20 +319,26 @@ export class TrainingScene extends Phaser.Scene {
     );
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
       // A summon's own pack failing fails the summon alone (HPA-972): the
-      // match stays intact and the dialog reports it. A pack's key names it
-      // (fighter-<who>) and so does every art key inside it (<who>-<image>).
-      // Any other load — a stage, a fighter a match seats — still fails the
-      // scene.
-      if (
-        this.summonRequest &&
-        (file.key === `fighter-${this.summonRequest.who}` ||
-          file.key.startsWith(`${this.summonRequest.who}-`))
-      ) {
+      // match stays intact and the dialog reports it. A pack's key names
+      // it (fighter-<who>) and so does every art key inside it
+      // (<who>-<image>), and it stays owned until it settles — even after
+      // its dialog close cancelled the request, so a late failure cannot
+      // poison the scene. Any other load — a stage, a fighter a match
+      // seats — still fails the scene.
+      const who = [...this.summonLoads].find(
+        (loading) =>
+          file.key === `fighter-${loading}` ||
+          file.key.startsWith(`${loading}-`),
+      );
+      if (who) {
+        this.summonLoads.delete(who);
         const request = this.summonRequest;
-        this.summonRequest = undefined;
-        request.reject(
-          new Error(`Could not load ${request.who}. The match is unchanged.`),
-        );
+        if (request && request.who === who) {
+          this.summonRequest = undefined;
+          request.reject(
+            new Error(`Could not load ${who}. The match is unchanged.`),
+          );
+        }
         return;
       }
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
@@ -1158,10 +1169,14 @@ export class TrainingScene extends Phaser.Scene {
       this.spawnSummon(request);
       return promise;
     }
+    // The pack is outstanding until it settles (COMPLETE or loaderror),
+    // so a cancel followed by its failure still fails the summon alone.
+    this.summonLoads.add(who);
     this.loadPlayer(who);
-    this.load.once(Phaser.Loader.Events.COMPLETE, () =>
-      this.spawnSummon(request),
-    );
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.summonLoads.delete(who);
+      this.spawnSummon(request);
+    });
     this.load.start();
     return promise;
   }
