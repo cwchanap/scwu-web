@@ -299,6 +299,70 @@ test('arrow keys walk menu rows; summon Enter follows the highlight', async ({
   expect(errors).toEqual([]);
 });
 
+test('clamped summon navigation still hands focus to the highlight', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  // Into a practice battle, as the journeys above.
+  const health = page.locator('[aria-label="Match health"]');
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+
+  // Summon needs cheats on; the master switch applies at once.
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  await dialog.getByLabel('Cheat mode').click();
+  await expect(dialog.getByLabel('Cheat mode')).toBeChecked();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  const tiles = dialog.getByRole('option');
+  await expect(tiles).toHaveCount(44);
+
+  // Boundary case (HPA-972 review round 2): the cursor rests on tile 0,
+  // so ←/↑ are clamped — the cursor cannot move, but focus must still
+  // ride to the highlight, or Enter would activate whichever button
+  // focus sat on instead of summoning.
+  await dialog.getByRole('button', { name: 'Partner' }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(tiles.nth(0)).toHaveAttribute('aria-selected', 'true');
+  expect(
+    await tiles.nth(0).evaluate((el) => document.activeElement === el),
+  ).toBe(true);
+  await page.keyboard.press('ArrowUp');
+  await expect(tiles.nth(0)).toHaveAttribute('aria-selected', 'true');
+  expect(
+    await tiles.nth(0).evaluate((el) => document.activeElement === el),
+  ).toBe(true);
+  // Enter now confirms the highlighted fighter.
+  await page.keyboard.press('Enter');
+  await expect(dialog.locator('.note')).toContainText(
+    'Ryuko joined the fight.',
+    { timeout: 30_000 },
+  );
+  expect(errors).toEqual([]);
+});
+
 test('a close event arriving after a reopen cannot close the menu', async ({
   page,
 }) => {
