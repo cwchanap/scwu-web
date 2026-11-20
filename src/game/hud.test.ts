@@ -95,6 +95,21 @@ it('shows the CHEAT tag only for a battle whose effective cheats are on', () => 
   expect(hud.tag().visible).toBe(false);
 });
 
+it('shows the CHEAT tag from a mid-match summon alone (HPA-972)', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  update(match);
+  expect(hud.tag().visible).toBe(false);
+  // A summon into a battle whose snapshot is still disabled marks it.
+  match.summon('zoma', -1, DEFAULT_CHEATS);
+  update(match);
+  expect(hud.tag().visible).toBe(true);
+  // The next battle's native match clears it again.
+  update(new Match('cpu', true));
+  expect(hud.tag().visible).toBe(false);
+});
+
 it('crops the HUD life bar by the battle’s effective maximum', () => {
   const hud = hudScene();
   const update = createHud(hud.as, (key) => key);
