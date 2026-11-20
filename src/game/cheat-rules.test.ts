@@ -752,6 +752,26 @@ describe('live enemy bars (HPA-972)', () => {
     expect(match.lifeBars).toEqual([match.fighters[1], match.fighters[2]]);
   });
 
+  it('bars a living summoned ally with the option off or on, a summoned enemy only with it on', () => {
+    const match = Match.story('ryuko', storyBattle());
+    // A summon holds no slot and an ally is no hostile of the 1P, so only
+    // the summon clause bars it; it is present, shown and living from its
+    // spawn on.
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    expect(match.lifeBars).toEqual([ally]);
+    match.practice.enemyBars = true;
+    expect(match.lifeBars).toEqual([match.fighters[1], ally, foe]);
+    // Living, present and shown gate every clause: a fallen ally drops out,
+    // and with the option off only the summon keeps its bar.
+    ally.hp = 0;
+    expect(match.lifeBars).toEqual([match.fighters[1], foe]);
+    // Turning the option off leaves nothing: the summoned enemy's bar was
+    // the option's alone, and the fallen ally's was the summon clause's.
+    match.practice.enemyBars = false;
+    expect(match.lifeBars).toEqual([]);
+  });
+
   it('applies in every mode, instantly', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'zoma']);
     expect(match.lifeBars).toHaveLength(0);

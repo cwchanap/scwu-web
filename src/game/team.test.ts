@@ -1992,4 +1992,74 @@ describe('summoned fighters (HPA-972)', () => {
     expect(ally.hp).toBeGreaterThan(0);
     for (let t = 0; t < 5; t++) match.step();
   });
+
+  it('hands the next story battle a clean match, the summons left to the old one', () => {
+    // The scene's actual handoff: the runner's next step after a decided
+    // battle seats a fresh Match (demos and jumps read the native life and
+    // losses on the way), which the round reseats never cover.
+    const story = new Story('ryuko');
+    const first = story.next();
+    if (first.kind !== 'battle') throw new Error('no first battle');
+    const match = Match.story('ryuko', first.battle);
+    fight(match);
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    match.step();
+    aligned(match, match.fighters.length, PER_FIGHTER);
+    // Win the rounds the way the player would: every living native enemy
+    // falls each round, until state 902 reports the match decided with the
+    // summon still standing.
+    while (!match.resultReady) {
+      for (const f of match.natives)
+        if (f.enemies & 1 && f.present && !f.downed)
+          knockOut(match, f, match.fighters[0]!);
+      const round = match.round;
+      for (
+        let t = 0;
+        t < 5000 && !match.resultReady && match.round === round;
+        t++
+      )
+        match.step();
+      expect(
+        match.resultReady || match.round !== round,
+        'a round never ended',
+      ).toBe(true);
+    }
+    expect(ally.hp).toBeGreaterThan(0);
+    const [one] = match.fighters;
+    const nextBattle = (life: number, lost: number) => {
+      let next = story.next(life, lost);
+      for (let i = 0; next.kind !== 'battle' && i < 20; i++)
+        next = story.next(life, lost);
+      if (next.kind !== 'battle')
+        throw new Error('the runner never dealt the next battle');
+      return next.battle;
+    };
+    const again = Match.story(
+      'ryuko',
+      nextBattle(
+        Math.trunc((one.hp * lifeOf(one.who)) / one.maxHp),
+        match.lost,
+      ),
+    );
+    // The new battle seats only its own natives: no summon survived, every
+    // per-fighter array aligned, no summon's null slot, no effect beyond
+    // the natives.
+    expect(again.fighters).not.toContain(ally);
+    expect(again.natives).toEqual(again.fighters);
+    const arr = arrays(again);
+    aligned(again, again.fighters.length, PER_FIGHTER);
+    expect(arr.cpus).toHaveLength(again.fighters.length);
+    // Every fighter past the 1P holds its slot, a waiting reinforcement's
+    // living in waits until it enters (the 1P holds no slot record) — a
+    // summon would hold neither.
+    expect(
+      arr.slots.every(
+        (slot, i) => i === 0 || slot !== null || arr.waits[i] !== null,
+      ),
+    ).toBe(true);
+    for (let t = 0; t < 10; t++) again.step();
+    expect(again.effects.every((e) => e.owner < again.fighters.length)).toBe(
+      true,
+    );
+  });
 });
