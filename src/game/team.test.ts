@@ -5,7 +5,8 @@ import { CPU_TABLES } from './cpu';
 import { desperationOf, lifeOf, stocksOf } from './characters';
 import type { Who } from './characters';
 import { addPower, firstStrike, LIFE, Match } from './match';
-import type { Fighter } from './match';
+import type { Fighter, Input } from './match';
+import type { CpuVM } from './cpu';
 import { BOSSES, ROSTER } from './select';
 import { scenarioOf, Story } from './story';
 import { enter, playing, RYUKO, strike } from './testing';
@@ -1852,5 +1853,143 @@ describe('boss B.R. ANOTHER', () => {
       1,
     );
     expect(enemy.maxHp).toBe(6 * lifeOf(enemy.who));
+  });
+});
+
+describe('summoned fighters (HPA-972)', () => {
+  // The summon state the tests read through the private-field cast the
+  // other suites use.
+  const arrays = (match: Match) =>
+    match as unknown as {
+      history: number[][];
+      previous: Input[];
+      inputs: Input[];
+      keyed: boolean[];
+      spent: number[];
+      slots: (Slot | null)[];
+      waits: (Slot | null)[];
+      seats: number[];
+      results: number[];
+      cpus: (CpuVM | null)[];
+      nativeCount: number;
+    };
+  const aligned = (match: Match, count: number, keys: string[]) => {
+    const arr = arrays(match);
+    for (const key of keys) expect(arr[key as never]).toHaveLength(count);
+  };
+  const PER_FIGHTER = [
+    'history',
+    'previous',
+    'inputs',
+    'keyed',
+    'spent',
+    'slots',
+    'waits',
+    'seats',
+  ];
+
+  it('joins a brawl enemy beyond the natives, and the next round clears it', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ rounds: 2, slots: [slot(), slot()] }),
+    );
+    fight(match);
+    const [one, a, b] = match.fighters;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    expect(match.fighters).toEqual([one, a, b, foe]);
+    expect(match.natives).toEqual([one, a, b]);
+    // The summon is hostile to the 1P and 1P's allies; the 1P-side natives
+    // gain its bit and its fellow enemies lose it, indices unchanged.
+    expect(foe.enemies).toBe(1);
+    expect((one.enemies >> 3) & 1).toBe(1);
+    expect((a.enemies >> 3) & 1).toBe(0);
+    expect((b.enemies >> 3) & 1).toBe(0);
+    // Every per-fighter array grew with a null slot, and a tick stays aligned.
+    aligned(match, 4, PER_FIGHTER);
+    const arr = arrays(match);
+    expect(arr.slots[3]).toBeNull();
+    expect(arr.seats).toEqual([0, 1, 2, 3]);
+    expect(match.palettes).toHaveLength(4);
+    expect(new Set(match.palettes).size).toBe(4);
+    match.step();
+    aligned(match, 4, PER_FIGHTER);
+    expect(arr.cpus).toHaveLength(4);
+    // Its normal VS CHARGE object spawned for the sensors.
+    expect(match.effects.some((e) => e.owner === 3)).toBe(true);
+    // The brawl ends once the native enemies have fallen; the summon lives on.
+    knockOut(match, a, one);
+    knockOut(match, b, one);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
+    expect(foe.hp).toBeGreaterThan(0);
+    expect(foe.downed).toBe(false);
+    // The next native round reseats without it, arrays and effects included.
+    const { round } = match;
+    for (let t = 0; t < 5000 && match.round === round; t++) match.step();
+    expect(match.round).toBe(round + 1);
+    expect(match.fighters).toHaveLength(3);
+    expect(match.natives).toHaveLength(3);
+    expect(arr.nativeCount).toBe(3);
+    aligned(match, 3, PER_FIGHTER);
+    expect(arr.cpus).toHaveLength(3);
+    expect(match.effects.some((e) => e.owner === 3)).toBe(false);
+  });
+
+  it('scores a summon’s fall on no seat and awards nothing, natives scoring as ever', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ koPoints: 50, slots: [slot({ points: 100 })] }),
+    );
+    fight(match);
+    const [one, a] = match.fighters;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    knockOut(match, foe, one);
+    expect(foe.downed).toBe(true);
+    expect(one.points).toBe(0);
+    // The native enemy's fall still pays its slot to its scorer.
+    knockOut(match, a, one);
+    expect(one.points).toBe(100);
+  });
+
+  it('keeps the point objective on the natives alone, even at a summon’s 100 points', () => {
+    const match = Match.story('ryuko', battle());
+    fight(match);
+    const [one] = match.fighters;
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    ally.points = 100;
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBeNull();
+    one.points = 100;
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('player');
+  });
+
+  it('loses the brawl when the 1P falls, a living summoned ally or not', () => {
+    const match = Match.story('ryuko', battle({ slots: [slot(), slot()] }));
+    fight(match);
+    const [one] = match.fighters;
+    match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    knockOut(match, one, match.fighters[1]);
+    for (let t = 0; t < 3; t++) match.step();
+    expect(match.winner).toBe('opponent');
+    expect(match.lost).toBe(1);
+  });
+
+  it('resolves a time-up and the results on the natives, a summoned ally crashing on no null slot', () => {
+    const match = Match.story(
+      'ryuko',
+      battle({ time: 1, timeUp: 100, slots: [slot({ timeUp: 100 })] }),
+    );
+    fight(match);
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    while (match.ticks < 99) match.step();
+    expect(match.seconds).toBe(1);
+    match.step();
+    for (let t = 0; t < 5 && match.winner === null; t++) match.step();
+    expect(match.winner).toBe('player');
+    const arr = arrays(match);
+    expect(arr.results).toEqual([1, 3]);
+    expect(ally.hp).toBeGreaterThan(0);
+    for (let t = 0; t < 5; t++) match.step();
   });
 });

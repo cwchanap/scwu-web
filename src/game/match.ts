@@ -139,6 +139,9 @@ export const GROUND = 636;
 export const ART_SCALE = 1.5;
 // The walls with the camera at either end of the stage: 50 source pixels in.
 export const FIGHTER_MARGIN = 50 * 1.5;
+// Authored (HPA-972): the roster cap for summons, beyond which `summon`
+// refuses — the palette and bit-mask paths have no automatic safe cap.
+export const MAX_FIGHTERS = 10;
 const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
 // Opcode 1 uses 16.16 velocity scaled by floor(65536 / 100) at speed 10.
 // Convert the recovered source velocities to the web's 1.5-scale arena.
@@ -1841,6 +1844,21 @@ export class Match {
   get cheats(): Readonly<CheatOptions> {
     return this.cheatsSnapshot;
   }
+  // Authored (HPA-972): the fighters the round seated natively, in their
+  // original indices; a summon appends beyond this slice and every scoring
+  // and outcome path reads only it. Refreshed whenever native fighters are
+  // seated (the constructor, a round's or battle's reseating).
+  private nativeCount = 0;
+  private summoned = false;
+
+  get natives() {
+    return this.fighters.slice(0, this.nativeCount);
+  }
+  // Authored (HPA-972): the in-arena CHEAT badge reads this, not the
+  // frozen snapshot alone — a summon marks the battle cheated too.
+  get cheated() {
+    return this.cheats.enabled || this.summoned;
+  }
   // Each player's CPU (+0xdf5d), player 2's in VS.
   cpus: (CpuVM | null)[];
   // A story's seat for each fighter (+0x156: the 1P 0, slot n's player n +
@@ -1935,6 +1953,13 @@ export class Match {
       : intro
         ? this.entrants()
         : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+    this.nativeCount = this.fighters.length;
+    // The Vs. modes seat no slot data: nulls, so every per-fighter array
+    // stays aligned with the fighters (HPA-972's summons append to these).
+    if (!battle) {
+      this.slots = this.fighters.map(() => null);
+      this.waits = this.fighters.map(() => null);
+    }
     // Authored: with no 開始時, whose OP super Charge follows its player into
     // VS CHARGE at once in VS single (Ryuko's 39 into 38, PCs 320–321, 417),
     // each player starts with its VS CHARGE (TRAINING's VS CHANGE, which his
@@ -2090,10 +2115,11 @@ export class Match {
     return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
   }
 
-  // The fighters hostile to the 1P, by seat.
+  // The fighters hostile to the 1P, by seat. Authored (HPA-972): only the
+  // natives — a summon never decides whether the native hostiles are beaten.
   private get enemiesOfOne() {
-    const [one] = this.fighters;
-    return one ? this.fighters.filter((_, i) => one.enemies & (1 << i)) : [];
+    const [one] = this.natives;
+    return one ? this.natives.filter((_, i) => one.enemies & (1 << i)) : [];
   }
 
   // Authored: all hostile seats count.
@@ -2120,14 +2146,16 @@ export class Match {
       const first = this.bySeat(1);
       if (first && perMille(one) < perMille(first))
         first.points += battle.timeUp;
-      this.fighters.forEach((f, i) => {
+      // Authored (HPA-972): the natives alone — a summon holds no slot for
+      // the +0x14 read.
+      this.natives.forEach((f, i) => {
         if (i && perMille(f) < perMille(one))
           one.points += this.slots[i]!.timeUp;
       });
     }
     const ally = (i: number) => !i || this.slots[i]!.flags & 0x200;
     let [ours, theirs] = [one.points, 0];
-    this.fighters.forEach((f, i) => {
+    this.natives.forEach((f, i) => {
       if (!i || f.points < 100) return;
       if (ally(i)) ours = Math.max(ours, f.points);
       else theirs = Math.max(theirs, f.points);
@@ -2144,7 +2172,7 @@ export class Match {
       ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
     if (winner !== 'player') this.lost++;
     const lose = timeUp ? 3 : 2;
-    this.results = this.fighters.map((_, i) =>
+    this.results = this.natives.map((_, i) =>
       winner === 'draw'
         ? 3
         : winner === 'player'
@@ -2332,6 +2360,12 @@ export class Match {
         blockedCpuCommands(who, this.br),
       );
     }
+    // Authored (HPA-972): the natives reseat — drop the summons' extensions
+    // (their slot, wait, seat and CPU entries) before the rebuild reads them.
+    this.slots.length = this.nativeCount;
+    this.waits.length = this.nativeCount;
+    this.seats.length = this.nativeCount;
+    this.cpus.length = this.nativeCount;
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
@@ -2341,7 +2375,10 @@ export class Match {
     // fresh Menu values cannot reach a running match — and 1P's carried
     // stock fits the EN cap; the enemy's stock carries as it was. The new
     // seats are installed first, so hostility reads their own masks.
+    // Authored (HPA-972): the seating is native, which clears the summons
+    // and every fighter-indexed array they extended.
     this.fighters = fighters;
+    this.nativeCount = fighters.length;
     if (this.cheats.enabled) {
       fighters.forEach((f, i) => this.cheatSeat(f, i));
       fighters[0].stock = Math.min(fighters[0].stock, fighters[0].maxStock);
@@ -2448,6 +2485,7 @@ export class Match {
     this.freeing = [];
     this.kgt = [];
     this.fighters = this.storyFighters();
+    this.nativeCount = this.fighters.length;
     if (this.calls) this.hold(0x65, openingLife(this));
     this.clearInput();
   }
@@ -2490,6 +2528,112 @@ export class Match {
     }
     f.enGainMultiplier = enGainOf(f.maxStock);
     f.hp = f.maxHp;
+  }
+
+  // Authored (HPA-972): appends one CPU fighter beyond the native seats for
+  // the rest of this battle, or returns null at MAX_FIGHTERS. `side` 1
+  // joins the 1P's side (beside the 1P, facing out), −1 the enemies' (the
+  // far side). `effectiveSummonCheats` scales the new fighter alone — full
+  // HP by its side, the enemy EN cap included — leaving the frozen battle
+  // snapshot and every seated fighter as they are. Native indices and all
+  // per-fighter arrays keep their places; the summons leave at the next
+  // native seating (nextRound, a battle's new Match).
+  summon(
+    who: Who,
+    side: -1 | 1,
+    effectiveSummonCheats: CheatOptions,
+  ): Fighter | null {
+    if (this.fighters.length >= MAX_FIGHTERS) return null;
+    const index = this.fighters.length;
+    const [one] = this.fighters;
+    // Each fighter's side: a native by its hostility to the 1P, an earlier
+    // summon by its own mask's 1P bit (the natives' masks toward summons
+    // move as the sides demand, so they cannot re-derive a side).
+    const onOneSide = (i: number) =>
+      i < this.nativeCount
+        ? !this.hostile(0, i)
+        : (this.fighters[i]!.enemies & 1) === 0;
+    const sameSide = (i: number) => onOneSide(i) === (side === 1);
+    // ponytail: with no same-side native to stand past (an all-ally battle),
+    // the far side falls back to beside the 1P.
+    const far = this.fighters.filter((_, i) => sameSide(i)).map((n) => n.x);
+    const f = fighter(
+      side === 1
+        ? Math.max(75, one.x - 135)
+        : Math.min(
+            1845,
+            Math.max(75, (far.length ? Math.max(...far) : one.x) + 135),
+          ),
+      side,
+      who,
+    );
+    this.fighters.push(f);
+    // Hostility by side, both directions: the summon strikes the natives
+    // across its side, and each native's mask gains or loses its bit.
+    f.enemies = this.fighters
+      .slice(0, index)
+      .reduce<number>(
+        (mask, _, i) => (sameSide(i) ? mask : mask | (1 << i)),
+        0,
+      );
+    this.fighters.forEach((n, i) => {
+      if (i === index) return;
+      n.enemies = sameSide(i)
+        ? n.enemies & ~(1 << index)
+        : n.enemies | (1 << index);
+    });
+    this.previous.push({});
+    this.inputs.push({});
+    this.history.push(blankHistory());
+    this.keyed.push(false);
+    this.spent.push(-1);
+    this.slots.push(null);
+    this.waits.push(null);
+    const seat = Math.max(...this.seats) + 1;
+    this.seats.push(seat);
+    if (this.battle) this.takeSeat(index);
+    const vm = new CpuVM(
+      CPU_TABLES[who],
+      CPU_LEVEL,
+      this.seed,
+      CPU_CONTROLS[who],
+      blockedCpuCommands(who, this.br),
+    );
+    if (this.cpus[1]) vm.shared = this.cpus[1];
+    this.cpus[index] = vm;
+    if (effectiveSummonCheats.enabled) {
+      const enemy = side === -1;
+      f.maxHp = Math.max(
+        1,
+        Math.round(
+          lifeOf(who) *
+            (enemy
+              ? effectiveSummonCheats.enemyHpMultiplier
+              : effectiveSummonCheats.partnerHpMultiplier),
+        ),
+      );
+      f.maxStock = enemy
+        ? Math.min(
+            10,
+            stocksOf(who) * effectiveSummonCheats.enemyStocksMultiplier,
+          )
+        : stocksOf(who);
+      f.enGainMultiplier = enGainOf(f.maxStock);
+      f.hp = f.maxHp;
+    }
+    // Its normal VS CHARGE, so the sensors reach its body (op 0x11's 9900
+    // down, PC 410) as any seated player's does.
+    this.spawnObject(f, index, {
+      flags: 0x24,
+      action: CHARACTERS[f.who].charge,
+      offset: 0,
+      x: 0,
+      y: 0,
+      slot: 0,
+      z: 0,
+    });
+    this.summoned = true;
+    return f;
   }
 
   // Authored (HPA-767): the 1P's positive outgoing damage to a hostile
@@ -2638,9 +2782,16 @@ export class Match {
     );
   }
 
-  // Whether a CPU plays this player this tick (+0xdf5d).
+  // Whether a CPU plays this player this tick (+0xdf5d). Authored
+  // (HPA-972): a summoned CPU plays from phase 1 whatever the mode's usual
+  // drive — a practice dummy or a human 2P leaves it on.
   private driven(f: Fighter) {
     const i = this.fighters.indexOf(f);
+    if (i >= this.nativeCount)
+      return (
+        Boolean(this.cpus[i]) &&
+        !(this.calls && this.roundTicks <= this.fightTick)
+      );
     return i > 0 && this.cpuDriven && Boolean(this.cpus[i]);
   }
 
@@ -2730,6 +2881,10 @@ export class Match {
     // check for lives emptied outside this routine.
     f.downed = true;
     this.queue(f, 'down');
+    // Authored (HPA-972): a summoned fighter's fall scores and awards
+    // nothing — it holds no slot; the downed flag and KO action above still
+    // ran for combat.
+    if (this.fighters.indexOf(f) >= this.nativeCount) return;
     const { battle } = this;
     if (!battle) return;
     const slot = this.slots[this.fighters.indexOf(f)];
@@ -5685,7 +5840,7 @@ export class Match {
       ? !one.hp ||
         (enemies
           ? enemies.every((f) => f.downed)
-          : this.fighters.some((f) => f.points >= 100))
+          : this.natives.some((f) => f.points >= 100))
       : !one.hp || !two.hp;
     if (this.picking?.winner) {
       this.winner = this.picking.winner;
