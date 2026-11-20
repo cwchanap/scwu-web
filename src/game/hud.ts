@@ -298,7 +298,10 @@ const NAMES: Record<Who, number | null> = {
 };
 
 // The stock count picks its digits from the word at 0x445202 + stock × 2
-// (0x40a30b): KGT actions 45–51, images 17–23, EMPTY and 100–600.
+// (0x40a30b): KGT actions 45–51, images 17–23, EMPTY and 100–600. Stocks 7–10
+// have no source art: HPA-971's authored digits ride in the boot pack as
+// en-7 … en-10 (published as en/7.png … en/10.png for the DOM), centred on
+// the same anchors.
 const STOCK_OFFSETS = [
   [0, 0],
   [0, -1],
@@ -307,7 +310,16 @@ const STOCK_OFFSETS = [
   [-3, -1],
   [-2, -1],
   [-2, -1],
+  [0, 0],
+  [0, 0],
+  [0, 0],
+  [0, 0],
 ];
+
+// The digit texture for a stock count: the source digits 0–6, then the
+// authored 700–1000 art.
+export const stockTexture = (stock: number): string =>
+  stock < 7 ? `ui-${17 + stock}` : `en-${stock}`;
 
 // The draw walks the 128 priority lists lowest first (0x404df1), stage,
 // HUD, viewport and world objects alike. Within one go the players by slot,
@@ -451,7 +463,7 @@ export function createHud(
       const [dx, dy] = STOCK_OFFSETS[f.stock];
       stocks[index]
         .setVisible(true)
-        .setTexture(`ui-${17 + f.stock}`)
+        .setTexture(stockTexture(f.stock))
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
       underPower[index].setTexture(
         Math.floor(match.ticks / 15) % 2

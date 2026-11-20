@@ -18,6 +18,7 @@ import {
   roundEndTick,
   ROUND_END_TICKS,
   healthCrop,
+  stockTexture,
 } from './hud';
 import { Match } from './match';
 
@@ -116,16 +117,32 @@ it('crops the HUD life bar by the battle’s effective maximum', () => {
   expect(hud.lifeBars()[0].crop).toEqual({ x: 127, width: 127 });
 });
 
-it('draws the stock count from the source’s 0–6 images (ui 17–23)', () => {
+it('draws the stock count from the source 0–6 digits and the authored 7–10 art', () => {
   for (const index of [17, 18, 19, 20, 21, 22, 23])
     expect(ui.images.some((image) => image.index === index)).toBe(true);
+  // The source word ends at 600 (six stocks); 700–1000 are HPA-971's authored
+  // digits, shipped in the boot pack as en-7 … en-10.
+  expect([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(stockTexture)).toEqual([
+    'ui-17',
+    'ui-18',
+    'ui-19',
+    'ui-20',
+    'ui-21',
+    'ui-22',
+    'ui-23',
+    'en-7',
+    'en-8',
+    'en-9',
+    'en-10',
+  ]);
   const hud = hudScene();
   const update = createHud(hud.as, (key) => key);
   const match = new Match('cpu', true);
-  for (let stock = 0; stock <= 6; stock++) {
+  for (let stock = 0; stock <= 10; stock++) {
     match.fighters[0].stock = stock;
     update(match);
-    expect(hud.stocks()[0].texture).toBe(`ui-${17 + stock}`);
+    expect(hud.stocks()[0].texture).toBe(stockTexture(stock));
+    expect(hud.stocks()[0].visible).toBe(true);
   }
 });
 
