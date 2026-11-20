@@ -4784,6 +4784,12 @@ def export_ui():
         filename = f"ui/{index}.png"
         write_if_changed(PUBLIC / filename, indexed_png(record.width, record.height, pixels, palette, True))
         images.append(dict(index=index, width=record.width, height=record.height, filename=filename))
+    # The word ends at 600: stocks 7–10 show HPA-971's authored digits, copied
+    # verbatim for the DOM (Menu.svelte names en/7.png … en/10.png) and packed
+    # below as the HUD's en-7 … en-10 textures.
+    (PUBLIC / "en").mkdir(exist_ok=True)
+    for stocks, art in zip(range(7, 11), AUTHORED_ART[:4]):
+        write_if_changed(PUBLIC / f"en/{stocks}.png", (ROOT / art).read_bytes())
     write_json(GENERATED / "ui.json", dict(source_sha256=digest, images=images, sounds=sounds, ko=ko, calls=calls,
                                            select=select, title=title, hits=hits, combo=combo, **{"continue": resume}))
     return demo_name
@@ -4944,14 +4950,25 @@ def export_demo(key, name, sha256, out):
                                                sounds=sounds, flags=flags, duration=duration))
 
 
+# The committed art the export reads: HPA-971's authored EN stock digits for
+# 700–1000, then Dora's nameplate. One order, hashed by inputs() and exporter()
+# and concatenated in the same order by build.sh's script_sha and CI's
+# fetch-generated.sh (the Cloudflare builds' fingerprint).
+AUTHORED_ART = ("art/hud/en-700.png", "art/hud/en-800.png", "art/hud/en-900.png",
+                "art/hud/en-1000.png", "art/dora/name.png")
+
+
 def dom_art():
-    """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon, the
-    Instructions sources' select and gauge art, moves.ts's guide art and nameplates, and the shared page.ts
-    backdrop the profile page reuses. The literal paths are the one source, so this scans the same text."""
-    sources = [ROOT / "src/App.svelte", *sorted((ROOT / "src/instructions").glob("*.svelte")),
+    """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon and
+    Menu.svelte's cheat digits and stage thumbnails, the Instructions sources' select and gauge art,
+    moves.ts's guide art and nameplates, and the shared page.ts backdrop the profile page reuses. The
+    literal paths are the one source, so this scans the same text; the regex takes whole nested paths
+    (a stage thumbnail is stages/<stage>/<image>.png)."""
+    sources = [ROOT / "src/App.svelte", ROOT / "src/Menu.svelte",
+               *sorted((ROOT / "src/instructions").glob("*.svelte")),
                ROOT / "src/instructions/moves.ts", ROOT / "src/instructions/page.ts",
                *sorted((ROOT / "src/profile").glob("*.svelte")), *sorted((ROOT / "src/profile").glob("*.ts"))]
-    return sorted({name for source in sources for name in re.findall(r"[a-z0-9]+/[0-9]+\.png", source.read_text(encoding="utf8"))})
+    return sorted({name for source in sources for name in re.findall(r"(?:[a-z0-9]+/)+[0-9]+\.png", source.read_text(encoding="utf8"))})
 
 
 def published_files():
@@ -4992,7 +5009,9 @@ def export_packs():
         return {f"{prefix}-{e['index']}": (PUBLIC / e["filename"]).read_bytes() for e in entries}
 
     ui, select, t2 = load("ui.json"), load("select.json"), load("t2.json")
-    boot_images = {"text": (PUBLIC / "text.png").read_bytes(), **files(ui["images"], "ui"),
+    boot_images = {"text": (PUBLIC / "text.png").read_bytes(),
+                   **{f"en-{stocks}": (PUBLIC / f"en/{stocks}.png").read_bytes() for stocks in range(7, 11)},
+                   **files(ui["images"], "ui"),
                    **files(select["images"], "select"), **files(t2["images"], "t2")}
     boot_sounds = {**files(ui["sounds"], "kgt-sound"), **files(select["sounds"], "select-sound"),
                    **files(t2["sounds"], "t2-sound")}
@@ -5033,9 +5052,11 @@ def export_packs():
 
 
 def inputs():
-    """What the export reads: this script, the handoff's files by name, size and time, and the DOM's art paths."""
+    """What the export reads: this script, the committed art (AUTHORED_ART), the handoff's files by
+    name, size and time, and the DOM's art paths."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
-    digest.update((ROOT / "art/dora/name.png").read_bytes())
+    for name in AUTHORED_ART:
+        digest.update((ROOT / name).read_bytes())
     for path in sorted(RESEARCH.rglob("*")):
         if path.is_file():
             stat = path.stat()
@@ -5047,9 +5068,10 @@ def inputs():
 
 def exporter():
     """This script's fingerprint: the part of inputs() a git checkout can reproduce —
-    the script itself and the committed art it reads (art/dora/name.png)."""
+    the script itself and the committed art it reads (AUTHORED_ART, in order)."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
-    digest.update((ROOT / "art/dora/name.png").read_bytes())
+    for name in AUTHORED_ART:
+        digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 
 
