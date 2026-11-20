@@ -46,6 +46,7 @@ import {
   HEIGHT,
   LIFE,
   Match,
+  MAX_FIGHTERS,
   stepShake,
   WIDTH,
 } from './match';
@@ -152,6 +153,17 @@ const keyMap: Record<string, Control> = {
   KeyJ: 'throw',
   KeyE: 'ex',
 };
+
+// A summon awaiting its fighter pack (HPA-972): the token a later load's
+// COMPLETE handler compares against, the match it must still be, and the
+// promise App's dialog awaits.
+interface SummonRequest {
+  who: Who;
+  side: -1 | 1;
+  match: Match;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+}
 
 // The free state's program (action 1), which reads the fighter's variable 0
 // (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
@@ -275,6 +287,11 @@ export class TrainingScene extends Phaser.Scene {
   // run's cheated mark if no new run began.
   private routeLoad?: object;
   private cheatedBeforeRoute?: boolean;
+  // The summon in flight (HPA-972): its own request token, the match it
+  // joined and the promise a Menu dialog awaits. Any dialog close, screen
+  // opening, match replacement or scene shutdown drops it before it can
+  // spawn.
+  private summonRequest?: SummonRequest;
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -296,6 +313,23 @@ export class TrainingScene extends Phaser.Scene {
       new PackFile(this.load, 'boot', () => this.textures.exists('text')),
     );
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      // A summon's own pack failing fails the summon alone (HPA-972): the
+      // match stays intact and the dialog reports it. A pack's key names it
+      // (fighter-<who>) and so does every art key inside it (<who>-<image>).
+      // Any other load — a stage, a fighter a match seats — still fails the
+      // scene.
+      if (
+        this.summonRequest &&
+        (file.key === `fighter-${this.summonRequest.who}` ||
+          file.key.startsWith(`${this.summonRequest.who}-`))
+      ) {
+        const request = this.summonRequest;
+        this.summonRequest = undefined;
+        request.reject(
+          new Error(`Could not load ${request.who}. The match is unchanged.`),
+        );
+        return;
+      }
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
       this.report();
     });
@@ -516,6 +550,9 @@ export class TrainingScene extends Phaser.Scene {
   setModal(open: boolean) {
     if (this.modal === open) return;
     this.modal = open;
+    // Closing cancels a summon still loading: the dialog that asked for it
+    // is gone, so nothing may spawn into the match it left.
+    if (!open) this.dropSummon('Summon cancelled.');
     // Opening holds the pause the match was under; closing puts it back,
     // keeping a pause taken while the dialog was up (a window blur).
     if (open) this.pausedBefore = this.paused;
@@ -560,6 +597,7 @@ export class TrainingScene extends Phaser.Scene {
     this.demoRequest = undefined;
     this.routeLoad = undefined;
     this.cheatedBeforeRoute = undefined;
+    this.dropSummon('Summon cancelled.');
     this.loading = false;
     this.report();
   }
@@ -1082,6 +1120,111 @@ export class TrainingScene extends Phaser.Scene {
       } else this.selectTrack?.stop();
     } else this.playMusic();
     this.report();
+  }
+
+  // One mid-match summon (HPA-972): loads the fighter's pack, then seats
+  // a CPU into the live match. The caller (App's dialog) holds the fight
+  // with setModal; this only adds to it, idempotently, and never lifts it —
+  // the dialog's close does. Never whenReady: that begins a new match.
+  summon(who: Who, side: -1 | 1): Promise<void> {
+    if (!this.ready || this.error)
+      return Promise.reject(new Error('The arena is not ready.'));
+    if (this.select || this.loading || this.match.resultReady)
+      return Promise.reject(new Error('No live match to summon into.'));
+    if (this.summonRequest)
+      return Promise.reject(new Error('A summon is already loading.'));
+    if (this.match.fighters.length >= MAX_FIGHTERS)
+      return Promise.reject(new Error('The arena is already full.'));
+    this.setModal(true);
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    const request: SummonRequest = {
+      who,
+      side,
+      match: this.match,
+      resolve,
+      reject,
+    };
+    this.summonRequest = request;
+    // A scene shutdown (game destroyed mid-load) must not dangle the
+    // dialog's await; registered per request so a stubbed test scene can
+    // fire the same hook the real Phaser boot does.
+    this.events.once('shutdown', () => this.dropSummon('The scene shut down.'));
+    if (this.players.has(who)) {
+      this.spawnSummon(request);
+      return promise;
+    }
+    this.loadPlayer(who);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () =>
+      this.spawnSummon(request),
+    );
+    this.load.start();
+    return promise;
+  }
+
+  // The request token decides: anything else — a cancel, a newer request,
+  // a later load's COMPLETE — leaves the match as it stands.
+  private spawnSummon(request: SummonRequest) {
+    if (this.summonRequest !== request) return;
+    this.summonRequest = undefined;
+    if (this.select || this.loading || this.match !== request.match) {
+      request.reject(
+        new Error('The match moved on before the fighter loaded.'),
+      );
+      return;
+    }
+    const f = this.match.summon(
+      request.who,
+      request.side,
+      this.effectiveSummonCheats(),
+    );
+    if (!f) {
+      request.reject(new Error('The arena is already full.'));
+      this.report();
+      return;
+    }
+    const index = this.match.fighters.indexOf(f);
+    // The fighter's art is here (loaded or resident), so it stays unloadable
+    // with the match's own players.
+    this.players.add(request.who);
+    // Its idle program starts at once and holds a frame, so the draw loop
+    // can pose it before the next unfrozen tick rebuilds the VM.
+    const vm = idleVM(f, index);
+    vm.tick();
+    this.idle.push(vm);
+    this.idling.push(false);
+    // A story's summon takes the palette its seat drew; versus and practice
+    // draw with none.
+    this.palettes.push(
+      this.match.battle ? (this.match.palettes[index] ?? 0) : 0,
+    );
+    this.growFighters(this.match.fighters.length);
+    // A summon marks the run cheated at once, snapshot enabled or not.
+    this.runCheated ||= this.match.cheated;
+    this.report();
+    request.resolve();
+  }
+
+  // The cheats the new fighter alone takes: the battle's snapshot when it
+  // was already cheat-enabled, otherwise a cheat mode the player turned on
+  // mid-battle (still pending for the next battle). Otherwise the frozen
+  // snapshot's off state — no scaling.
+  private effectiveSummonCheats(): CheatOptions {
+    if (this.match.cheats.enabled) return { ...this.match.cheats };
+    return { ...this.pendingCheats };
+  }
+
+  // Drop an in-flight summon, rejecting its dialog await. The match, its
+  // arrays and the modal pause are untouched.
+  private dropSummon(reason: string) {
+    const request = this.summonRequest;
+    if (!request) return;
+    this.summonRequest = undefined;
+    request.reject(new Error(reason));
   }
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).

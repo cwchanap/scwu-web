@@ -421,9 +421,10 @@ export function createHud(
   const shown = [0, 1, 2, 3].map(() =>
     image(97, 0, 0).setDepth(110).setVisible(false),
   );
-  // Authored (HPA-767): a small CHEAT tag under the timer, shown only for
-  // a battle whose effective snapshot has cheats on — the Menu's pending
-  // switch cannot hide a begun battle's tag.
+  // Authored (HPA-767, HPA-972): a small CHEAT tag under the timer, shown
+  // for a battle whose effective snapshot has cheats on — the Menu's
+  // pending switch cannot hide a begun battle's tag — or that a summon
+  // joined mid-battle, which marks it too (match.cheated).
   const cheatTag = scene.add
     .text(320 * scale, 44 * scale, 'CHEAT', {
       fontFamily: 'monospace',
@@ -481,7 +482,7 @@ export function createHud(
     const dim = [0, -5, -10, -15, -20, -15, -10, -5][
       Math.floor(match.ticks / 10) % 8
     ];
-    cheatTag.setVisible(match.cheats.enabled);
+    cheatTag.setVisible(match.cheated);
     strips.forEach((strip, index) =>
       strip.setTexture(tint(`ui-${40 + index}`, { r: dim, g: dim, b: dim })),
     );
