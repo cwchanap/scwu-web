@@ -258,7 +258,9 @@ const openArena = async (page: Page) => {
   const backToModeSelect = async () => {
     await menu.click();
     const dialog = page.getByRole('dialog', { name: 'Menu' });
-    await dialog.getByRole('button', { name: 'Character select' }).click();
+    await dialog
+      .getByRole('button', { name: 'Character select', exact: true })
+      .click();
     await expect(dialog).toBeHidden();
     await press('Escape');
     await press('g');

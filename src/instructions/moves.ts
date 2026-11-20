@@ -3,64 +3,9 @@ import type { Who } from '../game/characters';
 // One page per fighter, laid out like the select screen. The face grid and the
 // guide tables port docs/superpowers/specs/2026-10-31-guide-revamp-mockup.html.
 
-// Grid order of the select screen (src/game/select.ts ROSTER); null = GATE LOCK.
-export const GRID: readonly (Who | null)[] = [
-  'ryuko',
-  'zoma',
-  'kiki',
-  'chung',
-  'amiro',
-  'anmc',
-  'giant',
-  'suneo',
-  'yo',
-  'sin',
-  'lizard',
-  'kay',
-  'dido',
-  'sakuya',
-  'alex',
-  'sou',
-  'hiso',
-  'erus',
-  'feng',
-  'sean',
-  'gon',
-  'kate',
-  'remu',
-  'rear',
-  'gigi',
-  'sww',
-  'ogi',
-  'ziro',
-  'masa',
-  'times',
-  'zenka',
-  'zmega',
-  'alpha',
-  'shinz',
-  'zaku',
-  'pachelo',
-  'golf',
-  'asura',
-  'ttro',
-  'astroman',
-  'yinan',
-  'aya',
-  null,
-  null,
-  null,
-  'dora',
-  'rario',
-  'training',
-];
-
-// Tile origins in the 206 x 417 sheet (1x source pixels), derived from the
-// engine's own grid (select.ts LAYOUT: origin (233, 50), step (26, 70))
-// plus the sheet's baked odd-column stagger: 7 x 26 + 24 = 206 wide and
-// 5 x 70 + 60 + 7 = 417 tall, matching the sheet exactly.
-export const XS: readonly number[] = [0, 26, 52, 78, 104, 130, 156, 182];
-export const YS: readonly number[] = [0, 70, 140, 210, 280, 350];
+// The select grid's order and tile origins live in fighters.ts, which the
+// Menu reads without pulling this module's guide data into the game page.
+export { GRID, XS, YS } from './fighters';
 
 // Stocks on a full power gauge when it differs from three (characters.ts
 // stocksOf): one for ZAKU and PAC-HELO, two for GOLF and ASURA, five for

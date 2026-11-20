@@ -147,7 +147,7 @@
 
     {#each [...SHARED, ...guide.sections] as section (section.title)}
       <section>
-        <h2>
+        <h2 class="chrome">
           <span>{section.title}</span>
           {#if section.note && !section.cost}<small>{section.note}</small>{/if}
         </h2>
