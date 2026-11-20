@@ -483,6 +483,39 @@ describe('low-HP super gates (HPA-972)', () => {
     expect(String(playing(ryuko))).toBe('254+9');
   });
 
+  it('keeps the super gates 1P-only: Zoma’s BOMB conversion is enemy-native', () => {
+    // Zoma’s Shin Spark (279, below:false 147) is tabled too, so a seat
+    // check can run the same command on both sides of the roster.
+    const shinSpark = (one: boolean, fields: Partial<CheatOptions> = {}) => {
+      const match = new Match(
+        'practice',
+        false,
+        0,
+        one ? ['zoma', 'ryuko'] : ['ryuko', 'zoma'],
+      );
+      match.useCheats(cheats({ enabled: true, lowHpSupers: true, ...fields }));
+      const zoma = match.fighters[one ? 0 : 1];
+      zoma.hp = 400;
+      zoma.stock = 3;
+      match.step();
+      match.step();
+      if (one) match.step({ blackRush: true });
+      else match.step({}, { blackRush: true });
+      match.step();
+      return String(playing(zoma));
+    };
+    // Native everywhere: at 400 (≥147) the command jumps Shin Spark into
+    // BOMB (222), whatever the seat.
+    expect(shinSpark(true, { enabled: false })).toBe('222');
+    const native = shinSpark(false, { enabled: false });
+    expect(native).toBe('222');
+    // The option only ever suppresses the 1P seat's escape (below:false
+    // never jumps there): Shin Spark walks on past its check (233).
+    expect(shinSpark(true)).toBe('233');
+    // An enemy keeps its native conversion — the gates are 1P-only.
+    expect(shinSpark(false)).toBe(native);
+  });
+
   it('moves the tabled thresholds with the Low HP line', () => {
     const run = (hp: number, lowHpLine: number) => {
       const { match, ryuko } = superMatch();

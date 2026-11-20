@@ -216,3 +216,64 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await expect.poll(() => meCalls).toBe(3);
   expect(errors).toEqual([]);
 });
+
+test('Reset all returns the cheats to their defaults (HPA-972)', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.route('**/api/me', (route) => route.fulfill(json({ user: USER })));
+
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  const cheatSwitch = dialog.getByLabel('Cheat mode');
+  await cheatSwitch.check();
+  const hp = dialog.getByLabel('HP ×', { exact: true });
+  await hp.fill('5');
+  await hp.blur();
+  const enemyHp = dialog.getByLabel('Enemy HP ×', { exact: true });
+  await enemyHp.fill('150');
+  await enemyHp.blur();
+  // The out-of-range entry clamped to its bound counts as changed too.
+  await expect(enemyHp).toHaveValue('100');
+  await expect(dialog.getByText('2 changed')).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Reset all' }).click();
+  await expect(cheatSwitch).not.toBeChecked();
+  await expect(hp).toHaveValue('1');
+  await expect(enemyHp).toHaveValue('1');
+  await expect(hp).toBeDisabled();
+  await expect(enemyHp).toBeDisabled();
+  await expect(dialog.getByText('changed')).toHaveCount(0);
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem('scwu.cheats')))
+    .toBe(
+      JSON.stringify({
+        enabled: false,
+        playerHpMultiplier: 1,
+        playerMaxEn: 300,
+        unlimitedEn: false,
+        enemyHpMultiplier: 1,
+        playerDamageMultiplier: 1,
+        partnerHpMultiplier: 1,
+        enemyStocksMultiplier: 1,
+        lowHpLine: 30,
+        damageCutMultiplier: 1,
+        lowHpSupers: false,
+        brNoPartner: false,
+        brHpPerKill: null,
+        brEnPerKill: null,
+      }),
+    );
+  expect(errors).toEqual([]);
+});
