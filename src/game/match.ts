@@ -2293,12 +2293,14 @@ export class Match {
   // slot sets bit 0 (+0xdf0d), the allies, once it has entered and shown a
   // display, while it has life. Authored (HPA-972): the Enemy HP bars
   // option adds the present, shown living hostiles in every mode — a
-  // session option, no cheats needed.
+  // session option, no cheats needed; a summoned ally always keeps one
+  // too, holding no slot and no hostile mask toward the 1P.
   get lifeBars() {
     return this.fighters.filter(
       (f, i) =>
         ((this.slots[i]?.flags ?? 0) & 1 ||
-          (this.practice.enemyBars && this.hostile(0, i))) &&
+          (this.practice.enemyBars && this.hostile(0, i)) ||
+          (i >= this.nativeCount && !this.hostile(0, i))) &&
         f.present &&
         f.shown &&
         f.hp,
