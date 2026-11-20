@@ -348,24 +348,27 @@ export const tileOf = (who: Who): { x: number; y: number } | null => {
   };
 };
 
-// One grid step: WASD or the arrows. Rows never wrap sideways; up/down
-// clamp at the first and last filled cell, the last row being partial.
+// One grid step: WASD or the arrows, over `columns` — the rendered grid's
+// own column count (the stylesheet holds 8 desktop, 4 at phone width).
+// Rows never wrap sideways; up/down clamp at the first and last filled
+// cell, the last row being partial.
 export const summonStep = (
   index: number,
   count: number,
   key: string,
+  columns: number = SUMMON_COLUMNS,
 ): number => {
-  const column = index % SUMMON_COLUMNS;
+  const column = index % columns;
   const by = (delta: number) => Math.min(count - 1, Math.max(0, index + delta));
   switch (key) {
     case 'w':
     case 'W':
     case 'ArrowUp':
-      return by(-SUMMON_COLUMNS);
+      return by(-columns);
     case 's':
     case 'S':
     case 'ArrowDown':
-      return by(SUMMON_COLUMNS);
+      return by(columns);
     case 'a':
     case 'A':
     case 'ArrowLeft':
@@ -373,9 +376,7 @@ export const summonStep = (
     case 'd':
     case 'D':
     case 'ArrowRight':
-      return column < SUMMON_COLUMNS - 1 && index < count - 1
-        ? index + 1
-        : index;
+      return column < columns - 1 && index < count - 1 ? index + 1 : index;
     default:
       return index;
   }
