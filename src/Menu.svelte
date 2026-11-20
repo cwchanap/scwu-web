@@ -302,13 +302,13 @@
           event.preventDefault();
           void confirmSummon();
         }
-      } else {
-        const step = summonStep(cursor, summonables.length, key, gridColumns());
-        if (step !== cursor) {
-          event.preventDefault();
-          cursor = step;
-          focusCell(step);
-        }
+      } else if (/^[wasd]$/i.test(key) || key.startsWith('Arrow')) {
+        // Every recognised nav key rides focus to the cursor — a step the
+        // grid edge clamps too, so Enter confirms the highlight instead
+        // of whichever button focus sat on (HPA-972 review round 2).
+        event.preventDefault();
+        cursor = summonStep(cursor, summonables.length, key, gridColumns());
+        focusCell(cursor);
       }
       return;
     }
