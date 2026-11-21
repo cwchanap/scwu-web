@@ -352,14 +352,14 @@
         <h2 class="chrome"><span>SUMMON</span></h2>
         <div class="sides" role="group" aria-label="Summon side">
           <button
-            class="side"
+            class="side enemy"
             class:on={side === -1}
             aria-pressed={side === -1}
             disabled={summoning}
             onclick={() => (side = -1)}>Enemy</button
           >
           <button
-            class="side"
+            class="side partner"
             class:on={side === 1}
             aria-pressed={side === 1}
             disabled={summoning}
@@ -657,7 +657,7 @@
                 {#if changed}<small>{changed} changed</small>{/if}
               </h2>
               <div class="panel stack">
-                <div class="master" data-row>
+                <div class="master" class:on={cheats.enabled} data-row>
                   <label class="check"
                     ><input
                       type="checkbox"
@@ -1078,11 +1078,27 @@
     justify-content: space-between;
     gap: 12px;
   }
+  /* The mockup's red cheat-mode band while the master switch is on. */
+  .master.on {
+    padding: 10px 12px;
+    background: rgba(238, 36, 33, 0.12);
+    box-shadow: inset 4px 0 0 var(--red);
+  }
+  /* The mockup's gold group headings over a fading rule line. */
   h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin: 6px 0 0;
     font: italic 900 15px/1 var(--display);
-    color: var(--cyan-hi);
-    letter-spacing: 1px;
+    color: var(--gold);
+    letter-spacing: 0.5px;
+  }
+  h3::after {
+    content: '';
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(90deg, var(--edge), transparent);
   }
   .cheat {
     display: grid;
@@ -1166,6 +1182,12 @@
     color: var(--gold);
     border-color: var(--gold);
     background: #241a0c;
+  }
+  /* The mockup codes the two sides: red for enemies, gold for partners. */
+  .side.enemy.on {
+    color: #fff;
+    background: linear-gradient(#ff6a5a, var(--red));
+    border-color: var(--red);
   }
   .side:disabled {
     opacity: 0.4;
