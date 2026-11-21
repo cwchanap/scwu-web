@@ -232,10 +232,15 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   await page.goto('/');
   // Zoma's pack, held back so the dialog is mid-load while the keys are
   // tried. No artificial hooks: the delay is the network's, the rest is
-  // the production build's own UI.
+  // the production build's own UI. A gate the test releases holds it —
+  // never a fixed sleep a slow worker's steps can outlast.
   let loaded = 0;
+  let releasePack!: () => void;
+  const packGate = new Promise<void>((resolve) => {
+    releasePack = resolve;
+  });
   await page.route('**/packs/fighter-zoma.bin', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await packGate;
     loaded++;
     await route.continue();
   });
@@ -275,6 +280,7 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   // writes only after the pack's decode and cache adds have run, so the
   // no-spawn assert cannot outrun a late spawn. The closed dialog drops
   // its role, so the note's own element is polled, not the dialog's.
+  releasePack();
   await packReceived;
   await expect
     .poll(() => page.locator('.note').textContent(), { timeout: 30_000 })
@@ -304,9 +310,15 @@ test('a re-pick while its pack is still landing keeps the loading note', async (
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/');
   // Zoma's pack held back so the cancel and the re-pick both land while
-  // it is still in flight.
+  // it is still in flight — a gate the test releases, never a fixed
+  // sleep: a slow worker's steps between the picks can outlast 3 s and
+  // land the pack before the re-pick's loading note is read.
+  let releasePack!: () => void;
+  const packGate = new Promise<void>((resolve) => {
+    releasePack = resolve;
+  });
   await page.route('**/packs/fighter-zoma.bin', async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await packGate;
     await route.continue();
   });
   const { menu, dialog } = await bootIntoBattle(page);
@@ -335,6 +347,7 @@ test('a re-pick while its pack is still landing keeps the loading note', async (
   await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
   await expect(dialog.getByRole('option').first()).toBeDisabled();
   // The in-flight pack serves the re-pick too: it still joins.
+  releasePack();
   await expect(dialog.locator('.note')).toContainText(
     'Zoma joined the fight.',
     { timeout: 30_000 },
