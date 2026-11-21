@@ -151,6 +151,15 @@ export function normalizeCheats(value: unknown): CheatOptions {
 export const enGainOf = (stocks: number): number =>
   Math.max(1, 1 + (stocks - 3) / 2);
 
+// The cheats a mid-battle summon alone takes (authored, HPA-972): the
+// battle's snapshot when it was already cheat-enabled, otherwise a cheat
+// mode the player turned on mid-battle (still pending for the next
+// battle); with both off, the unscaled defaults.
+export const effectiveSummonCheats = (
+  snapshot: Readonly<CheatOptions>,
+  pending: Readonly<CheatOptions> = DEFAULT_CHEATS,
+): CheatOptions => (snapshot.enabled ? { ...snapshot } : { ...pending });
+
 // Counts the parameters that differ from the defaults, excluding the
 // master switch: the Cheats tab shows this count next to Reset all, and
 // flipping the switch alone is not a change (authored, HPA-972).

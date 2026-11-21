@@ -181,6 +181,16 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await playerHp.fill('1');
   await playerHp.blur();
 
+  // Left/right arrows inside a stepper's number input move the caret
+  // without stepping the stored value or discarding uncommitted text.
+  await playerHp.focus();
+  await playerHp.fill('25');
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('ArrowRight');
+  await expect(playerHp).toHaveValue('25');
+  await playerHp.fill('1');
+  await playerHp.blur();
+
   // Max EN shows the actual stock-digit art (HPA-971's en/7–10): each
   // authored digit decodes in the browser, not merely a 200 over HTTP.
   const maxEn = dialog.getByLabel('Max EN', { exact: true });

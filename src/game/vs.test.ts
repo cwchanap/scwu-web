@@ -3337,4 +3337,50 @@ describe('summoned fighters (HPA-972)', () => {
     expect(allyMatch.fighters[0].maxHp).toBe(lifeOf('ryuko'));
     expect(allyMatch.cheated).toBe(true);
   });
+
+  it('places summons by the nearest hostile or 1P facing, counting only present living same-side fighters', () => {
+    // 1P on the right facing an enemy on the left, with a downed enemy and
+    // a not-yet-entered waiting enemy sitting past both edges: the partner
+    // spawns behind 1P (+135, facing left), and the summoned enemy spawns
+    // past the lone living present hostile (−135, facing right).
+    const match = new Match('practice', false, 0);
+    const [one, live] = match.fighters;
+    one.x = 1200;
+    one.facing = -1;
+    live.x = 700;
+    live.facing = 1;
+    const downed = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    downed.x = 300;
+    downed.hp = 0;
+    downed.downed = true;
+    const waiting = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    waiting.x = 250;
+    waiting.present = false;
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const foe = match.summon('kiki', -1, DEFAULT_CHEATS)!;
+    expect([ally.x, ally.facing]).toEqual([1200 + 135, -1]);
+    expect([foe.x, foe.facing]).toEqual([700 - 135, 1]);
+  });
+
+  it('gives summoned allies and enemies their side’s win or draw pose at round end', () => {
+    const match = new Match('practice', false, 0);
+    const [one, two] = match.fighters;
+    const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    two.hp = 0;
+    for (let t = 0; t < 1000 && !match.resultReady; t++) match.step();
+    expect(match.winner).toBe('player');
+    expect(one.action).toBe('win');
+    expect(ally.action).toBe('win');
+    expect(foe.action).toBe('draw');
+
+    const lost = new Match('practice', false, 0);
+    const lostAlly = lost.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const lostFoe = lost.summon('zoma', -1, DEFAULT_CHEATS)!;
+    lost.fighters[0].hp = 0;
+    for (let t = 0; t < 1000 && !lost.resultReady; t++) lost.step();
+    expect(lost.winner).toBe('opponent');
+    expect(lostAlly.action).toBe('draw');
+    expect(lostFoe.action).toBe('win');
+  });
 });

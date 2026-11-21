@@ -49,4 +49,14 @@ describe('Menu Enemy side switch contrast', () => {
       expect(r).toBeGreaterThan(b);
     }
   });
+
+  it('keeps arcade.css’s --muted palette unshadowed by style.css on the game page', () => {
+    const arcade = readFileSync(
+      new URL('./arcade.css', import.meta.url),
+      'utf8',
+    );
+    const style = readFileSync(new URL('./style.css', import.meta.url), 'utf8');
+    expect(arcade).toContain('--muted: #b4c5da;');
+    expect(style).not.toContain('--muted:');
+  });
 });

@@ -1975,22 +1975,68 @@ describe('summoned fighters (HPA-972)', () => {
     expect(match.lost).toBe(1);
   });
 
-  it('resolves a time-up and the results on the natives, a summoned ally crashing on no null slot', () => {
+  it('resolves a time-up and the results on the natives, giving summons their side’s result', () => {
     const match = Match.story(
       'ryuko',
       battle({ time: 1, timeUp: 100, slots: [slot({ timeUp: 100 })] }),
     );
     fight(match);
     const ally = match.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const foe = match.summon('zoma', -1, DEFAULT_CHEATS)!;
     while (match.ticks < 99) match.step();
+    match.fighters[1]!.hp = 100;
     expect(match.seconds).toBe(1);
     match.step();
     for (let t = 0; t < 5 && match.winner === null; t++) match.step();
     expect(match.winner).toBe('player');
     const arr = arrays(match);
-    expect(arr.results).toEqual([1, 3]);
+    expect(arr.results).toEqual([1, 3, 1, 3]);
     expect(ally.hp).toBeGreaterThan(0);
-    for (let t = 0; t < 5; t++) match.step();
+    for (
+      let t = 0;
+      t < 500 && (ally.action !== 'win' || foe.action !== 'draw');
+      t++
+    )
+      match.step();
+    expect(ally.action).toBe('win');
+    expect(foe.action).toBe('draw');
+  });
+
+  it('gives standing summons their win, lose and draw actions on a non-time-up story finish', () => {
+    // Player win by points: the standing ally celebrates ('win') and the
+    // standing summoned enemy takes the lose action ('down' -> 'koLand'),
+    // rather than fighting on as CPUs through the ending.
+    const won = Match.story('ryuko', battle());
+    fight(won);
+    const wonAlly = won.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const wonFoe = won.summon('zoma', -1, DEFAULT_CHEATS)!;
+    won.fighters[0]!.points = 100;
+    for (
+      let t = 0;
+      t < 500 && (wonAlly.action !== 'win' || wonFoe.action !== 'koLand');
+      t++
+    )
+      won.step();
+    expect(won.winner).toBe('player');
+    expect(wonAlly.action).toBe('win');
+    expect(wonFoe.action).toBe('koLand');
+
+    // Player loss by KO: the standing summoned ally takes 'draw' (3) and
+    // the standing summoned enemy takes 'win' (1), matching native seats.
+    const lost = Match.story('ryuko', battle({ slots: [slot(), slot()] }));
+    fight(lost);
+    const lostAlly = lost.summon('shinz', 1, DEFAULT_CHEATS)!;
+    const lostFoe = lost.summon('zoma', -1, DEFAULT_CHEATS)!;
+    knockOut(lost, lost.fighters[0]!, lost.fighters[1]!);
+    for (
+      let t = 0;
+      t < 500 && (lostAlly.action !== 'draw' || lostFoe.action !== 'win');
+      t++
+    )
+      lost.step();
+    expect(lost.winner).toBe('opponent');
+    expect(lostAlly.action).toBe('draw');
+    expect(lostFoe.action).toBe('win');
   });
 
   it('hands the next story battle a clean match, the summons left to the old one', () => {

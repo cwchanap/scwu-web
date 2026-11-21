@@ -5,7 +5,7 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { Match, LIFE } from './match';
+import { Match } from './match';
 import type { Fighter } from './match';
 import {
   MODE_SELECT_SIGN_KEYS,
@@ -1023,22 +1023,31 @@ describe('cheats (HPA-767)', () => {
     expect(await route(2, 500)).toEqual(native(250));
   });
 
-  it('gives the idle interpreter the seat’s life and both maxima in scaled units', () => {
+  it('gives the idle interpreter the seat’s life, maxima and Low HP line before its first tick', () => {
     const { scene, view, artIn } = boot();
     artIn();
-    scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 2 }));
-    scene.reset('practice');
-    // begin seated the fighters before their idle programs started, so
-    // SIN-style op 0x11 marks (standing.ts) read the scaled life against
-    // the scaled maximum over the native one.
-    const [vm] = view.idle as {
+    scene.setCheats(
+      cheats({ enabled: true, playerHpMultiplier: 2, lowHpLine: 100 }),
+    );
+    scene.setFighter('sou');
+    // begin seated the fighters and set 1P's lifeLine before resetIdle
+    // ticked their idle programs, so SOU's first-tick op 0x11 check (PC 8)
+    // already sees the 100% line while 2P stays at 30.
+    const [vm, opponentVm] = view.idle as {
       life: number;
       lifeMax: number;
       lifeNative: number;
+      lifeLine: number;
+      events: { image: number }[];
+      tick(): void;
     }[];
-    expect(vm.life).toBe(1020);
-    expect(vm.lifeMax).toBe(1020);
-    expect(vm.lifeNative).toBe(LIFE);
+    expect(vm.life).toBe(960);
+    expect(vm.lifeMax).toBe(960);
+    expect(vm.lifeNative).toBe(lifeOf('sou'));
+    expect(vm.lifeLine).toBe(100);
+    expect(opponentVm.lifeLine).toBe(30);
+    for (let t = 0; t < 40; t++) vm.tick();
+    expect(vm.events.some((e) => e.image === 360)).toBe(true);
   });
 });
 
