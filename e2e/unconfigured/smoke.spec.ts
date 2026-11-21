@@ -372,6 +372,50 @@ test('↑/↓ past the Opponent row leave the Vs. CPU match running', async ({
   expect(errors).toEqual([]);
 });
 
+test('the Opponent chooser still focuses without showPicker', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  // Stable Safari lacks HTMLSelectElement.showPicker; Enter on the row
+  // must still hand the select focus for its native keys rather than
+  // throwing and stranding it (Tab skips the tabindex=-1 select).
+  await page.addInitScript(() => {
+    delete (HTMLSelectElement.prototype as Partial<HTMLSelectElement>)
+      .showPicker;
+  });
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  const health = page.locator('[aria-label="Match health"]');
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  const opponent = dialog.getByLabel('Opponent');
+  // As the ↑/↓ walk leaves it: focus on the row itself, then Enter.
+  const fieldRow = dialog.locator('label.field');
+  await fieldRow.focus();
+  await page.keyboard.press('Enter');
+  await expect(opponent).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test('clamped summon navigation still hands focus to the highlight', async ({
   page,
 }) => {

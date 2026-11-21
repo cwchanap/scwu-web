@@ -230,9 +230,15 @@
 
   // Summon confirm: the same action the grid's Enter/G and a tile's click
   // take. The scene holds the fight (setModal) for the whole dialog visit;
-  // this only reports what the summon did.
+  // this only reports what the summon did. A request outlives its cancel —
+  // the dialog's close drops it live but its await still settles with the
+  // pack — so a reopen can start a newer confirm while an older one hangs:
+  // each generation alone writes its own outcome, and a superseded one's
+  // late settle can neither clobber the newer note nor re-enable the grid.
+  let summonSeq = 0;
   async function confirmSummon() {
     if (summoning) return;
+    const seq = ++summonSeq;
     const entry = summonables[cursor]!;
     summoning = true;
     // Confirming disables the tiles, which would drop a focused tile's
@@ -243,17 +249,21 @@
     note = { kind: 'load', text: `Loading ${entry.name}…` };
     try {
       await onsummon(entry.id, side);
-      note = { kind: 'ok', text: `${entry.name} joined the fight.` };
+      if (seq === summonSeq)
+        note = { kind: 'ok', text: `${entry.name} joined the fight.` };
     } catch (error) {
-      note = {
-        kind: 'error',
-        text: error instanceof Error ? error.message : String(error),
-      };
+      if (seq === summonSeq)
+        note = {
+          kind: 'error',
+          text: error instanceof Error ? error.message : String(error),
+        };
     } finally {
-      summoning = false;
-      // The re-enable and a pointer click elsewhere can still have moved
-      // focus off the dialog; keep the keys ours.
-      dialog?.focus();
+      if (seq === summonSeq) {
+        summoning = false;
+        // The re-enable and a pointer click elsewhere can still have
+        // moved focus off the dialog; keep the keys ours.
+        dialog?.focus();
+      }
     }
   }
 
@@ -322,8 +332,11 @@
       );
       if (select) {
         event.preventDefault();
-        select.showPicker();
+        // Focus first: stable Safari has no showPicker, and there the
+        // focused select is the chooser — Space, Enter or an arrow opens
+        // its popup natively. Where the API exists it takes the picker.
         select.focus();
+        select.showPicker?.();
       }
     }
     if (view === 'summon') {
