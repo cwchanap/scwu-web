@@ -178,8 +178,8 @@ test('the first summon marks the run cheated at once and the CPU fights', async 
   await expect(dialog).toBeHidden();
   await expect(health).not.toContainText('Cheat mode is on for this run.');
   // The canvas agrees in pixels: the CHEAT badge stays hidden while the
-  // switch is only pending — a badge wired to the pending switch or the
-  // run's announcement instead of match.cheated would already draw here.
+  // switch is only pending — a badge wired to the pending switch instead
+  // of match.cheated would already draw here.
   await expect.poll(() => cheatBadgeGold(page)).toBe(0);
 
   await page.keyboard.press('Control+Backquote');
