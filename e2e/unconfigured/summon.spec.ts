@@ -297,6 +297,51 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   expect(errors).toEqual([]);
 });
 
+test('a re-pick while its pack is still landing keeps the loading note', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  // Zoma's pack held back so the cancel and the re-pick both land while
+  // it is still in flight.
+  await page.route('**/packs/fighter-zoma.bin', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    await route.continue();
+  });
+  const { menu, dialog } = await bootIntoBattle(page);
+
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  await dialog.getByLabel('Cheat mode').check();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await page.keyboard.press('Control+Backquote');
+  await dialog.getByRole('option').nth(1).click();
+  await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
+
+  // Escape cancels the request, not the pack. Reopening and picking the
+  // same fighter supersedes the first request — whose rejection must not
+  // overwrite this one's loading note nor re-enable the grid mid-load
+  // (HPA-972 review: a superseded confirm's late settle clobbered both).
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('option').nth(1).click();
+  // The superseded request's rejection lands on a microtask behind the
+  // click, so a beat later the live note and the disabled grid are the
+  // state that proves it never wrote.
+  await page.waitForTimeout(300);
+  await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
+  await expect(dialog.getByRole('option').first()).toBeDisabled();
+  // The in-flight pack serves the re-pick too: it still joins.
+  await expect(dialog.locator('.note')).toContainText(
+    'Zoma joined the fight.',
+    { timeout: 30_000 },
+  );
+  expect(errors).toEqual([]);
+});
+
 test.describe('at a phone size', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
