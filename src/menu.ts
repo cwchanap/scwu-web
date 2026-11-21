@@ -218,7 +218,7 @@ export const CHEAT_GROUPS: { name: string; rows: CheatRow[] }[] = [
         max: 5,
         step: 1,
         suffix: '×',
-        help: 'Scales 1P’s low-HP damage reduction; ×0 removes it, past ×2.5 it caps at 100%.',
+        help: 'Scales 1P’s low-HP damage reduction, 0–5; ×0 removes it, and it caps at 100%.',
       },
       {
         field: 'lowHpSupers',

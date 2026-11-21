@@ -60,7 +60,12 @@ import {
   scan,
 } from './commands';
 import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
-import { DEFAULT_CHEATS, enGainOf, normalizeCheats } from './cheats';
+import {
+  DEFAULT_CHEATS,
+  effectiveSummonCheats,
+  enGainOf,
+  normalizeCheats,
+} from './cheats';
 import type { CheatOptions } from './cheats';
 import { lifeAmountOf, lifeMarkOf, lifeShareOf } from './life';
 import { dummyInput } from './dummy';
@@ -82,6 +87,7 @@ import {
   WIN_TICK,
 } from './hud';
 import { ROSTER, takePalette } from './select';
+import { StandingVM } from './standing';
 import ui from './generated/ui.json';
 import type { Battle, Slot } from './story';
 const toughSeat = (slot: Slot | null | undefined) =>
@@ -1869,6 +1875,8 @@ export class Match {
   private slots: (Slot | null)[] = [];
   private waits: (Slot | null)[] = [];
   private results: number[] = [];
+  private readonly initialHeld: number[];
+  private summonPalettes: number[] = [];
   lost = 0;
   // VS multi's teams (0x47006c) and the member each side fights with
   // (0x4700ec, 0x4700f0).
@@ -1948,6 +1956,7 @@ export class Match {
       this.seat(battle, seed);
       while (this.held.length < battle.slots.length + 1) this.held.push(-1);
     }
+    this.initialHeld = [...this.held];
     this.fighters = battle
       ? this.storyFighters()
       : intro
@@ -2153,7 +2162,7 @@ export class Match {
           one.points += this.slots[i]!.timeUp;
       });
     }
-    const ally = (i: number) => !i || this.slots[i]!.flags & 0x200;
+    const ally = (i: number) => !this.hostile(0, i);
     let [ours, theirs] = [one.points, 0];
     this.natives.forEach((f, i) => {
       if (!i || f.points < 100) return;
@@ -2172,7 +2181,7 @@ export class Match {
       ours === theirs ? 'draw' : ours > theirs ? 'player' : 'opponent';
     if (winner !== 'player') this.lost++;
     const lose = timeUp ? 3 : 2;
-    this.results = this.natives.map((_, i) =>
+    this.results = this.fighters.map((_, i) =>
       winner === 'draw'
         ? 3
         : winner === 'player'
@@ -2216,9 +2225,15 @@ export class Match {
     takePalette(this.held, seat, Math.max(0, this.held[seat] ?? -1));
   }
 
-  // Each fighter's palette.
+  // Each fighter's palette: native seats read the session's held palettes,
+  // while story summons keep their own per-round palettes so a departed
+  // summon never leaks into later rounds or battles (HPA-972).
   get palettes() {
-    return this.seats.map((seat) => Math.max(0, this.held[seat] ?? -1));
+    return this.seats.map((seat, i) =>
+      i < this.nativeCount
+        ? Math.max(0, this.held[seat] ?? -1)
+        : (this.summonPalettes[i - this.nativeCount] ?? 0),
+    );
   }
   get cpu() {
     return this.cpus[1]!;
@@ -2363,11 +2378,13 @@ export class Match {
       );
     }
     // Authored (HPA-972): the natives reseat — drop the summons' extensions
-    // (their slot, wait, seat and CPU entries) before the rebuild reads them.
+    // (their slot, wait, seat, palette and CPU entries) before the rebuild
+    // reads them.
     this.slots.length = this.nativeCount;
     this.waits.length = this.nativeCount;
     this.seats.length = this.nativeCount;
     this.cpus.length = this.nativeCount;
+    this.summonPalettes = [];
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
@@ -2476,6 +2493,8 @@ export class Match {
   // held palettes stay as asset loading left them.
   private reseatWithoutAlly() {
     const battle = this.battle!;
+    this.held.splice(0, this.held.length, ...this.initialHeld);
+    this.summonPalettes = [];
     this.cpus = [null];
     this.seat(
       {
@@ -2537,16 +2556,18 @@ export class Match {
 
   // Authored (HPA-972): appends one CPU fighter beyond the native seats for
   // the rest of this battle, or returns null at MAX_FIGHTERS. `side` 1
-  // joins the 1P's side (beside the 1P, facing out), −1 the enemies' (the
-  // far side). `effectiveSummonCheats` scales the new fighter alone — full
-  // HP by its side, the enemy EN cap included — leaving the frozen battle
-  // snapshot and every seated fighter as they are. Native indices and all
+  // joins the 1P's side (behind the 1P, facing toward the enemies), −1 the
+  // enemies' (past the farthest present, living same-side fighter).
+  // `pendingCheats` combines with the battle's snapshot through
+  // `effectiveSummonCheats` to scale the new fighter alone — full HP by its
+  // side, the enemy EN cap included — leaving the frozen battle snapshot
+  // and every seated fighter as they are. Native indices and all
   // per-fighter arrays keep their places; the summons leave at the next
   // native seating (nextRound, a battle's new Match).
   summon(
     who: Who,
     side: -1 | 1,
-    effectiveSummonCheats: CheatOptions,
+    pendingCheats: CheatOptions = DEFAULT_CHEATS,
   ): Fighter | null {
     if (this.fighters.length >= MAX_FIGHTERS) return null;
     const index = this.fighters.length;
@@ -2559,17 +2580,29 @@ export class Match {
         ? !this.hostile(0, i)
         : (this.fighters[i]!.enemies & 1) === 0;
     const sameSide = (i: number) => onOneSide(i) === (side === 1);
-    // ponytail: with no same-side native to stand past (an all-ally battle),
-    // the far side falls back to beside the 1P.
-    const far = this.fighters.filter((_, i) => sameSide(i)).map((n) => n.x);
+    const target = this.nearest(one);
+    const dir: -1 | 1 = target
+      ? one.x < target.x
+        ? 1
+        : one.x > target.x
+          ? -1
+          : one.facing
+      : one.facing;
+    const clampX = (x: number) => Math.min(1845, Math.max(75, x));
+    // ponytail: with no present, living same-side fighter to stand past (an
+    // all-ally battle, or all hostiles downed or waiting), the far side
+    // falls back to 135 past the 1P.
+    const far = this.fighters
+      .filter((n, i) => sameSide(i) && n.present && n.hp > 0 && !n.downed)
+      .map((n) => n.x);
+    const anchor = far.length
+      ? dir === 1
+        ? Math.max(...far)
+        : Math.min(...far)
+      : one.x;
     const f = fighter(
-      side === 1
-        ? Math.max(75, one.x - 135)
-        : Math.min(
-            1845,
-            Math.max(75, (far.length ? Math.max(...far) : one.x) + 135),
-          ),
-      side,
+      clampX(side === 1 ? one.x - dir * 135 : anchor + dir * 135),
+      side === 1 ? dir : (-dir as -1 | 1),
       who,
     );
     this.fighters.push(f);
@@ -2597,12 +2630,17 @@ export class Match {
     // Authored (HPA-972): a seat no native of this battle can ever hold —
     // past every battle slot, so a No-partner reseat's dropped ally seat,
     // every native scorer/watch seat and every native held-palette entry
-    // keep their original identity in this and later battles.
+    // keep their original identity in this and later battles. The summon's
+    // palette stays in `summonPalettes`, never mutating `this.held`.
     const seat = this.battle
       ? Math.max(this.battle.slots.length, ...this.seats) + 1
       : Math.max(...this.seats) + 1;
     this.seats.push(seat);
-    if (this.battle) this.takeSeat(index);
+    if (this.battle) {
+      const taken = [...this.held, ...this.summonPalettes];
+      takePalette(taken, taken.length, 0);
+      this.summonPalettes.push(taken.at(-1)!);
+    }
     const vm = new CpuVM(
       CPU_TABLES[who],
       CPU_LEVEL,
@@ -2612,22 +2650,20 @@ export class Match {
     );
     if (this.cpus[1]) vm.shared = this.cpus[1];
     this.cpus[index] = vm;
-    if (effectiveSummonCheats.enabled) {
+    const summonCheats = effectiveSummonCheats(this.cheats, pendingCheats);
+    if (summonCheats.enabled) {
       const enemy = side === -1;
       f.maxHp = Math.max(
         1,
         Math.round(
           lifeOf(who) *
             (enemy
-              ? effectiveSummonCheats.enemyHpMultiplier
-              : effectiveSummonCheats.partnerHpMultiplier),
+              ? summonCheats.enemyHpMultiplier
+              : summonCheats.partnerHpMultiplier),
         ),
       );
       f.maxStock = enemy
-        ? Math.min(
-            10,
-            stocksOf(who) * effectiveSummonCheats.enemyStocksMultiplier,
-          )
+        ? Math.min(10, stocksOf(who) * summonCheats.enemyStocksMultiplier)
         : stocksOf(who);
       f.enGainMultiplier = enGainOf(f.maxStock);
       f.hp = f.maxHp;
@@ -2838,6 +2874,35 @@ export class Match {
     // (0x40e8cd), behind the other.
     if (f.hp === 0) f.z = 0x3c;
     return loss;
+  }
+
+  // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's idle stance
+  // marks (a stance change, never the supers bypass); every other fighter,
+  // and 1P with the master off, stays at the native 30.
+  idleLifeLine(f: Fighter): number {
+    return f === this.fighters[0] && this.cheats.enabled
+      ? this.cheats.lowHpLine
+      : 30;
+  }
+
+  // The free state's program (action 1), which reads the fighter's variable 0
+  // (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
+  // The life reads in scaled units against the seat's effective maximum and
+  // native life, so SIN-style op 0x11 marks (standing.ts) scale exactly as
+  // lifeMark does (HPA-767), and lifeLine is set before the first tick
+  // (HPA-972).
+  idleVM(f: Fighter, seed?: number) {
+    return Object.assign(
+      new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
+        0x40: f.variables[0] ?? 0,
+      }),
+      {
+        life: f.hp,
+        lifeMax: f.maxHp,
+        lifeNative: lifeOf(f.who),
+        lifeLine: this.idleLifeLine(f),
+      },
+    );
   }
 
   // Authored (HPA-972): the low-life line in effective-HP units — 1P under
@@ -3065,13 +3130,29 @@ export class Match {
   // The action of a standing fighter's round result (+0xe007): 1 win (57),
   // or 3 draw (65), which the result states (0x409444, 0x409519) also give
   // the loser once the timer (0x470050) has run out. A story's may be 2, the
-  // lose action (0x411038).
+  // lose action (0x411038). Authored (HPA-972): a summon takes its side's
+  // result, in Vs., practice and story alike.
   private result(f: Fighter) {
     const index = this.fighters.indexOf(f);
-    if (this.battle)
-      return (['win', 'lose', 'draw'] as const)[this.results[index] - 1];
-    return this.winner !== 'draw' &&
-      (this.winner === 'player') === (index === 0)
+    const ally = !this.hostile(0, index);
+    if (this.battle) {
+      const lose = this.seconds === 0 ? 3 : 2;
+      const code =
+        this.results[index] ??
+        (this.winner === 'draw'
+          ? 3
+          : this.winner === 'player'
+            ? ally
+              ? 1
+              : lose
+            : !index
+              ? lose
+              : ally
+                ? 3
+                : 1);
+      return (['win', 'lose', 'draw'] as const)[code - 1];
+    }
+    return this.winner !== 'draw' && (this.winner === 'player') === ally
       ? 'win'
       : 'draw';
   }

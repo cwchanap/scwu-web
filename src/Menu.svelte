@@ -274,7 +274,8 @@
     event.stopPropagation();
     const target = event.target as HTMLElement;
     const key = event.key;
-    // Left/right on a focused switch or stepper button adjusts it.
+    // Left/right on a focused switch or stepper button adjusts it; inside
+    // a text or number field they stay the caret's own.
     if (key === 'ArrowLeft' || key === 'ArrowRight') {
       const dir = key === 'ArrowLeft' ? -1 : 1;
       if (target.matches?.('input[type="checkbox"]')) {
@@ -282,19 +283,21 @@
         target.click();
         return;
       }
-      // The steppers resolve from the containing row, so ←/→ adjust from
-      // the row's other controls (a fighter portrait) as from ◀/▶.
-      const stepper = target
-        .closest?.('[data-row]')
-        ?.querySelector<HTMLElement>('[data-step]');
-      if (stepper) {
-        event.preventDefault();
-        (
-          stepper.querySelector(
-            dir < 0 ? '[data-minus]' : '[data-plus]',
-          ) as HTMLButtonElement | null
-        )?.click();
-        return;
+      if (!target.closest?.('input, select, textarea')) {
+        // The steppers resolve from the containing row, so ←/→ adjust from
+        // the row's other controls (a fighter portrait) as from ◀/▶.
+        const stepper = target
+          .closest?.('[data-row]')
+          ?.querySelector<HTMLElement>('[data-step]');
+        if (stepper) {
+          event.preventDefault();
+          (
+            stepper.querySelector(
+              dir < 0 ? '[data-minus]' : '[data-plus]',
+            ) as HTMLButtonElement | null
+          )?.click();
+          return;
+        }
       }
     }
     // ↑/↓ walk the rows — from a control, a disabled row or a bare field.

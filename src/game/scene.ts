@@ -33,7 +33,7 @@ import {
   letteringSounds,
   screenDepth,
 } from './hud';
-import { StandingVM, heldPlacement, placement } from './standing';
+import { heldPlacement, placement } from './standing';
 import { animationFrame, BLACK, isBlank, NORMAL_COLOR } from './animations';
 import type { Color, Pose } from './animations';
 import {
@@ -169,19 +169,6 @@ interface SummonRequest {
   shutdown: () => void;
 }
 
-// The free state's program (action 1), which reads the fighter's variable 0
-// (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
-// The life reads in scaled units against the seat's effective maximum and
-// native life, so SIN-style op 0x11 marks (standing.ts) scale exactly as
-// match.ts's lifeMark does (HPA-767).
-const idleVM = (f: Fighter, seed?: number) =>
-  Object.assign(
-    new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
-      0x40: f.variables[0] ?? 0,
-    }),
-    { life: f.hp, lifeMax: f.maxHp, lifeNative: lifeOf(f.who) },
-  );
-
 export class TrainingScene extends Phaser.Scene {
   private fighter: Who = 'ryuko';
   private opponent: Who = 'zoma';
@@ -243,7 +230,7 @@ export class TrainingScene extends Phaser.Scene {
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
   private quake: Match['quake'] = { x: null, y: null };
   private frame = 0;
-  private idle = this.match.fighters.map((f, i) => idleVM(f, i));
+  private idle = this.match.fighters.map((f, i) => this.match.idleVM(f, i));
   // Whether each fighter's idle program ran on the last unfrozen step.
   private idling = [true, true];
   private ready = false;
@@ -1153,7 +1140,7 @@ export class TrainingScene extends Phaser.Scene {
 
   // Each round's fighters start their idle programs afresh.
   private resetIdle() {
-    this.idle = this.match.fighters.map((f, i) => idleVM(f, i));
+    this.idle = this.match.fighters.map((f, i) => this.match.idleVM(f, i));
     this.idling = this.match.fighters.map(() => true);
     this.idle.forEach((vm) => vm.tick());
   }
@@ -1247,11 +1234,7 @@ export class TrainingScene extends Phaser.Scene {
       );
       return;
     }
-    const f = this.match.summon(
-      request.who,
-      request.side,
-      this.effectiveSummonCheats(),
-    );
+    const f = this.match.summon(request.who, request.side, this.pendingCheats);
     if (!f) {
       request.reject(new Error('The arena is already full.'));
       this.report();
@@ -1263,7 +1246,7 @@ export class TrainingScene extends Phaser.Scene {
     this.players.add(request.who);
     // Its idle program starts at once and holds a frame, so the draw loop
     // can pose it before the next unfrozen tick rebuilds the VM.
-    const vm = idleVM(f, index);
+    const vm = this.match.idleVM(f, index);
     vm.tick();
     this.idle.push(vm);
     this.idling.push(false);
@@ -1279,15 +1262,6 @@ export class TrainingScene extends Phaser.Scene {
     this.runCheated ||= this.match.cheated;
     this.report();
     request.resolve();
-  }
-
-  // The cheats the new fighter alone takes: the battle's snapshot when it
-  // was already cheat-enabled, otherwise a cheat mode the player turned on
-  // mid-battle (still pending for the next battle). Otherwise the frozen
-  // snapshot's off state — no scaling.
-  private effectiveSummonCheats(): CheatOptions {
-    if (this.match.cheats.enabled) return { ...this.match.cheats };
-    return { ...this.pendingCheats };
   }
 
   // Settle a request: clear it while it is still the live one and take
@@ -1638,13 +1612,11 @@ export class TrainingScene extends Phaser.Scene {
               return;
             }
             // Entering action 1 starts its program again (0x410cf0).
-            if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
+            if (vm.ended || !this.idling[i])
+              this.idle[i] = this.match.idleVM(f, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
-            // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's
-            // idle stance marks (a stance change, never the supers bypass).
-            const { enabled, lowHpLine } = this.match.cheats;
-            this.idle[i].lifeLine = i === 0 && enabled ? lowHpLine : 30;
+            this.idle[i].lifeLine = this.match.idleLifeLine(f);
             this.idle[i].tick();
             for (const index of this.idle[i].sounds.splice(0))
               this.play(`${f.who}-sound-${index}`, i);

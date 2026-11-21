@@ -653,6 +653,30 @@ describe('low-HP super gates (HPA-972)', () => {
     expect(stance(577, 60)).toBe(false);
     expect(stance(100, 0)).toBe(false);
   });
+
+  it('sets 1P’s idleVM lifeLine before its first tick, keeping opponents and summons at 30', () => {
+    const match = new Match('practice', false, 0, ['sou', 'sou']);
+    match.useCheats(cheats({ enabled: true, lowHpLine: 100 }));
+    const summon = match.summon('sou', 1)!;
+    const [oneVm, twoVm, summonVm] = match.fighters.map((f, i) =>
+      match.idleVM(f, i),
+    );
+    expect([oneVm.lifeLine, twoVm.lifeLine, summonVm.lifeLine]).toEqual([
+      100, 30, 30,
+    ]);
+    // SOU checks life only on his first idle tick (PC 8): with a 100% line,
+    // 1P enters the tired stand (image 360) at full HP on tick 1, while 2P
+    // and the summoned ally stay on the normal stand.
+    for (let t = 0; t < 40; t++) {
+      oneVm.tick();
+      twoVm.tick();
+      summonVm.tick();
+    }
+    expect(oneVm.events.some((e) => e.image === 360)).toBe(true);
+    expect(twoVm.events.some((e) => e.image === 360)).toBe(false);
+    expect(summonVm.events.some((e) => e.image === 360)).toBe(false);
+    expect(match.idleLifeLine(summon)).toBe(30);
+  });
 });
 
 describe('B.R. No partner (HPA-972)', () => {
@@ -820,12 +844,12 @@ describe('B.R. No partner (HPA-972)', () => {
     expect(ko(true, 0x80, { enabled: false })).toEqual([200, 0, 1]);
   });
 
-  it('gives a summon a seat no native of the battle can hold', () => {
-    const { match, battle } = brMatch({ brNoPartner: true });
-    const heldBefore = [...(match as unknown as { held: number[] }).held].slice(
-      0,
-      battle.slots.length + 1,
-    );
+  it('gives a summon a seat no native of the battle can hold without leaking its palette into held', () => {
+    const held = [0, -1, -1, -1, -1, -1, -1, -1];
+    const battle = brAnotherStages('masa').stage2!;
+    const match = Match.story('masa', battle, 0, held, undefined, true);
+    match.useCheats(cheats({ enabled: true, brNoPartner: true }));
+    const heldBefore = [...held];
     const ally = match.summon('shinz', 1, cheats())!;
     const seats = (match as unknown as { seats: number[] }).seats;
     // The natives keep every original seat — including the dropped ally's
@@ -837,10 +861,46 @@ describe('B.R. No partner (HPA-972)', () => {
       match as unknown as { bySeat: (seat: number) => Fighter | undefined }
     ).bySeat;
     expect(bySeat.call(match, battle.slots.length)).toBeUndefined();
-    // The summon's palette lands past every native seat's held entry.
-    const held = (match as unknown as { held: number[] }).held;
-    expect(held.slice(0, battle.slots.length + 1)).toEqual(heldBefore);
+    // The summon gets its story palette without mutating the shared held
+    // array, so later rounds and later battles never shift off it.
+    expect(held).toEqual(heldBefore);
     expect(match.palettes).toHaveLength(match.fighters.length);
+    expect(match.palettes.at(-1)).toBeGreaterThan(0);
+  });
+
+  it('restores held before reseating so a dropped immediate ally’s palette never lingers', () => {
+    const held = [0, -1, -1, -1, -1, -1, -1, -1];
+    // Seat 1 is an immediate ally (takes palette 1 in the constructor);
+    // seat 2 is an immediate enemy (would be pushed to palette 2 unless
+    // reseatWithoutAlly restores held first).
+    const battle = storyBattle({
+      slots: [
+        storySlot({ flags: 0x201 }),
+        storySlot(),
+        null,
+        null,
+        null,
+        null,
+        null,
+      ],
+    });
+    const match = Match.story('ryuko', battle, 0, held, undefined, true);
+    expect(held.slice(0, 3)).toEqual([0, 1, 2]);
+    match.useCheats(cheats({ enabled: true, brNoPartner: true }));
+    // Seat 1's stale entry is restored to −1, and seat 2 takes palette 1.
+    expect(held.slice(0, 3)).toEqual([0, -1, 1]);
+    expect(match.palettes).toEqual([0, 1]);
+  });
+
+  it('prefers the battle’s enabled cheat snapshot over pending cheats when summoning', () => {
+    const match = new Match();
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
+    const foe = match.summon(
+      'zoma',
+      -1,
+      cheats({ enabled: true, enemyHpMultiplier: 5 }),
+    )!;
+    expect(foe.maxHp).toBe(lifeOf('zoma') * 2);
   });
 });
 
