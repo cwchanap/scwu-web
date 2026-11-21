@@ -338,7 +338,7 @@ export class TrainingScene extends Phaser.Scene {
         this.summonLoads.delete(who);
         const request = this.summonRequest;
         if (request && request.who === who) {
-          this.summonRequest = undefined;
+          this.settleSummon(request);
           request.reject(
             new Error(`Could not load ${who}. The match is unchanged.`),
           );
@@ -837,8 +837,22 @@ export class TrainingScene extends Phaser.Scene {
     ]);
     const missing = [...players].filter((who) => !this.players.has(who));
     const start = () => {
-      for (const who of missing) this.players.add(who);
+      // A pack this load waited on can have failed under another owner's
+      // handler — a summon's loaderror swallows its key as the summon
+      // alone's (Phaser rejects the duplicate queue entry but still emits
+      // COMPLETE). Seat only what actually landed; a pack that did not
+      // fails the scene instead of starting the match without the art.
+      for (const who of missing)
+        if (this.residentPack(who)) this.players.add(who);
       if (this.wanted !== match) return;
+      const lost = missing.find((who) => !this.players.has(who));
+      if (lost) {
+        this.loading = false;
+        if (!this.error)
+          this.error = `Could not load fighter-${lost}. Run bun run assets, then reload.`;
+        this.report();
+        return;
+      }
       this.loading = false;
       this.unloadPlayers(players);
       this.leaveScreen();
@@ -1209,21 +1223,15 @@ export class TrainingScene extends Phaser.Scene {
   private spawnSummon(request: SummonRequest) {
     const live = this.summonRequest === request;
     this.settleSummon(request);
-    if (!live) {
-      // The pack finished after its summon was cancelled or superseded.
-      // When its art actually landed, track the fighter with the loaded
-      // players: the next match change's unloadPlayers then frees what it
-      // does not seat, and no second summon of the same fighter re-
-      // downloads a resident pack. (A failed pack decodes nothing — it
-      // stays unowned and a fresh summon loads it again.) Nothing spawns
-      // here either way.
+    if (!live || this.select || this.loading || this.match !== request.match) {
+      // The pack finished after its summon was cancelled, superseded or
+      // left behind by a match change. When its art actually landed,
+      // track the fighter with the loaded players: the next match
+      // change's unloadPlayers then frees what it does not seat, and no
+      // second summon of the same fighter re-downloads a resident pack.
+      // (A failed pack decodes nothing — it stays unowned and a fresh
+      // summon loads it again.) Nothing spawns here either way.
       if (this.residentPack(request.who)) this.players.add(request.who);
-      request.reject(
-        new Error('The match moved on before the fighter loaded.'),
-      );
-      return;
-    }
-    if (this.select || this.loading || this.match !== request.match) {
       request.reject(
         new Error('The match moved on before the fighter loaded.'),
       );
@@ -1249,11 +1257,13 @@ export class TrainingScene extends Phaser.Scene {
     vm.tick();
     this.idle.push(vm);
     this.idling.push(false);
-    // A story's summon takes the palette its seat drew; versus and practice
-    // draw with none.
-    this.palettes.push(
-      this.match.battle ? (this.match.palettes[index] ?? 0) : 0,
-    );
+    // A story's summon takes the palette its seat drew; versus and
+    // practice draw with none. Written at the fighter's index — the held
+    // array can run longer than the roster after a story reset left it,
+    // so a push would leave the stale entry at the summon's slot.
+    this.palettes[index] = this.match.battle
+      ? (this.match.palettes[index] ?? 0)
+      : 0;
     this.growFighters(this.match.fighters.length);
     // A summon marks the run cheated at once, snapshot enabled or not.
     this.runCheated ||= this.match.cheated;

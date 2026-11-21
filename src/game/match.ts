@@ -2374,16 +2374,19 @@ export class Match {
       f.power = this.fighters[i].power;
     });
     // Authored (HPA-767): the next round seats under the same snapshot —
-    // fresh Menu values cannot reach a running match — and 1P's carried
-    // stock fits the EN cap; the enemy's stock carries as it was. The new
-    // seats are installed first, so hostility reads their own masks.
+    // fresh Menu values cannot reach a running match — and each fighter's
+    // carried stock fits its new seat's EN cap, a smaller cap emptying a
+    // full gauge's power as addPower leaves it. The new seats are
+    // installed first, so hostility reads their own masks.
     // Authored (HPA-972): the seating is native, which clears the summons
     // and every fighter-indexed array they extended.
     this.fighters = fighters;
     this.nativeCount = fighters.length;
     if (this.cheats.enabled) {
-      fighters.forEach((f, i) => this.cheatSeat(f, i));
-      fighters[0].stock = Math.min(fighters[0].stock, fighters[0].maxStock);
+      fighters.forEach((f, i) => {
+        this.cheatSeat(f, i);
+        if (f.stock >= f.maxStock) [f.stock, f.power] = [f.maxStock, 0];
+      });
     }
     this.round++;
     this.ticks = 0;
@@ -4725,14 +4728,18 @@ export class Match {
             // Projectiles run their own clash handler; fighters queue none.
             if ((box.kind | met.kind) & 0x100) {
               if (!box.damage && !met.damage) continue;
-              if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
+              // Authored (HPA-972): the story HUD's target is a native seat
+              // — a met summon never displaces it.
+              if (owner === 0 && other < this.nativeCount)
+                [this.enemy, this.enemyTicks] = [other, 1000];
               for (const o of [a, b])
                 if ('clip' in o && o.onClash)
                   [o.pending, o.onClash] = [o.onClash, undefined];
               strip(a, b);
               return;
             }
-            if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
+            if (owner === 0 && other < this.nativeCount)
+              [this.enemy, this.enemyTicks] = [other, 1000];
             if (!box.damage && !met.damage) {
               strip(a, b);
               continue;
@@ -5388,8 +5395,10 @@ export class Match {
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;
     // The story HUD (0x40a36e) takes the only other player with life.
+    // Authored (HPA-972): of the natives — a living summon keeps a lone
+    // native opponent's mark from lapsing back onto it.
     if (this.battle) {
-      const alive = this.fighters.flatMap((f, i) => (i && f.hp ? [i] : []));
+      const alive = this.natives.flatMap((f, i) => (i && f.hp ? [i] : []));
       if (alive.length === 1) this.enemy = alive[0];
     }
     // 0x412271: before its script each tick, frozen or not, an object with
@@ -5920,8 +5929,12 @@ export class Match {
       // A 1P's box, its objects' too, marks the player it met (0x40f2e6).
       const by =
         'clip' in striker ? striker.owner : this.fighters.indexOf(striker);
-      if (by === 0 && !('clip' in victim))
-        [this.enemy, this.enemyTicks] = [this.fighters.indexOf(victim), 1000];
+      if (by === 0 && !('clip' in victim)) {
+        const at = this.fighters.indexOf(victim);
+        // Authored (HPA-972): the mark a 1P's box leaves names a native
+        // seat — striking a summon never steals the story HUD's target.
+        if (at < this.nativeCount) [this.enemy, this.enemyTicks] = [at, 1000];
+      }
       if (!('clip' in victim)) victim.z = FIGHTER_Z - 1;
       if ('clip' in striker) return;
       striker.z = FIGHTER_Z + 1;

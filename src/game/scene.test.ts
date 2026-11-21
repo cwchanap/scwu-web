@@ -7,7 +7,12 @@ import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
 import { Match, LIFE } from './match';
 import type { Fighter } from './match';
-import { MODE_SELECT_SIGN_KEYS, parsePack } from './packs';
+import {
+  MODE_SELECT_SIGN_KEYS,
+  MODE_SELECT_SIGNS,
+  parsePack,
+  selectAssets,
+} from './packs';
 import {
   BOSSES,
   CharacterSelect,
@@ -56,6 +61,20 @@ const boot = () => {
   // The packs the scene queued (boot, stage, fighter and demo), in order.
   const files: PackFile[] = [];
   let cached = false;
+  // The resident texture keys a finished fighter pack leaves behind — the
+  // first non-select image per fighter, what residentPack probes. A real
+  // textures.remove drops them, so an evicted fighter reads non-resident
+  // and queues its pack again rather than trusting art that is gone.
+  const resident = new Set<string>();
+  const residentKey = (who: Who) => {
+    const { images } = CHARACTERS[who];
+    const select = selectAssets[who];
+    const signs = new Set(MODE_SELECT_SIGNS[who] ?? []);
+    const rest = images.filter(
+      (image) => !select.images.has(image.index) && !signs.has(image.index),
+    );
+    return `${who}-${rest[0]!.index}`;
+  };
   const silent = { play: () => {}, stop: () => {}, pause: () => {} };
   // A chainable game object: every setter returns the object itself, enough
   // for the draw loop to run for real (poses, depths, life bars).
@@ -109,10 +128,10 @@ const boot = () => {
       start: () => {},
     },
     textures: {
-      exists: () => cached,
+      exists: (key: string) => cached || resident.has(key),
       get: () => ({ has: () => true, add: () => {} }),
-      getTextureKeys: () => [] as string[],
-      remove: () => {},
+      getTextureKeys: () => [...resident],
+      remove: (key: string) => void resident.delete(key),
     },
     children: { list: [] },
     cache: { audio: { exists: () => false, remove: () => {} } },
@@ -153,7 +172,8 @@ const boot = () => {
     // The fighters' own packs decoded into the caches (resident textures)
     // without seating anyone: what a finished pack load leaves behind.
     packIn: () => {
-      cached = true;
+      for (const who of Object.keys(CHARACTERS) as Who[])
+        resident.add(residentKey(who));
     },
     finishLoad: () => {
       for (const done of completes.splice(0)) done();
@@ -385,7 +405,7 @@ it('opens a story demo once its records and art finish loading', async () => {
 });
 
 it('keeps the finished select up until the match it chose begins', () => {
-  const { scene, view, finishLoad } = boot();
+  const { scene, view, packIn, finishLoad } = boot();
   const select = new CharacterSelect();
   view.select = select;
   select.done = ['kiki', 'zoma'];
@@ -394,6 +414,7 @@ it('keeps the finished select up until the match it chose begins', () => {
   // early would leave the old match's frozen frame up through the load.
   expect(view.select).toBe(select);
   expect(view.loading).toBe(true);
+  packIn();
   finishLoad();
   expect(view.select).toBeNull();
   expect(scene.match.mode).toBe('practice');
@@ -438,12 +459,13 @@ it('starts free practice on a stage picked over a finished story, not the battle
 });
 
 it('drops a playing story demo once a menu pick’s match begins', async () => {
-  const { scene, view, completes, finishLoad } = boot();
+  const { scene, view, completes, packIn, finishLoad } = boot();
   const select = new CharacterSelect(undefined, true);
   view.select = select;
   select.done = ['golf', 'golf'];
   stepSelect(view);
   await vi.waitFor(() => expect(completes).toHaveLength(1));
+  packIn();
   finishLoad();
   expect(view.select).toBeInstanceOf(StoryDemo);
   // Vs. CPU in the Menu: the demo stays through the load, then goes with
@@ -464,21 +486,23 @@ it('reports the requested match’s mode while it loads', () => {
 });
 
 it('keeps the requested mode when a pick lands mid-load', () => {
-  const { scene, view, finishLoad } = boot();
+  const { scene, view, packIn, finishLoad } = boot();
   scene.reset('cpu');
   expect(view.loading).toBe(true);
   // A quick follow-up joins the pending Vs. CPU — the practice match it
   // replaces would drop the request back to practice.
   scene.setStage('park');
+  packIn();
   finishLoad();
   expect(scene.match.mode).toBe('cpu');
   expect(scene.match.stage).toBe('park');
 });
 
 it('keeps the requested mode when a fighter pick lands mid-load', () => {
-  const { scene, finishLoad } = boot();
+  const { scene, packIn, finishLoad } = boot();
   scene.reset('cpu');
   scene.setFighter('kiki');
+  packIn();
   finishLoad();
   expect(scene.match.mode).toBe('cpu');
   expect(scene.match.fighters.map((f) => f.who)).toEqual(['kiki', 'zoma']);
@@ -639,8 +663,9 @@ it('reports music while a screen is open', () => {
 });
 
 it('a fighter evicted by unloadPlayers is queued as a pack again', () => {
-  const { scene, view, files, finishLoad } = boot();
+  const { scene, view, files, packIn, finishLoad } = boot();
   scene.setFighter('kiki');
+  packIn();
   finishLoad();
   // Ryuko's match starts without Kiki, so its start drops her (unloadPlayers).
   scene.setFighter('ryuko');
@@ -779,9 +804,10 @@ describe('cheats (HPA-767)', () => {
   });
 
   it('applies a switch changed during a pending load to the upcoming battle', () => {
-    const { scene, finishLoad } = boot();
+    const { scene, packIn, finishLoad } = boot();
     scene.reset('practice');
     scene.setCheats(cheats({ enabled: true, playerHpMultiplier: 3 }));
+    packIn();
     finishLoad();
     expect(scene.match.cheats.playerHpMultiplier).toBe(3);
     expect(scene.match.fighters[0].maxHp).toBe(1530);
@@ -2176,5 +2202,64 @@ describe('scene summon (HPA-972)', () => {
     finishLoad();
     await first;
     expect(scene.match.fighters.map((f) => f.who)).toContain('golf');
+  });
+
+  it('settles a failed summon’s shutdown hook with the request', async () => {
+    const { scene, shutdowns, loadErrors, preload } = boot();
+    preload();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    expect(shutdowns).toHaveLength(1);
+    loadErrors[0]!({ key: 'golf-419' });
+    await expect(pending).rejects.toThrow('Could not load golf');
+    // The rejection settles the request like a cancel does — without it
+    // the dead hook would reject every later summon on shutdown.
+    expect(shutdowns).toHaveLength(0);
+  });
+
+  it('fails the scene when a pack a cancelled summon shared errors', async () => {
+    const { scene, loadErrors, finishLoad, preload } = boot();
+    preload();
+    state(scene).players.add('ryuko');
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The pick's match load re-queues the same pack while the cancelled
+    // summon's copy is still outstanding; the summon claims the error,
+    // but nothing decoded — the match must not begin on the absent art.
+    scene.setOpponent('golf');
+    loadErrors[0]!({ key: 'golf-419' });
+    finishLoad();
+    expect((scene as unknown as { error: string }).error).toContain(
+      'fighter-golf',
+    );
+    expect(scene.match.fighters.map((f) => f.who)).not.toContain('golf');
+  });
+
+  it('adopts a pack that finished after the match left its summon', async () => {
+    const { scene, packIn, finishLoad } = boot();
+    const pending = scene.summon('golf', 1);
+    scene.match = new Match('cpu', true);
+    packIn();
+    finishLoad();
+    await expect(pending).rejects.toThrow('moved on');
+    // The decode landed, so the fighter joins the loaded players — the
+    // next match change's unload can account for its art.
+    expect(state(scene).players.has('golf')).toBe(true);
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('writes a summon’s palette at its index, past a stale tail', async () => {
+    const { scene, artIn } = boot();
+    artIn();
+    const view = state(scene);
+    // A story reset can leave the held array longer than the roster; a
+    // push would append past the summon and leave the stale entry at its
+    // slot.
+    view.palettes.push(99);
+    await scene.summon('golf', 1);
+    expect(view.palettes).toHaveLength(3);
+    expect(view.palettes[2]).toBe(0);
   });
 });
