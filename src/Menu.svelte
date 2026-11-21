@@ -1186,7 +1186,10 @@
   /* The mockup codes the two sides: red for enemies, gold for partners. */
   .side.enemy.on {
     color: #fff;
-    background: linear-gradient(#ff6a5a, var(--red));
+    /* The mockup's #ff6a5a→#ee2421 ramp leaves white 15px text at 2.8–4.3:1;
+       this darker ramp keeps the red coding at ≥5.4:1 on every stop
+       (menu-contrast.test.ts pins the AA floor). */
+    background: linear-gradient(#d31412, #a5110f);
     border-color: var(--red);
   }
   .side:disabled {
