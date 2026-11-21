@@ -6,7 +6,9 @@ import { expect, test } from '@playwright/test';
 // saved cheats persist, it does not. The summoned fighters' rules and
 // bars are covered by the Vitest suite (vs.test.ts, cheat-rules.test.ts);
 // the HUD draws them on the canvas, which the browser-MCP screenshots
-// in the task report show.
+// in the task report show. The canvas CHEAT badge itself is asserted here
+// as pixels (cheatBadgeGold) — the sr-only GameStatus announcement alone
+// cannot prove the HUD draws it.
 
 // Into a practice battle, as the smoke journeys: buttons skip T2, pick
 // VS single, both cursors rest on Ryuko and start.
@@ -30,6 +32,49 @@ const bootIntoBattle = async (page: import('@playwright/test').Page) => {
     await expect(health).toContainText('510 510', { timeout: 10_000 });
   }).toPass({ timeout: 60_000 });
   return { menu, dialog: page.getByRole('dialog', { name: 'Menu' }), health };
+};
+
+// The authored canvas CHEAT badge (hud.ts): gold italic text centred at
+// (480, 66) of the 960×720 scene, a region the HUD's other art — timer box
+// and digits above it, win marks and bars beside it — never reaches. Its
+// #ffd24a fill is counted from a composited page screenshot (canvas
+// .toDataURL is blank for this WebGL context), scaled through the canvas's
+// box and devicePixelRatio as mode-select.spec.ts samples. Verified empty
+// (0 gold pixels) through the VS splash and letterings and full (≈190)
+// once the badge draws, so the count splits hard: 0 hidden, >20 shown.
+const CHEAT_BADGE = { x: 445, y: 50, w: 70, h: 32 };
+const cheatBadgeGold = async (page: import('@playwright/test').Page) => {
+  const box = (await page.locator('.arena canvas').boundingBox())!;
+  const shot = await page.screenshot();
+  return page.evaluate(
+    async ({ data, badge, box, ratio }) => {
+      const img = new Image();
+      img.src = data;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth;
+      c.height = img.naturalHeight;
+      const ctx = c.getContext('2d')!;
+      ctx.drawImage(img, 0, 0);
+      const x = Math.round((box.x + (badge.x / 960) * box.width) * ratio);
+      const y = Math.round((box.y + (badge.y / 720) * box.height) * ratio);
+      const w = Math.max(1, Math.round((badge.w / 960) * box.width * ratio));
+      const h = Math.max(1, Math.round((badge.h / 720) * box.height * ratio));
+      const d = ctx.getImageData(x, y, w, h).data;
+      let gold = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const [r, g, b] = [d[i], d[i + 1], d[i + 2]];
+        if (r > 200 && g > 150 && g < 240 && b < 160 && r - b > 70) gold++;
+      }
+      return gold;
+    },
+    {
+      badge: CHEAT_BADGE,
+      data: 'data:image/png;base64,' + shot.toString('base64'),
+      box,
+      ratio: await page.evaluate(() => devicePixelRatio),
+    },
+  );
 };
 
 test('summons an enemy and a partner, then the fight resumes', async ({
@@ -132,6 +177,10 @@ test('the first summon marks the run cheated at once and the CPU fights', async 
   await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
   await expect(health).not.toContainText('Cheat mode is on for this run.');
+  // The canvas agrees in pixels: the CHEAT badge stays hidden while the
+  // switch is only pending — a badge wired to the pending switch or the
+  // run's announcement instead of match.cheated would already draw here.
+  await expect.poll(() => cheatBadgeGold(page)).toBe(0);
 
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
@@ -148,6 +197,9 @@ test('the first summon marks the run cheated at once and the CPU fights', async 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
   await expect(page.locator('.arena canvas')).toBeFocused();
+  // And the badge itself draws from the same mark: the summon's gold CHEAT
+  // tag under the timer, not only the sr-only announcement.
+  await expect.poll(() => cheatBadgeGold(page)).toBeGreaterThan(20);
   // The summoned CPU plays: one of the two standing fighters loses life
   // to it without any input.
   const meters = [
