@@ -269,6 +269,49 @@ describe('EN gain assignment (HPA-972)', () => {
     });
   });
 
+  it('seats a reseated enemy at its own cap when carried stocks overfill it', () => {
+    // TEAM VS's next round hands the outgoing fighter's stocks to the next
+    // member; SHIN-Z's six-stock cap (ten at ×2) would seat PAC-HELO, a
+    // one-stock fighter capped at two, with eight. The seat switch
+    // reconciles: the stock drops to the cap and a full gauge's power
+    // empties as addPower leaves it.
+    const match = Match.team(
+      [
+        ['ryuko', 'zoma', 'kiki'],
+        ['shinz', 'pachelo', 'golf'],
+      ],
+      'court',
+    );
+    match.useCheats(cheats({ enabled: true, enemyStocksMultiplier: 2 }));
+    match.fighters[1]!.stock = 8;
+    match.fighters[1]!.power = 50;
+    finishRound(match, 1);
+    expect(match.fighters[1]).toMatchObject({
+      who: 'pachelo',
+      maxStock: 2,
+      stock: 2,
+      power: 0,
+    });
+    // An under-cap gauge keeps its power across the same switch.
+    const second = Match.team(
+      [
+        ['ryuko', 'zoma', 'kiki'],
+        ['shinz', 'pachelo', 'golf'],
+      ],
+      'court',
+    );
+    second.useCheats(cheats({ enabled: true, enemyStocksMultiplier: 2 }));
+    second.fighters[1]!.stock = 1;
+    second.fighters[1]!.power = 40;
+    finishRound(second, 1);
+    expect(second.fighters[1]).toMatchObject({
+      who: 'pachelo',
+      maxStock: 2,
+      stock: 1,
+      power: 40,
+    });
+  });
+
   it('recomputes, never compounds, on the next round’s re-seat', () => {
     const match = new Match('cpu', true, 0, ['ryuko', 'shinz']);
     match.useCheats(cheats({ enabled: true, playerMaxEn: 600 }));
@@ -922,6 +965,26 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     const one2 = second.fighters[0]!;
     expect([one2.hp, one2.power, one2.stock, foe.hp]).toEqual(before);
     expect(one2.points).toBe(0);
+  });
+
+  it('keeps the story HUD on the natives when the 1P strikes a summon', () => {
+    // The enemy index the opponent HUD reads (`rival`) names native seats
+    // only: a 1P box meeting a summon marks nothing, and the lone-native
+    // fallback hands a stale mark straight back to the story opponent.
+    const match = Match.story('ryuko', storyBattle());
+    toFight(match);
+    const [one, native] = match.fighters;
+    const summon = match.summon('zoma', -1, cheats())!;
+    match.cpus[match.fighters.indexOf(summon)] = null;
+    native!.x = 1500;
+    summon.x = one!.x + 120;
+    for (let t = 0; t < 30 && summon.caught !== one; t++)
+      match.step({ punch: t === 0 });
+    expect(summon.caught).toBe(one);
+    expect(match.rival).toBe(native);
+    match.enemy = match.fighters.indexOf(summon);
+    match.step();
+    expect(match.rival).toBe(native);
   });
 });
 

@@ -141,6 +141,10 @@
       summoning = false;
       note = null;
       if (dialog && !dialog.open) dialog.showModal();
+      // The summon grid highlights its first cell; focus rides there too,
+      // so an immediate Enter confirms the fighter instead of clicking
+      // whichever button the dialog landed on (Back to game).
+      if (view === 'summon') focusCell(0);
     } else if (dialog?.open) {
       dialog.close();
     }
@@ -165,11 +169,14 @@
       dialog.focus();
   });
 
-  // ↑/↓ land a row's first enabled control — a stepper's ◀, a checkbox,
-  // an input — or the row itself when everything it holds is disabled.
+  // ↑/↓ land a row's first enabled control — a portrait or select, then a
+  // stepper's ◀, a checkbox, an input — or the row itself when everything
+  // it holds is disabled. The portrait precedes the steppers: Enter on it
+  // opens character select rather than stepping (and restarting) at once.
   function focusRow(row: HTMLElement | undefined) {
     if (!row) return;
     const control =
+      row.querySelector<HTMLElement>('.tilebtn:not([disabled])') ??
       row.querySelector<HTMLElement>('[data-step] button:not([disabled])') ??
       row.querySelector<HTMLElement>(
         'input:not([disabled]), select:not([disabled]), button:not([disabled])',
@@ -262,7 +269,11 @@
         target.click();
         return;
       }
-      const stepper = target.closest?.('[data-step]');
+      // The steppers resolve from the containing row, so ←/→ adjust from
+      // the row's other controls (a fighter portrait) as from ◀/▶.
+      const stepper = target
+        .closest?.('[data-row]')
+        ?.querySelector<HTMLElement>('[data-step]');
       if (stepper) {
         event.preventDefault();
         (
@@ -276,8 +287,13 @@
     // ↑/↓ walk the rows — from a control, a disabled row or a bare field.
     // They run before the input early-return, so navigation never strands
     // once an edit field is focused; the summon view's arrows walk the
-    // grid instead.
-    if ((key === 'ArrowDown' || key === 'ArrowUp') && view !== 'summon') {
+    // grid instead. A select keeps its own arrows: it opens and cycles
+    // natively rather than stranding on its row.
+    if (
+      (key === 'ArrowDown' || key === 'ArrowUp') &&
+      view !== 'summon' &&
+      !target.matches?.('select')
+    ) {
       event.preventDefault();
       const rows = [
         ...(dialog?.querySelectorAll<HTMLElement>('[data-row]') ?? []),
@@ -288,7 +304,10 @@
       focusRow(next);
       return;
     }
-    if (target.closest?.('input, select, textarea')) return;
+    // Typing and a select's type-ahead stay inside inputs; a checkbox
+    // takes no characters, so Q/E still reach the tab switch.
+    if (target.closest?.('input:not([type="checkbox"]), select, textarea'))
+      return;
     if (view === 'summon') {
       // Tab flips the side; WASD and the arrows walk the grid; G/Enter
       // join the picked fighter; Esc closes natively.
@@ -478,7 +497,7 @@
             <section aria-label="Match">
               <h2 class="chrome"><span>MATCH</span></h2>
               <div class="panel stack">
-                <label class="field"
+                <label class="field" data-row
                   ><span class="label">Opponent</span>
                   <select
                     value={opponentChoice}
@@ -839,6 +858,10 @@
   .body {
     display: grid;
     grid-template-columns: 190px minmax(0, 1fr);
+    /* The row is bounded to the body's flex height so .content's own
+       overflow-y can scroll inside it; start alignment keeps the rail
+       content-sized. */
+    grid-template-rows: minmax(0, 1fr);
     gap: 24px;
     flex: 1;
     min-height: 0;
@@ -920,6 +943,7 @@
   }
   .content {
     min-height: 0;
+    align-self: stretch;
     overflow-y: auto;
     padding-bottom: 16px;
   }
@@ -1271,6 +1295,10 @@
     }
     .body {
       grid-template-columns: 1fr;
+      /* One column stacks rail over content: the rail keeps its own
+         height and the content row bounds to what remains, so the
+         content scrolls inside it here too. */
+      grid-template-rows: auto minmax(0, 1fr);
       gap: 10px;
     }
     .rail {

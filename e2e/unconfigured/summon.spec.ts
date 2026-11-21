@@ -111,12 +111,14 @@ test('summons an enemy and a partner, then the fight resumes', async ({
   await expect(tiles).toHaveCount(44);
 
   // The summon view opens on the enemy side with the cursor on Ryuko
-  // and focus on the dialog's back button, so the pick goes by pointer:
-  // a tile click loads her pack and joins her against 1P.
+  // and focus on her tile, so an immediate Enter would confirm her —
+  // the pick still goes by pointer here: a tile click loads her pack
+  // and joins her against 1P.
   await expect(dialog.getByRole('button', { name: 'Enemy' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
+  await expect(tiles.nth(0)).toBeFocused();
   await tiles.nth(0).click();
   await expect(dialog.locator('.note')).toContainText(
     'Ryuko joined the fight.',
@@ -245,6 +247,9 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
+  // Watch the pack's delivery itself: `loaded` counts the route's release,
+  // which still leaves the response and the app's load unsettled.
+  const packReceived = page.waitForResponse('**/packs/fighter-zoma.bin');
   await dialog.getByRole('option').nth(1).click();
   await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
 
@@ -264,11 +269,20 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   await page.keyboard.up('d');
 
   // The delayed response lands after the cancel: adopted, not spawned —
-  // the run still reads uncheated.
+  // the run still reads uncheated. The whole pack must reach the page and
+  // the app's loader settle it before this assert means anything; a pair
+  // of frames covers the decode and the COMPLETE handler.
+  await packReceived;
   await expect.poll(() => loaded).toBe(1);
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve)),
+      ),
+  );
   await expect(health).not.toContainText('Cheat mode is on for this run.');
   // A fresh summon of the same fighter joins at once off the adopted
-  // pack — and only now marks the run cheated.
+  // pack — no second download — and only now marks the run cheated.
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
   await dialog.getByRole('option').nth(1).click();
@@ -276,6 +290,7 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
     'Zoma joined the fight.',
     { timeout: 10_000 },
   );
+  expect(loaded).toBe(1);
   await expect(health).toContainText('Cheat mode is on for this run.');
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
