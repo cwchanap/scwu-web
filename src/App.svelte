@@ -442,6 +442,10 @@
               : 'Unlimited'}</span
           >
           <span>Action: {status.action}</span>
+          <!-- The canvas HUD's gold CHEAT tag, announced for assistive
+               tech: set when the battle's snapshot runs under Cheat mode
+               or a summon joined it (GameStatus.cheated). -->
+          {#if status.cheated}<span>Cheat mode is on for this run.</span>{/if}
         </div>
         {#if status.error}
           <div class="stage-overlay">

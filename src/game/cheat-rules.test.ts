@@ -562,46 +562,52 @@ describe('low-HP super gates (HPA-972)', () => {
   });
 
   it('moves SIN’s idle stance line without ever bypassing it', () => {
-    const stance = (life: number, scale: number) => {
+    const stance = (life: number, line: number) => {
       const vm = new StandingVM(CHARACTERS.sin.idle);
       vm.life = life;
       vm.lifeMax = 1100;
       vm.lifeNative = 550;
-      vm.lifeLineScale = scale;
+      vm.lifeLine = line;
       for (let t = 0; t < 40 && !vm.ended; t++) vm.tick();
       // The tired loop's images (334–339) show only past the check.
       return vm.events.some((e) => e.image >= 334 && e.image <= 339);
     };
     // SIN's op 0x11 (PC 16, value 165): the tired loop at 330 of the
-    // doubled effective maximum, at the native mark with scale 1.
-    expect(stance(330, 1)).toBe(true);
-    expect(stance(331, 1)).toBe(false);
+    // doubled effective maximum, at the native line of 30.
+    expect(stance(330, 30)).toBe(true);
+    expect(stance(331, 30)).toBe(false);
     // The Low HP line of 60 doubles the mark 330 → 660.
-    expect(stance(500, 2)).toBe(true);
-    expect(stance(660, 2)).toBe(true);
-    expect(stance(661, 2)).toBe(false);
+    expect(stance(500, 60)).toBe(true);
+    expect(stance(660, 60)).toBe(true);
+    expect(stance(661, 60)).toBe(false);
     // A line of 0 closes the stance change entirely.
     expect(stance(100, 0)).toBe(false);
+    // The mark truncates once over the whole product, as match.ts's
+    // lineScaledMark truncates the same one: a line of 22 puts the mark
+    // at exactly 165·22·2 = 7260/30 = 242 — not the 241 the old
+    // trunc-then-scale order read off the same numbers.
+    expect(stance(242, 22)).toBe(true);
+    expect(stance(243, 22)).toBe(false);
   });
 
   it('moves SOU’s idle stance line the same way', () => {
-    const stance = (life: number, scale: number) => {
+    const stance = (life: number, line: number) => {
       const vm = new StandingVM(CHARACTERS.sou.idle);
       vm.life = life;
       vm.lifeMax = 960;
       vm.lifeNative = 480;
-      vm.lifeLineScale = scale;
+      vm.lifeLine = line;
       for (let t = 0; t < 40 && !vm.ended; t++) vm.tick();
       // The tired stand shows its image 360 only past the check.
       return vm.events.some((e) => e.image === 360);
     };
     // SOU's op 0x11 (PC 8, value 144) at the native mark.
-    expect(stance(288, 1)).toBe(true);
-    expect(stance(289, 1)).toBe(false);
+    expect(stance(288, 30)).toBe(true);
+    expect(stance(289, 30)).toBe(false);
     // At 60% the mark 288 doubles to 576.
-    expect(stance(400, 2)).toBe(true);
-    expect(stance(576, 2)).toBe(true);
-    expect(stance(577, 2)).toBe(false);
+    expect(stance(400, 60)).toBe(true);
+    expect(stance(576, 60)).toBe(true);
+    expect(stance(577, 60)).toBe(false);
     expect(stance(100, 0)).toBe(false);
   });
 });
@@ -627,9 +633,27 @@ describe('B.R. No partner (HPA-972)', () => {
     const withAlly = native.fighters.map((f) => f.who);
     const { match } = brMatch({ brNoPartner: true });
     const without = match.fighters.map((f) => f.who);
-    // One fighter fewer — the ally — everyone else in place.
-    expect(without.length).toBe(withAlly.length - 1);
-    expect(without).toEqual(expect.arrayContaining(without));
+    // The stage-2 course's real lineup: MASA, six paired regulars and the
+    // finale's donated ally (3-TIMES) — everyone in place, the ally gone.
+    expect(withAlly).toEqual([
+      'masa',
+      'ogi',
+      'ziro',
+      'yinan',
+      'aya',
+      'gigi',
+      'sww',
+      'times',
+    ]);
+    expect(without).toEqual([
+      'masa',
+      'ogi',
+      'ziro',
+      'yinan',
+      'aya',
+      'gigi',
+      'sww',
+    ]);
     const ally = withAlly.find((who) => !without.includes(who));
     expect(withAlly.filter((who) => who === ally)).toHaveLength(1);
     expect(match.cheats.brNoPartner).toBe(true);
@@ -751,6 +775,153 @@ describe('B.R. No partner (HPA-972)', () => {
     ]);
     // The master off keeps the source award whatever the overrides.
     expect(ko(true, 0x80, { enabled: false })).toEqual([200, 0, 1]);
+  });
+
+  it('gives a summon a seat no native of the battle can hold', () => {
+    const { match, battle } = brMatch({ brNoPartner: true });
+    const heldBefore = [...(match as unknown as { held: number[] }).held].slice(
+      0,
+      battle.slots.length + 1,
+    );
+    const ally = match.summon('shinz', 1, cheats())!;
+    const seats = (match as unknown as { seats: number[] }).seats;
+    // The natives keep every original seat — including the dropped ally's
+    // seat number, which stays theirs and empty.
+    expect(seats.slice(0, -1)).toEqual([0, 1, 2, 3, 4, 5, 6]);
+    expect(ally).toBe(match.fighters.at(-1));
+    expect(seats.at(-1)).toBeGreaterThan(battle.slots.length);
+    const bySeat = (
+      match as unknown as { bySeat: (seat: number) => Fighter | undefined }
+    ).bySeat;
+    expect(bySeat.call(match, battle.slots.length)).toBeUndefined();
+    // The summon's palette lands past every native seat's held entry.
+    const held = (match as unknown as { held: number[] }).held;
+    expect(held.slice(0, battle.slots.length + 1)).toEqual(heldBefore);
+    expect(match.palettes).toHaveLength(match.fighters.length);
+  });
+});
+
+describe('summoned strikers and native outcomes (HPA-972)', () => {
+  // Plays to the fight, seats the striker `seat` names (a summon's index
+  // for these tests), then KO's a native through knockOut with `caught`
+  // naming the striker, and returns the winner the controller settles on.
+  const koWinner = (
+    battle: Battle,
+    seat: (match: Match) => number,
+    victim: number,
+  ): { match: Match; winner: string | null } => {
+    const match = Match.story('ryuko', battle);
+    toFight(match);
+    match.fighters[victim]!.caught = match.fighters[seat(match)]!;
+    match.fighters[victim]!.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(
+      match.fighters[victim]!,
+    );
+    for (let t = 0; t < 500 && !match.winner; t++) match.step();
+    return { match, winner: match.winner };
+  };
+
+  it('a summoned enemy’s KO of the 1P still loses the battle', () => {
+    // The lone native enemy scores the striker's KO points (koScorer 0),
+    // so the natives-only outcome checks read a beaten 1P as a loss —
+    // never the draw or win a stranded summon score would leave.
+    const { match, winner } = koWinner(
+      storyBattle({ koScorer: 0, koPoints: 100 }),
+      (m) => m.fighters.indexOf(m.summon('zoma', -1, cheats())!),
+      0,
+    );
+    expect(match.fighters[0]!.hp).toBe(0);
+    expect(match.fighters[2]!.points).toBe(0);
+    expect(match.natives.some((f) => f.points >= 100)).toBe(true);
+    expect(winner).toBe('opponent');
+  });
+
+  it('a summoned ally’s KO of the lone enemy still wins the battle', () => {
+    // The step scores its KO to the striker (scorer 0): the summon's kill
+    // lands on the 1P, whose 100 points end the round as a win.
+    const { match, winner } = koWinner(
+      storyBattle({
+        slots: [
+          storySlot({ scorer: 0, points: 100 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+      (m) => m.fighters.indexOf(m.summon('shinz', 1, cheats())!),
+      1,
+    );
+    expect(match.fighters[1]!.hp).toBe(0);
+    expect(match.fighters[2]!.points).toBe(0);
+    expect(match.fighters[0]!.points).toBe(100);
+    expect(winner).toBe('player');
+  });
+
+  it('a falling summon takes no seat award, a native striker bonus passes it by', () => {
+    // An award configured for the 1P (bits 7–8 = 1, 100 life and power)
+    // pays nothing when the fallen fighter is a summon — and a summon's
+    // own points stay empty either way.
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ flags: 0x80, life: 100, power: 100 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    toFight(match);
+    const one = match.fighters[0]!;
+    one.hp = 100;
+    one.stock = 0;
+    one.power = 0;
+    const ally = match.summon('shinz', 1, cheats())!;
+    ally.caught = one;
+    ally.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(ally);
+    expect(ally.downed).toBe(true);
+    expect([one.hp, one.power, one.stock]).toEqual([100, 0, 0]);
+    expect(match.fighters.every((f) => f.points === 0)).toBe(true);
+    // A native victim killed by a summon scores through the natives (the
+    // 1P here), but the striker's own award share (bits 7–8 = 2) passes
+    // the summon by: no life or power lands anywhere.
+    const second = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ flags: 0x100, life: 100, power: 100, scorer: 1 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    toFight(second);
+    const foe = second.summon('zoma', -1, cheats())!;
+    const victim = second.fighters[1]!;
+    victim.caught = foe;
+    const before = [
+      second.fighters[0]!.hp,
+      second.fighters[0]!.power,
+      second.fighters[0]!.stock,
+      foe.hp,
+    ];
+    victim.hp = 0;
+    (second as unknown as { knockOut(f: Fighter): void }).knockOut(victim);
+    const one2 = second.fighters[0]!;
+    expect([one2.hp, one2.power, one2.stock, foe.hp]).toEqual(before);
+    expect(one2.points).toBe(0);
   });
 });
 

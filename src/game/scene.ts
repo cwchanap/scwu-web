@@ -163,6 +163,10 @@ interface SummonRequest {
   match: Match;
   resolve: () => void;
   reject: (error: unknown) => void;
+  // The per-request shutdown hook, so settling — success, cancel or a
+  // replaced request — removes it instead of letting one per summon
+  // accumulate on the scene until shutdown.
+  shutdown: () => void;
 }
 
 // The free state's program (action 1), which reads the fighter's variable 0
@@ -867,11 +871,29 @@ export class TrainingScene extends Phaser.Scene {
       (sound) => !select.sounds.has(sound.index),
     );
     if (!restImages.length && !restSounds.length) return;
-    // Resident once its first entry is in.
-    const resident = restImages.length
-      ? () => this.textures.exists(`${who}-${restImages[0].index}`)
-      : () => this.cache.audio.exists(`${who}-sound-${restSounds[0].index}`);
-    this.load.addFile(new PackFile(this.load, `fighter-${who}`, resident));
+    if (this.residentPack(who)) return;
+    this.load.addFile(
+      new PackFile(this.load, `fighter-${who}`, () => this.residentPack(who)),
+    );
+  }
+  // Whether the fighter's own pack is already in the caches: resident once
+  // its first non-select entry is in. A failed pack decodes nothing, so
+  // this stays false for one that never landed.
+  private residentPack(who: Who): boolean {
+    const { images, sounds } = CHARACTERS[who];
+    const select = selectAssets[who];
+    const signs = new Set(MODE_SELECT_SIGNS[who] ?? []);
+    const restImages = images.filter(
+      (image) => !select.images.has(image.index) && !signs.has(image.index),
+    );
+    if (restImages.length)
+      return this.textures.exists(`${who}-${restImages[0].index}`);
+    const restSounds = sounds.filter(
+      (sound) => !select.sounds.has(sound.index),
+    );
+    return restSounds.length
+      ? this.cache.audio.exists(`${who}-sound-${restSounds[0].index}`)
+      : true;
   }
   private unloadPlayers(keep: Set<Who>) {
     const textures = new Set<string>();
@@ -1079,13 +1101,13 @@ export class TrainingScene extends Phaser.Scene {
   }
   private begin(match: Match, paused = false) {
     this.match = match;
+    // The battle's cheat snapshot installs first (match.ts useCheats): a
+    // B.R. battle's No partner reseats here, and the displayed palettes
+    // below must read the seating it leaves, not the constructor's —
+    // before its first tick, so a later change still waits (HPA-767).
+    this.match.useCheats(this.pendingCheats);
     this.roundPalettes();
     this.match.practice = { ...this.practice };
-    // The battle's cheat snapshot installs here, before its first tick
-    // (match.ts useCheats): a change before this point applies to this
-    // battle — also one made while it loaded — and a later one waits for
-    // the next.
-    this.match.useCheats(this.pendingCheats);
     // A non-story match is a run of its own; a story battle ORs into the
     // route's mark, which the route's selection reset.
     this.cheatedBeforeRoute = undefined;
@@ -1159,12 +1181,13 @@ export class TrainingScene extends Phaser.Scene {
       match: this.match,
       resolve,
       reject,
+      shutdown: () => this.dropSummon('The scene shut down.'),
     };
     this.summonRequest = request;
     // A scene shutdown (game destroyed mid-load) must not dangle the
     // dialog's await; registered per request so a stubbed test scene can
     // fire the same hook the real Phaser boot does.
-    this.events.once('shutdown', () => this.dropSummon('The scene shut down.'));
+    this.events.once('shutdown', request.shutdown);
     if (this.players.has(who)) {
       this.spawnSummon(request);
       return promise;
@@ -1184,8 +1207,22 @@ export class TrainingScene extends Phaser.Scene {
   // The request token decides: anything else — a cancel, a newer request,
   // a later load's COMPLETE — leaves the match as it stands.
   private spawnSummon(request: SummonRequest) {
-    if (this.summonRequest !== request) return;
-    this.summonRequest = undefined;
+    const live = this.summonRequest === request;
+    this.settleSummon(request);
+    if (!live) {
+      // The pack finished after its summon was cancelled or superseded.
+      // When its art actually landed, track the fighter with the loaded
+      // players: the next match change's unloadPlayers then frees what it
+      // does not seat, and no second summon of the same fighter re-
+      // downloads a resident pack. (A failed pack decodes nothing — it
+      // stays unowned and a fresh summon loads it again.) Nothing spawns
+      // here either way.
+      if (this.residentPack(request.who)) this.players.add(request.who);
+      request.reject(
+        new Error('The match moved on before the fighter loaded.'),
+      );
+      return;
+    }
     if (this.select || this.loading || this.match !== request.match) {
       request.reject(
         new Error('The match moved on before the fighter loaded.'),
@@ -1233,12 +1270,19 @@ export class TrainingScene extends Phaser.Scene {
     return { ...this.pendingCheats };
   }
 
+  // Settle a request: clear it while it is still the live one and take
+  // its shutdown hook off the scene, so repeated summons leave none behind.
+  private settleSummon(request: SummonRequest) {
+    if (this.summonRequest === request) this.summonRequest = undefined;
+    this.events.off('shutdown', request.shutdown);
+  }
+
   // Drop an in-flight summon, rejecting its dialog await. The match, its
   // arrays and the modal pause are untouched.
   private dropSummon(reason: string) {
     const request = this.summonRequest;
     if (!request) return;
-    this.summonRequest = undefined;
+    this.settleSummon(request);
     request.reject(new Error(reason));
   }
   // A sound the stage's export lacks is its empty one, which stops every
@@ -1578,8 +1622,7 @@ export class TrainingScene extends Phaser.Scene {
             // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's
             // idle stance marks (a stance change, never the supers bypass).
             const { enabled, lowHpLine } = this.match.cheats;
-            this.idle[i].lifeLineScale =
-              i === 0 && enabled ? lowHpLine / 30 : 1;
+            this.idle[i].lifeLine = i === 0 && enabled ? lowHpLine : 30;
             this.idle[i].tick();
             for (const index of this.idle[i].sounds.splice(0))
               this.play(`${f.who}-sound-${index}`, i);

@@ -19,7 +19,7 @@ import {
 import type { Demo } from './select';
 import { scenarioOf, Story, TAKES } from './story';
 import type { Battle } from './story';
-import { bossBrAnotherStory } from './br-another';
+import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { itWithArt } from './testing';
@@ -126,6 +126,10 @@ const boot = () => {
     cameras: { main: { setScroll: () => {} } },
     events: {
       once: (_event: string, done: () => void) => void shutdowns.push(done),
+      off: (_event: string, done: () => void) => {
+        const at = shutdowns.indexOf(done);
+        if (at >= 0) shutdowns.splice(at, 1);
+      },
     },
   });
   view.ready = true;
@@ -145,6 +149,11 @@ const boot = () => {
     artIn: () => {
       cached = true;
       view.players = new Set(Object.keys(CHARACTERS) as Who[]);
+    },
+    // The fighters' own packs decoded into the caches (resident textures)
+    // without seating anyone: what a finished pack load leaves behind.
+    packIn: () => {
+      cached = true;
     },
     finishLoad: () => {
       for (const done of completes.splice(0)) done();
@@ -776,6 +785,24 @@ describe('cheats (HPA-767)', () => {
     finishLoad();
     expect(scene.match.cheats.playerHpMultiplier).toBe(3);
     expect(scene.match.fighters[0].maxHp).toBe(1530);
+  });
+
+  it('reads the No-partner reseating’s palettes at begin, paused start included', () => {
+    const { scene, view } = boot();
+    // The B.R. ANOTHER stage-2 battle seats its donated ally last, so the
+    // No-partner reseat drops the highest native seat — the seating the
+    // displayed palettes must read after the snapshot installs.
+    const battle = brAnotherStages('masa').stage2!;
+    const match = Match.story('masa', battle, 0, undefined, undefined, true);
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true, brNoPartner: true });
+    (view.begin as (m: Match, paused?: boolean) => void)(match, true);
+    expect(match.cheats.brNoPartner).toBe(true);
+    const shown = view as unknown as { palettes: number[] };
+    expect(shown.palettes).toEqual(match.palettes);
+    expect(shown.palettes).toHaveLength(match.fighters.length);
+    expect(match.fighters.length).toBeLessThan(battle.slots.length + 1);
+    // The battle began paused and stays paused.
+    expect(scene.paused).toBe(true);
   });
 
   it('marks a cheated run and resets it on a new non-story match', () => {
@@ -1970,6 +1997,37 @@ describe('scene summon (HPA-972)', () => {
     expect(scene.match.fighters).toHaveLength(2);
   });
 
+  it('tracks a cancelled summon’s finished pack and frees it at the next match', async () => {
+    const { scene, view, finishLoad, packIn } = boot();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The pack's late completion decoded its art: no spawn, but the
+    // resident fighter joins the loaded players so the caches stay
+    // accountable.
+    packIn();
+    finishLoad();
+    const state_ = state(scene);
+    expect(state_.players.has('golf')).toBe(true);
+    expect(scene.match.fighters).toHaveLength(2);
+    // A second summon of the same fighter finds it resident at once.
+    scene.setModal(true);
+    await scene.summon('golf', 1);
+    expect(scene.match.fighters).toHaveLength(3);
+    scene.setModal(false);
+    // The next match that doesn't seat golf frees the adopted art: the
+    // unload runs through the same cache cleanup a native player takes.
+    const removed: string[] = [];
+    (view.cache as { audio: { remove: (key: string) => void } }).audio.remove =
+      (key: string) => void removed.push(key);
+    scene.setFighter('zoma');
+    finishLoad();
+    expect(state(scene).players.has('golf')).toBe(false);
+    expect(removed.some((key) => key.startsWith('golf-sound-'))).toBe(true);
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
   it('a cancelled summon failing later leaves the scene intact', async () => {
     const { scene, loadErrors, finishLoad, preload } = boot();
     preload();
@@ -2014,8 +2072,31 @@ describe('scene summon (HPA-972)', () => {
   it('rejects an in-flight summon when the scene shuts down', async () => {
     const { scene, shutdowns } = boot();
     const pending = scene.summon('golf', 1);
-    for (const done of shutdowns) done();
+    for (const done of [...shutdowns]) done();
     await expect(pending).rejects.toThrow('shut down');
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('settles each summon’s shutdown hook, leaving none behind', async () => {
+    const { scene, shutdowns, finishLoad } = boot();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    expect(shutdowns).toHaveLength(1);
+    // A cancel takes its hook off with it.
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    expect(shutdowns).toHaveLength(0);
+    // The next summon owns exactly one hook again.
+    scene.setModal(true);
+    const second = scene.summon('golf', 1);
+    expect(shutdowns).toHaveLength(1);
+    // A cancel while the pack is still loading keeps that one hook, and
+    // the pack's late completion settles the second request's own.
+    scene.setModal(false);
+    await expect(second).rejects.toThrow('cancel');
+    expect(shutdowns).toHaveLength(0);
+    finishLoad();
+    expect(shutdowns).toHaveLength(0);
     expect(scene.match.fighters).toHaveLength(2);
   });
 

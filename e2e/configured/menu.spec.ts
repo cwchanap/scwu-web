@@ -181,6 +181,27 @@ test('cheats settings live in the menu, persist and leave identity alone', async
   await playerHp.fill('1');
   await playerHp.blur();
 
+  // Max EN shows the actual stock-digit art (HPA-971's en/7–10): each
+  // authored digit decodes in the browser, not merely a 200 over HTTP.
+  const maxEn = dialog.getByLabel('Max EN', { exact: true });
+  for (const en of [700, 800, 900, 1000]) {
+    await maxEn.fill(String(en));
+    await maxEn.blur();
+    const digit = dialog.locator(`img.digit[alt="${en} EN"]`);
+    await expect(digit).toHaveCount(1);
+    // Decoded pixels, not a 200 over HTTP: the bitmap is really there.
+    await expect
+      .poll(
+        () => digit.evaluate((img) => (img as HTMLImageElement).naturalWidth),
+        { timeout: 15_000 },
+      )
+      .toBeGreaterThan(0);
+    await expect(digit).toHaveJSProperty('complete', true);
+  }
+  // Put the default back before the persistence assertions.
+  await maxEn.fill('300');
+  await maxEn.blur();
+
   // Keys stay contained to the dialog: a leaked Escape would pause, an R
   // reset; the close still behaves and nothing errors.
   await dialog.getByRole('button', { name: '◂ Back to game' }).focus();
