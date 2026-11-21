@@ -248,7 +248,8 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
   // Watch the pack's delivery itself: `loaded` counts the route's release,
-  // which still leaves the response and the app's load unsettled.
+  // which still leaves the response and the app's load unsettled — the
+  // request's own rejection note below is the settle the assertions read.
   const packReceived = page.waitForResponse('**/packs/fighter-zoma.bin');
   await dialog.getByRole('option').nth(1).click();
   await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
@@ -269,17 +270,16 @@ test('Escape during a slow pack load cancels without a late spawn', async ({
   await page.keyboard.up('d');
 
   // The delayed response lands after the cancel: adopted, not spawned —
-  // the run still reads uncheated. The whole pack must reach the page and
-  // the app's loader settle it before this assert means anything; a pair
-  // of frames covers the decode and the COMPLETE handler.
+  // the run still reads uncheated. The app's own settle signal is the
+  // cancelled request's rejection note, which the load's COMPLETE handler
+  // writes only after the pack's decode and cache adds have run, so the
+  // no-spawn assert cannot outrun a late spawn. The closed dialog drops
+  // its role, so the note's own element is polled, not the dialog's.
   await packReceived;
+  await expect
+    .poll(() => page.locator('.note').textContent(), { timeout: 30_000 })
+    .toContain('The match moved on before the fighter loaded.');
   await expect.poll(() => loaded).toBe(1);
-  await page.evaluate(
-    () =>
-      new Promise((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(resolve)),
-      ),
-  );
   await expect(health).not.toContainText('Cheat mode is on for this run.');
   // A fresh summon of the same fighter joins at once off the adopted
   // pack — no second download — and only now marks the run cheated.

@@ -2015,11 +2015,12 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     scene.setModal(false);
-    await expect(pending).rejects.toThrow('cancel');
-    // The pre-existing pause came back with the modal, and the load's
-    // completion spawns nothing.
+    // The pre-existing pause comes back with the modal; the request's
+    // await still settles with its pack — the load's COMPLETE rejects it
+    // 'moved on' and spawns nothing.
     expect(scene.paused).toBe(true);
     finishLoad();
+    await expect(pending).rejects.toThrow('moved on');
     expect(scene.match.fighters).toHaveLength(2);
   });
 
@@ -2028,12 +2029,12 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     scene.setModal(false);
-    await expect(pending).rejects.toThrow('cancel');
-    // The pack's late completion decoded its art: no spawn, but the
-    // resident fighter joins the loaded players so the caches stay
-    // accountable.
+    // The pack's late completion decoded its art: no spawn, the request
+    // settles 'moved on', and the resident fighter joins the loaded
+    // players so the caches stay accountable.
     packIn();
     finishLoad();
+    await expect(pending).rejects.toThrow('moved on');
     const state_ = state(scene);
     expect(state_.players.has('golf')).toBe(true);
     expect(scene.match.fighters).toHaveLength(2);
@@ -2061,10 +2062,11 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     scene.setModal(false);
-    await expect(pending).rejects.toThrow('cancel');
-    // The cancelled pack is still outstanding; its failure must not
-    // poison the preserved match with the global scene error.
+    // The cancelled pack is still outstanding; its failure settles the
+    // request with the load's own error and must not poison the
+    // preserved match with the global scene error.
     loadErrors[0]!({ key: 'golf-419' });
+    await expect(pending).rejects.toThrow('Could not load golf');
     await Promise.resolve();
     expect((scene as unknown as { error: string }).error).toBe('');
     expect(scene.match.fighters).toHaveLength(2);
@@ -2108,20 +2110,24 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     expect(shutdowns).toHaveLength(1);
-    // A cancel takes its hook off with it.
+    // A cancel takes its hook off with it; the await still settles when
+    // its pack's load does — or when another summon supersedes it.
     scene.setModal(false);
-    await expect(pending).rejects.toThrow('cancel');
     expect(shutdowns).toHaveLength(0);
-    // The next summon owns exactly one hook again.
+    // The next summon owns exactly one hook again; summoning the same
+    // fighter supersedes the cancelled one's outstanding load and
+    // settles its await there.
     scene.setModal(true);
     const second = scene.summon('golf', 1);
     expect(shutdowns).toHaveLength(1);
+    await expect(pending).rejects.toThrow('took over the load');
     // A cancel while the pack is still loading keeps that one hook, and
     // the pack's late completion settles the second request's own.
     scene.setModal(false);
-    await expect(second).rejects.toThrow('cancel');
     expect(shutdowns).toHaveLength(0);
+    const settled = expect(second).rejects.toThrow('moved on');
     finishLoad();
+    await settled;
     expect(shutdowns).toHaveLength(0);
     expect(scene.match.fighters).toHaveLength(2);
   });
@@ -2224,12 +2230,13 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     scene.setModal(false);
-    await expect(pending).rejects.toThrow('cancel');
     // The pick's match load re-queues the same pack while the cancelled
-    // summon's copy is still outstanding; the summon claims the error,
-    // but nothing decoded — the match must not begin on the absent art.
+    // summon's copy is still outstanding; the summon claims the error —
+    // settling its own await with it — but nothing decoded, so the match
+    // must not begin on the absent art.
     scene.setOpponent('golf');
     loadErrors[0]!({ key: 'golf-419' });
+    await expect(pending).rejects.toThrow('Could not load golf');
     finishLoad();
     expect((scene as unknown as { error: string }).error).toContain(
       'fighter-golf',

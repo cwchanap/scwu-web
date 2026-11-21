@@ -300,7 +300,7 @@ export class TrainingScene extends Phaser.Scene {
   // a close cancels the request but leaves the pack in flight, and its
   // late loaderror must still fail alone instead of poisoning the live
   // scene. An entry settles when its pack completes or errors.
-  private summonLoads = new Set<Who>();
+  private summonLoads = new Map<Who, SummonRequest>();
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -329,20 +329,20 @@ export class TrainingScene extends Phaser.Scene {
       // its dialog close cancelled the request, so a late failure cannot
       // poison the scene. Any other load — a stage, a fighter a match
       // seats — still fails the scene.
-      const who = [...this.summonLoads].find(
+      const who = [...this.summonLoads.keys()].find(
         (loading) =>
           file.key === `fighter-${loading}` ||
           file.key.startsWith(`${loading}-`),
       );
       if (who) {
+        // The request may no longer be live — a close cancelled it — but
+        // its await still settles here, with the pack's real fate.
+        const request = this.summonLoads.get(who)!;
         this.summonLoads.delete(who);
-        const request = this.summonRequest;
-        if (request && request.who === who) {
-          this.settleSummon(request);
-          request.reject(
-            new Error(`Could not load ${who}. The match is unchanged.`),
-          );
-        }
+        this.settleSummon(request);
+        request.reject(
+          new Error(`Could not load ${who}. The match is unchanged.`),
+        );
         return;
       }
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
@@ -567,7 +567,7 @@ export class TrainingScene extends Phaser.Scene {
     this.modal = open;
     // Closing cancels a summon still loading: the dialog that asked for it
     // is gone, so nothing may spawn into the match it left.
-    if (!open) this.dropSummon('Summon cancelled.');
+    if (!open) this.cancelSummon();
     // Opening holds the pause the match was under; closing puts it back,
     // keeping a pause taken while the dialog was up (a window blur).
     if (open) this.pausedBefore = this.paused;
@@ -612,7 +612,7 @@ export class TrainingScene extends Phaser.Scene {
     this.demoRequest = undefined;
     this.routeLoad = undefined;
     this.cheatedBeforeRoute = undefined;
-    this.dropSummon('Summon cancelled.');
+    this.cancelSummon();
     this.loading = false;
     this.report();
   }
@@ -1195,12 +1195,17 @@ export class TrainingScene extends Phaser.Scene {
       match: this.match,
       resolve,
       reject,
-      shutdown: () => this.dropSummon('The scene shut down.'),
+      shutdown: () => {
+        this.settleSummon(request);
+        request.reject(new Error('The scene shut down.'));
+      },
     };
     this.summonRequest = request;
     // A scene shutdown (game destroyed mid-load) must not dangle the
-    // dialog's await; registered per request so a stubbed test scene can
-    // fire the same hook the real Phaser boot does.
+    // dialog's await, so it rejects at once — the only drop that settles
+    // the request itself, as no load will ever report for it. Registered
+    // per request so a stubbed test scene can fire the same hook the
+    // real Phaser boot does.
     this.events.once('shutdown', request.shutdown);
     if (this.players.has(who)) {
       this.spawnSummon(request);
@@ -1208,7 +1213,12 @@ export class TrainingScene extends Phaser.Scene {
     }
     // The pack is outstanding until it settles (COMPLETE or loaderror),
     // so a cancel followed by its failure still fails the summon alone.
-    this.summonLoads.add(who);
+    // A second summon of the same fighter supersedes a stale entry — its
+    // own load dedupes against the in-flight pack or the adopted art.
+    this.summonLoads
+      .get(who)
+      ?.reject(new Error('Another summon took over the load.'));
+    this.summonLoads.set(who, request);
     this.loadPlayer(who);
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {
       this.summonLoads.delete(who);
@@ -1287,13 +1297,15 @@ export class TrainingScene extends Phaser.Scene {
     this.events.off('shutdown', request.shutdown);
   }
 
-  // Drop an in-flight summon, rejecting its dialog await. The match, its
-  // arrays and the modal pause are untouched.
-  private dropSummon(reason: string) {
+  // Cancel an in-flight summon: the request stops being live so nothing
+  // spawns into the match its dialog left. The await itself still
+  // settles with the pack — COMPLETE's 'moved on', or a loaderror's own
+  // message — so the report lands when the load's fate is known rather
+  // than at the close, and the scene reads the settled outcome it would
+  // read on a completed summon.
+  private cancelSummon() {
     const request = this.summonRequest;
-    if (!request) return;
-    this.settleSummon(request);
-    request.reject(new Error(reason));
+    if (request) this.settleSummon(request);
   }
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).
