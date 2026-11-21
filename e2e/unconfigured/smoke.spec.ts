@@ -299,6 +299,79 @@ test('arrow keys walk menu rows; summon Enter follows the highlight', async ({
   expect(errors).toEqual([]);
 });
 
+test('↑/↓ past the Opponent row leave the Vs. CPU match running', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  const menu = page.getByRole('button', { name: 'Menu' });
+  const failed = page.getByText('Couldn’t enter the arena.');
+  await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+    timeout: 60_000,
+  });
+  await expect(failed).toBeHidden();
+  // Into a practice battle, as the journeys above.
+  const health = page.locator('[aria-label="Match health"]');
+  await expect(async () => {
+    await page.reload();
+    await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
+      timeout: 30_000,
+    });
+    for (const key of ['g', 's', 'g', 'g', 'g']) {
+      await page.keyboard.press(key);
+      await page.waitForTimeout(80);
+    }
+    await expect(health).toContainText('510 510', { timeout: 10_000 });
+  }).toPass({ timeout: 60_000 });
+
+  // From practice into a Vs. CPU match: the Opponent row's chooser
+  // reports the running mode.
+  await menu.click();
+  const dialog = page.getByRole('dialog', { name: 'Menu' });
+  await expect(dialog).toBeVisible();
+  const opponent = dialog.getByLabel('Opponent');
+  await opponent.selectOption('vsCpu');
+  await expect(opponent).toHaveValue('vsCpu');
+  await expect(opponent).toBeEnabled();
+
+  // ↑/↓ navigate rows, never the select: landing on Opponent focuses the
+  // row itself — a focused closed select would read ↑ as a pick, and
+  // resetModeOf would replace the paused match with free practice
+  // (HPA-972 review). Walk past it both ways and back.
+  await dialog.getByRole('checkbox', { name: 'Music' }).focus();
+  for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowUp');
+  const fieldRow = dialog.locator('label.field');
+  expect(await fieldRow.evaluate((row) => document.activeElement === row)).toBe(
+    true,
+  );
+  await page.keyboard.press('ArrowUp'); // wraps to Character select
+  await expect(
+    dialog.getByRole('button', { name: 'Character select', exact: true }),
+  ).toBeFocused();
+  await page.keyboard.press('ArrowDown'); // back to the Opponent row
+  expect(await fieldRow.evaluate((row) => document.activeElement === row)).toBe(
+    true,
+  );
+  await page.keyboard.press('ArrowDown'); // the 1P card
+  await expect(
+    dialog.getByRole('button', { name: /1P .* open character select/ }),
+  ).toBeFocused();
+  await page.keyboard.press('ArrowUp'); // Opponent row again
+  expect(await fieldRow.evaluate((row) => document.activeElement === row)).toBe(
+    true,
+  );
+  // The mode and the match behind it never moved: the select still reads
+  // the CPU match — a stray pick would have flipped it to a partner and
+  // restarted as practice.
+  await expect(opponent).toHaveValue('vsCpu');
+  // Enter is the row's chooser key: it opens the picker (and nothing
+  // commits until the picker's own Enter).
+  await page.keyboard.press('Enter');
+  await expect(opponent).toHaveValue('vsCpu');
+  expect(errors).toEqual([]);
+});
+
 test('clamped summon navigation still hands focus to the highlight', async ({
   page,
 }) => {

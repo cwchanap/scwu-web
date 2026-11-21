@@ -169,17 +169,20 @@
       dialog.focus();
   });
 
-  // ↑/↓ land a row's first enabled control — a portrait or select, then a
-  // stepper's ◀, a checkbox, an input — or the row itself when everything
-  // it holds is disabled. The portrait precedes the steppers: Enter on it
-  // opens character select rather than stepping (and restarting) at once.
+  // ↑/↓ land a row's first enabled control — a portrait, then a stepper's
+  // ◀, a checkbox, an input — or the row itself when everything it holds
+  // is disabled, and on the Opponent row always the row: a focused closed
+  // select would read ↑/↓ as a pick (a mode change can replace the match
+  // outright), so the chooser opens on Enter instead. The portrait
+  // precedes the steppers: Enter on it opens character select rather
+  // than stepping (and restarting) at once.
   function focusRow(row: HTMLElement | undefined) {
     if (!row) return;
     const control =
       row.querySelector<HTMLElement>('.tilebtn:not([disabled])') ??
       row.querySelector<HTMLElement>('[data-step] button:not([disabled])') ??
       row.querySelector<HTMLElement>(
-        'input:not([disabled]), select:not([disabled]), button:not([disabled])',
+        'input:not([disabled]), button:not([disabled])',
       );
     (control ?? row).focus();
   }
@@ -287,8 +290,9 @@
     // ↑/↓ walk the rows — from a control, a disabled row or a bare field.
     // They run before the input early-return, so navigation never strands
     // once an edit field is focused; the summon view's arrows walk the
-    // grid instead. A select keeps its own arrows: it opens and cycles
-    // natively rather than stranding on its row.
+    // grid instead. A select only ever holds focus while its picker is
+    // open — row navigation lands on its row — so its arrows stay its
+    // own there rather than stranding the walk.
     if (
       (key === 'ArrowDown' || key === 'ArrowUp') &&
       view !== 'summon' &&
@@ -308,6 +312,20 @@
     // takes no characters, so Q/E still reach the tab switch.
     if (target.closest?.('input:not([type="checkbox"]), select, textarea'))
       return;
+    // Enter on a focused row opens its chooser — the Opponent select —
+    // which arrows never reach while closed: once open it navigates and
+    // commits natively, and its change or cancel hands focus back to the
+    // row.
+    if (key === 'Enter' && target.matches?.('[data-row]')) {
+      const select = target.querySelector<HTMLElement & HTMLSelectElement>(
+        'select:not([disabled])',
+      );
+      if (select) {
+        event.preventDefault();
+        select.showPicker();
+        select.focus();
+      }
+    }
     if (view === 'summon') {
       // Tab flips the side; WASD and the arrows walk the grid; G/Enter
       // join the picked fighter; Esc closes natively.
@@ -502,8 +520,17 @@
                   <select
                     value={opponentChoice}
                     disabled={!status.ready}
-                    onchange={(event) =>
-                      onopponentchoice(event.currentTarget.value)}
+                    tabindex="-1"
+                    onchange={(event) => {
+                      onopponentchoice(event.currentTarget.value);
+                      event.currentTarget
+                        .closest<HTMLElement>('[data-row]')
+                        ?.focus();
+                    }}
+                    oncancel={(event) =>
+                      event.currentTarget
+                        .closest<HTMLElement>('[data-row]')
+                        ?.focus()}
                   >
                     {#if opponentChoice === 'story'}
                       <option value="story" disabled>Story mode</option>
@@ -957,6 +984,13 @@
   }
   .field {
     display: block;
+  }
+  /* Rows take programmatic focus so ↑/↓ can land on one whose controls
+     are all disabled or are the Opponent select's — the ring shows where
+     the walk sits. */
+  [data-row]:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 1px;
   }
   .label {
     display: block;
