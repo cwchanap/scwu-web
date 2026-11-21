@@ -6,6 +6,7 @@ import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
 import { Match, LIFE } from './match';
+import type { Fighter } from './match';
 import { MODE_SELECT_SIGN_KEYS, parsePack } from './packs';
 import {
   BOSSES,
@@ -18,7 +19,7 @@ import {
 import type { Demo } from './select';
 import { scenarioOf, Story, TAKES } from './story';
 import type { Battle } from './story';
-import { bossBrAnotherStory } from './br-another';
+import { bossBrAnotherStory, brAnotherStages } from './br-another';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { itWithArt } from './testing';
@@ -50,10 +51,44 @@ const boot = () => {
     [key: string]: unknown;
   };
   const completes: (() => void)[] = [];
+  const loadErrors: ((file: { key: string }) => void)[] = [];
+  const shutdowns: (() => void)[] = [];
   // The packs the scene queued (boot, stage, fighter and demo), in order.
   const files: PackFile[] = [];
   let cached = false;
   const silent = { play: () => {}, stop: () => {}, pause: () => {} };
+  // A chainable game object: every setter returns the object itself, enough
+  // for the draw loop to run for real (poses, depths, life bars).
+  const object = () => {
+    const o: { texture: string; visible: boolean; [key: string]: unknown } = {
+      texture: '',
+      visible: true,
+    };
+    for (const method of [
+      'setTexture',
+      'setVisible',
+      'setCrop',
+      'setX',
+      'setPosition',
+      'setScrollFactor',
+      'setOrigin',
+      'setScale',
+      'setDepth',
+      'setAlpha',
+      'setBlendMode',
+      'setFlip',
+      'setFlipX',
+      'clear',
+      'fillStyle',
+      'fillRect',
+    ])
+      o[method] = (arg?: unknown) => {
+        if (method === 'setTexture' && typeof arg === 'string') o.texture = arg;
+        if (method === 'setVisible') o.visible = !!arg;
+        return o;
+      };
+    return o;
+  };
   Object.assign(view, {
     sound: {
       pauseAll: () => {},
@@ -67,7 +102,9 @@ const boot = () => {
       // Stage music is the one individual file left (playMusic).
       audio: () => {},
       addFile: (file: PackFile) => files.push(file),
-      on: () => {},
+      on: (event: string, done: (file: { key: string }) => void) => {
+        if (event === 'loaderror') loadErrors.push(done);
+      },
       once: (_event: string, done: () => void) => void completes.push(done),
       start: () => {},
     },
@@ -79,6 +116,21 @@ const boot = () => {
     },
     children: { list: [] },
     cache: { audio: { exists: () => false, remove: () => {} } },
+    add: {
+      image: () => object(),
+      ellipse: () => object(),
+      rectangle: () => object(),
+      text: () => object(),
+      graphics: () => object(),
+    },
+    cameras: { main: { setScroll: () => {} } },
+    events: {
+      once: (_event: string, done: () => void) => void shutdowns.push(done),
+      off: (_event: string, done: () => void) => {
+        const at = shutdowns.indexOf(done);
+        if (at >= 0) shutdowns.splice(at, 1);
+      },
+    },
   });
   view.ready = true;
   view.select = null;
@@ -87,11 +139,21 @@ const boot = () => {
     view,
     statuses,
     completes,
+    loadErrors,
+    shutdowns,
     files,
+    // The real preload, against the stubs: registers the loaderror handler
+    // the way a Phaser boot does and queues the boot and stage packs.
+    preload: () => scene.preload(),
     // Every player's art already in, so a match change starts at once.
     artIn: () => {
       cached = true;
       view.players = new Set(Object.keys(CHARACTERS) as Who[]);
+    },
+    // The fighters' own packs decoded into the caches (resident textures)
+    // without seating anyone: what a finished pack load leaves behind.
+    packIn: () => {
+      cached = true;
     },
     finishLoad: () => {
       for (const done of completes.splice(0)) done();
@@ -725,6 +787,24 @@ describe('cheats (HPA-767)', () => {
     expect(scene.match.fighters[0].maxHp).toBe(1530);
   });
 
+  it('reads the No-partner reseating’s palettes at begin, paused start included', () => {
+    const { scene, view } = boot();
+    // The B.R. ANOTHER stage-2 battle seats its donated ally last, so the
+    // No-partner reseat drops the highest native seat — the seating the
+    // displayed palettes must read after the snapshot installs.
+    const battle = brAnotherStages('masa').stage2!;
+    const match = Match.story('masa', battle, 0, undefined, undefined, true);
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true, brNoPartner: true });
+    (view.begin as (m: Match, paused?: boolean) => void)(match, true);
+    expect(match.cheats.brNoPartner).toBe(true);
+    const shown = view as unknown as { palettes: number[] };
+    expect(shown.palettes).toEqual(match.palettes);
+    expect(shown.palettes).toHaveLength(match.fighters.length);
+    expect(match.fighters.length).toBeLessThan(battle.slots.length + 1);
+    // The battle began paused and stays paused.
+    expect(scene.paused).toBe(true);
+  });
+
   it('marks a cheated run and resets it on a new non-story match', () => {
     const { scene, artIn, statuses } = boot();
     artIn();
@@ -795,11 +875,11 @@ describe('cheats (HPA-767)', () => {
     const { scene, artIn, statuses } = boot();
     artIn();
     scene.setCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, enemyHpMultiplier: 0.5 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, enemyHpMultiplier: 2 }),
     );
     scene.reset('practice');
-    expect(statuses.at(-1)?.hp).toEqual([1020, 245]);
-    expect(statuses.at(-1)?.life).toEqual([1020, 245]);
+    expect(statuses.at(-1)?.hp).toEqual([1020, 980]);
+    expect(statuses.at(-1)?.life).toEqual([1020, 980]);
   });
 
   it('divides the world life bars by the effective maximum', () => {
@@ -849,16 +929,16 @@ describe('cheats (HPA-767)', () => {
       },
       0,
     );
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
     while (!match.lifeBars.length) match.step();
     const bar = match.lifeBars[0];
-    bar.hp = 50;
+    bar.hp = 200;
     view.match = match;
     (view.drawLifeBars as () => void)();
     const backing = drawn.find((r) => r.color === 0 && r.h === 15)!;
     const green = drawn.find((r) => r.color === 0x00ff00)!;
     // The green row is 25 of the bar's 50 source pixels — half life against
-    // the halved maximum, where the native maximum would fill all 50
+    // the doubled maximum, where the native maximum would fill all 50
     // (1.5× art scale, ±1px for the two rounded edges).
     expect(green.h).toBe(12);
     expect(backing.w - green.w).toBeGreaterThanOrEqual(37);
@@ -903,13 +983,13 @@ describe('cheats (HPA-767)', () => {
       finishLoad();
       return { kind: 'demo' as const, demo: (view.select as StoryDemo).index };
     };
-    // ×0.5 (maximum 255): 81 and 80 scaled read as native 162 and 160 —
-    // the tight pair’s lower edge and the route below it; 82 and 125 land
+    // ×4 (maximum 2040): 648 and 640 scaled read as native 162 and 160 —
+    // the tight pair's lower edge and the route below it; 656 and 1000 land
     // in the middle and top bands.
-    expect(await route(0.5, 81)).toEqual(native(162));
-    expect(await route(0.5, 80)).toEqual(native(160));
-    expect(await route(0.5, 82)).toEqual(native(164));
-    expect(await route(0.5, 125)).toEqual(native(250));
+    expect(await route(4, 648)).toEqual(native(162));
+    expect(await route(4, 640)).toEqual(native(160));
+    expect(await route(4, 656)).toEqual(native(164));
+    expect(await route(4, 1000)).toEqual(native(250));
     // ×2 (maximum 1020): 325 reads as native 162, and 500 keeps the full-
     // life route.
     expect(await route(2, 325)).toEqual(native(162));
@@ -1754,5 +1834,347 @@ describe('mode select (HPA-858 bosses)', () => {
     expect(statuses.at(-1)?.cheated).toBe(true);
     finishLoad();
     expect(statuses.at(-1)?.cheated).toBe(true);
+  });
+});
+
+describe('scene summon (HPA-972)', () => {
+  const idleOf = (scene: TrainingScene, index: number) =>
+    (scene as unknown as { idle: { frame: unknown; seed: number }[] }).idle[
+      index
+    ];
+  const state = (scene: TrainingScene) =>
+    scene as unknown as {
+      idle: unknown[];
+      idling: boolean[];
+      palettes: number[];
+      players: Set<Who>;
+      sprites: { texture: string; visible: boolean }[];
+      modal: boolean;
+      summonRequest: unknown;
+      pendingCheats: CheatOptions;
+    };
+
+  it('spawns a resident fighter at once, extending the scene arrays', async () => {
+    const { scene, artIn } = boot();
+    artIn();
+    scene.setModal(true);
+    await scene.summon('golf', 1);
+    const view = state(scene);
+    expect(scene.match.fighters).toHaveLength(3);
+    expect(scene.match.fighters[2]!.who).toBe('golf');
+    expect(view.idle).toHaveLength(3);
+    expect(view.idling).toEqual([true, true, false]);
+    // The new VM already ticked: it holds a frame for the draw loop.
+    expect(idleOf(scene, 2).frame).toBeTruthy();
+    // A non-story battle's summon draws with palette 0.
+    expect(view.palettes).toHaveLength(3);
+    expect(view.palettes[2]).toBe(0);
+    expect(view.players.has('golf')).toBe(true);
+    expect(view.sprites).toHaveLength(3);
+    // The modal held for the summon stays held; the dialog close lifts it.
+    expect(view.modal).toBe(true);
+  });
+
+  it('waits for the fighter pack, then registers the player and spawns', async () => {
+    const { scene, view, files, finishLoad } = boot();
+    const pending = scene.summon('golf', 1);
+    // The pack queued and the fight held while it loads.
+    expect(files.some((file) => file.key === 'fighter-golf')).toBe(true);
+    expect(view.loading).toBe(false);
+    expect(state(scene).players.has('golf')).toBe(false);
+    expect(state(scene).idle).toHaveLength(2);
+    let done = false;
+    void pending.then(() => {
+      done = true;
+    });
+    finishLoad();
+    await pending;
+    expect(done).toBe(true);
+    const summoned = state(scene);
+    expect(summoned.players.has('golf')).toBe(true);
+    expect(scene.match.fighters).toHaveLength(3);
+    expect(summoned.idle).toHaveLength(3);
+    expect(summoned.idling).toEqual([true, true, false]);
+    expect(summoned.palettes[2]).toBe(0);
+    expect(summoned.sprites).toHaveLength(3);
+  });
+
+  it('renders the idle summon on the next unfrozen frame', async () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    await scene.summon('golf', 1);
+    scene.setModal(false);
+    // A full unfrozen update: the draw loop reads every fighter's pose, so
+    // a missing idle VM would crash here.
+    (view.update as (t: number, d: number) => void)(0, 10);
+    expect((scene as unknown as { error: string }).error).toBe('');
+    const sprite = state(scene).sprites[2]!;
+    expect(sprite.visible).toBe(true);
+    expect(sprite.texture).toMatch(/^golf-/);
+  });
+
+  it('rejects without freezing when there is no live match to join', async () => {
+    const { scene, view } = boot();
+    view.ready = false;
+    await expect(scene.summon('golf', 1)).rejects.toThrow('ready');
+    expect(state(scene).modal).toBe(false);
+    view.ready = true;
+    view.select = new Title();
+    await expect(scene.summon('golf', 1)).rejects.toThrow('match');
+    view.select = null;
+    view.loading = true;
+    await expect(scene.summon('golf', 1)).rejects.toThrow('match');
+    view.loading = false;
+    // A full arena never opens the modal either.
+    const filler = { who: 'golf' } as Fighter;
+    for (let i = 0; i < 8; i++) scene.match.fighters.push(filler);
+    await expect(scene.summon('golf', 1)).rejects.toThrow('full');
+    expect(state(scene).modal).toBe(false);
+    expect(scene.match.fighters).toHaveLength(10);
+    // A finished match takes no summon either: its result transition has
+    // run out (the fields the resultReady getter reads).
+    while (scene.match.fighters.length > 2) scene.match.fighters.pop();
+    const finished = scene.match as unknown as {
+      calls: boolean;
+      winner: string | null;
+      wins: number[];
+      endingTicks: number;
+      roundEnd: number;
+    };
+    finished.calls = true;
+    finished.winner = 'opponent';
+    finished.wins = [3, 0];
+    finished.endingTicks = finished.roundEnd + 999;
+    expect(scene.match.resultReady).toBe(true);
+    await expect(scene.summon('golf', 1)).rejects.toThrow('match');
+  });
+
+  it('fails the summon alone when its pack fails, match intact', async () => {
+    const { scene, view, loadErrors, finishLoad, preload } = boot();
+    preload();
+    const pending = scene.summon('golf', 1);
+    let failed: unknown = null;
+    pending.catch((error: unknown) => {
+      failed = error;
+    });
+    // The summon's own pack errors — every other load still poisons the
+    // scene, so the handler keys on the pack's key.
+    expect(loadErrors).toHaveLength(1);
+    loadErrors[0]!({ key: 'golf-419' });
+    await Promise.resolve();
+    expect(failed).toBeTruthy();
+    const view_ = state(scene);
+    expect(view_.summonRequest).toBeUndefined();
+    // The scene is unharmed: no error, the match and its arrays untouched.
+    expect((scene as unknown as { error: string }).error).toBe('');
+    expect(scene.match.fighters).toHaveLength(2);
+    expect(view_.idle).toHaveLength(2);
+    expect((view as { error?: string }).error ?? '').toBe('');
+    // A later COMPLETE (a match load) spawns nothing.
+    finishLoad();
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('fails the scene as before when an unrelated load errors', () => {
+    const { scene, loadErrors, preload } = boot();
+    preload();
+    expect(loadErrors).toHaveLength(1);
+    loadErrors[0]!({ key: 'court-3' });
+    expect((scene as unknown as { error: string }).error).toContain('court-3');
+  });
+
+  it('cancels a summon when the dialog closes, restoring the pause', async () => {
+    const { scene, finishLoad } = boot();
+    scene.togglePause();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The pre-existing pause came back with the modal, and the load's
+    // completion spawns nothing.
+    expect(scene.paused).toBe(true);
+    finishLoad();
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('tracks a cancelled summon’s finished pack and frees it at the next match', async () => {
+    const { scene, view, finishLoad, packIn } = boot();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The pack's late completion decoded its art: no spawn, but the
+    // resident fighter joins the loaded players so the caches stay
+    // accountable.
+    packIn();
+    finishLoad();
+    const state_ = state(scene);
+    expect(state_.players.has('golf')).toBe(true);
+    expect(scene.match.fighters).toHaveLength(2);
+    // A second summon of the same fighter finds it resident at once.
+    scene.setModal(true);
+    await scene.summon('golf', 1);
+    expect(scene.match.fighters).toHaveLength(3);
+    scene.setModal(false);
+    // The next match that doesn't seat golf frees the adopted art: the
+    // unload runs through the same cache cleanup a native player takes.
+    const removed: string[] = [];
+    (view.cache as { audio: { remove: (key: string) => void } }).audio.remove =
+      (key: string) => void removed.push(key);
+    scene.setFighter('zoma');
+    finishLoad();
+    expect(state(scene).players.has('golf')).toBe(false);
+    expect(removed.some((key) => key.startsWith('golf-sound-'))).toBe(true);
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('a cancelled summon failing later leaves the scene intact', async () => {
+    const { scene, loadErrors, finishLoad, preload } = boot();
+    preload();
+    scene.togglePause();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    // The cancelled pack is still outstanding; its failure must not
+    // poison the preserved match with the global scene error.
+    loadErrors[0]!({ key: 'golf-419' });
+    await Promise.resolve();
+    expect((scene as unknown as { error: string }).error).toBe('');
+    expect(scene.match.fighters).toHaveLength(2);
+    expect(scene.paused).toBe(true);
+    // A later COMPLETE spawns nothing either.
+    finishLoad();
+    expect(scene.match.fighters).toHaveLength(2);
+    // Tracking settles with the pack: a fresh summon still owns its own
+    // failure alone, and an unrelated key still fails the scene.
+    const second = scene.summon('golf', 1);
+    loadErrors[0]!({ key: 'golf-401' });
+    await expect(second).rejects.toThrow('Could not load golf');
+    expect((scene as unknown as { error: string }).error).toBe('');
+    loadErrors[0]!({ key: 'court-3' });
+    expect((scene as unknown as { error: string }).error).toContain('court-3');
+  });
+
+  it('leaves a stale summon unmatched when the match was replaced', async () => {
+    const { scene, view, finishLoad } = boot();
+    const pending = scene.summon('golf', 1);
+    // A reset inside the dialog (or any pick) swaps the match while the
+    // pack loads.
+    scene.match = new Match('cpu', true);
+    finishLoad();
+    await expect(pending).rejects.toThrow('moved on');
+    expect(scene.match.fighters).toHaveLength(2);
+    expect(state(scene).idle).toHaveLength(2);
+    expect(view.loading).toBe(false);
+  });
+
+  it('rejects an in-flight summon when the scene shuts down', async () => {
+    const { scene, shutdowns } = boot();
+    const pending = scene.summon('golf', 1);
+    for (const done of [...shutdowns]) done();
+    await expect(pending).rejects.toThrow('shut down');
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('settles each summon’s shutdown hook, leaving none behind', async () => {
+    const { scene, shutdowns, finishLoad } = boot();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    expect(shutdowns).toHaveLength(1);
+    // A cancel takes its hook off with it.
+    scene.setModal(false);
+    await expect(pending).rejects.toThrow('cancel');
+    expect(shutdowns).toHaveLength(0);
+    // The next summon owns exactly one hook again.
+    scene.setModal(true);
+    const second = scene.summon('golf', 1);
+    expect(shutdowns).toHaveLength(1);
+    // A cancel while the pack is still loading keeps that one hook, and
+    // the pack's late completion settles the second request's own.
+    scene.setModal(false);
+    await expect(second).rejects.toThrow('cancel');
+    expect(shutdowns).toHaveLength(0);
+    finishLoad();
+    expect(shutdowns).toHaveLength(0);
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
+  it('summons with the pending cheats after a mid-battle enable', async () => {
+    const { scene, artIn } = boot();
+    artIn();
+    // The battle's snapshot stays native: setCheats only holds the next
+    // battle's values — the explicit summon reads them now.
+    scene.setCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 3,
+    });
+    await scene.summon('zoma', -1);
+    expect(scene.match.cheats.enabled).toBe(false);
+    expect(scene.match.fighters[2]!.maxHp).toBe(lifeOf('zoma') * 3);
+    // With the snapshot already enabled, it — not the pending edit — wins.
+    const { scene: second, artIn: artIn2 } = boot();
+    artIn2();
+    second.match.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 2,
+    });
+    second.setCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      enemyHpMultiplier: 3,
+    });
+    await second.summon('zoma', -1);
+    expect(second.match.fighters[2]!.maxHp).toBe(lifeOf('zoma') * 2);
+    // A disabled pending set leaves the new fighter native.
+    const { scene: third, artIn: artIn3 } = boot();
+    artIn3();
+    third.setCheats({ ...DEFAULT_CHEATS });
+    await third.summon('zoma', -1);
+    expect(third.match.fighters[2]!.maxHp).toBe(lifeOf('zoma'));
+    expect(third.match.fighters[2]!.maxStock).toBe(
+      third.match.fighters[1]!.maxStock,
+    );
+  });
+
+  it('marks the run cheated and reports it the moment the summon lands', async () => {
+    const { scene, artIn, statuses } = boot();
+    artIn();
+    await scene.summon('golf', 1);
+    // The modal's opening report ran before the summon, the landing one
+    // after: the run's cheated mark flips between them.
+    expect(statuses[0]?.cheated).toBe(false);
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    expect(scene.match.cheated).toBe(true);
+  });
+
+  it('gives a story summon the story palette', async () => {
+    const { scene, artIn } = boot();
+    artIn();
+    const battle = scenarioOf('rario').find((step) => step.type === 1);
+    expect(battle?.type).toBe(1);
+    scene.match = Match.story('rario', battle as Battle);
+    // begin() would have synced the seats' palettes; mirror it.
+    (state(scene) as unknown as { palettes: number[] }).palettes = [
+      ...scene.match.palettes,
+    ];
+    await scene.summon('shinz', 1);
+    const view = state(scene);
+    const index = scene.match.fighters.length - 1;
+    expect(scene.match.fighters[index]!.who).toBe('shinz');
+    expect(scene.match.battle).toBeTruthy();
+    expect(view.palettes[index]).toBe(scene.match.palettes[index]);
+    expect(view.palettes[index]).toBeGreaterThanOrEqual(0);
+  });
+
+  it('refuses a second summon while one loads', async () => {
+    const { scene, finishLoad } = boot();
+    const first = scene.summon('golf', 1);
+    await expect(scene.summon('zoma', -1)).rejects.toThrow('already');
+    finishLoad();
+    await first;
+    expect(scene.match.fighters.map((f) => f.who)).toContain('golf');
   });
 });

@@ -200,7 +200,7 @@
   </aside>
 
   <main>
-    <h2><span>Profile</span></h2>
+    <h2 class="chrome"><span>Profile</span></h2>
     {#if me}
       <div class="panel">
         <dl class="rows">

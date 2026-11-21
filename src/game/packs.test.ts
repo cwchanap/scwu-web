@@ -191,6 +191,11 @@ describe('exported packs', () => {
         [
           ...ui.images.map((i) => `ui-${i.index}`),
           'text',
+          // The authored EN stock digits (HPA-971), HUD keys en-7 … en-10.
+          'en-7',
+          'en-8',
+          'en-9',
+          'en-10',
           ...select.images.map((i) => `select-${i.index}`),
           ...t2.images.map((i) => `t2-${i.index}`),
           ...fighters.flatMap((who) =>

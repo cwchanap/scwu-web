@@ -46,6 +46,7 @@ import {
   HEIGHT,
   LIFE,
   Match,
+  MAX_FIGHTERS,
   stepShake,
   WIDTH,
 } from './match';
@@ -152,6 +153,21 @@ const keyMap: Record<string, Control> = {
   KeyJ: 'throw',
   KeyE: 'ex',
 };
+
+// A summon awaiting its fighter pack (HPA-972): the token a later load's
+// COMPLETE handler compares against, the match it must still be, and the
+// promise App's dialog awaits.
+interface SummonRequest {
+  who: Who;
+  side: -1 | 1;
+  match: Match;
+  resolve: () => void;
+  reject: (error: unknown) => void;
+  // The per-request shutdown hook, so settling — success, cancel or a
+  // replaced request — removes it instead of letting one per summon
+  // accumulate on the scene until shutdown.
+  shutdown: () => void;
+}
 
 // The free state's program (action 1), which reads the fighter's variable 0
 // (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
@@ -275,6 +291,16 @@ export class TrainingScene extends Phaser.Scene {
   // run's cheated mark if no new run began.
   private routeLoad?: object;
   private cheatedBeforeRoute?: boolean;
+  // The summon in flight (HPA-972): its own request token, the match it
+  // joined and the promise a Menu dialog awaits. Any dialog close, screen
+  // opening, match replacement or scene shutdown drops it before it can
+  // spawn.
+  private summonRequest?: SummonRequest;
+  // Summon packs still loading, tracked apart from the active request:
+  // a close cancels the request but leaves the pack in flight, and its
+  // late loaderror must still fail alone instead of poisoning the live
+  // scene. An entry settles when its pack completes or errors.
+  private summonLoads = new Set<Who>();
   // The tracks the loaded demos cue, by sound key.
   private demoTracks = new Set<string>();
   private selectSprites: Phaser.GameObjects.Image[] = [];
@@ -296,6 +322,29 @@ export class TrainingScene extends Phaser.Scene {
       new PackFile(this.load, 'boot', () => this.textures.exists('text')),
     );
     this.load.on('loaderror', (file: Phaser.Loader.File) => {
+      // A summon's own pack failing fails the summon alone (HPA-972): the
+      // match stays intact and the dialog reports it. A pack's key names
+      // it (fighter-<who>) and so does every art key inside it
+      // (<who>-<image>), and it stays owned until it settles — even after
+      // its dialog close cancelled the request, so a late failure cannot
+      // poison the scene. Any other load — a stage, a fighter a match
+      // seats — still fails the scene.
+      const who = [...this.summonLoads].find(
+        (loading) =>
+          file.key === `fighter-${loading}` ||
+          file.key.startsWith(`${loading}-`),
+      );
+      if (who) {
+        this.summonLoads.delete(who);
+        const request = this.summonRequest;
+        if (request && request.who === who) {
+          this.summonRequest = undefined;
+          request.reject(
+            new Error(`Could not load ${who}. The match is unchanged.`),
+          );
+        }
+        return;
+      }
       this.error = `Could not load ${file.key}. Run bun run assets, then reload.`;
       this.report();
     });
@@ -516,6 +565,9 @@ export class TrainingScene extends Phaser.Scene {
   setModal(open: boolean) {
     if (this.modal === open) return;
     this.modal = open;
+    // Closing cancels a summon still loading: the dialog that asked for it
+    // is gone, so nothing may spawn into the match it left.
+    if (!open) this.dropSummon('Summon cancelled.');
     // Opening holds the pause the match was under; closing puts it back,
     // keeping a pause taken while the dialog was up (a window blur).
     if (open) this.pausedBefore = this.paused;
@@ -560,6 +612,7 @@ export class TrainingScene extends Phaser.Scene {
     this.demoRequest = undefined;
     this.routeLoad = undefined;
     this.cheatedBeforeRoute = undefined;
+    this.dropSummon('Summon cancelled.');
     this.loading = false;
     this.report();
   }
@@ -818,11 +871,29 @@ export class TrainingScene extends Phaser.Scene {
       (sound) => !select.sounds.has(sound.index),
     );
     if (!restImages.length && !restSounds.length) return;
-    // Resident once its first entry is in.
-    const resident = restImages.length
-      ? () => this.textures.exists(`${who}-${restImages[0].index}`)
-      : () => this.cache.audio.exists(`${who}-sound-${restSounds[0].index}`);
-    this.load.addFile(new PackFile(this.load, `fighter-${who}`, resident));
+    if (this.residentPack(who)) return;
+    this.load.addFile(
+      new PackFile(this.load, `fighter-${who}`, () => this.residentPack(who)),
+    );
+  }
+  // Whether the fighter's own pack is already in the caches: resident once
+  // its first non-select entry is in. A failed pack decodes nothing, so
+  // this stays false for one that never landed.
+  private residentPack(who: Who): boolean {
+    const { images, sounds } = CHARACTERS[who];
+    const select = selectAssets[who];
+    const signs = new Set(MODE_SELECT_SIGNS[who] ?? []);
+    const restImages = images.filter(
+      (image) => !select.images.has(image.index) && !signs.has(image.index),
+    );
+    if (restImages.length)
+      return this.textures.exists(`${who}-${restImages[0].index}`);
+    const restSounds = sounds.filter(
+      (sound) => !select.sounds.has(sound.index),
+    );
+    return restSounds.length
+      ? this.cache.audio.exists(`${who}-sound-${restSounds[0].index}`)
+      : true;
   }
   private unloadPlayers(keep: Set<Who>) {
     const textures = new Set<string>();
@@ -1030,13 +1101,13 @@ export class TrainingScene extends Phaser.Scene {
   }
   private begin(match: Match, paused = false) {
     this.match = match;
+    // The battle's cheat snapshot installs first (match.ts useCheats): a
+    // B.R. battle's No partner reseats here, and the displayed palettes
+    // below must read the seating it leaves, not the constructor's —
+    // before its first tick, so a later change still waits (HPA-767).
+    this.match.useCheats(this.pendingCheats);
     this.roundPalettes();
     this.match.practice = { ...this.practice };
-    // The battle's cheat snapshot installs here, before its first tick
-    // (match.ts useCheats): a change before this point applies to this
-    // battle — also one made while it loaded — and a later one waits for
-    // the next.
-    this.match.useCheats(this.pendingCheats);
     // A non-story match is a run of its own; a story battle ORs into the
     // route's mark, which the route's selection reset.
     this.cheatedBeforeRoute = undefined;
@@ -1082,6 +1153,137 @@ export class TrainingScene extends Phaser.Scene {
       } else this.selectTrack?.stop();
     } else this.playMusic();
     this.report();
+  }
+
+  // One mid-match summon (HPA-972): loads the fighter's pack, then seats
+  // a CPU into the live match. The caller (App's dialog) holds the fight
+  // with setModal; this only adds to it, idempotently, and never lifts it —
+  // the dialog's close does. Never whenReady: that begins a new match.
+  summon(who: Who, side: -1 | 1): Promise<void> {
+    if (!this.ready || this.error)
+      return Promise.reject(new Error('The arena is not ready.'));
+    if (this.select || this.loading || this.match.resultReady)
+      return Promise.reject(new Error('No live match to summon into.'));
+    if (this.summonRequest)
+      return Promise.reject(new Error('A summon is already loading.'));
+    if (this.match.fighters.length >= MAX_FIGHTERS)
+      return Promise.reject(new Error('The arena is already full.'));
+    this.setModal(true);
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    const request: SummonRequest = {
+      who,
+      side,
+      match: this.match,
+      resolve,
+      reject,
+      shutdown: () => this.dropSummon('The scene shut down.'),
+    };
+    this.summonRequest = request;
+    // A scene shutdown (game destroyed mid-load) must not dangle the
+    // dialog's await; registered per request so a stubbed test scene can
+    // fire the same hook the real Phaser boot does.
+    this.events.once('shutdown', request.shutdown);
+    if (this.players.has(who)) {
+      this.spawnSummon(request);
+      return promise;
+    }
+    // The pack is outstanding until it settles (COMPLETE or loaderror),
+    // so a cancel followed by its failure still fails the summon alone.
+    this.summonLoads.add(who);
+    this.loadPlayer(who);
+    this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+      this.summonLoads.delete(who);
+      this.spawnSummon(request);
+    });
+    this.load.start();
+    return promise;
+  }
+
+  // The request token decides: anything else — a cancel, a newer request,
+  // a later load's COMPLETE — leaves the match as it stands.
+  private spawnSummon(request: SummonRequest) {
+    const live = this.summonRequest === request;
+    this.settleSummon(request);
+    if (!live) {
+      // The pack finished after its summon was cancelled or superseded.
+      // When its art actually landed, track the fighter with the loaded
+      // players: the next match change's unloadPlayers then frees what it
+      // does not seat, and no second summon of the same fighter re-
+      // downloads a resident pack. (A failed pack decodes nothing — it
+      // stays unowned and a fresh summon loads it again.) Nothing spawns
+      // here either way.
+      if (this.residentPack(request.who)) this.players.add(request.who);
+      request.reject(
+        new Error('The match moved on before the fighter loaded.'),
+      );
+      return;
+    }
+    if (this.select || this.loading || this.match !== request.match) {
+      request.reject(
+        new Error('The match moved on before the fighter loaded.'),
+      );
+      return;
+    }
+    const f = this.match.summon(
+      request.who,
+      request.side,
+      this.effectiveSummonCheats(),
+    );
+    if (!f) {
+      request.reject(new Error('The arena is already full.'));
+      this.report();
+      return;
+    }
+    const index = this.match.fighters.indexOf(f);
+    // The fighter's art is here (loaded or resident), so it stays unloadable
+    // with the match's own players.
+    this.players.add(request.who);
+    // Its idle program starts at once and holds a frame, so the draw loop
+    // can pose it before the next unfrozen tick rebuilds the VM.
+    const vm = idleVM(f, index);
+    vm.tick();
+    this.idle.push(vm);
+    this.idling.push(false);
+    // A story's summon takes the palette its seat drew; versus and practice
+    // draw with none.
+    this.palettes.push(
+      this.match.battle ? (this.match.palettes[index] ?? 0) : 0,
+    );
+    this.growFighters(this.match.fighters.length);
+    // A summon marks the run cheated at once, snapshot enabled or not.
+    this.runCheated ||= this.match.cheated;
+    this.report();
+    request.resolve();
+  }
+
+  // The cheats the new fighter alone takes: the battle's snapshot when it
+  // was already cheat-enabled, otherwise a cheat mode the player turned on
+  // mid-battle (still pending for the next battle). Otherwise the frozen
+  // snapshot's off state — no scaling.
+  private effectiveSummonCheats(): CheatOptions {
+    if (this.match.cheats.enabled) return { ...this.match.cheats };
+    return { ...this.pendingCheats };
+  }
+
+  // Settle a request: clear it while it is still the live one and take
+  // its shutdown hook off the scene, so repeated summons leave none behind.
+  private settleSummon(request: SummonRequest) {
+    if (this.summonRequest === request) this.summonRequest = undefined;
+    this.events.off('shutdown', request.shutdown);
+  }
+
+  // Drop an in-flight summon, rejecting its dialog await. The match, its
+  // arrays and the modal pause are untouched.
+  private dropSummon(reason: string) {
+    const request = this.summonRequest;
+    if (!request) return;
+    this.settleSummon(request);
+    request.reject(new Error(reason));
   }
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).
@@ -1417,6 +1619,10 @@ export class TrainingScene extends Phaser.Scene {
             if (vm.ended || !this.idling[i]) this.idle[i] = idleVM(f, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
+            // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's
+            // idle stance marks (a stance change, never the supers bypass).
+            const { enabled, lowHpLine } = this.match.cheats;
+            this.idle[i].lifeLine = i === 0 && enabled ? lowHpLine : 30;
             this.idle[i].tick();
             for (const index of this.idle[i].sounds.splice(0))
               this.play(`${f.who}-sound-${index}`, i);
