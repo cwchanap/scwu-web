@@ -1,5 +1,4 @@
 // Port of the handoff's verified StandingVM subset, not the full gameplay VM.
-import { lifeMarkOf } from './life';
 
 export interface Frame {
   pc: number;
@@ -92,10 +91,12 @@ export class StandingVM {
   // truncated. Equal maxima keep every mark native.
   lifeMax = 1;
   lifeNative = 1;
-  // Authored (HPA-972): 1P's Low HP line over the native 30, which scales
-  // SIN's and SOU's op 0x11 stance marks — a stance change the scene
-  // moves; the Low-HP supers bypass never touches it.
-  lifeLineScale = 1;
+  // Authored (HPA-972): 1P's Low HP line percent (the native 30 scales
+  // nothing), which moves SIN's and SOU's op 0x11 stance marks — a stance
+  // change the scene moves; the Low-HP supers bypass never touches it.
+  // Held as the raw percent so the mark truncates once, exactly as
+  // match.ts's lineScaledMark truncates the same product.
+  lifeLine = 30;
   collisionRecords: Record<number, number | null> = {};
   color: number | null = null;
   // Op 0x03 cues (0x4132c8) since the scene last played them: GIGI's idle
@@ -273,11 +274,21 @@ export class StandingVM {
         // the effective maximum as lifeMark does — every mark but the exact
         // 1-HP sentinel and nonpositive ones, floored at 1 — reading the
         // scaled `life` against the same share of the bar. Authored
-        // (HPA-972): the Low HP line scales it further, in proportion.
-        const mark =
-          lifeMarkOf(u16(r, 6), this.lifeMax, this.lifeNative) *
-          this.lifeLineScale;
-        const line = Math.trunc(mark);
+        // (HPA-972): the Low HP line scales it further, in proportion —
+        // the same full-precision single truncation match.ts's
+        // lineScaledMark applies to the identical product, so the idle
+        // stance line and the script gate never differ by a rounding step.
+        const scaled = (u16(r, 6) * this.lifeLine) / 30;
+        const line =
+          scaled <= 0 || scaled === 1
+            ? scaled
+            : Math.max(
+                1,
+                Math.trunc(
+                  (u16(r, 6) * this.lifeLine * this.lifeMax) /
+                    (30 * this.lifeNative),
+                ),
+              );
         if (r[5] & 1 ? this.life <= line : this.life >= line && u16(r, 2)) {
           this.target(u16(r, 2), r[4]);
           continue;

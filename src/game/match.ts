@@ -2591,7 +2591,13 @@ export class Match {
     this.spent.push(-1);
     this.slots.push(null);
     this.waits.push(null);
-    const seat = Math.max(...this.seats) + 1;
+    // Authored (HPA-972): a seat no native of this battle can ever hold —
+    // past every battle slot, so a No-partner reseat's dropped ally seat,
+    // every native scorer/watch seat and every native held-palette entry
+    // keep their original identity in this and later battles.
+    const seat = this.battle
+      ? Math.max(this.battle.slots.length, ...this.seats) + 1
+      : Math.max(...this.seats) + 1;
     this.seats.push(seat);
     if (this.battle) this.takeSeat(index);
     const vm = new CpuVM(
@@ -2895,11 +2901,27 @@ export class Match {
       caught && ('clip' in caught ? this.fighters[caught.owner] : caught);
     const pick = (n: number) =>
       n === 0 ? striker : n <= 8 ? this.bySeat(n - 1) : null;
-    const scorer = pick(slot ? slot.scorer : battle.koScorer);
+    let scorer = pick(slot ? slot.scorer : battle.koScorer);
+    // Authored (HPA-972): a summon never scores a native KO. The source's
+    // striker (0) resolves to a native of the striker's own side — the 1P
+    // for its allies, the first native hostile otherwise — so the points
+    // land where the natives-only outcome checks can read them and the
+    // round ends as the source would end it; the summon's own points stay
+    // empty. A seat-named scorer only names native seats.
+    if (scorer && this.fighters.indexOf(scorer) >= this.nativeCount)
+      scorer = this.hostile(0, this.fighters.indexOf(scorer))
+        ? (this.natives.find((n, i) => i > 0 && this.hostile(0, i)) ?? null)
+        : this.fighters[0];
     if (scorer) scorer.points += slot ? slot.points : battle.koPoints;
     const award = slot ? (slot.flags >> 7) & 3 : 0;
-    const bonus = slot && [null, this.fighters[0], striker][award];
-    if (!bonus) return;
+    const picked = slot && [null, this.fighters[0], striker][award];
+    // Authored (HPA-972): the striker's share of a KO bonus passes a
+    // summon by — it holds no seat and takes no native award.
+    const bonus =
+      picked && this.fighters.indexOf(picked) >= this.nativeCount
+        ? null
+        : picked;
+    if (!slot || !bonus) return;
     // Authored (HPA-972): a B.R. battle's award to the 1P itself can be
     // replaced by the per-kill overrides — null keeps the source amounts, a
     // positive HP award scales by lifeAmount, and 0 skips the gain

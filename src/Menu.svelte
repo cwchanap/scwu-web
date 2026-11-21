@@ -225,6 +225,11 @@
     if (summoning) return;
     const entry = summonables[cursor]!;
     summoning = true;
+    // Confirming disables the tiles, which would drop a focused tile's
+    // focus to the body — where the dialog's keydown never runs and the
+    // arena reads Esc and P again. Take the dialog itself first, so the
+    // keys stay ours through a slow pack load.
+    dialog?.focus();
     note = { kind: 'load', text: `Loading ${entry.name}…` };
     try {
       await onsummon(entry.id, side);
@@ -236,9 +241,8 @@
       };
     } finally {
       summoning = false;
-      // The clicked tile was disabled while loading, which dropped focus
-      // to the body — and a dialog without focus stays open on Esc. Put
-      // it back so the keys (Esc included) keep working.
+      // The re-enable and a pointer click elsewhere can still have moved
+      // focus off the dialog; keep the keys ours.
       dialog?.focus();
     }
   }
@@ -327,6 +331,7 @@
   class="menu"
   bind:this={dialog}
   aria-label="Menu"
+  tabindex="-1"
   {onkeydown}
   onclose={() => {
     // A close event fires only once the open attribute is gone — so one

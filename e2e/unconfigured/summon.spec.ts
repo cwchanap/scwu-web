@@ -116,6 +116,120 @@ test('summons an enemy and a partner, then the fight resumes', async ({
   expect(errors).toEqual([]);
 });
 
+test('the first summon marks the run cheated at once and the CPU fights', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  const { menu, dialog, health } = await bootIntoBattle(page);
+
+  // Cheat mode on while a battle runs stays pending: nothing announces a
+  // cheated run yet.
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  await dialog.getByLabel('Cheat mode').check();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(health).not.toContainText('Cheat mode is on for this run.');
+
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  // Ryuko's pack is already resident: the summon lands at once.
+  await dialog.getByRole('option').nth(0).click();
+  await expect(dialog.locator('.note')).toContainText(
+    'Ryuko joined the fight.',
+    { timeout: 30_000 },
+  );
+  // GameStatus.cheated flips the moment the summon lands, with the
+  // canvas HUD's CHEAT badge drawing from the same mark.
+  await expect(health).toContainText('Cheat mode is on for this run.');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.arena canvas')).toBeFocused();
+  // The summoned CPU plays: one of the two standing fighters loses life
+  // to it without any input.
+  const meters = [
+    page.getByRole('meter', { name: 'Player health' }),
+    page.getByRole('meter', { name: 'Opponent health' }),
+  ];
+  await expect
+    .poll(
+      async () =>
+        Math.min(
+          ...(await Promise.all(
+            meters.map(async (m) =>
+              Number((await m.getAttribute('aria-valuenow')) ?? 510),
+            ),
+          )),
+        ),
+      { timeout: 45_000 },
+    )
+    .toBeLessThan(510);
+  expect(errors).toEqual([]);
+});
+
+test('Escape during a slow pack load cancels without a late spawn', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  // Zoma's pack, held back so the dialog is mid-load while the keys are
+  // tried. No artificial hooks: the delay is the network's, the rest is
+  // the production build's own UI.
+  let loaded = 0;
+  await page.route('**/packs/fighter-zoma.bin', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    loaded++;
+    await route.continue();
+  });
+  const { menu, dialog, health } = await bootIntoBattle(page);
+
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  await dialog.getByLabel('Cheat mode').check();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('option').nth(1).click();
+  await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
+
+  // The dialog holds focus through the load, so Esc stays the dialog's:
+  // it closes, cancelling the summon and restoring the pause state.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.arena canvas')).toBeFocused();
+  await page.keyboard.press('p');
+  await expect(
+    page.getByRole('button', { name: 'Resume match' }),
+  ).toBeVisible();
+  await page.keyboard.press('p');
+  await expect(page.getByRole('button', { name: 'Resume match' })).toBeHidden();
+  await page.keyboard.down('d');
+  await expect(health).toContainText(/Action: (back)?walk/);
+  await page.keyboard.up('d');
+
+  // The delayed response lands after the cancel: adopted, not spawned —
+  // the run still reads uncheated.
+  await expect.poll(() => loaded).toBe(1);
+  await expect(health).not.toContainText('Cheat mode is on for this run.');
+  // A fresh summon of the same fighter joins at once off the adopted
+  // pack — and only now marks the run cheated.
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('option').nth(1).click();
+  await expect(dialog.locator('.note')).toContainText(
+    'Zoma joined the fight.',
+    { timeout: 10_000 },
+  );
+  await expect(health).toContainText('Cheat mode is on for this run.');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  expect(errors).toEqual([]);
+});
+
 test.describe('at a phone size', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
