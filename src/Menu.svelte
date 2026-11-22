@@ -46,6 +46,7 @@
 </script>
 
 <script lang="ts">
+  import { tick } from 'svelte';
   import { ASSET_BASE } from './game/assetBase';
   import type { CheatOptions } from './game/cheats';
   import type { Who } from './game/characters';
@@ -132,9 +133,16 @@
   let note = $state<{ kind: 'load' | 'ok' | 'error'; text: string } | null>(
     null,
   );
+  // The confirm generation, bumped on each confirm and on open, so a
+  // settle from an earlier visit writes nothing into the new one.
+  let summonSeq = 0;
 
   $effect(() => {
     if (open) {
+      // A confirm that outlived its visit can still settle after this
+      // one starts: spending its generation keeps its late outcome —
+      // the note and the dialog refocus — out of the reopened view.
+      summonSeq++;
       tab = view === 'cheats' ? 'cheats' : 'match';
       cursor = 0;
       side = -1;
@@ -143,8 +151,10 @@
       if (dialog && !dialog.open) dialog.showModal();
       // The summon grid highlights its first cell; focus rides there too,
       // so an immediate Enter confirms the fighter instead of clicking
-      // whichever button the dialog landed on (Back to game).
-      if (view === 'summon') focusCell(0);
+      // whichever button the dialog landed on (Back to game). The tick
+      // waits out this reset's own flush: a tile still disabled by the
+      // prior visit's `summoning` cannot take focus.
+      if (view === 'summon') void tick().then(() => focusCell(0));
     } else if (dialog?.open) {
       dialog.close();
     }
@@ -235,7 +245,6 @@
   // pack — so a reopen can start a newer confirm while an older one hangs:
   // each generation alone writes its own outcome, and a superseded one's
   // late settle can neither clobber the newer note nor re-enable the grid.
-  let summonSeq = 0;
   async function confirmSummon() {
     if (summoning) return;
     const seq = ++summonSeq;
@@ -394,12 +403,22 @@
     // close from closing the reopened dialog.
     if (!dialog?.open) onclose();
   }}
+  oncancel={() => {
+    // Esc's cancel event is the close's own start: reporting the close
+    // here — not at the close event Chrome queues as a task — cancels
+    // the scene's summon before a pack finishing inside the gap could
+    // seat a fighter into the match the dialog already left.
+    onclose();
+  }}
 >
   <div class="page" style="--face-sheet: url({ASSET_BASE}select/13.png)">
     <header class="top">
       <button
         class="back"
         onclick={() => {
+          // As oncancel: the close begins at the click, not at the
+          // queued close event, so the scene's request dies first.
+          onclose();
           dialog?.close();
         }}>◂ Back to game</button
       >
