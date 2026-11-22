@@ -2998,13 +2998,14 @@ export class Match {
         ? null
         : picked;
     if (!slot || !bonus) return;
-    // Authored (HPA-972): a B.R. battle's award to the 1P itself can be
+    // Authored (HPA-972): a B.R. battle's award the 1P itself receives —
+    // paid to it by the slot or struck by it as the striker — can be
     // replaced by the per-kill overrides — null keeps the source amounts, a
     // positive HP award scales by lifeAmount, and 0 skips the gain
     // (lifeAmountOf(0) would force 1); the EN 0 skips addPower. Every other
-    // recipient — the striker even when the 1P struck it —, every other
-    // battle and the master-off path keep the source award.
-    if (award === 1 && this.br && this.cheats.enabled) {
+    // recipient, every other battle and the master-off path keep the source
+    // award.
+    if (bonus === this.fighters[0] && this.br && this.cheats.enabled) {
       const { brHpPerKill, brEnPerKill } = this.cheats;
       if (brHpPerKill === null) gainLife(bonus, lifeAmount(bonus, slot.life));
       else if (brHpPerKill > 0)
