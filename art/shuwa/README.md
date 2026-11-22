@@ -51,3 +51,4 @@ How a drawing becomes a sprite:
   never part of the fighter drawings.
 
 `tools/lineup.py` puts SHUWA's sprites beside the donor's at the same scale, for checking a pose's size and reach.
+`tools/posref.py` makes a new pose guide from a donor sprite (`python3 -I tools/posref.py <sprites> ryuko 34 base 1024x1536`).

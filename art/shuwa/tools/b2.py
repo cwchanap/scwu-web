@@ -26,22 +26,20 @@ from v4 import Frame, Ref, feet, load, pixel, save  # noqa: E402
 MAP = {
     31: "idle", 24: "b1:crouch-24", 12: "b1:jump-12", 13: "b1:jump-13", 14: "b1:jump-14", 15: "b1:jump-16", 16: "b1:jump-16",
     84: "b1:crouch-25", 89: "b1:crouch-25", 94: "b1:crouch-25", 112: "b1:crouch-25", 53: "b1:jump-14", 43: "b1:jump-12",
-    32: "p1-32", 33: "p1-33", 34: "p1-32", 74: "p1-32",
-    10: "p3-10", 35: "p3-36", 36: "p3-36", 37: "p3-37", 39: "p3-39",  # see NUDGE
+    32: "p1-32", 33: "p1-33", 34: "p1-34", 74: "p1-32",
+    10: "p3-10", 35: "p3-35", 36: "p3-36", 37: "p3-37", 39: "p3-39",
     38: "p4-38", 40: "p4-38", 41: "p4-41", 42: "p4-42",
-    54: "ap-55", 55: "ap-55", 56: "ap-56",
-    90: "cp-90", 91: "cp-92", 92: "cp-92", 93: "cp-93",
+    54: "ap-54", 55: "ap-55", 56: "ap-56",
+    90: "cp-90", 91: "cp-91", 92: "cp-92", 93: "cp-93",
     71: "k1-71", 72: "k1-72", 73: "k1-71",
     75: "k3-75", 76: "k3-76", 77: "k3-76", 78: "k3-78",
     79: "k4-79", 80: "k4-79", 81: "k4-82", 82: "k4-82", 83: "k4-83",
     85: "ak-86", 86: "ak-86", 87: "ak-87", 88: "ak-87",
     95: "ck-95", 96: "ck-95", 97: "ck-98", 98: "ck-98", 99: "ck-98",
-    103: "ch-103", 104: "ch-105", 105: "ch-105", 106: "ch-105",
+    103: "ch-103", 104: "ch-104", 105: "ch-105", 106: "ch-105",
     107: "ct-107", 108: "ct-108", 110: "ct-110", 111: "ct-111",
-    113: "hu-113", 114: "hu-115", 115: "hu-115", 116: "hu-116", 117: "hu-116",
+    113: "hu-113", 114: "hu-114", 115: "hu-115", 116: "hu-116", 117: "hu-117",
 }
-# Where a pair of rapid-fire drawings came out the same, the second beat is the first one nudged (the cast's trick).
-NUDGE = {37: ("p3-36", 3)}  # RYUKO image -> (b2 pose to use, dx); p3-37 came out the same as p3-36
 # RYUKO image each b1 sprite was drawn from (for its offset)
 B1_SRC = {"crouch-24": 24, "jump-12": 12, "jump-13": 13, "jump-14": 14, "jump-16": 16}
 CLIPS = {  # clip key -> RYUKO script
@@ -107,7 +105,7 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
     off["idle"] = 31, False
 
     def frame(n, ms, flip):
-        key, nx = NUDGE.get(n, (MAP[n], 0))
+        key = MAP[n]
         s = spr[key][:, ::-1] if flip else spr[key]
         if key == "idle":
             ax, ay = idle["anchor"]
@@ -119,14 +117,14 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
             src, vert = off[key]
             ox, oy = ryuko_offset(src, flip, vert)
             ax, ay = ax + ox, ay + oy
-        return Frame(ms).add(np.ascontiguousarray(s), ax, ay, dx=nx)
+        return Frame(ms).add(np.ascontiguousarray(s), ax, ay)
 
     for clip, script in CLIPS.items():
         frames, last = [], None
         for n, t, _, _, flip in R["scripts"][script]:
             if MAP.get(n) not in spr:
                 raise SystemExit(f"{clip}: no sprite for RYUKO image {n}")
-            this = (NUDGE.get(n, (MAP[n], 0)), flip)
+            this = (MAP[n], flip)
             if last == this:  # same SHUWA drawing in the same place: one longer hold
                 frames[-1].dur += t * 10
                 continue

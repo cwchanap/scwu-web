@@ -237,8 +237,9 @@ def main(prev, out, raw4):
         print("no giant-foot.png yet: giantStep skipped")
 
     # ---------------- ULTRA SWING: SWING's grab, twice the spin, the toss, then a beam ----------------
-    fr = clip_frames("swing")  # 103, ch-105, 13 spin cycles of 4 frames, ct-111, ...
-    grab, spin, toss = fr[:2], fr[2:54], fr[54]
+    fr = clip_frames("swing")  # the grab, 13 spin cycles of 4 frames, the toss (ct-111), 3 recovery frames
+    g = len(fr) - 56
+    grab, spin, toss = fr[:g], fr[g:g + 52], fr[g + 52]
     frames = [Frame(d).add(a, ax, ay) for a, ax, ay, d in grab + spin + spin + [toss]]
     frames += beam_frames(620, 72, 900)
     frames += [Frame(150).add(X, Xax, Xay), Frame(300).add(P, Pax, Pay)]
