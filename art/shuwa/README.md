@@ -12,9 +12,14 @@ bash art/shuwa/draw.sh p1-33 k1-72   # or single poses
 ```
 
 Each pose is one image edit: SHUWA's key drawing (`refs/base.png`, or `refs/hero.png` for the powered form) as
-image 1, and, where the pose has one, the donor fighter's sprite for the same move (`posrefs/`) as a pose and size
-guide. `poses.txt` lists every pose with its batch, guide, form and canvas; `prompts/<pose>.txt` is its prompt.
+image 1, and, where the pose has one, the donor fighter's sprite for the same move as a pose and size guide.
+`poses.txt` lists every pose with its batch, guide, form and canvas; `prompts/<pose>.txt` is its prompt.
 Drawings land in `out/raw/<pose>.png` (not committed; about 1.5 MB each).
+
+Nothing cut from the game is committed here. The guides (`out/posrefs/`, made by `tools/posref.py`) are the game's
+sprites scaled up, and the donors' frame offsets and move scripts (`out/data/`, copied by `tools/donor_data.py`) come
+from its export, so both scripts make them from your checkout's `public/assets` and `src/game/generated`
+(`ASSETS` and `GENERATED` point elsewhere).
 
 It needs `OPENAI_API_KEY` in the environment and never prints it. The model is `gpt-image-2.6-sunburst`
 (`IMAGE_MODEL` overrides it). Four requests run at once; a refused pose prints `FAILED <pose>` and the rest carry on.
@@ -44,7 +49,7 @@ How a drawing becomes a sprite:
   matched on the head; a drawing whose head can't be matched takes its form's median scale.
 - Each clip plays the donor's own script for the move (RYUKO for most; DoraEmon, ALEX and ZOMA for some specials),
   with every donor image swapped for a SHUWA sprite, so timing, reach and travel match the donor.
-  `tools/data/` holds those scripts, taken from the game's export.
+  `out/data/` holds those scripts, taken from the game's export.
 - A sprite's anchor height is its feet plus the donor's offset from feet to position point in the image it was drawn
   from. Its anchor x is where it stands on its drawing canvas: the guide's position point, or the key drawing's
   feet for a pose drawn without a guide (b2; b1 and b3 still use the feet).
@@ -56,4 +61,5 @@ How a drawing becomes a sprite:
   never part of the fighter drawings.
 
 `tools/lineup.py` puts SHUWA's sprites beside the donor's at the same scale, for checking a pose's size and reach.
-`tools/posref.py` makes a new pose guide from a donor sprite (`python3 -I tools/posref.py <sprites> ryuko 34 base 1024x1536`).
+`tools/posref.py` makes one pose guide from a donor sprite (`python3 -I tools/posref.py <sprites> ryuko 34 base 1024x1536`);
+draw.sh runs it for every guide it needs.
