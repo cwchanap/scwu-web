@@ -1,175 +1,84 @@
 {
- "idle": {
-  "width": 190,
-  "height": 257,
-  "anchor": [
-   89,
-   228
-  ],
-  "durations": [
-   220,
-   120,
-   220,
-   120
-  ],
-  "loop": true,
-  "frames": [
-   "idle/1.png",
-   "idle/2.png",
-   "idle/3.png",
-   "idle/4.png"
-  ],
-  "keys": [
-   1,
-   2,
-   3
-  ]
- },
- "walk": {
-  "width": 173,
-  "height": 245,
-  "anchor": [
-   78,
-   225
-  ],
-  "durations": [
-   150,
-   120,
-   150
-  ],
-  "loop": true,
-  "frames": [
-   "walk/1.png",
-   "walk/2.png",
-   "walk/3.png"
-  ],
-  "keys": [
-   1,
-   2,
-   3
-  ],
-  "vx": 200
- },
- "henshin": {
-  "width": 186,
-  "height": 274,
-  "anchor": [
-   77,
-   274
-  ],
-  "durations": [
-   120,
-   90,
-   90,
-   70,
-   50,
-   50,
-   80,
-   320,
-   500
-  ],
-  "loop": false,
-  "frames": [
-   "henshin/1.png",
-   "henshin/2.png",
-   "henshin/3.png",
-   "henshin/4.png",
-   "henshin/5.png",
-   "henshin/6.png",
-   "henshin/7.png",
-   "henshin/8.png",
-   "henshin/9.png"
-  ],
-  "keys": [
-   1,
-   3,
-   5,
-   6,
-   8,
-   9
-  ]
- },
- "specium": {
-  "width": 872,
-  "height": 205,
-  "anchor": [
-   98,
-   205
-  ],
-  "durations": [
-   120,
-   110,
-   110,
-   130,
-   50,
-   50,
-   50,
-   50,
-   50,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   60,
-   160,
-   300
-  ],
-  "loop": false,
-  "frames": [
-   "specium/1.png",
-   "specium/2.png",
-   "specium/3.png",
-   "specium/4.png",
-   "specium/5.png",
-   "specium/6.png",
-   "specium/7.png",
-   "specium/8.png",
-   "specium/9.png",
-   "specium/10.png",
-   "specium/11.png",
-   "specium/12.png",
-   "specium/13.png",
-   "specium/14.png",
-   "specium/15.png",
-   "specium/16.png",
-   "specium/17.png",
-   "specium/18.png",
-   "specium/19.png",
-   "specium/20.png",
-   "specium/21.png",
-   "specium/22.png",
-   "specium/23.png",
-   "specium/24.png",
-   "specium/25.png",
-   "specium/26.png",
-   "specium/27.png",
-   "specium/28.png",
-   "specium/29.png",
-   "specium/30.png",
-   "specium/31.png"
-  ],
-  "keys": [
-   1,
-   3,
-   5,
-   8,
-   15,
-   30
-  ]
- }
+  "idle": {
+    "width": 190,
+    "height": 257,
+    "anchor": [89, 228],
+    "durations": [220, 120, 220, 120],
+    "loop": true,
+    "frames": ["idle/1.png", "idle/2.png", "idle/3.png", "idle/4.png"],
+    "keys": [1, 2, 3]
+  },
+  "walk": {
+    "width": 173,
+    "height": 245,
+    "anchor": [78, 225],
+    "durations": [150, 120, 150],
+    "loop": true,
+    "frames": ["walk/1.png", "walk/2.png", "walk/3.png"],
+    "keys": [1, 2, 3],
+    "vx": 200
+  },
+  "henshin": {
+    "width": 186,
+    "height": 274,
+    "anchor": [77, 274],
+    "durations": [120, 90, 90, 70, 50, 50, 80, 320, 500],
+    "loop": false,
+    "frames": [
+      "henshin/1.png",
+      "henshin/2.png",
+      "henshin/3.png",
+      "henshin/4.png",
+      "henshin/5.png",
+      "henshin/6.png",
+      "henshin/7.png",
+      "henshin/8.png",
+      "henshin/9.png"
+    ],
+    "keys": [1, 3, 5, 6, 8, 9]
+  },
+  "specium": {
+    "width": 872,
+    "height": 205,
+    "anchor": [98, 205],
+    "durations": [
+      120, 110, 110, 130, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60, 60, 60, 60,
+      60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 160, 300
+    ],
+    "loop": false,
+    "frames": [
+      "specium/1.png",
+      "specium/2.png",
+      "specium/3.png",
+      "specium/4.png",
+      "specium/5.png",
+      "specium/6.png",
+      "specium/7.png",
+      "specium/8.png",
+      "specium/9.png",
+      "specium/10.png",
+      "specium/11.png",
+      "specium/12.png",
+      "specium/13.png",
+      "specium/14.png",
+      "specium/15.png",
+      "specium/16.png",
+      "specium/17.png",
+      "specium/18.png",
+      "specium/19.png",
+      "specium/20.png",
+      "specium/21.png",
+      "specium/22.png",
+      "specium/23.png",
+      "specium/24.png",
+      "specium/25.png",
+      "specium/26.png",
+      "specium/27.png",
+      "specium/28.png",
+      "specium/29.png",
+      "specium/30.png",
+      "specium/31.png"
+    ],
+    "keys": [1, 3, 5, 8, 15, 30]
+  }
 }
