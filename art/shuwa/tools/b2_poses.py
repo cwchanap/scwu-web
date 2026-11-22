@@ -7,7 +7,6 @@ POSES = {
     "p3-10": (10, "base", "guide", P, "big wind-up: stepping in low, body coiled, free hand drawn far back, about to strike hard"),
     "p3-36": (36, "hero", "guide", P, "rapid chops: legs in a wide low stance, his front arm thrust straight forward at chest height with a flat knife-hand, the rear arm pulled back to his ribs"),
     "p3-35": (35, "hero", "guide", P, "chop coming out: legs in a wide low stance, body hunched forward, his front arm halfway out in front of his chest with a flat knife-hand, elbow still bent, the rear fist at his ribs"),
-    "p3-37": (37, "hero", "self", P, "rapid chops, the other hand: the same wide low stance, the arms swapped"),  # guide: SHUWA's own p3-36
     "p3-39": (39, "hero", "guide", P, "finishing pose: standing tall, forearms crossed in front of his chest in an X, hands in fists"),
     "p4-38": (38, "hero", "guide", P, "spinning kick wind-up: turning away from the viewer mid-spin, shoulders twisted, front knee raised high, arms tucked in"),
     "p4-41": (41, "hero", "guide", L, "spinning heel kick: body leaning back, one leg swung forward and fully straight at head height, the other leg planted, arms flung out for balance"),
@@ -17,7 +16,6 @@ POSES = {
     "ap-56": (56, "hero", "guide", P, "jumping overhead chop: in the air with knees tucked up, both arms swung down and forward together, flat knife-hands striking low in front of him"),
     "cp-90": (90, "base", "guide", P, "crouching jab: crouched low on bent knees, his free hand jabbing straight forward at waist height, the lantern held close to his body"),
     "cp-92": (92, "hero", "guide", L, "crouching straight punch: crouched low on bent knees, his front arm punching straight forward at chest height with a fist, the rear fist at his hip"),
-    "cp-91": (91, "hero", "guide", P, "crouching punch coming out: crouched low on bent knees, his front fist halfway out at chest height, elbow still bent, the rear fist at his hip"),
     "cp-93": (93, "hero", "guide", P, "crouching, recovering: crouched low on bent knees, arms pulled back in front of his chest, fists up"),
     "k1-71": (71, "base", "guide", P, "kick wind-up: standing on one leg, front knee raised high, arms up in a loose guard, the lantern still in his hand"),
     "k1-72": (72, "base", "guide", P, "front kick: standing on one leg, the front leg kicked straight forward at waist height with the sole of the boot forward, body leaning back slightly, arms back for balance"),
