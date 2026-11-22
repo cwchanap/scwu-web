@@ -796,14 +796,14 @@ describe('B.R. No partner (HPA-972)', () => {
     br: boolean,
     flags: number,
     fields: Partial<CheatOptions> = {},
-    strike1p = false,
+    striker: '1p' | 'other' | null = null,
   ) => {
     const match = Match.story(
       'ryuko',
       storyBattle({
         slots: [
           storySlot({ flags, life: 100, power: 100 }),
-          null,
+          striker === 'other' ? storySlot() : null,
           null,
           null,
           null,
@@ -817,16 +817,26 @@ describe('B.R. No partner (HPA-972)', () => {
       br,
     );
     match.useCheats(cheats({ enabled: true, ...fields }));
-    const [one, victim] = match.fighters;
+    const [one, victim, other] = match.fighters;
     // A near-empty bar and gauge make both awards visible: the life share
     // moves the bar, and the power fills stock 1 without capping out.
     one.hp = 100;
     one.stock = 0;
     one.power = 0;
-    if (strike1p) victim.caught = one;
+    if (striker === '1p') victim.caught = one;
+    // A striker-directed award can name another native — a second slot
+    // seats it, emptied for the same readout.
+    if (striker === 'other' && other) {
+      other.hp = 100;
+      other.stock = 0;
+      other.power = 0;
+      victim.caught = other;
+    }
     victim.hp = 0;
     (match as unknown as { knockOut(f: Fighter): void }).knockOut(victim);
-    return [one.hp, one.power, one.stock] as const;
+    // 'other' reads the striker's outcome; every other case reads the 1P's.
+    const paid = striker === 'other' ? other! : one;
+    return [paid.hp, paid.power, paid.stock] as const;
   };
 
   it('replaces only a B.R. kill award paid to the 1P', () => {
@@ -843,6 +853,12 @@ describe('B.R. No partner (HPA-972)', () => {
     // The EN override replaces the power award; zero skips it.
     expect(ko(true, 0x80, { brEnPerKill: 250 })).toEqual([200, 50, 2]);
     expect(ko(true, 0x80, { brEnPerKill: 0 })).toEqual([200, 0, 0]);
+    // A striker-directed award (bits 2) the 1P struck is the 1P's own —
+    // the recipient, not the destination flag, keys the override.
+    expect(ko(true, 0x100, { brHpPerKill: 0, brEnPerKill: 0 }, '1p')).toEqual([
+      100, 0, 0,
+    ]);
+    expect(ko(true, 0x100, { brHpPerKill: 255 }, '1p')).toEqual([355, 0, 1]);
   });
 
   it('keeps the source award outside B.R. and for other recipients', () => {
@@ -850,11 +866,11 @@ describe('B.R. No partner (HPA-972)', () => {
     expect(ko(false, 0x80, { brHpPerKill: 0, brEnPerKill: 0 })).toEqual([
       200, 0, 1,
     ]);
-    // A B.R. award paid to the striker (bits 2) is not 1P's own: the 1P
-    // collects it only as the striker, through the source amounts.
-    expect(ko(true, 0x100, { brHpPerKill: 0, brEnPerKill: 0 }, true)).toEqual([
-      200, 0, 1,
-    ]);
+    // A B.R. award paid to a striker that isn't the 1P keeps the source
+    // amounts: it collects its own 100-life share and stock fill.
+    expect(
+      ko(true, 0x100, { brHpPerKill: 0, brEnPerKill: 0 }, 'other'),
+    ).toEqual([200, 0, 1]);
     // The master off keeps the source award whatever the overrides.
     expect(ko(true, 0x80, { enabled: false })).toEqual([200, 0, 1]);
   });
