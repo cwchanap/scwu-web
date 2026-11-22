@@ -1,0 +1,473 @@
+<title>SHUWA Animation Test</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@1,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column, the stage viewer first like a test cabinet, frames and notes below. Single dark look by choice: a Metro tunnel at night. */
+:root {
+  --ground: #0d131e;
+  --panel: #151d2c;
+  --raise: #1d2840;
+  --line: #2b3a56;
+  --ink: #e9edf4;
+  --muted: #95a2ba;
+  --signal: #f2862b;
+  --lamp: #ffe08a;
+  --sheet: #28589c;
+  --display: "Exo 2", "Arial Black", system-ui, sans-serif;
+  --body: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+html { background: var(--ground); }
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--body);
+  font-size: 15px;
+  line-height: 1.55;
+}
+.wrap {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding-block: 28px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 36px;
+}
+header { display: grid; gap: 8px; }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: clamp(44px, 9vw, 76px);
+  line-height: 0.95;
+  letter-spacing: 0.01em;
+}
+h1 span { color: var(--lamp); }
+.lede { margin: 0; max-width: 62ch; color: var(--muted); text-wrap: pretty; }
+h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-style: italic;
+  font-weight: 800;
+  font-size: 24px;
+  text-wrap: balance;
+}
+
+/* Viewer */
+.viewer { display: grid; gap: 12px; }
+.screen {
+  position: relative;
+  border: 2px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  background: #000;
+  max-width: 100%;
+}
+canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  max-width: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.readout {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgb(13 19 30 / 0.78);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+.group { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.group-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-right: 4px;
+}
+button {
+  font: 500 13px/1 var(--body);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 8px 11px;
+  cursor: pointer;
+}
+button:hover { background: var(--raise); }
+button[aria-pressed="true"] { background: var(--signal); border-color: var(--signal); color: #1a0f04; }
+button:disabled { opacity: 0.45; cursor: default; }
+select {
+  font: 500 13px/1 var(--body);
+  color: var(--ink);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 7px 8px;
+  max-width: 100%;
+}
+select:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, .cell:focus-visible { outline: 2px solid var(--lamp); outline-offset: 2px; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; }
+input[type="checkbox"] { accent-color: var(--signal); width: 16px; height: 16px; }
+
+/* Frames */
+.frames { display: grid; gap: 22px; }
+.row { display: grid; gap: 8px; min-width: 0; }
+.row-head { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.row-head h3 { margin: 0; font-size: 16px; font-weight: 600; }
+.row-head .meta { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.strip { overflow-x: auto; padding-bottom: 6px; }
+.cells { display: flex; gap: 6px; width: max-content; }
+.cell {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 6px 6px 4px;
+  background: var(--sheet);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.cell:hover { border-color: var(--lamp); background: var(--sheet); }
+.cell img { image-rendering: pixelated; display: block; max-width: none; }
+.cell span { font-family: var(--mono); font-size: 11px; color: #dce6f6; font-variant-numeric: tabular-nums; }
+
+/* Notes */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.note { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px 18px; min-width: 0; }
+.note h3 { margin: 0 0 8px; font-size: 13px; font-family: var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+.note.good h3 { color: var(--lamp); }
+.note.fix h3 { color: var(--signal); }
+.note ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.how { margin: 0; max-width: 70ch; color: var(--muted); font-size: 14px; }
+.how code { font-family: var(--mono); font-size: 12.5px; color: var(--ink); }
+@media (max-width: 520px) {
+  .controls { gap: 10px; }
+  .group-label { width: 100%; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">SCWU · new fighter · every move</div>
+    <h1>SHUWA <span>in motion</span></h1>
+    <p class="lede">Every move in the design now has animation. Batch 4 adds his four supers (SPECIUM RAY, THREE MINUTES, GIANT STEP, ULTRA SWING) and the light effects on his specials: the saw ring, the wall of light and the lamp glow. Pick moves from the More list by group: Body, Attacks, Specials and Supers. Idle, walk, transform and SPECIUM are the approved round 7.</p>
+  </header>
+
+  <section class="viewer" aria-label="Animation viewer">
+    <div class="screen">
+      <canvas id="stage" width="640" height="480"></canvas>
+      <div class="readout" id="readout">Loading…</div>
+    </div>
+    <div class="controls">
+      <div class="group" role="group" aria-label="Animation">
+        <span class="group-label">Play</span>
+        <button type="button" id="m-reel" data-mode="reel">Full reel</button>
+        <button type="button" id="m-idle" data-mode="idle">Idle</button>
+        <button type="button" id="m-walk" data-mode="walk">Walk</button>
+        <button type="button" id="m-henshin" data-mode="henshin">Transform</button>
+        <button type="button" id="m-specium" data-mode="specium">SPECIUM beam</button>
+      </div>
+      <div class="group" role="group" aria-label="More moves">
+        <label class="group-label" for="clip">More</label>
+        <select id="clip"><option value="">Pick a move…</option></select>
+      </div>
+      <div class="group" role="group" aria-label="Playback">
+        <button type="button" id="toggle">Pause</button>
+        <button type="button" id="step" disabled>Next frame</button>
+      </div>
+      <div class="group" role="group" aria-label="Speed">
+        <span class="group-label">Speed</span>
+        <button type="button" id="s-1" data-speed="1">1×</button>
+        <button type="button" id="s-05" data-speed="0.5">½×</button>
+        <button type="button" id="s-025" data-speed="0.25">¼×</button>
+      </div>
+      <div class="group" role="group" aria-label="Stage">
+        <span class="group-label">Stage</span>
+        <button type="button" id="b-temple" data-stage="temple">Temple</button>
+        <button type="button" id="b-city" data-stage="city">City</button>
+        <button type="button" id="b-blue" data-stage="blue">Sheet blue</button>
+      </div>
+      <div class="group" role="group" aria-label="Beside">
+        <span class="group-label">Beside</span>
+        <button type="button" id="c-ryuko" data-cast="ryuko">RYUKO</button>
+        <button type="button" id="c-sou" data-cast="sou">SOU</button>
+        <button type="button" id="c-kate" data-cast="kate">KATE</button>
+        <button type="button" id="c-none" data-cast="none">Nobody</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="frames" aria-labelledby="cast-h">
+    <h2 id="cast-h">What the cast does</h2>
+    <div class="notes">
+      <div class="note good">
+        <h3>Idle</h3>
+        <ul>
+          <li>Most loops use 3 to 5 images and last 0.4 to 1 s. The most common shape is 4 frames from 3 images played A B C B (11 of 43), like SOU at 200, 100, 200, 200 ms.</li>
+          <li>It is one drawing, nudged. In 11 of the 12 fighters I compared pixel by pixel, the head is the same pixels from frame to frame, just moved a pixel or two. Half of them never touch the boots.</li>
+        </ul>
+      </div>
+      <div class="note good">
+        <h3>Walk</h3>
+        <ul>
+          <li>Most walks are 4 to 6 frames (33 of 43) and 0.4 to 0.7 s a cycle. The median speed is 230 px a second.</li>
+          <li>In 7 of the 12 I compared, the head is the same pixels in every walk frame and only the legs and arms change. Calm walkers (KATE, FENG, ZOMA, YO) bob 2 to 3 px; brawlers like RYUKO and REMU bob 10 px or more.</li>
+          <li>Walking back reuses the walk's images (34 of 43), usually at a slower speed (31 of 43).</li>
+        </ul>
+      </div>
+      <div class="note good">
+        <h3>Specials</h3>
+        <ul>
+          <li>Few drawings, long holds. RYUKO's G BEAM uses 5 drawings in 3.75 s, with a 450 ms wind-up and one firing pose held for 2.7 s.</li>
+          <li>Transforms are quick. SOU's TYPE CHANGE takes 200 ms. RYUKO cuts straight from his normal pose to his armour, then swings into the firing pose through one 50 ms smear frame.</li>
+          <li>In the specials I checked (RYUKO, SOU, KATE, ZOMA), beams, rings, flashes and glows are separate effect objects drawn over the fighter, not part of the fighter's own frames.</li>
+        </ul>
+      </div>
+      <div class="note fix">
+        <h3>Faces: the cast against round 6</h3>
+        <ul>
+          <li>Shape: the cast's faces are long ovals with a jaw line and a defined chin. Round 6 had a short, round baby face.</li>
+          <li>Size: on SOU, KATE, ZOMA, CHUNG and RYUKO the mouth sits 16 to 18 px below the eye's centre and the chin 22 to 25 px below it, with eyes 10 to 14 px tall. Round 6 was 12 and 18 px.</li>
+          <li>Angle: the cast turn three-quarters toward the opponent (far eye narrower, chin forward) and keep their ears mostly under their hair. Round 6 looked straight out, with a big ear showing.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="frames" aria-labelledby="frames-h">
+    <h2 id="frames-h">Key frames at game size</h2>
+    <div id="rows"></div>
+  </section>
+
+  <section class="frames" aria-labelledby="notes-h">
+    <h2 id="notes-h">What changed, and what's still open</h2>
+    <div class="notes">
+      <div class="note good">
+        <h3>What's new in batch 4</h3>
+        <ul>
+          <li>SPECIUM RAY: crouch, the lamp charges, then a thick beam about a screen long, held for 2.5 seconds (RYUKO's Getter Beam timing).</li>
+          <li>THREE MINUTES: a big charge, he flies off the top, and a beam falls from the sky just ahead of where he stood, then he drops back in.</li>
+          <li>GIANT STEP: he jumps off the top and a giant foot stamps the spot ahead. The foot is the one new drawing in this batch.</li>
+          <li>ULTRA SWING: SWING's grab with twice the spin, the toss, then a beam after them.</li>
+          <li>Effects are drawn in code as soft light, like round 7's SPECIUM beam: RING's saw ring flies forward low and slow, BARRIER holds a wall of light at his palms, RECHARGE pumps the lamp brighter and ends in a flash.</li>
+        </ul>
+        <h3>Batch 3</h3>
+        <ul>
+          <li>5 specials from 14 new drawings. RING throws on RYUKO's Spinning Axe timing, SHUWATCH flies up on DoraEmon's Sky Rise, BARRIER pushes out on ALEX's REFLACT, RECHARGE powers up on ZOMA's reload.</li>
+          <li>SWING is RYUKO's Daisetsuzan played with the Chuck throw drawings (grab, spin, hurl), without his missile volley at the end.</li>
+          <li>DoraEmon and ALEX are bigger than RYUKO, so their guides and offsets were scaled to RYUKO's size first.</li>
+          <li>RECHARGE faces the viewer, like a power-up pose: ZOMA sits in his tank there, so SHUWA's poses were drawn from a description.</li>
+        </ul>
+        <h3>Batch 2</h3>
+        <ul>
+          <li>15 attacks from 35 new drawings: punches 1 to 4 (G), kicks 1 to 4 (H), crouch punch and kick, air punch and kick, Hit Up (K), and Chuck's grab and throw (J).</li>
+          <li>Chops instead of punches, as the design asks: a quick knife-hand jab, rapid chops, a spinning heel kick into a somersault, a flying kick, a low sweep and a rising chop for Hit Up.</li>
+          <li>Each move runs RYUKO's script for it frame by frame, with his timing and his body offsets, so reach and travel match RYUKO's.</li>
+          <li>Where RYUKO's frame is a tank or a gun, SHUWA's pose was drawn from a description instead of RYUKO's sprite.</li>
+        </ul>
+      </div>
+      <div class="note fix">
+        <h3>Still open</h3>
+        <ul>
+          <li>The two rapid-chop drawings came out the same, so the chop flurry shakes one drawing back and forth.</li>
+          <li>Air attacks, Hit Up and SHUWATCH play in place here; in the game the jump or flight carries him.</li>
+          <li>Batch 1 slips still open: stacked forearms in the standing guard, the chest lamp drifting in two poses, a wide landing squat.</li>
+          <li>Supers play in place: the screen does not shake or darken, and no opponent gets hit or thrown, since this page has no game behind it.</li>
+          <li>The low-life forms (red blinking lamp, the stronger SPECIUM RAY) are a colour and size change for the game build, not new art.</li>
+          <li>Next: put SHUWA into the game on these donor moves (the authored-fighter work in the design), plus his portraits, HUD face and palettes.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="how">Drawings come from the OpenAI Image API (gpt-image-2 for the round 7 key drawing, gpt-image-2.6 for every pose since): one key drawing as a flat cel illustration, then image edits of it for each pose. A script turns each one into a sprite at one shared scale, matched on the head. The glows, flashes and ray are separate effect layers, like the cast's. The scripts, prompts and pose guides are in <code>art/shuwa/</code> in the repo.</p>
+  </section>
+</div>
+
+<script>
+(() => {
+  const DATA = /*DATA*/null;
+  const GROUND = 424;
+  const RYUKO_X = 470;
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const readout = document.getElementById('readout');
+
+  const load = (src) => { const i = new Image(); i.src = src; return i; };
+  const anims = {};
+  for (const [k, a] of Object.entries(DATA.anims)) anims[k] = { ...a, imgs: a.frames.map(load) };
+  const stages = { temple: load(DATA.stages.temple), city: load(DATA.stages.city) };
+  const cast = {};
+  for (const [k, src] of Object.entries(DATA.cast)) cast[k] = load(src);
+
+  // A mode is a list of steps; each step plays one animation some number of loops,
+  // may hold its last frame, and may walk forward.
+  const WALK_V = 0.23; // px per ms at 1x: the cast's usual walk speed, 230 px a second
+  const MODES = {
+    reel: { repeat: true, steps: [
+      { anim: 'walk', loops: 3, walk: true, x: 40 },
+      { anim: 'idle', loops: 3 },
+      { anim: 'henshin', loops: 1 },
+      { anim: 'specium', loops: 1, hold: 900 },
+    ] },
+    idle: { repeat: true, steps: [{ anim: 'idle', loops: Infinity, x: 260 }] },
+    walk: { repeat: true, steps: [{ anim: 'walk', loops: Infinity, walk: true, wrap: true, x: -70 }] },
+    henshin: { repeat: true, steps: [{ anim: 'henshin', loops: 1, hold: 1200, x: 260 }] },
+    specium: { repeat: true, steps: [{ anim: 'specium', loops: 1, hold: 1200, x: 260 }] },
+  };
+  const MAIN = ['idle', 'walk', 'henshin', 'specium'];
+  const clipSel = document.getElementById('clip');
+  const groups = {};
+  for (const [k, a] of Object.entries(anims)) {
+    if (MAIN.includes(k)) continue;
+    const g = a.group || 'Moves';
+    if (!groups[g]) { groups[g] = document.createElement('optgroup'); groups[g].label = g; clipSel.appendChild(groups[g]); }
+    const o = document.createElement('option'); o.value = k; o.textContent = a.label; groups[g].appendChild(o);
+  }
+  function clipMode(k) {
+    const a = anims[k];
+    MODES.clip = { repeat: true, steps: [{ anim: k, loops: a.loop ? 3 : 1, hold: 900, x: 260 }] };
+    clipSel.value = k;
+    return 'clip';
+  }
+
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const S = { mode: 'reel', step: 0, frame: 0, t: 0, loops: 0, holding: false, x: 260, playing: !reduce, speed: 1, stage: 'temple', cast: 'ryuko' };
+
+  const cur = () => MODES[S.mode].steps[S.step];
+  const anim = () => anims[cur().anim];
+  const frameDur = () => (S.holding ? cur().hold : anim().dur[S.frame]);
+
+  function startStep(i) {
+    S.step = i; S.frame = 0; S.t = 0; S.loops = 0; S.holding = false;
+    if (cur().x !== undefined) S.x = cur().x;
+  }
+  function setMode(m) {
+    S.mode = m; startStep(0); syncButtons(); draw();
+  }
+  function advance() {
+    if (S.holding) return nextStep();
+    const a = anim();
+    if (S.frame + 1 < a.imgs.length) { S.frame++; return; }
+    S.loops++;
+    if (S.loops < cur().loops) { S.frame = 0; return; }
+    if (cur().hold) { S.holding = true; return; }
+    nextStep();
+  }
+  function nextStep() {
+    const steps = MODES[S.mode].steps;
+    startStep(S.step + 1 < steps.length ? S.step + 1 : 0);
+  }
+  function move(ms) {
+    const st = cur();
+    if (!st.walk || S.holding) return;
+    S.x += WALK_V * ms;
+    if (st.wrap && S.x > 640 + 80) S.x = -80;
+  }
+  function tick(ms) {
+    let left = ms * S.speed;
+    while (left > 0) {
+      const rest = frameDur() - S.t;
+      if (left < rest) { S.t += left; move(left); left = 0; }
+      else { move(rest); left -= rest; S.t = 0; advance(); }
+    }
+  }
+
+  function draw() {
+    if (S.stage === 'blue') { ctx.fillStyle = '#28589c'; ctx.fillRect(0, 0, 640, 480); ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, GROUND, 640, 480 - GROUND); }
+    else if (stages[S.stage].complete) ctx.drawImage(stages[S.stage], 0, 0);
+    const buddy = cast[S.cast];
+    if (buddy && buddy.complete) {
+      ctx.save(); ctx.translate(RYUKO_X + buddy.width, GROUND - buddy.height); ctx.scale(-1, 1);
+      ctx.drawImage(buddy, 0, 0); ctx.restore();
+    }
+    const a = anim();
+    const img = a.imgs[S.frame];
+    if (img.complete) ctx.drawImage(img, Math.round(S.x - a.ax), GROUND - a.ay);
+    const n = a.imgs.length;
+    readout.textContent = `${a.label} · frame ${S.frame + 1} of ${n} · ${S.holding ? 'hold' : a.dur[S.frame] + ' ms'}${S.speed !== 1 ? ' · ' + (S.speed === 0.5 ? '½' : '¼') + '×' : ''}`;
+  }
+
+  let last = null;
+  function loop(now) {
+    if (last !== null && S.playing) tick(Math.min(100, now - last));
+    last = now;
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  // Controls
+  const toggle = document.getElementById('toggle');
+  const stepBtn = document.getElementById('step');
+  function syncButtons() {
+    document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+    if (S.mode !== 'clip') clipSel.value = '';
+    document.querySelectorAll('[data-speed]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.speed) === S.speed)));
+    document.querySelectorAll('[data-stage]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.stage === S.stage)));
+    document.querySelectorAll('[data-cast]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.cast === S.cast)));
+    toggle.textContent = S.playing ? 'Pause' : 'Play';
+    stepBtn.disabled = S.playing;
+  }
+  document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { S.playing = true; setMode(b.dataset.mode); }));
+  clipSel.addEventListener('change', () => { if (clipSel.value) { S.playing = true; setMode(clipMode(clipSel.value)); } });
+  document.querySelectorAll('[data-speed]').forEach((b) => b.addEventListener('click', () => { S.speed = Number(b.dataset.speed); syncButtons(); }));
+  document.querySelectorAll('[data-stage]').forEach((b) => b.addEventListener('click', () => { S.stage = b.dataset.stage; syncButtons(); draw(); }));
+  toggle.addEventListener('click', () => { S.playing = !S.playing; syncButtons(); });
+  stepBtn.addEventListener('click', () => { S.t = 0; advance(); draw(); });
+  document.querySelectorAll('[data-cast]').forEach((b) => b.addEventListener('click', () => { S.cast = b.dataset.cast; syncButtons(); draw(); }));
+
+  // Frame strips: click a frame to stop on it in the viewer.
+  const rows = document.getElementById('rows');
+  rows.className = 'frames';
+  for (const [k, a] of Object.entries(anims)) {
+    const total = a.dur.reduce((s, d) => s + d, 0);
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="row-head"><h3>${a.label}</h3><span class="meta">${a.imgs.length} frames · ${total} ms · ${a.loop ? 'loops' : 'plays once'}</span></div><div class="strip"><div class="cells"></div></div>`;
+    const cells = row.querySelector('.cells');
+    a.frames.forEach((src, i) => {
+      if (a.keys && !a.keys.includes(i + 1)) return;
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'cell';
+      c.setAttribute('aria-label', `${a.label} frame ${i + 1}`);
+      c.innerHTML = `<img src="${src}" width="${a.w}" height="${a.h}" alt=""><span>${i + 1} · ${a.dur[i]} ms</span>`;
+      c.addEventListener('click', () => {
+        const mode = MAIN.includes(k) ? k : clipMode(k);
+        S.mode = mode; startStep(0); S.frame = i; S.playing = false;
+        if (k === 'walk') S.x = 260;
+        syncButtons(); draw();
+        canvas.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+      });
+      cells.appendChild(c);
+    });
+    rows.appendChild(row);
+  }
+
+  startStep(0);
+  syncButtons();
+  requestAnimationFrame(loop);
+})();
+</script>
