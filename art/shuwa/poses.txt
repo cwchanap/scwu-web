@@ -1,7 +1,8 @@
 # One row per SHUWA drawing, read by draw.sh.
 # pose: prompts/<pose>.txt is its prompt, out/raw/<pose>.png its drawing.
 # batch: b1 body, b2 attacks, b3 specials, b4 supers.
-# guide: posrefs/<guide>.png, the donor's sprite for the same pose, sent as image 2 (- draws from the prompt alone).
+# guide: out/posrefs/<guide>.png, the donor's sprite for the same pose, sent as image 2 (- draws from the prompt
+#   alone). draw.sh makes it from the game's sprites (tools/posref.py); it is never committed.
 # form: refs/<form>.png, SHUWA's key drawing sent as image 1 (base or hero).
 # size: the canvas the API draws on.
 #pose        batch guide      form size
