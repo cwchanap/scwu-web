@@ -33,7 +33,6 @@ p1-34        b2    ryuko-34   base 1024x1536
 p3-10        b2    ryuko-10   base 1024x1536
 p3-35        b2    ryuko-35   hero 1024x1536
 p3-36        b2    ryuko-36   hero 1024x1536
-p3-37        b2    shuwa-p3-36 hero 1024x1536
 p3-39        b2    ryuko-39   hero 1024x1536
 p4-38        b2    ryuko-38   hero 1024x1536
 p4-41        b2    ryuko-41   hero 1536x1024
@@ -42,7 +41,6 @@ ap-54        b2    ryuko-54   hero 1024x1536
 ap-55        b2    ryuko-55   hero 1024x1536
 ap-56        b2    ryuko-56   hero 1024x1536
 cp-90        b2    ryuko-90   base 1024x1536
-cp-91        b2    ryuko-91   hero 1024x1536
 cp-92        b2    ryuko-92   hero 1536x1024
 cp-93        b2    ryuko-93   hero 1024x1536
 k1-71        b2    ryuko-71   base 1024x1536
