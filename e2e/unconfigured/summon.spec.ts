@@ -355,6 +355,54 @@ test('a re-pick while its pack is still landing keeps the loading note', async (
   expect(errors).toEqual([]);
 });
 
+test('a summon settled after reopening writes nothing into the new visit', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/');
+  // Zoma's pack gated so the close and the reopen both land mid-load;
+  // the first confirm's settle after the release is the stale write the
+  // reopened visit must ignore (HPA-972 review: the generation now opens
+  // with the dialog, so a prior visit's late outcome can write no note
+  // nor pull focus off the highlighted tile).
+  let releasePack!: () => void;
+  const packGate = new Promise<void>((resolve) => {
+    releasePack = resolve;
+  });
+  await page.route('**/packs/fighter-zoma.bin', async (route) => {
+    await packGate;
+    await route.continue();
+  });
+  const { menu, dialog } = await bootIntoBattle(page);
+
+  await menu.click();
+  await dialog.getByRole('button', { name: 'Cheats' }).click();
+  await dialog.getByLabel('Cheat mode').check();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await page.keyboard.press('Control+Backquote');
+  await dialog.getByRole('option').nth(1).click();
+  await expect(dialog.locator('.note')).toContainText('Loading Zoma…');
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Control+Backquote');
+  await expect(dialog).toBeVisible();
+  const tiles = dialog.getByRole('option');
+  await expect(tiles.nth(0)).toBeFocused();
+
+  // The first visit's confirm settles on a microtask behind the pack's
+  // release: its 'moved on' rejection belongs to that visit, so the new
+  // one keeps its empty note and the first tile's focus.
+  releasePack();
+  await page.waitForTimeout(300);
+  await expect(dialog.locator('.note')).toContainText(
+    'Pick a fighter to join the enemy side.',
+  );
+  await expect(tiles.nth(0)).toBeFocused();
+  expect(errors).toEqual([]);
+});
+
 test.describe('at a phone size', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
