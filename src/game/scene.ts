@@ -371,7 +371,6 @@ export class TrainingScene extends Phaser.Scene {
       window.removeEventListener('blur', this.blur);
       document.removeEventListener('visibilitychange', this.visibility);
       this.clearInput();
-      this.settleSummonLoads();
     });
     this.report();
   }
@@ -1266,11 +1265,26 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // Settle a request: clear it while it is still the live one and take
-  // its shutdown hook off the scene, so repeated summons leave none behind.
+  // its shutdown hook off the scene, so repeated summons leave none
+  // behind. A hook dropped with a pack still in `summonLoads` leaves the
+  // pack to the scene's one armed sweep — the request's own settler is
+  // gone and the loader's listeners die with the scene.
   private settleSummon(request: SummonRequest) {
     if (this.summonRequest === request) this.summonRequest = undefined;
     this.events.off('shutdown', request.shutdown);
+    if (this.summonLoads.size && !this.summonSweepArmed) {
+      this.summonSweepArmed = true;
+      this.events.once('shutdown', this.sweepSummons);
+    }
   }
+  // One shared shutdown hook, armed the first time a request drops its own
+  // hook with an outstanding pack (a dialog close or a screen open): the
+  // once-listener fires the sweep at shutdown or lingers harmlessly.
+  private summonSweepArmed = false;
+  private readonly sweepSummons = () => {
+    this.settleSummonLoads();
+    this.summonSweepArmed = false;
+  };
 
   // Cancel an in-flight summon: the request stops being live so nothing
   // spawns into the match its dialog left. The await itself still
@@ -1283,8 +1297,8 @@ export class TrainingScene extends Phaser.Scene {
     if (request) this.settleSummon(request);
   }
 
-  // The scene's shutdown handler runs this: a cancelled request dropped
-  // its own hook with the dialog that asked for it, and the loader's
+  // The armed shutdown sweep runs this: a cancelled request dropped its
+  // own hook with the dialog that asked for it, and the loader's
   // COMPLETE/loaderror listeners die with the scene, so without the
   // sweep its outstanding pack would never settle — the Menu's confirm
   // would wait on it forever, `summoning` stuck for its mounted life.
