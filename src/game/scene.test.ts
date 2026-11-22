@@ -2119,12 +2119,12 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     scene.setModal(false);
-    // The cancel dropped the request's own hook; the scene's shutdown
-    // sweep over the still-outstanding pack is its await's last settler
+    // The cancel dropped the request's own hook and armed the scene's
+    // sweep for the still-outstanding pack — its await's last settler
     // now that the loader's listeners die with the scene (HPA-972
     // review: the Menu's confirm otherwise waited on it forever).
-    expect(shutdowns).toHaveLength(0);
-    (scene as unknown as { settleSummonLoads(): void }).settleSummonLoads();
+    expect(shutdowns).toHaveLength(1);
+    for (const done of [...shutdowns]) done();
     await expect(pending).rejects.toThrow('shut down');
     expect(scene.match.fighters).toHaveLength(2);
   });
@@ -2134,25 +2134,27 @@ describe('scene summon (HPA-972)', () => {
     scene.setModal(true);
     const pending = scene.summon('golf', 1);
     expect(shutdowns).toHaveLength(1);
-    // A cancel takes its hook off with it; the await still settles when
-    // its pack's load does — or when another summon supersedes it.
+    // A cancel takes its hook off with it, arming the scene's sweep for
+    // the outstanding pack; the await still settles when its pack's load
+    // does — or when another summon supersedes it.
     scene.setModal(false);
-    expect(shutdowns).toHaveLength(0);
-    // The next summon owns exactly one hook again; summoning the same
-    // fighter supersedes the cancelled one's outstanding load and
-    // settles its await there.
+    expect(shutdowns).toHaveLength(1);
+    // The next summon adds its own hook beside the armed sweep; summoning
+    // the same fighter supersedes the cancelled one's outstanding load
+    // and settles its await there.
     scene.setModal(true);
     const second = scene.summon('golf', 1);
-    expect(shutdowns).toHaveLength(1);
+    expect(shutdowns).toHaveLength(2);
     await expect(pending).rejects.toThrow('took over the load');
-    // A cancel while the pack is still loading keeps that one hook, and
-    // the pack's late completion settles the second request's own.
+    // A cancel while the pack is still loading drops that hook, leaving
+    // the armed sweep, and the pack's late completion settles the second
+    // request's own.
     scene.setModal(false);
-    expect(shutdowns).toHaveLength(0);
+    expect(shutdowns).toHaveLength(1);
     const settled = expect(second).rejects.toThrow('moved on');
     finishLoad();
     await settled;
-    expect(shutdowns).toHaveLength(0);
+    expect(shutdowns).toHaveLength(1);
     expect(scene.match.fighters).toHaveLength(2);
   });
 
