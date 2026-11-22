@@ -1027,6 +1027,73 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     expect(one2.points).toBe(0);
   });
 
+  it('moves an arriving story seat off a summon’s palette', () => {
+    // A summoned partner ZAKU takes palette 2; the enemy ZAKU waiting at
+    // seat 2 must not arrive in the same colours.
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ player: 35 }),
+          storySlot({ flags: 4, watch: 1, below: 153, player: 34 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    toFight(match);
+    const arrival = match.fighters[2]!;
+    expect(arrival).toMatchObject({ who: 'zaku', present: false });
+    const ally = match.summon('zaku', 1, cheats({ enabled: true }))!;
+    const summonPalette = match.palettes[3]!;
+    match.fighters[1]!.hp = 152;
+    match.step();
+    expect(arrival).toMatchObject({ who: ally.who, present: true });
+    expect(match.palettes[2]).not.toBe(summonPalette);
+  });
+
+  it('does not stack a losing summon’s KO stop over the story celebration', () => {
+    const match = Match.story(
+      'ryuko',
+      storyBattle({
+        slots: [
+          storySlot({ scorer: 0, points: 100 }),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      }),
+    );
+    toFight(match);
+    const [one, native] = match.fighters;
+    const summons = [
+      match.summon('zoma', -1, cheats({ enabled: true }))!,
+      match.summon('kiki', -1, cheats({ enabled: true }))!,
+    ];
+    native!.caught = one!;
+    native!.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(native!);
+    for (let t = 0; t < 30 && !match.winner; t++) match.step();
+    expect(match.winner).toBe('player');
+    // The native loser's own KO holds the arena 40 ticks; each losing
+    // summon plays its result without adding another hold.
+    let holds = 0;
+    let last = one!.hitStop;
+    for (let t = 0; t < 120; t++) {
+      match.step();
+      if (one!.hitStop - last >= 30) holds++;
+      last = one!.hitStop;
+    }
+    expect(summons.map((f) => f.action)).toContain('down');
+    expect(holds).toBe(1);
+  });
+
   it('keeps the story HUD on the natives when the 1P strikes a summon', () => {
     // The enemy index the opponent HUD reads (`rival`) names native seats
     // only: a 1P box meeting a summon marks nothing, and the lone-native

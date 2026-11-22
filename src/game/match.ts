@@ -2222,7 +2222,13 @@ export class Match {
   private takeSeat(i: number) {
     const seat = this.seats[i];
     if (seat) this.held[seat] = -1;
-    takePalette(this.held, seat, Math.max(0, this.held[seat] ?? -1));
+    // Authored (HPA-972): a summon's palette is used too, so an arriving
+    // native keeps off it; the summons sit past a seat-indexed copy.
+    const taken = [...this.held];
+    taken.length = Math.max(taken.length, seat + 1);
+    taken.push(...this.summonPalettes);
+    takePalette(taken, seat, Math.max(0, this.held[seat] ?? -1));
+    this.held[seat] = taken[seat]!;
   }
 
   // Each fighter's palette: native seats read the session's held palettes,
@@ -3386,7 +3392,11 @@ export class Match {
     if (!launch) return false;
     if (f.action === 'down' && f.age === 5) {
       this.koFreeze(f);
-      this.koStop += 40;
+      // Authored (HPA-972): once the round is decided, a losing summon
+      // adds no arena stop, which would otherwise chain 40 ticks per
+      // summon over the celebration. A native loser's hold stays.
+      if (!this.winner || this.fighters.indexOf(f) < this.nativeCount)
+        this.koStop += 40;
     }
     if (f.age === launch) {
       const straight = STRAIGHT_KO.includes(f.who);
