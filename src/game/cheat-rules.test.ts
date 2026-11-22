@@ -1082,16 +1082,29 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     for (let t = 0; t < 30 && !match.winner; t++) match.step();
     expect(match.winner).toBe('player');
     // The native loser's own KO holds the arena 40 ticks; each losing
-    // summon plays its result without adding another hold.
+    // summon plays its result without adding another hold — no stop on
+    // the others, and no global-6 freeze for the arena's objects.
     let holds = 0;
     let last = one!.hitStop;
+    let stops = 0;
+    let freezes = 0;
+    let lastFreeze = match.freeze;
     for (let t = 0; t < 120; t++) {
       match.step();
       if (one!.hitStop - last >= 30) holds++;
+      if (one!.hitStop > last) stops++;
       last = one!.hitStop;
+      if (match.freeze > lastFreeze) freezes++;
+      lastFreeze = match.freeze;
     }
-    expect(summons.map((f) => f.action)).toContain('down');
+    // Each losing summon still plays its KO fall — landed by the
+    // window's end once no stop chains behind it.
+    expect(
+      summons.every((f) => f.action === 'down' || f.action === 'koLand'),
+    ).toBe(true);
     expect(holds).toBe(1);
+    expect(stops).toBe(1);
+    expect(freezes).toBe(1);
   });
 
   it('keeps the story HUD on the natives when the 1P strikes a summon', () => {

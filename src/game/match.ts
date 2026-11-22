@@ -3071,7 +3071,7 @@ export class Match {
     if (f.who === 'dora' && action !== 'script') f.pierceCastTick = undefined;
     if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
-    if (action === 'down') this.pauseOthers(f, 10);
+    if (action === 'down' && this.koHolds(f)) this.pauseOthers(f, 10);
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -3082,7 +3082,7 @@ export class Match {
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     if (action === 'down') {
       f.branch ??= this.koTest(f);
-      this.koFreeze(f);
+      if (this.koHolds(f)) this.koFreeze(f);
     }
     f.copy = null;
     f.slideBase = 0;
@@ -3305,6 +3305,15 @@ export class Match {
     return test?.op === 'test' ? sourceKey(test.action, test.offset) : null;
   }
 
+  // Whether the fighter's KO stops the arena: the others' ten ticks (PC
+  // 607), its freeze to global 6 (PCs 606, 610) and PC 611's 40-tick
+  // hold. Authored (HPA-972): once the round is decided, a losing summon
+  // adds no arena stop, which would otherwise chain 40 ticks per summon
+  // over the celebration. A native loser's hold stays.
+  private koHolds(f: Fighter) {
+    return !this.winner || this.fighters.indexOf(f) < this.nativeCount;
+  }
+
   // KO Normal's freeze (global 6) at the fighter's age, from the timeline
   // it draws: Ryuko's adds 10 (PC 606), then 40 at age 5 (PC 610). ASURA's
   // voice roll (PC 416) jumps past its 10 to + 15 (PC 418) when it fails.
@@ -3390,13 +3399,9 @@ export class Match {
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
     if (!launch) return false;
-    if (f.action === 'down' && f.age === 5) {
+    if (f.action === 'down' && f.age === 5 && this.koHolds(f)) {
       this.koFreeze(f);
-      // Authored (HPA-972): once the round is decided, a losing summon
-      // adds no arena stop, which would otherwise chain 40 ticks per
-      // summon over the celebration. A native loser's hold stays.
-      if (!this.winner || this.fighters.indexOf(f) < this.nativeCount)
-        this.koStop += 40;
+      this.koStop += 40;
     }
     if (f.age === launch) {
       const straight = STRAIGHT_KO.includes(f.who);
