@@ -2596,10 +2596,12 @@ export class Match {
       : one.facing;
     const clampX = (x: number) => Math.min(1845, Math.max(75, x));
     // ponytail: with no present, living same-side fighter to stand past (an
-    // all-ally battle, or all hostiles downed or waiting), the far side
-    // falls back to 135 past the 1P.
+    // all-ally battle, or all hostiles fallen or waiting), the far side
+    // falls back to 135 past the 1P. `downed` stays out of this: it holds
+    // through a ZAKU or PAC-HELO revival for the brawl's elimination
+    // count, and a hostile back on its feet is a living anchor again.
     const far = this.fighters
-      .filter((n, i) => sameSide(i) && n.present && n.hp > 0 && !n.downed)
+      .filter((n, i) => sameSide(i) && n.present && n.hp > 0)
       .map((n) => n.x);
     const anchor = far.length
       ? dir === 1
