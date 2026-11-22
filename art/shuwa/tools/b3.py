@@ -25,7 +25,7 @@ from v4 import Frame, Ref, feet, load, pixel, save  # noqa: E402
 
 FOLDER = {"assets": "ryuko", "dora": "dora", "alex": "alex", "zoma": "zoma"}
 # clip -> (donor, [script ids], {donor image: SHUWA sprite}, donor images to drop)
-SWING = {103: "b2:ch-103", 104: "b2:ch-105", 105: "b2:ch-105", 106: "b2:ch-105", 107: "b2:ct-107", 108: "b2:ct-108",
+SWING = {103: "b2:ch-103", 104: "b2:ch-104", 105: "b2:ch-105", 106: "b2:ch-105", 107: "b2:ct-107", 108: "b2:ct-108",
          110: "b2:ct-110", 111: "b2:ct-111", 94: "b1:crouch-25", 24: "b1:crouch-24"}
 CLIPS = {
     "ring": ("assets", ["226"], {10: "b2:p3-10", 320: "r-320", 321: "r-321", 322: "r-322", 323: "r-322", 324: "r-325",
