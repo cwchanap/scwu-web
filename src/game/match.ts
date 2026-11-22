@@ -5858,16 +5858,21 @@ export class Match {
       this.hitTest();
       return;
     }
-    if (!this.winner && !this.picking) this.ticks++;
-    // Authored (HPA-972): round 1's first active tick grants 1P its
-    // starting EN — one stock under the cap and no stored power — after
-    // the intro's phase 0 has returned, which no-intro practice reaches on
-    // its first step. Unlimited EN below refills over it; later rounds
-    // keep the native carryover.
-    if (this.cheats.enabled && this.round === 1 && this.ticks === 1) {
-      const one = this.fighters[0];
-      one.stock = one.maxStock - 1;
-      one.power = 0;
+    if (!this.winner && !this.picking) {
+      this.ticks++;
+      // Authored (HPA-972): round 1's first active tick grants 1P its
+      // starting EN — one stock under the cap and no stored power — after
+      // the intro's phase 0 has returned, which no-intro practice reaches
+      // on its first step. Nested in the count's increment so a round
+      // already picking its result — a pre-FIGHT KO like SHIN-Z's VS
+      // start leaves `ticks` at 1 — cannot re-grant it under the
+      // celebration. Unlimited EN below refills over it; later rounds
+      // keep the native carryover.
+      if (this.cheats.enabled && this.round === 1 && this.ticks === 1) {
+        const one = this.fighters[0];
+        one.stock = one.maxStock - 1;
+        one.power = 0;
+      }
     }
     // Authored (HPA-767): Unlimited EN tops the 1P up to its effective cap
     // every active tick, before the tick's inputs — the source's pays and
