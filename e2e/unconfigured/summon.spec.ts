@@ -393,13 +393,16 @@ test('a summon settled after reopening writes nothing into the new visit', async
 
   // The first visit's confirm settles on a microtask behind the pack's
   // release: its 'moved on' rejection belongs to that visit, so the new
-  // one keeps its empty note and the first tile's focus. Waiting for the
-  // response bounds the window to the decode — a suppressed settle
-  // writes nothing observable, so the beat covers it alone.
+  // one keeps its empty note and the first tile's focus. A suppressed
+  // settle writes nothing else to wait on, so the settle stamp is the
+  // signal — it lands however long the pack's decode takes.
   const packReceived = page.waitForResponse('**/packs/fighter-zoma.bin');
   releasePack();
   await packReceived;
-  await page.waitForTimeout(300);
+  await expect(dialog.locator('.note')).toHaveAttribute(
+    'data-summon-settles',
+    '1',
+  );
   await expect(dialog.locator('.note')).toContainText(
     'Pick a fighter to join the enemy side.',
   );

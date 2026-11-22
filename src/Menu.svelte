@@ -136,6 +136,9 @@
   // The confirm generation, bumped on each confirm and on open, so a
   // settle from an earlier visit writes nothing into the new one.
   let summonSeq = 0;
+  // Every settled confirm bumps this — a superseded one's included,
+  // whose suppression writes nothing else a test could wait on.
+  let summonSettles = $state(0);
 
   $effect(() => {
     if (open) {
@@ -267,6 +270,7 @@
           text: error instanceof Error ? error.message : String(error),
         };
     } finally {
+      summonSettles++;
       if (seq === summonSeq) {
         summoning = false;
         // The re-enable and a pointer click elsewhere can still have
@@ -479,6 +483,7 @@
           class="note"
           class:ok={note?.kind === 'ok'}
           class:error={note?.kind === 'error'}
+          data-summon-settles={summonSettles}
           aria-live="polite"
         >
           {note?.text ??
