@@ -3362,6 +3362,25 @@ describe('summoned fighters (HPA-972)', () => {
     expect([foe.x, foe.facing]).toEqual([700 - 135, 1]);
   });
 
+  it('stands an enemy summon past a hostile back on its feet after a KO', () => {
+    // ZAKU and PAC-HELO rise about 5 s after a KO and `downed` stays set
+    // for the brawl's elimination count — a revived hostile is still a
+    // present, living fighter `nearest` can target, so it anchors the
+    // far side too (HPA-972 review: a revived-only hostile left the
+    // anchor at the 1P and the summon landed on the wrong side).
+    const match = new Match('practice', false, 0);
+    const [one, live] = match.fighters;
+    one.x = 1200;
+    one.facing = -1;
+    live.x = 700;
+    live.facing = 1;
+    const revived = match.summon('zoma', -1, DEFAULT_CHEATS)!;
+    revived.x = 300;
+    revived.downed = true;
+    const foe = match.summon('kiki', -1, DEFAULT_CHEATS)!;
+    expect([foe.x, foe.facing]).toEqual([300 - 135, 1]);
+  });
+
   it('gives summoned allies and enemies their side’s win or draw pose at round end', () => {
     const match = new Match('practice', false, 0);
     const [one, two] = match.fighters;
