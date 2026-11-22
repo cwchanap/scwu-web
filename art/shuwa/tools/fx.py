@@ -65,3 +65,19 @@ def flash(mask_rgba, strength=1.0):
     out = np.zeros_like(mask_rgba)
     out[a] = (248, 248, 248, int(255 * strength))
     return out
+
+
+def swoosh(length, height, phase=0, steps=6):
+    """A crescent of light bulging forward (to the right) from its left edge: the sweep a fast strike throws ahead of
+    the fist or foot, carrying it out to the donor's reach. Brightest on the leading edge, fading back and at the tips;
+    phase moves the inner edge a little so held frames shimmer."""
+    hh = height / 2
+    y, x = np.mgrid[0:height, 0:length].astype(float)
+    x, yc = x + 0.5, (y + 0.5 - hh) / hh
+    k = 0.45 + 0.08 * np.sin(phase)
+    ro = np.maximum(np.hypot(x / length, yc), 1e-6)  # 1 on the leading edge
+    ri = np.maximum(np.hypot(x / (length * k), yc / 0.85), 1e-6)  # 1 on the inner edge
+    s = (1 - 1 / ri) / np.maximum(1 / ro - 1 / ri, 1e-6)  # 0 inner edge .. 1 leading edge, along a ray
+    v = np.where((ro <= 1) & (ri >= 1), np.clip(s, 0, 1) ** 1.3, 0)
+    v = v * np.clip(np.cos(np.arctan2(yc, x / length)), 0, 1) ** 0.8
+    return _rgba(v, PALE, BLUE, steps)

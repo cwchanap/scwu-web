@@ -20,7 +20,7 @@ from scipy import ndimage as ndi
 
 sys.path.insert(0, str(Path(__file__).parent))
 import crisp  # noqa: E402
-from v4 import Frame, Ref, feet, load, pixel, save  # noqa: E402
+from v4 import BASE_ACTION, Frame, Ref, feet, load, pixel, save  # noqa: E402
 
 # pose -> (form, scale method)
 POSES = {
@@ -96,7 +96,7 @@ def main(raw, ref_dir, prev, out, base_h=208.0):
               for fm in ("base", "hero")}
     for name, (a, bg, (f, _, _), score) in found.items():
         form, how = POSES[name]
-        s0 = S if form == "base" else Sp
+        s0 = S * BASE_ACTION if form == "base" else Sp
         hat = hat_area(a, bg) if form == "base" else 0
         f_hat = (hat / hat0) ** 0.5 if hat else None
         f_area = (fig_area(a, bg) / area_p) ** 0.5 if form == "hero" else None

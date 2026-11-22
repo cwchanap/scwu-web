@@ -21,9 +21,10 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
 import crisp  # noqa: E402
+import fx  # noqa: E402
 import posref  # noqa: E402
 from b2_poses import POSES  # noqa: E402
-from v4 import Frame, Ref, feet, load, pixel, save  # noqa: E402
+from v4 import BASE_ACTION, Frame, Ref, feet, load, pixel, save  # noqa: E402
 
 # RYUKO image -> SHUWA sprite (b2 pose, or b1 key sprite "b1:<pose>", or the idle stance "idle")
 MAP = {
@@ -52,6 +53,9 @@ CLIPS = {  # clip key -> RYUKO script
     "chuck": "196", "chuckThrow": "197", "hitUp": "200",
 }
 HOLD = 300  # ms for a script's final frame of length 0 (held until landing in the game)
+# RYUKO images whose drill, sweep, gun or tank tread reach well past SHUWA's fist or foot. Their frames get a sweep of
+# light (fx.swoosh) from his limb out to RYUKO's front edge, so the strike reaches where the move's hit lands.
+STRIKES = {36, 41, 72, 82, 83, 97, 98, 99}
 
 
 def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
@@ -93,7 +97,7 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
               for form in refs}
     for name, (a, bg, f, score) in found.items():
         n, form, how = POSES[name][:3]
-        s0 = refs[form][1]
+        s0 = refs[form][1] * (BASE_ACTION if form == "base" else 1)
         use = f if score >= 0.6 else median[form]
         spr[name], (x0, _) = pixel(a, bg, s0 / use)
         off[name] = n, how == "free"
@@ -129,14 +133,29 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
         if key in canvas_x:
             x = round(canvas_x[key])
             ax = s.shape[1] - 1 - x if flip else x
-        return Frame(ms).add(np.ascontiguousarray(s), ax, ay)
+        fr = Frame(ms)
+        if n in STRIKES and not flip:
+            al = s[..., 3] > 0
+            tx = np.nonzero(al.any(0))[0].max()  # his front edge and the row it sits on
+            ty = int(np.nonzero(al[:, max(0, tx - 3):tx + 1].any(1))[0].mean())
+            gap = reach(n) - (tx - ax)
+            if gap > 12:
+                sw = fx.swoosh(gap + 8, int(np.clip(gap * 0.6, 24, 56)), phase=n)
+                fr.add(sw, ax - (tx - 8), ay - (ty - sw.shape[0] // 2))  # behind him, starting 8 px inside the tip
+        return fr.add(np.ascontiguousarray(s), ax, ay)
+
+    def reach(n):
+        """RYUKO's front edge in image n, from his position point."""
+        dx, _, w, _ = R["frames"][str(n)]
+        al = np.asarray(Image.open(ryuko_png / f"{n}.png").convert("RGBA"))[..., 3] > 0
+        return np.nonzero(al.any(0))[0].max() - (w // 2 - dx)
 
     for clip, script in CLIPS.items():
         frames, last = [], None
         for n, t, _, _, flip in R["scripts"][script]:
             if MAP.get(n) not in spr:
                 raise SystemExit(f"{clip}: no sprite for RYUKO image {n}")
-            this = (MAP[n], flip)
+            this = (MAP[n], flip, n if n in STRIKES else None)
             if last == this:  # same SHUWA drawing in the same place: one longer hold
                 frames[-1].dur += t * 10
                 continue

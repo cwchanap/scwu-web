@@ -48,6 +48,10 @@ How a drawing becomes a sprite:
 - A sprite's anchor height is its feet plus the donor's offset from feet to position point in the image it was drawn
   from. Its anchor x is where it stands on its drawing canvas: the guide's position point, or the key drawing's
   feet for a pose drawn without a guide (b2; b1 and b3 still use the feet).
+- Worker-form action drawings take a 1.1x scale on top of the head match (`BASE_ACTION` in `tools/v4.py`): the model
+  draws his hard hat and body about 11% smaller in action poses than in the key drawing.
+- Where the donor's drill, sweep, gun or tank tread reaches past SHUWA's fist or foot, the strike frame gets a sweep of
+  light out to the donor's front edge (`STRIKES` in `tools/b2.py`, `fx.swoosh`), so he reaches where the hit lands.
 - Glows, rings, walls of light and beams are soft-light layers drawn in code (`tools/fx.py`, `tools/b4.py`),
   never part of the fighter drawings.
 

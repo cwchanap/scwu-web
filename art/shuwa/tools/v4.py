@@ -28,6 +28,10 @@ import fx  # noqa: E402
 BG = (40, 88, 156)
 SPRITE_H = 205  # master guard stance, crest to sole, like the cast's 193 to 212 px idles
 SPRITE_H_P = 205  # powered master, crest to sole
+# Worker-form action drawings (batches 1 and 2) are matched on the face, but the model draws their hard hat and
+# body about 11% smaller than the key drawing's (hat ratio median 0.885), so they popped down from idle. They
+# take this extra scale, which brings the hat back to idle's size; the face ends up about 10% larger.
+BASE_ACTION = 1.1
 SKIN = {(248, 216, 192), (232, 144, 128)}
 
 
