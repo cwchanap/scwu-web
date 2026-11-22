@@ -45,8 +45,9 @@ How a drawing becomes a sprite:
 - Each clip plays the donor's own script for the move (RYUKO for most; DoraEmon, ALEX and ZOMA for some specials),
   with every donor image swapped for a SHUWA sprite, so timing, reach and travel match the donor.
   `tools/data/` holds those scripts, taken from the game's export.
-- A sprite's anchor is its feet plus the donor's offset from feet to position point in the image it was drawn
-  from. Poses drawn without a guide keep only the vertical offset.
+- A sprite's anchor height is its feet plus the donor's offset from feet to position point in the image it was drawn
+  from. Its anchor x is where it stands on its drawing canvas: the guide's position point, or the key drawing's
+  feet for a pose drawn without a guide (b2; b1 and b3 still use the feet).
 - Glows, rings, walls of light and beams are soft-light layers drawn in code (`tools/fx.py`, `tools/b4.py`),
   never part of the fighter drawings.
 
