@@ -1078,33 +1078,36 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     ];
     native!.caught = one!;
     native!.hp = 0;
-    (match as unknown as { knockOut(f: Fighter): void }).knockOut(native!);
-    for (let t = 0; t < 30 && !match.winner; t++) match.step();
-    expect(match.winner).toBe('player');
-    // The native loser's own KO holds the arena 40 ticks; each losing
-    // summon plays its result without adding another hold — no stop on
-    // the others, and no global-6 freeze for the arena's objects.
+    // The count opens at the KO, so the native's own entry effects land in
+    // it — PC 607's ten-tick stop on the others and PC 606's ten on global
+    // 6 — before its KO Normal's 40-tick hold and 40-freeze at age 5; each
+    // losing summon then plays its result without adding another stop or
+    // freeze of its own.
     let holds = 0;
-    let last = one!.hitStop;
     let stops = 0;
     let freezes = 0;
+    let last = one!.hitStop;
     let lastFreeze = match.freeze;
-    for (let t = 0; t < 120; t++) {
+    const tick = () => {
       match.step();
       if (one!.hitStop - last >= 30) holds++;
       if (one!.hitStop > last) stops++;
       last = one!.hitStop;
       if (match.freeze > lastFreeze) freezes++;
       lastFreeze = match.freeze;
-    }
+    };
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(native!);
+    for (let t = 0; t < 30 && !match.winner; t++) tick();
+    expect(match.winner).toBe('player');
+    for (let t = 0; t < 120; t++) tick();
     // Each losing summon still plays its KO fall — landed by the
     // window's end once no stop chains behind it.
     expect(
       summons.every((f) => f.action === 'down' || f.action === 'koLand'),
     ).toBe(true);
     expect(holds).toBe(1);
-    expect(stops).toBe(1);
-    expect(freezes).toBe(1);
+    expect(stops).toBe(2);
+    expect(freezes).toBe(2);
   });
 
   it('keeps the story HUD on the natives when the 1P strikes a summon', () => {
