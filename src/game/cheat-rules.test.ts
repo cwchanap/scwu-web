@@ -1086,14 +1086,32 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     let holds = 0;
     let stops = 0;
     let freezes = 0;
+    let stopped = 0;
+    let frozen = 0;
     let last = one!.hitStop;
     let lastFreeze = match.freeze;
+    // Additions can stack on one tick, where a rising read counts once:
+    // `stopped` sums the stop `pause` puts on the 1P, and `frozen` each
+    // step's freeze addition — global 6 counts down one a step after the
+    // additions land, so a positive swing of d means d + 1 was added.
+    const spied = match as unknown as {
+      pause(f: Fighter, ticks: number): void;
+    };
+    const pause = spied.pause.bind(match);
+    spied.pause = (f, ticks) => {
+      if (f === one) stopped += ticks;
+      pause(f, ticks);
+    };
     const tick = () => {
       match.step();
       if (one!.hitStop - last >= 30) holds++;
       if (one!.hitStop > last) stops++;
       last = one!.hitStop;
-      if (match.freeze > lastFreeze) freezes++;
+      const swing = match.freeze - lastFreeze;
+      if (swing > 0) {
+        freezes++;
+        frozen += swing + 1;
+      }
       lastFreeze = match.freeze;
     };
     (match as unknown as { knockOut(f: Fighter): void }).knockOut(native!);
@@ -1108,6 +1126,10 @@ describe('summoned strikers and native outcomes (HPA-972)', () => {
     expect(holds).toBe(1);
     expect(stops).toBe(2);
     expect(freezes).toBe(2);
+    // Totals catch additions stacked on a counted tick: the ten-tick stop
+    // and the 40-hold on the 1P, and the 10- plus 40-freeze on global 6.
+    expect(stopped).toBe(50);
+    expect(frozen).toBe(50);
   });
 
   it('keeps the story HUD on the natives when the 1P strikes a summon', () => {
