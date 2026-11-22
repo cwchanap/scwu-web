@@ -9,96 +9,90 @@
 
 ## Preflight and minimal architecture
 
-HPA-1035 was closed as superseded (its #27 planning PR closed unmerged); HPA-1251 is Todo and assigned. HPA-1148 is explicitly downstream. HPA-1034 supplies B.R. LONG lettering and blocks *final LONG art acceptance*, not ANOTHER/no-revive/Low HP engineering. HPA-972 is merged on main; its cheat snapshot and 10-fighter *summon* guard are the current baseline. Unrelated PR #26 is art-tooling work; no conflict expected in these gameplay files.
+HPA-1035 was closed as superseded (its #27 planning PR closed unmerged); HPA-1251 is Todo and assigned. HPA-1148 is downstream, HPA-1034 supplies the **separate** B.R. LONG lettering. HPA-972 is merged on main and defines the current cheat snapshot and the 10-fighter **summon** cap; unrelated #26 is art-tooling work. Reuse existing `br-another.ts` (`assemble` and seeded boss builder), `story.ts`, `select.ts`, `scene.ts`, `match.ts`, `cheats.ts`, `menu.ts`, `hud.ts`, the mode-select pack, and existing `e2e/unconfigured/mode-select.spec.ts`.
 
-Reuse existing:
-- src/game/br-another.ts: assemble, brAnotherStages, brAnotherStory, bossBrAnotherStory.
-- src/game/story.ts: Battle, Slot, Route, Story.next/retry, Story.br.
-- src/game/select.ts and src/game/scene.ts: ModeSelect, route dispatch, Continue, Phaser life bars.
-- src/game/match.ts: deterministic 10 ms simulation, KO/entry, toughness, low-life and brawl settlement.
-- src/game/cheats.ts, src/menu.ts, src/Menu.svelte, src/game/hud.ts: cheat model, settings text and life-bar presentation.
-- scripts/export_assets.py and existing mode-select pack; e2e/ Playwright suites and Vitest.
-
-No engine refactor, new backend, new persistence, fairness algorithm or art generation. Prefer narrow pure data and helpers; add seat reuse only if concrete 14/13-seat tests prove it necessary.
+Architecture constraints: **one static lineup table**, no runtime solver, no extra `br-long.ts`, no generic mode framework, no backend or storage, no production-only E2E debug controls, no speculative seat pool. Use native Story/Match for full gameplay tests and existing browser signs/pixel probes for a short reusable visual smoke test. The PR remains the one implementation PR, including later artwork integration when HPA-1034 delivers its independent asset.
 
 ## Task 1 — Approved lineup table and ANOTHER stage construction
 
-**Change:** new src/game/br-lineups.ts; src/game/br-another.ts; src/game/br-another.test.ts; src/game/story.test.ts.
+**Change:** new `src/game/br-lineups.ts`; `src/game/br-another.ts`, `src/game/br-another.test.ts`, `src/game/story.test.ts`.
 
-- [ ] Transcribe all **34** approved stage 1/2/3 rows and all **38** LONG rows from HPA-1035 §7 verbatim into a typed table, keeping pair order and which member leads. Four bosses receive LONG only. Reject an unknown or missing fighter. Don't re-seed, shuffle or independently optimize this table.
-- [ ] Cover 34 standard players in brAnotherStages, including 30 source-style and four folded branches. Preserve own-player source header/intro, arena, allies, hostility, watch and source finale. Stage 1 uses three regular pairs, stage 2 **three extra pairs / six enemies**, and stage 3 four bosses with last-boss arena. Do not change bossBrAnotherStory's separate existing route.
-- [ ] Rebuild the ANOTHER story step sequence: keep stage-1 intro and original finale; insert **demo 5 SEEDED PLAYERS immediately before stage 2**, **demo 7 NEXT CHALLENGER immediately before stage 3**. Recalculate folded splice and source/twins/RARIO jumps so stage 3, source endings and Continue still connect.
-- [ ] Test every row against separately transcribed expected data and all §7 aggregate distribution/leader/exclusion/uniqueness invariants, including shared stage-2 pair order reversal and all 24 boss permutations; use a representative explicit RYUKO assertion (stage 1 G SUNEO+GIANT / LIZARD+KAY / ERUS+HISO; stage 2 OGI+ZIRO / GIGI+SWW / YINAN+AYA; stage 3 SHIN-Z, ALPHA, DoraEmon, ZENKA). Assert stability across retry, stage counts, arena and demo/jump flow for a normal fighter, the four folded fighters, twins and RARIO.
+- [ ] Mechanically convert the 34 ANOTHER stage-1/2/3 rows and 38 LONG rows in **HPA-1035 §7** into one typed data module, preserving every pair's leader and every ordered opponent. A throwaway converter is fine; map source display names to `Who` via `src/instructions/fighters.ts`, validate unknown names/roster gaps and discard the converter if not needed at runtime. No second hand-written table and no runtime fairness search; HPA-858 boss ANOTHER stays seeded as now.
+- [ ] Use existing `assemble` for **all 34 standard ANOTHER stage-1 fights** and stages 2/3, preserving each source fighter's header, opening intro, ally and finale, with fresh `watch`/`below` from the actual predecessor. Stage 2 is **three extra pairs / six opponents**, stage 3 the approved four-boss sequence with arena chosen by the last boss.
+- [ ] Change ANOTHER steps to **stage-1 intro → stage 1 → demo 5 SEEDED PLAYERS → stage 2 → demo 7 NEXT CHALLENGER → stage 3 → source finale**. Recalculate folded splice and source/twin/RARIO conditional jump offsets; preserve Continue, endings and boss ANOTHER.
+- [ ] Table-driven tests: for **each** approved row, compare the constructed `Battle.slots` / Story progression to the **same canonical typed row** (no duplicate expected table); independently hard-code a few small representative rows, including RYUKO stage 1 G SUNEO+GIANT / LIZARD+KAY / ERUS+HISO; stage 2 OGI+ZIRO / GIGI+SWW / YINAN+AYA; stage 3 SHIN-Z, ALPHA, DoraEmon, ZENKA. Assert all §7 distinctness, frequency/slot, pair-leader/omission invariants, 24 boss orders, retry stability, folded/normal/twin/RARIO demo/ending jumps and arena selection.
 
-**Checkpoint:** ANOTHER and pure table tests pass before starting LONG; no artwork needed.
+**Checkpoint:** ANOTHER table, fights and story-jump unit tests pass, independent of HPA-1034 art.
 
 ## Task 2 — LONG battle and generated route
 
-**Change:** src/game/br-another.ts or one small src/game/br-long.ts, src/game/story.ts, src/game/match.ts if justified, src/game/br-another.test.ts and focused Match/story tests.
+**Change:** `src/game/br-another.ts`, `src/game/story.ts`, `src/game/match.ts` only if tests expose a real limit; existing `br-another.test.ts`, Story and Match tests.
 
-- [ ] Build one Sakura Street Battle of twelve enemies from the six ordered pairs of each approved normal/boss LONG row, followed by { type: 4 }. Introduce br-long as a generated Route and B.R. marker. Do not use a fake Chii TAKE/life value.
-- [ ] Keep first enemy present at tick one; each succeeding enemy watches its predecessor's low-life mark. Preserve entry order (within-pair leader first), symmetric enemy masks, friendly mates, and status visibility for waits. Test each of the 38 exact orders and all 16-pair frequency/leader invariants.
-- [ ] Ordinary player: DoraEmon only as a present-from-start ally (not the usual partner), total **14** logical fighters. Boss player: no ally, total **13**. Preserve HPA-972 B.R. no-partner cheat and its normal-off behavior.
-- [ ] Boss LONG: put existing Slot.tough on all twelve hostile slots, giving 2× HP / 500 max EN / 2× positive gain; non-boss LONG stays at native stats. Confirm 14/13 logical seats work in Match, render/palette/HUD and result bookkeeping. HPA-972 MAX_FIGHTERS=10 must limit *summons*, not authored native fighters; implement a narrow seat fix only if a failing test shows a real cap.
-- [ ] Round settlement: twelve hostile KOs required for a normal win, player KO follows ordinary Continue, retry restores the same lineup and roles, victory returns to title. Do not grant win after six or eight KOs. No demos.
+- [ ] Build the one-battle `br-long` route next to existing `assemble` using the six approved ordered pairs (twelve enemies) on Sakura Street, followed by `{type:4}`. No demos or fabricated Chii TAKE. Key the route's row by `Who` for all **34 ordinary and four boss** players; add it to `Route` and `Story.br`.
+- [ ] First enemy present at start; later enemies use **native predecessor `Slot.below` through `lifeMark`**, not cheat `Low HP line`. Validate correct pair-leading arrival, friendship within pairs, enemies outside pairs, waiting slots, all 38 approved orders and aggregate §7 pair/leader frequency. Test 0% cheat line does **not** stall native arrivals.
+- [ ] Ordinary player: build DoraEmon's **first-tick** ally from an immediate-entry donor slot (such as `roles.slots[0]`) with `0x200` flag, **14 native fighters** in all. Boss: no ally, **13 native fighters**, all twelve hostile slots use the **existing `Slot.tough`** 2× HP / max EN 500 / 2× positive gains. Include HPA-972 optional no-partner cheat, which must remove Dora without corrupting waits. Do not treat the `MAX_FIGHTERS=10` summon cap as the story cap; existing palette duplication beyond eight is intentional.
+- [ ] Deterministic Story + Match tests: 12 KOs to win (never six), player KO → Continue, retry same lineup, winner → title, boss toughness, partner identity/presence and all 14/13 logical seats. Only implement a narrow seat/renderer repair if a failing test proves it necessary.
 
-**Checkpoint:** LONG runs from Story.next through Match and result/Continue in deterministic tests without selector artwork.
+**Checkpoint:** LONG progresses through Story, Match and full result flow under Vitest with no sign art or production test hooks.
 
-## Task 3 — Route selector, sign data and screen flow
+## Task 3 — Route selector, sign data and scene wiring
 
-**Change:** src/game/select.ts, src/game/scene.ts, src/game/story.ts, select/scene tests, scripts/export_assets.py after artwork arrives; existing pack registration only as required.
+**Change:** `src/game/select.ts`, `src/game/scene.ts`, `src/game/story.ts`, `src/game/select.test.ts` and focused scene tests, `scripts/export_assets.py` (blank sign now and HPA-1034 composition later).
 
-- [ ] Represent each route step with an array of its available boards: normal STORY two, normal B.R. **ZERO / ANOTHER / LONG three**, boss B.R. **ANOTHER / LONG two**; first-step STORY/B.R. remains two. Boss STORY still opens native scenario without route step. Do not add boss ZERO or implement CHAOS.
-- [ ] Replace two-choice XOR positioning/navigation with count-based choice and layout. Preserve selected/dim imagery, cursor, pointer hit boxes and keyboard confirm/direction, back/Escape, remembered choice, tap cooldown and route-load cancellation. Ensure ordinary ANOTHER and boss ANOTHER do not regress.
-- [ ] Connect br-long selection to a new generated Story route in scene.ts without invoking routeLife; keep ordinary sign routes' native jumps intact.
-- [ ] Only after **HPA-1034** delivers lettering: composite it with green-tinted native PAC-HELO blank sign at export, place it in the existing mode-select pack and render it. No original/derived asset commits. A temporary procedural sign is allowed for interaction tests, but leave final visual acceptance unchecked until the actual sign exists.
+- [ ] Build board arrays from `routeBoards(who, mode)`: normal STORY two, normal B.R. **ZERO / ANOTHER / LONG three**, boss B.R. **ANOTHER / LONG two**; boss STORY retains direct native start. First step still STORY/B.R. two signs. Keep CHAOS out of this ticket.
+- [ ] **Remember by Route value, not index.** Resolve saved route to an index in the offered list, falling back to first when unavailable; include a regular LONG → boss B.R. → regular ANOTHER selection regression. No two-board XOR navigation. Compute centre spots/scale from count with a fit cap and spacing for **2/3/4** signs, sharing one geometry function with draw/tap; assert active and dim boards remain on-canvas and non-overlapping, including a future fourth.
+- [ ] Fix `scene.ts` Story constructor: it currently passes only `boss-br` and otherwise null. Pass generated `br-long` and `boss-br` straight into Story; **only** native SignRoute values call `startOnRoute`/`routeLife`. Test that the actual select → scene → new Story → Match path retains `br-long` and `Story.br === true` (including HPA-972 no-partner behavior), plus back/Escape/cancel, keyboard and touch.
+- [ ] Use PAC-HELO's **already exported blank board 8004**, adding it to the `SIGNS` ownership set in `scripts/export_assets.py` so `mode-select` pack loads it, as the temporary LONG board. No throwaway procedural Phaser text. Once HPA-1034 supplies its lettering, compose a green original-blank sign at export, following existing authored-art composite precedent, and replace the image id. Never check in copied original art, generated packed assets or screenshot baselines. The blank allows functional E2E but does **not** satisfy final sign mockup visual acceptance.
 
-**Checkpoint:** Keyboard and touch can enter each supported regular/boss route; final mockup visual acceptance waits for art.
+**Checkpoint:** mode select and route-loading tests prove 2/3 choices, remembered-route switching and scene B.R. marker; final sign visual check waits for artwork.
 
 ## Task 4 — Strict battle-scoped no-revive
 
-**Change:** src/game/match.ts; Dora/ALPHA/ZAKU/PAC-HELO, story, team and related focused tests.
+**Change:** `src/game/match.ts`, focused Dora/ALPHA/ZAKU/PAC-HELO/Story/Match tests and the existing B.R. stage-3 Dora expectation in `team.test.ts`.
 
-- [ ] Add br-long to Story.br and carry the existing boolean into Match for all native B.R. battles. Suppress *true KO recovery* paths for fighter 0 and everyone else, including DoraEmon's two KO RELOAD entry paths, ALPHA's 450/449 recovery, common get-up, post-KO HP awards and any special B.R. ZERO revive. A sticky downed score alone is not enough: prevent a KO'd fighter from re-entering active combat after positive HP gain.
-- [ ] Test B.R. ZERO, normal ANOTHER, boss ANOTHER, normal LONG and boss LONG across player, partner and enemy roles, including timed/scripted KO recovery and kill-HP rewards. Confirm KO stays terminal for the battle, win counters don't double count, and waiting enemies can still arrive normally.
-- [ ] Pair each B.R. case with an unchanged non-B.R. control (CPU Dora, ALPHA, ZAKU/PAC-HELO, ordinary damage/knockdown), plus HPA-858's player Dora restriction and EN charge. CHAOS will inherit Story.br when its separate ticket lands; don't build it here.
+- [ ] Confirm `Story.br` marks B.R. ZERO, normal ANOTHER, boss ANOTHER and LONG. **HPA-973 already gates** `koRecovery` and `koDownGetUp` on `this.br`: do not rework them. CHAOS requires an explicit Story.br addition under its later ticket (current getter is an allow-list).
+- [ ] Extend the existing **`koReloadBlocked`** to block all Dora KO RELOAD entries under `this.br` while preserving player-controlled Dora outside B.R. In `enterPending`, suppress ALPHA's KO Boss revive jump (global 10) on B.R. KOs without altering its ordinary KO branch.
+- [ ] Add a small **Match-level guarded gainLife wrapper** so positive scripted/KO-award life gains do nothing for `this.br && f.downed`, keeping the shared normal `gainLife` helper for non-B.R. This covers ALPHA's 450/449 and other scripted/bonus gains; test whether ZAKU/PAC-HELO's variable-11 B.R. ZERO get-up can bypass these two choke points and guard only if necessary. Sticky `downed` scoring alone is not a sufficient KO lock.
+- [ ] Table-driven role tests for B.R. ZERO, normal/boss ANOTHER and ordinary/boss LONG: player, ally and enemy stay down after normal/script/bonus KO life gain; winner and next-entering slot unaffected. Pair with non-B.R. controls for CPU Dora, ALPHA, ZAKU/PAC-HELO and ordinary knockdown; retain HPA-858 player-Dora rule and EN restriction. Flip the current `team.test.ts` “keeps his KO RELOAD in a B.R. stage 3” assertion.
 
-**Checkpoint:** all B.R. no-revive tests and non-B.R. regression tests pass.
+**Checkpoint:** no-revive Match tests and native non-B.R. regressions pass without duplicating already-gated recovery sites.
 
 ## Task 5 — All-fighter Low HP, combat-to-display consistency
 
-**Change:** src/game/match.ts, src/game/cheats.ts, src/menu.ts, src/game/hud.ts, src/game/scene.ts; Match/HUD/Menu tests and relevant e2e/ suites.
+**Change:** `src/game/match.ts`, `src/game/cheats.ts`, `src/menu.ts`, `src/game/hud.ts`, `src/game/scene.ts` and focused Match/HUD/Menu/scene tests.
 
-- [ ] Remove fighter-0 restriction *only* for Low HP line, idle stance mark, and scaled native damage cut when cheats.enabled. Compute threshold from each fighter's effective maxHp, truncating once, and retained damage from its own native reduction times Damage cut ×, clamped at 0–100% cut. Preserve existing noncheat values, full-cut zero damage and native floor for all other nonzero losses.
-- [ ] Apply configured line to verified script low-HP super/stance gates for their owning fighters without broadening unrelated source HP conditions. Preserve the separate 1P-only **Low-HP supers at any HP** bypass unchanged.
-- [ ] Introduce one narrow read-only Match low-HP state accessor (effective maxHp, mark, active, effective cut percentage). Make actual loss computation and renderer both use that same formula; avoid reimplementing percentage arithmetic in Phaser. Test player, partner, hostile CPU, boss, summoned late entrant and changed effective max HP (including tough boss opponents).
-- [ ] Update the “Low HP · 1P” Cheats group and first two help descriptions to **all fighters**. Keep the low-HP supers option explicitly labeled as 1P-only.
-- [ ] On **already-visible** main HUD bars and arena/optional bars, draw the configured threshold marker and low-HP highlight. At/below the combat threshold show “Damage cut: NN%” using capped **reduction**, not damage retained. Test crossing above/below, 0× (still low HP with 0% cut), different per-fighter base cuts, 100% cap, late arrival and bar hiding; never reveal a normally hidden bar or add labels for absent fighters.
-- [ ] For Cheat Mode disabled, keep original HUD and source low-HP state, no new label/marker. Use pooled/updated Phaser graphics/text and existing visibility controls; no new UI subsystem or graphics assets.
+- [ ] Remove fighter-0-only checks from the existing `idleLifeLine`, `lifeLineMark` and `lossKeptPercent` **when Cheat Mode is on**. All native/summoned fighters use their own effective maxHp and native base cut scaled by Damage cut ×, clamped to 0–100% reduction; preserve the single-truncation threshold, full-cut zero damage, and nonzero loss floor. Keep native behavior unchanged with Cheat Mode off.
+- [ ] Split the `match.ts` verified super gate so the **owning fighter's threshold** uses the adjusted line, while the **Low-HP supers at any HP bypass stays 1P-only**. Do not change other script HP conditionals.
+- [ ] Expose `Match.lifeLineMark` and `lossKeptPercent` (or one tiny read-only composer) for HUD use, computing `Damage cut: NN%` as 100 − damage-kept percent; **no duplicate Phaser math**. Match tests cover player, ally, hostile CPU, boss, late summon, effective HP multipliers, threshold boundary, native base-cut differences, 0× and 100% cap.
+- [ ] Rename the “Low HP · 1P” group and first two help descriptions to **all fighters**, but label the separate supers bypass explicitly 1P-only.
+- [ ] Only on **visible** 1P/rival HUD bars and `Match.lifeBars` arena bars, draw the threshold marker and low-HP highlight. Show actual `Damage cut: NN%` while below/at the mark, even at 0%, use a small pooled Phaser **Text** object per visible bar (the arena currently uses bitmap digit sprites, not Phaser Text). Respect late-entry, hidden enemy bars, dead/absent fighters, canvas bounds and natural HUD when cheats off.
+- [ ] One focused `scene.test.ts` with `phaserStub` asserts displayed mark/percent equals the Match accessor and no otherwise-hidden bars are created; all fighter role/boundary permutations stay in deterministic Match tests.
 
-**Checkpoint:** simulation damage and every visible Low HP display agree for each fighter and state boundary.
+**Checkpoint:** actual per-fighter retained damage and any visible Low HP indicator agree, without broad extra UI scaffolding.
 
-## Task 6 — Documentation and end-to-end verification in this PR
+## Task 6 — Documentation, bounded E2E and visual verification
 
-**Change:** docs/evidence.md, docs/gameplay.md, existing e2e/ specs and test fixtures only as necessary.
+**Change:** `docs/evidence.md`, `docs/gameplay.md`, existing `e2e/unconfigured/mode-select.spec.ts` and focused tests only.
 
-- [ ] Document approved lineup data as **authored** rather than recovered, all route and demo differences, B.R.-scoped no-revive, per-fighter Low HP and HUD label calculation. Keep source timing/engine evidence and authored changes explicitly distinct.
-- [ ] Run targeted Vitest first, then **bun run validate**, **bun run build**, **bun run e2e**. These commands need the project's private handoff or remote generated fixtures; record actual command results and blockers in PR. Never mark unavailable checks passed.
-- [ ] Use **MCP-driven Playwright/browser** E2E against the running game in one Chromium target. Use deterministic match control/test hooks (no manual clicking gate) to traverse normal B.R. ANOTHER stages 1→2→3 with demo 5 and 7; standard LONG win/Continue; boss ANOTHER/LONG (all four bosses where relevant); routes through both keyboard and touch. Assert enemy/ally identity, 14/13 seats, staged arrival, toughness, defeat scoring, no revive, no JS errors and correct title/Continue transitions.
-- [ ] Browser E2E for Cheats: enable the Low HP line and Damage cut ×, take a player, a partner, a hostile enemy and a late entrant across the exact low-HP boundary at both high and low settings. Assert health-bar marker/highlight and percent against the tested Match reduction, incl. effective maxHP scaling, 0%, 60% example and 100% cap. Repeat master-off baseline; assert hidden bars stay hidden.
-- [ ] **Automated visual acceptance:** capture screenshots of (1) regular three-board B.R. LONG choice and (2) boss two-board B.R. choice and compare to the attached HPA-1251/HPA-1035 **HTML mockups** for composition, scale, original backdrop, colors/cursor and no clipping at 960×720 and narrow viewport. Final B.R. LONG screenshot must use HPA-1034 art; defer that assertion until asset integration, not to a new PR.
-- [ ] For Low HP (no supplied mockup), capture screenshots before, at and after the threshold for 1P, partner, enemy/boss and late entrant, visually checking via screenshot pixel/layout assertions that text is legible, correctly placed and clipped nowhere, marker/highlight matches state, and unchanged/hidden HUD is respected with cheats off.
-- [ ] Use one browser platform only; **no native-platform testing or human acceptance criterion**. Remove .playwright-mcp/ and transient screenshots from the branch. Record the MCP run/results and pass/fail evidence in this PR; leave PR **draft** until implementation and all required checks are complete.
+- [ ] Record approved fixed-table balancing, ANOTHER demos, LONG masks/watches/toughness, B.R.-scoped no-revive, and shared Low HP/HUD values as **authored** changes, distinct from recovered game evidence.
+- [ ] Run targeted Vitest first, then **`bun run validate`**, **`bun run build`** and **`bun run e2e`** with required private handoff/R2 fixtures; record command/results/blockers and never mark unavailable checks passed.
+- [ ] Add **reproducible Playwright** keyboard+touch tests to the existing `e2e/unconfigured/mode-select.spec.ts`, reusing its screenshot brightness/pixel probes. Navigate normal three-sign and boss two-sign route steps to the beginning of a LONG match (including a regular → boss route-memory regression), assert right initial fighter/ally UI, selected/dim cursor, correct route, no JS errors and keyboard/touch controls. **Do not** add production battle fast-forward hooks or automate defeating all twelve enemies in a browser; full ANOTHER and LONG combat/results are already covered by Story+Match Vitest.
+- [ ] **MCP browser E2E acceptance:** execute/inspect the same short real-app Chromium route journeys via MCP tools (one platform only) while the checked-in Playwright suite remains the CI-repeatable gate. Capture the **regular three-sign** and **boss two-sign** selection screenshots. With HPA-1034 final artwork, obtain fresh Linear HTML mockups from HPA-1251/HPA-1035 and compare composition, board count, proportions, cursor, active/dim state and clipping to those designs; do not require a brittle pixel-perfect reference or commit copyrighted sign screenshot baselines. Use canvas screenshot/pixel-layout checks at 960×720 and narrow viewport, with automatic assertions; **no human sign-off**.
+- [ ] **Low HP visual check without a mockup:** capture one representative in-match low-HP screen through MCP and use automated screenshot/layout checks for threshold marker, readable percent, clipping and unchanged hidden-bar behavior; exhaustive roles, combat values and threshold crossings are asserted in Match/scene tests rather than requiring browser damage control. Keep screenshots ephemeral; remove `.playwright-mcp/` and transient outputs.
+- [ ] Update **this same draft PR** with actual verification status and screenshot-test evidence. Final LONG visual acceptance is **blocked by HPA-1034 artwork**, independent of ANOTHER, no-revive and Low HP implementation. No native acceptance or separate verification PR.
 
-## End-to-end acceptance criteria (automated, not approval-based)
+**Checkpoint:** deterministic tests cover full game semantics, reusable Playwright/MCP smoke tests cover actual route UI and visual layout, and the final sign image passes mockup-based visual checks when independently delivered.
 
-- [ ] All **34** normal ANOTHER records and **38** LONG records equal the HPA-1035 §7 approved rows, with all specified count, positional, pair-leader and omission invariants. All route orderings are stable across retry.
-- [ ] Normal ANOTHER stage 2 has exactly six enemies; stage 3 has four bosses with correct last-boss arena; demo 5 precedes stage 2, demo 7 precedes stage 3 on normal/folded/twin/RARIO routes; original endings and Continue work.
-- [ ] Normal LONG has exactly twelve hostile enemies and first-tick DoraEmon ally; boss LONG has twelve tough hostiles and no ally. Pair hostility, sequential arrivals, 14/13 seats and palettes, total KO required for win, loss/Continue/title and no-partner cheat all pass.
-- [ ] Any fighter KO'd in B.R. ZERO/ANOTHER/LONG stays KO'd, including alternate revive and HP-reward paths. Non-B.R. and native Dora restrictions are unchanged.
-- [ ] In Cheat Mode, Low HP line/damage cut apply to all player/partner/enemy/boss/late fighter roles. Display threshold and percent match combat damage at every boundary, with modified max HP, 0% cut and 100% cap; master off leaves native effects and HUD unchanged. The separate 1P-only low-HP super bypass still behaves as before.
-- [ ] MCP browser E2E covers the complete regular/boss route journeys with keyboard and touch, match outcomes, demos, Low HP gameplay/HUD, hidden bar visibility and no JS/runtime errors.
-- [ ] MCP screenshot comparisons pass against the **Linear HTML route-selector mockups** using final HPA-1034 sign art; Low HP screenshots without mockups pass automated visual checks at 960×720 and narrow viewport.
-- [ ] docs/evidence.md and docs/gameplay.md updated; bun run validate, bun run build and bun run e2e actually pass in a workspace with the required inputs, with results recorded; no generated art, copied originals, temporary screenshots or unrelated features committed.
+## End-to-end acceptance criteria (automated, one PR)
+
+- [ ] All **34** normal ANOTHER and **38** LONG rows construct exact ordered Battle slots from the one approved HPA-1035 §7 table; all count, leader, omission and uniqueness invariants pass, and retry repeats the same data.
+- [ ] ANOTHER stage 2 is six enemies and stage 3 four bosses with last-boss arena; demo 5/7 precede stages 2/3 on source/folded/twin/RARIO flows, ending and Continue tests pass.
+- [ ] LONG has all twelve ordered native enemies, first-tick Dora ally for standards (14 seats), no ally and tough hostiles for bosses (13 seats); native-entry watches independent of Cheat Low HP, hostility, KO win, defeat/Continue and no-partner cheat pass.
+- [ ] ModeSelect normal B.R. 3 signs/boss B.R. 2 signs (and count-aware 4-layout test), route saved by **value** across fighter changes, scene preserves `Story.br` for LONG, keyboard/touch selection and cancellation pass.
+- [ ] Every B.R. KO stays down through blocked action/HP revive; HPA-973 existing gates remain and non-B.R. revive controls pass, including player-controlled Dora.
+- [ ] Cheat-mode Low HP thresholds, base-reduction multiplier, effective-max scaling, at/above/below boundary and 0%/100% reductions pass for player, allies, enemies, bosses and late arrivals, with the 1P-only super bypass unchanged. The `scene.test.ts` marker/label uses Match values and respects `Match.lifeBars`.
+- [ ] **MCP-driven Chromium E2E** reaches normal and boss LONG match starts via real keyboard/touch routing, with no page errors, alongside the repeatable `e2e/unconfigured/mode-select.spec.ts` tests. Full combat semantics are tested in deterministic Vitest, not through a production test API.
+- [ ] **Automated screenshot visual checks** compare ordinary 3-sign and boss 2-sign layout to the fresh Linear HTML mockups (with **final HPA-1034 lettering**) and check a representative Low HP screen without a mockup at game/narrow sizes, including label and clipping; no pixel-perfect asset snapshot or manual acceptance.
+- [ ] `docs/evidence.md` and `docs/gameplay.md` updated; `bun run validate`, `bun run build` and `bun run e2e` pass with results documented; no original/generated art, extra screenshots, test hooks or unrelated changes committed.
 
 **Unmet dependency:** HPA-1034 remains an external, already-created art ticket. Code may be developed and reviewed before its delivery, but final LONG sign acceptance cannot be checked off beforehand.
