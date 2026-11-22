@@ -28,13 +28,13 @@ bash art/shuwa/build.sh
 Needs python3 with numpy, scipy, pillow and opencv-python, every drawing in `out/raw/`, and the game's exported
 sprites in `public/assets` (`ASSETS=<dir>` points elsewhere). Steps, each building on the one before:
 
-| Step | Builder | Adds |
-| --- | --- | --- |
-| round 7 | `round7/` (kept, built by `tools/v4.py`) | idle, walk, transform, SPECIUM |
-| b1 | `tools/b1.py` | jump, land, crouch, guards, hits, knockdown, get-up, KO, time over, dashes |
-| b2 | `tools/b2.py`, `tools/b2_poses.py` | punches and kicks, crouch and air attacks, Hit Up, Chuck |
-| b3 | `tools/b3.py`, `tools/b3_poses.py` | RING, SHUWATCH, BARRIER, SWING, RECHARGE |
-| b4 | `tools/b4.py`, `tools/fx.py` | effect layers, SPECIUM RAY, THREE MINUTES, GIANT STEP, ULTRA SWING |
+| Step    | Builder                                  | Adds                                                                       |
+| ------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| round 7 | `round7/` (kept, built by `tools/v4.py`) | idle, walk, transform, SPECIUM                                             |
+| b1      | `tools/b1.py`                            | jump, land, crouch, guards, hits, knockdown, get-up, KO, time over, dashes |
+| b2      | `tools/b2.py`, `tools/b2_poses.py`       | punches and kicks, crouch and air attacks, Hit Up, Chuck                   |
+| b3      | `tools/b3.py`, `tools/b3_poses.py`       | RING, SHUWATCH, BARRIER, SWING, RECHARGE                                   |
+| b4      | `tools/b4.py`, `tools/fx.py`             | effect layers, SPECIUM RAY, THREE MINUTES, GIANT STEP, ULTRA SWING         |
 
 `out/b4/` then holds every clip (`frames.json` plus the frames) and `out/shuwa-animations.html` is the preview page.
 

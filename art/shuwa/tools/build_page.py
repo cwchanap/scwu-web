@@ -60,7 +60,7 @@ def main(out_dir, assets, page):
         cast=dict(ryuko=uri_png(assets / "ryuko/1.png"), sou=uri_png(assets / "sou/115.png"), kate=uri_png(assets / "kate/115.png")),
     )
     tpl = Path(__file__).with_name("page.html").read_text()
-    Path(page).write_text(tpl.replace("/*DATA*/null", json.dumps(data)))
+    Path(page).write_text(tpl.replace("/*DATA*/ null", json.dumps(data)))
     print(page, round(Path(page).stat().st_size / 1024), "KB")
 
 
