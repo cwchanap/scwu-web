@@ -371,6 +371,7 @@ export class TrainingScene extends Phaser.Scene {
       window.removeEventListener('blur', this.blur);
       document.removeEventListener('visibilitychange', this.visibility);
       this.clearInput();
+      this.settleSummonLoads();
     });
     this.report();
   }
@@ -1280,6 +1281,19 @@ export class TrainingScene extends Phaser.Scene {
   private cancelSummon() {
     const request = this.summonRequest;
     if (request) this.settleSummon(request);
+  }
+
+  // The scene's shutdown handler runs this: a cancelled request dropped
+  // its own hook with the dialog that asked for it, and the loader's
+  // COMPLETE/loaderror listeners die with the scene, so without the
+  // sweep its outstanding pack would never settle — the Menu's confirm
+  // would wait on it forever, `summoning` stuck for its mounted life.
+  private settleSummonLoads() {
+    for (const request of this.summonLoads.values()) {
+      this.settleSummon(request);
+      request.reject(new Error('The scene shut down.'));
+    }
+    this.summonLoads.clear();
   }
   // A sound the stage's export lacks is its empty one, which stops every
   // sound (0x4034e0).

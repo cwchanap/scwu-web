@@ -2114,6 +2114,21 @@ describe('scene summon (HPA-972)', () => {
     expect(scene.match.fighters).toHaveLength(2);
   });
 
+  it('settles a cancelled summon’s outstanding pack on shutdown', async () => {
+    const { scene, shutdowns } = boot();
+    scene.setModal(true);
+    const pending = scene.summon('golf', 1);
+    scene.setModal(false);
+    // The cancel dropped the request's own hook; the scene's shutdown
+    // sweep over the still-outstanding pack is its await's last settler
+    // now that the loader's listeners die with the scene (HPA-972
+    // review: the Menu's confirm otherwise waited on it forever).
+    expect(shutdowns).toHaveLength(0);
+    (scene as unknown as { settleSummonLoads(): void }).settleSummonLoads();
+    await expect(pending).rejects.toThrow('shut down');
+    expect(scene.match.fighters).toHaveLength(2);
+  });
+
   it('settles each summon’s shutdown hook, leaving none behind', async () => {
     const { scene, shutdowns, finishLoad } = boot();
     scene.setModal(true);
