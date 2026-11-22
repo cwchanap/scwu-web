@@ -77,6 +77,21 @@ describe('starting EN (HPA-972)', () => {
     expect(match.fighters[0].stock).toBe(0);
   });
 
+  it('grants once when a pre-FIGHT KO picks the result on the first tick', () => {
+    // SHIN-Z's VS start KO empties his life before FIGHT: the round then
+    // picks its result on the first active tick and `ticks` freezes at 1
+    // — the grant must not keep rewriting EN under the celebration.
+    const match = new Match();
+    match.useCheats(cheats({ enabled: true }));
+    match.fighters[1].hp = 0;
+    match.step();
+    expect(match.ticks).toBe(1);
+    expect(match.fighters[0]).toMatchObject({ stock: 2, power: 0 });
+    match.fighters[0].stock = 0;
+    for (let t = 0; t < 5; t++) match.step();
+    expect(match.fighters[0].stock).toBe(0);
+  });
+
   it.each([
     ['Vs. CPU', new Match('cpu', true, 0, ['ryuko', 'zoma'])],
     ['Vs. single', new Match('cpu', true, 0, ['ryuko', 'zoma'], 'court', true)],
