@@ -17,16 +17,30 @@ POINT = {("base", "1024x1536"): (508, 1386), ("hero", "1024x1536"): (502, 1416),
 MARGIN = 8
 
 
+def corner(frame, form, canvas):
+    """Top-left corner of the scaled donor sprite on the canvas. frame: the donor's [dx, dy, w, h]."""
+    dx, dy, w, h = frame
+    s = SCALE[form]
+    cx, cy = POINT[(form, canvas)]
+    x0, y0 = round(cx - (w // 2 - dx) * s), round(cy - (h - dy) * s)
+    return min(x0, int(canvas.split("x")[0]) - MARGIN - round(w * s)), y0
+
+
+def point(frame, form, canvas):
+    """Where the donor's position point sits on the guide's canvas (SHUWA is drawn over it)."""
+    dx, dy, w, h = frame
+    x0, y0 = corner(frame, form, canvas)
+    return x0 + (w // 2 - dx) * SCALE[form], y0 + (h - dy) * SCALE[form]
+
+
 def main(sprites, donor, n, form, canvas):
     sprites = Path(sprites)
-    dx, dy, w, h = json.loads((Path(__file__).parent / "data" / f"{donor}.json").read_text())["frames"][str(n)]
+    frame = json.loads((Path(__file__).parent / "data" / f"{donor}.json").read_text())["frames"][str(n)]
     im = Image.open(sprites / f"{n}.png").convert("RGBA")
     s = SCALE[form]
     big = im.resize((round(im.width * s), round(im.height * s)), Image.NEAREST)
     cw, ch = map(int, canvas.split("x"))
-    cx, cy = POINT[(form, canvas)]
-    x0, y0 = round(cx - (w // 2 - dx) * s), round(cy - (h - dy) * s)
-    x0 = min(x0, cw - MARGIN - big.width)
+    x0, y0 = corner(frame, form, canvas)
     out = Image.new("RGB", (cw, ch), BG)
     out.paste(big, (x0, y0), big)
     out.save(Path(__file__).parent.parent / "posrefs" / f"{donor}-{n}.png")

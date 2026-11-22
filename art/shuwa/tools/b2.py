@@ -6,8 +6,10 @@ PREV_OUT is the batch 1 build (its clips and key sprites are kept and reused). R
 and the move scripts (image, 10 ms ticks, dx, dy, flip) taken from src/game/generated/assets.json.
 
 Each clip plays RYUKO's script for the move with every RYUKO image swapped for a SHUWA sprite (MAP). A sprite's anchor
-is its own feet plus RYUKO's offset from his feet to his position point in the image it was drawn from, so
-lunges, kicks and air attacks sit where RYUKO's do. Free poses (drawn without a guide) keep only RYUKO's vertical offset.
+height is its own feet plus RYUKO's offset from his feet to his position point in the image it was drawn from (free poses,
+drawn without a guide, take the same). Its anchor x is where it stands on its drawing canvas: the guide's position point,
+or for a free portrait pose the key drawing's feet (the prompt keeps him in the same place). Feet alone shift the body
+whenever one foot is lifted a few pixels, which made lunges and the chop flurry jump 40 px.
 """
 import json
 import shutil
@@ -19,17 +21,19 @@ from PIL import Image
 
 sys.path.insert(0, str(Path(__file__).parent))
 import crisp  # noqa: E402
+import posref  # noqa: E402
 from b2_poses import POSES  # noqa: E402
 from v4 import Frame, Ref, feet, load, pixel, save  # noqa: E402
 
 # RYUKO image -> SHUWA sprite (b2 pose, or b1 key sprite "b1:<pose>", or the idle stance "idle")
 MAP = {
     31: "idle", 24: "b1:crouch-24", 12: "b1:jump-12", 13: "b1:jump-13", 14: "b1:jump-14", 15: "b1:jump-16", 16: "b1:jump-16",
-    84: "b1:crouch-25", 89: "b1:crouch-25", 94: "b1:crouch-25", 112: "b1:crouch-25", 53: "b1:jump-14", 43: "b1:jump-12",
+    84: "b1:crouch-25", 89: "b1:crouch-25", 94: "b1:crouch-25", 112: "b1:crouch-25", 43: "b1:jump-12",
     32: "p1-32", 33: "p1-33", 34: "p1-34", 74: "p1-32",
     10: "p3-10", 35: "p3-35", 36: "p3-36", 37: "p3-35", 39: "p3-39",  # the chop flurry pumps one arm in and out
     38: "p4-38", 40: "p4-38", 41: "p4-41", 42: "p4-42",
-    54: "ap-54", 55: "ap-55", 56: "ap-56",
+    # air punch: RYUKO's 54 is the wind-up spin and 55 the blow he holds, so the chop is the held pose
+    53: "ap-54", 54: "ap-55", 55: "ap-56", 56: "ap-56",
     90: "cp-90", 91: "cp-92", 92: "cp-92", 93: "cp-93",
     71: "k1-71", 72: "k1-72", 73: "k1-71",
     75: "k3-75", 76: "k3-76", 77: "k3-76", 78: "k3-78",
@@ -74,7 +78,7 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
         fx, fy = feet(im)
         return (0 if vertical_only else px - fx), py - fy
 
-    spr, off, report = {}, {}, {}
+    spr, off, report, canvas_x = {}, {}, {}, {}
     found = {}
     for name, (n, form, how, _, _) in POSES.items():
         if not (raw / f"{name}.png").exists():
@@ -91,8 +95,13 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
         n, form, how = POSES[name][:3]
         s0 = refs[form][1]
         use = f if score >= 0.6 else median[form]
-        spr[name], _ = pixel(a, bg, s0 / use)
+        spr[name], (x0, _) = pixel(a, bg, s0 / use)
         off[name] = n, how == "free"
+        size = POSES[name][3]
+        if how == "guide":
+            canvas_x[name] = (posref.point(R["frames"][str(n)], form, size)[0] - x0) * s0 / use
+        elif (form, size) in posref.POINT and size == "1024x1536":
+            canvas_x[name] = (posref.POINT[(form, size)][0] - x0) * s0 / use
         report[name] = dict(head=round(float(f), 3), head_score=round(float(score), 3), used=round(float(use), 3),
                             size=f"{spr[name].shape[1]}x{spr[name].shape[0]}", specks=round(crisp.specks(spr[name]), 1))
     for k, n in B1_SRC.items():
@@ -117,6 +126,9 @@ def main(raw, ref_dir, prev, out, ryuko_json, ryuko_png):
             src, vert = off[key]
             ox, oy = ryuko_offset(src, flip, vert)
             ax, ay = ax + ox, ay + oy
+        if key in canvas_x:
+            x = round(canvas_x[key])
+            ax = s.shape[1] - 1 - x if flip else x
         return Frame(ms).add(np.ascontiguousarray(s), ax, ay)
 
     for clip, script in CLIPS.items():
