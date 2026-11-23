@@ -38,8 +38,10 @@ draw() {
   local imgs=(-F "image[]=@refs/$form.png")
   [ "$guide" = - ] || imgs+=(-F "image[]=@out/posrefs/$guide.png")
   tmp=$(mktemp)
-  curl -sS https://api.openai.com/v1/images/edits -H "Authorization: Bearer $OPENAI_API_KEY" \
-    -F "model=$IMAGE_MODEL" "${imgs[@]}" -F "prompt=<prompts/$k.txt" -F "size=$size" -F quality=high -o "$tmp"
+  # The key reaches curl as config on stdin (printf is a builtin), so it is never in any process's arguments.
+  printf 'header = "Authorization: Bearer %s"\n' "$OPENAI_API_KEY" |
+    curl -sS -K - https://api.openai.com/v1/images/edits \
+      -F "model=$IMAGE_MODEL" "${imgs[@]}" -F "prompt=<prompts/$k.txt" -F "size=$size" -F quality=high -o "$tmp"
   python3 -c '
 import base64, json, sys
 d = json.load(open(sys.argv[1]))
