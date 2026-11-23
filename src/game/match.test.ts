@@ -20,7 +20,7 @@ import type { CpuEntry } from './cpu';
 import { FIGHT_TICK, ROUND_END_TICKS, roundEndTick } from './hud';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { brLongStory } from './br-another';
+import { brAnotherStages, brLongStory, bossBrAnotherStory } from './br-another';
 import { scenarioOf } from './story';
 import type { Battle, Slot } from './story';
 import {
@@ -33,7 +33,14 @@ import {
   script,
 } from './animations';
 import { rand } from './standing';
-import { CHARACTERS, lifeOf, STAGES, twin, twinOf } from './characters';
+import {
+  CHARACTERS,
+  desperationOf,
+  lifeOf,
+  STAGES,
+  twin,
+  twinOf,
+} from './characters';
 import { lifeAmountOf } from './life';
 import type { Stage, Who } from './characters';
 import {
@@ -1090,6 +1097,305 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(zenka)).toBe('koLand');
     expect(br.winner).toBe('opponent');
   });
+});
+
+// Authored (HPA-1251): the no-revive rule holds for every role on every
+// B.R. route — a KO'd 1P, ally or enemy stays at 0 through the award and
+// the scripted gains (op 0x15's own and the met player's otherLife), the
+// awards' power half still lands, a living winner still heals, and a
+// waiting seat still enters beside the fallen. The route table covers the
+// modes' five B.R. marks: the ZERO scenario battle, the fighter's and the
+// bosses' generated ANOTHER stages and the ordinary and boss LONG
+// line-ups.
+describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
+  const cheats = (fields: Partial<CheatOptions> = {}): CheatOptions => ({
+    ...DEFAULT_CHEATS,
+    ...fields,
+  });
+  const knock = (match: Match, f: Fighter) => {
+    f.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(f);
+  };
+  const seatsOf = (match: Match) =>
+    match as unknown as { seats: number[]; slots: (Slot | null)[] };
+  const quiet = (match: Match) => {
+    for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+  };
+  // A route match past its intro, CPUs idle so nothing disturbs the
+  // readouts.
+  const build = (
+    route: (typeof routes)[number],
+    fields?: Partial<CheatOptions>,
+  ) => {
+    const match = Match.story(
+      route.who,
+      route.battle(),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    if (fields) match.useCheats(cheats({ enabled: true, ...fields }));
+    quiet(match);
+    toFight(match);
+    return match;
+  };
+  // Drives one op 0x15 power record through runEvent, as the actor's own
+  // script would (selfLife, match.ts:4126), or onto the met player as a
+  // partner's record would (otherLife, match.ts:4149).
+  const scriptedGain = (match: Match, f: Fighter, life: number) =>
+    (
+      match as unknown as {
+        runEvent(actor: Fighter, owner: number, event: object): boolean;
+      }
+    ).runEvent(f, match.fighters.indexOf(f), {
+      op: 'power',
+      selfLife: life,
+      selfPower: 0,
+      otherLife: 0,
+      otherPower: 0,
+      t: 0,
+    });
+  const scriptedTransfer = (
+    match: Match,
+    actor: Fighter,
+    other: Fighter,
+    life: number,
+  ) => {
+    const saved = actor.caught;
+    actor.caught = other;
+    try {
+      (
+        match as unknown as {
+          runEvent(actor: Fighter, owner: number, event: object): boolean;
+        }
+      ).runEvent(actor, match.fighters.indexOf(actor), {
+        op: 'power',
+        selfLife: 0,
+        selfPower: 0,
+        otherLife: life,
+        otherPower: 0,
+        t: 0,
+      });
+    } finally {
+      actor.caught = saved;
+    }
+  };
+  const presentEnemy = (match: Match) =>
+    match.fighters.find((f, i) => i > 0 && f.present && (f.enemies & 1) !== 0)!;
+  const nativeAlly = (match: Match) => {
+    const { slots } = seatsOf(match);
+    return (
+      match.fighters.find(
+        (f, i) => i > 0 && slots[i] && (f.enemies & 1) === 0,
+      ) ?? null
+    );
+  };
+  // The absent seat that waits on `victim`'s life (assemble's watch
+  // chains; the donated ally watches the 1P).
+  const watcherOf = (match: Match, victim: Fighter) => {
+    const { seats, slots } = seatsOf(match);
+    const seat = seats[match.fighters.indexOf(victim)];
+    return (
+      match.fighters.find((f, i) => !f.present && slots[i]?.watch === seat) ??
+      null
+    );
+  };
+  const entersBeside = (
+    match: Match,
+    victim: Fighter,
+    expected: { hp: number; downed: boolean },
+  ) => {
+    const next = watcherOf(match, victim);
+    if (!next) return null;
+    for (let t = 0; t < 60 && !next.present; t++) match.step();
+    expect(next.present).toBe(true);
+    expect([victim.hp, victim.downed]).toEqual([expected.hp, expected.downed]);
+    return next;
+  };
+
+  const routes = [
+    {
+      name: 'B.R. ZERO',
+      who: 'masa' as Who,
+      battle: () => scenarioOf('masa')[45] as Battle,
+      ally: 'native',
+    },
+    {
+      name: 'normal B.R. ANOTHER',
+      who: 'masa' as Who,
+      battle: () => brAnotherStages('masa').stage2,
+      ally: 'native',
+    },
+    {
+      name: 'boss B.R. ANOTHER',
+      who: 'zenka' as Who,
+      battle: () => bossBrAnotherStory('zenka')[0] as Battle,
+      ally: 'summon',
+    },
+    {
+      name: 'ordinary B.R. LONG',
+      who: 'masa' as Who,
+      battle: () => brLongStory('masa')[0] as Battle,
+      ally: 'native',
+    },
+    {
+      name: 'boss B.R. LONG',
+      who: 'zenka' as Who,
+      battle: () => brLongStory('zenka')[0] as Battle,
+      ally: 'none',
+    },
+  ] as const;
+  const cells = routes.flatMap((route) =>
+    (['player', 'ally', 'enemy'] as const).map((role) => ({ route, role })),
+  );
+
+  it.each(cells)(
+    '$role stays down on $route.name (HPA-1251)',
+    ({ route, role }) => {
+      const match = build(route);
+      const one = match.fighters[0];
+      const gain = 10 * one.enGainMultiplier;
+
+      if (role === 'enemy') {
+        // The KO award pays the living striker-winner, its power half
+        // included; the fallen enemy keeps nothing.
+        const victim = presentEnemy(match);
+        one.hp = 100;
+        one.power = 0;
+        one.stock = 0;
+        victim.caught = one;
+        knock(match, victim);
+        expect(one.hp).toBe(
+          Math.min(
+            one.maxHp,
+            100 + lifeAmountOf(50, one.maxHp, lifeOf(one.who)),
+          ),
+        );
+        expect(one.power).toBe(gain);
+        expect([victim.hp, victim.downed]).toEqual([0, true]);
+        // No scripted gain raises the fallen: neither its own op 0x15 nor
+        // one aimed at it as the met player.
+        scriptedGain(match, victim, 100);
+        scriptedTransfer(match, one, victim, 100);
+        expect([victim.hp, victim.downed]).toEqual([0, true]);
+        // The next seat still enters beside the fallen — and its own KO
+        // award aimed at the fallen victim pays the power half only.
+        const next = entersBeside(match, victim, { hp: 0, downed: true })!;
+        victim.power = 0;
+        victim.stock = 0;
+        next.caught = victim;
+        knock(match, next);
+        expect(victim.power).toBe(10 * victim.enGainMultiplier);
+        expect([victim.hp, victim.downed]).toEqual([0, true]);
+        expect([next.hp, next.downed]).toEqual([0, true]);
+        for (let t = 0; t < 120; t++) match.step();
+        expect([victim.hp, victim.downed]).toEqual([0, true]);
+        return;
+      }
+
+      if (role === 'ally') {
+        const native = nativeAlly(match);
+        let ally: Fighter;
+        if (route.ally === 'summon') {
+          expect(native).toBeNull();
+          ally = match.summon('dora', 1)!;
+          expect(ally).toBeTruthy();
+        } else if (route.ally === 'none') {
+          // Thirteen natives fill the roster cap: no ally can seat on the
+          // boss LONG route, and the summon returns null.
+          expect(native).toBeNull();
+          expect(match.summon('dora', 1)).toBeNull();
+          return;
+        } else {
+          ally = native!;
+        }
+        // A donated ally waits on the 1P's desperation: it enters beside
+        // the living 1P as the source's watch reads.
+        if (!ally.present) {
+          one.hp = desperationOf(route.who) - 1;
+          for (let t = 0; t < 60 && !ally.present; t++) match.step();
+          expect(ally.present).toBe(true);
+        }
+        // Its KO award pays the living 1P, power included; the ally keeps
+        // nothing. A summon holds no slot, so its fall scores and awards
+        // nothing at all (HPA-972).
+        one.hp = 100;
+        one.power = 0;
+        one.stock = 0;
+        ally.caught = one;
+        knock(match, ally);
+        if (route.ally === 'summon') {
+          expect([one.hp, one.power]).toEqual([100, 0]);
+        } else {
+          expect(one.hp).toBe(
+            Math.min(
+              one.maxHp,
+              100 + lifeAmountOf(50, one.maxHp, lifeOf(one.who)),
+            ),
+          );
+          expect(one.power).toBe(gain);
+        }
+        expect([ally.hp, ally.downed]).toEqual([0, true]);
+        scriptedGain(match, ally, 100);
+        scriptedTransfer(match, one, ally, 100);
+        expect([ally.hp, ally.downed]).toEqual([0, true]);
+        // An enemy's award aimed at the fallen ally pays the power half
+        // only — a summon recipient passes the whole award by.
+        const enemy = presentEnemy(match);
+        ally.power = 0;
+        ally.stock = 0;
+        enemy.caught = ally;
+        knock(match, enemy);
+        if (route.ally === 'summon') {
+          expect(ally.power).toBe(0);
+        } else {
+          expect(ally.power).toBe(10 * ally.enGainMultiplier);
+        }
+        expect([ally.hp, ally.downed]).toEqual([0, true]);
+        expect([enemy.hp, enemy.downed]).toEqual([0, true]);
+        for (let t = 0; t < 120; t++) match.step();
+        expect([ally.hp, ally.downed]).toEqual([0, true]);
+        return;
+      }
+
+      // The 1P holds no slot, so its own KO pays nothing anywhere.
+      knock(match, one);
+      expect([one.hp, one.downed]).toEqual([0, true]);
+      scriptedGain(match, one, 100);
+      const striker = presentEnemy(match);
+      scriptedTransfer(match, striker, one, 100);
+      expect([one.hp, one.downed]).toEqual([0, true]);
+      // The seat watching the 1P still enters beside the fallen player
+      // (the donated ally's watch mark).
+      entersBeside(match, one, { hp: 0, downed: true });
+      // The enemy's award aimed at the fallen 1P is blocked — and its
+      // power half lands, the downed taker included.
+      one.power = 0;
+      one.stock = 0;
+      striker.caught = one;
+      knock(match, striker);
+      expect(one.power).toBe(gain);
+      expect([one.hp, one.downed]).toEqual([0, true]);
+      expect([striker.hp, striker.downed]).toEqual([0, true]);
+      for (let t = 0; t < 120; t++) match.step();
+      expect([one.hp, one.downed]).toEqual([0, true]);
+
+      // The cheat per-kill override reads the same guard: both HP branches
+      // skip the fallen 1P's gain while the EN half lands.
+      for (const brHpPerKill of [null, 255] as const) {
+        const ceded = build(route, { brHpPerKill });
+        const payer = ceded.fighters[0];
+        const foe = presentEnemy(ceded);
+        knock(ceded, payer);
+        foe.caught = payer;
+        knock(ceded, foe);
+        expect(payer.power).toBe(10 * payer.enGainMultiplier);
+        expect([payer.hp, payer.downed]).toEqual([0, true]);
+        expect([foe.hp, foe.downed]).toEqual([0, true]);
+      }
+    },
+  );
 });
 
 describe('Daisetsuzan Oroshi command throw', () => {

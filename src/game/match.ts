@@ -5122,6 +5122,15 @@ export class Match {
       // jump (68 into 77) runs its own stock test past this loop.
       const plainKo = this.koReloadBlocked(f);
       const koReload = SEAT_GATES[f.who]?.koReload;
+      // Authored (HPA-1251): on a B.R. route ALPHA's KO Boss revive jump —
+      // his lose action's global-10 tests (PCs 1029–1030, into 84) — stays
+      // shut; his ordinary branch (yowai, the variable-15 KOs) stands as
+      // outside the route. The prefix below skips the excluded tests too:
+      // a passing one would enter 84 from there, the test handler taking
+      // jumps while the action is still script, and KO Boss's records
+      // would play before the entry the scan chose.
+      const koBossShut = (e: SourceEvent) =>
+        this.br && f.who === 'alpha' && e.op === 'test' && e.selector === 0x8a;
       const check = checks.find((e) =>
         e.op === 'stock'
           ? e.atLeast && f.stock >= e.min && !(plainKo && e.target === koReload)
@@ -5131,13 +5140,7 @@ export class Match {
       const jump =
         lose.find(
           (e): e is Extract<ScriptEvent, { op: 'test' }> =>
-            e.op === 'test' &&
-            // Authored (HPA-1251): on a B.R. route ALPHA's KO Boss revive
-            // jump — his lose action's global-10 tests (PCs 1029–1030, into
-            // 84) — stays shut; his ordinary branch (yowai, the variable-15
-            // KOs) stands as outside the route.
-            !(this.br && f.who === 'alpha' && e.selector === 0x8a) &&
-            this.passes(f, f, e),
+            e.op === 'test' && !koBossShut(e) && this.passes(f, f, e),
         ) ??
         (check?.op === 'stock'
           ? { action: check.target, offset: check.offset }
@@ -5152,7 +5155,8 @@ export class Match {
         0,
         'op' in jump ? lose.indexOf(jump) : lose.length,
       ))
-        this.runEvent(f, this.fighters.indexOf(f), event);
+        if (!koBossShut(event))
+          this.runEvent(f, this.fighters.indexOf(f), event);
       if (jump.action !== twin(f.who, LOSE))
         return this.enterSource(f, jump.action, jump.offset);
       key = sourceKey(jump.action, jump.offset);
