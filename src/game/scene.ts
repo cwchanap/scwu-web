@@ -225,6 +225,8 @@ export class TrainingScene extends Phaser.Scene {
   // A story's life bars (lifeBars) and their digits.
   private bars?: Phaser.GameObjects.Graphics;
   private digitSprites: Phaser.GameObjects.Image[] = [];
+  // The arena bars' pooled Damage cut labels (authored, HPA-1251).
+  private cutTexts: Phaser.GameObjects.Text[] = [];
   // Op 0x0e's shake, stepped once per drawn frame like the source's draw
   // loop, and the drawn-frame count whose parity flips it.
   private shake: Record<'x' | 'y', ShakeAxis> = { x: still(), y: still() };
@@ -1380,6 +1382,25 @@ export class TrainingScene extends Phaser.Scene {
     return sprites;
   }
 
+  // The pooled Damage cut labels the arena bars show under cheats
+  // (authored, HPA-1251).
+  private cutPool(count: number) {
+    while (this.cutTexts.length < count)
+      this.cutTexts.push(
+        this.add
+          .text(0, 0, '', {
+            fontFamily: 'monospace',
+            fontSize: '13px',
+            color: '#ffd24a',
+          })
+          .setOrigin(0)
+          .setScrollFactor(0)
+          .setDepth(150.1)
+          .setVisible(false),
+      );
+    return this.cutTexts;
+  }
+
   // A player's objects draw with its palette (0x40ccf2), but for images with
   // their own; each recoloured image is drawn once and cached.
   private recolored(image: number, who: Container, palette: number) {
@@ -1450,6 +1471,7 @@ export class TrainingScene extends Phaser.Scene {
       bars.fillRect(left, top, right - left, bottom - top);
     };
     const digits: { key: string; digit: number; x: number; y: number }[] = [];
+    const labels: { text: string; x: number; y: number }[] = [];
     const count = (value: number, x: number, y: number, key: string) => {
       for (; value > 0; value = Math.trunc(value / 10), x -= 10)
         digits.push({ key, digit: value % 10, x, y });
@@ -1465,10 +1487,35 @@ export class TrainingScene extends Phaser.Scene {
       rect(x, y + 1, green, 8);
       bars.fillStyle(0xff0000);
       rect(x + green, y + 1, Math.trunc((f.lost * 50) / life), 8);
+      // Authored (HPA-1251): under the battle snapshot's cheats every bar
+      // shows its fighter's real line — a gold tick at the mark, a red
+      // wash over the life row at or under it — and its own Damage cut
+      // label, clamped inside the canvas.
+      if (this.match.cheats.enabled) {
+        const mark = this.match.lifeLineMark(f);
+        bars.fillStyle(0xffd24a, 0.9);
+        rect(x + (50 * mark) / life - 1, y, 2, 10);
+        if (f.hp <= mark) {
+          bars.fillStyle(0xff3020, 0.4);
+          rect(x, y + 1, green, 8);
+        }
+        const [tx, ty] = screen(x, y - 12);
+        labels.push({
+          text: `Damage cut: ${100 - this.match.lossKeptPercent(f)}%`,
+          x: Math.max(0, Math.min(960, tx)),
+          y: Math.max(0, Math.min(720, ty)),
+        });
+      }
       if (!(TITLE.flags & 0x20)) continue;
       count(f.hp, x - 18, y, 'text');
       count(f.lost, x + 40, y, this.tint('text', { r: 32, g: 0, b: 0 }));
     }
+    this.cutPool(labels.length).forEach((label, index) => {
+      const cut = labels[index];
+      label.setVisible(!!cut);
+      if (!cut) return;
+      label.setText(cut.text).setPosition(cut.x, cut.y);
+    });
     this.pool(this.digitSprites, digits.length).forEach((sprite, index) => {
       const digit = digits[index];
       sprite.setVisible(!!digit);
@@ -1647,7 +1694,7 @@ export class TrainingScene extends Phaser.Scene {
               this.idle[i] = this.match.idleVM(f, vm.seed);
             this.idling[i] = true;
             this.idle[i].life = f.hp;
-            this.idle[i].lifeLine = this.match.idleLifeLine(f);
+            this.idle[i].lifeLine = this.match.idleLifeLine();
             this.idle[i].tick();
             for (const index of this.idle[i].sounds.splice(0))
               this.play(`${f.who}-sound-${index}`, i);

@@ -154,7 +154,10 @@ export const enGainOf = (stocks: number): number =>
 // The cheats a mid-battle summon alone takes (authored, HPA-972): the
 // battle's snapshot when it was already cheat-enabled, otherwise a cheat
 // mode the player turned on mid-battle (still pending for the next
-// battle); with both off, the unscaled defaults.
+// battle); with both off, the unscaled defaults. These values scale the
+// summon's HP/EN only: the Low HP rules it plays under read the battle's
+// frozen snapshot (`match.cheats.enabled`), never these pending values
+// (authored, HPA-1251).
 export const effectiveSummonCheats = (
   snapshot: Readonly<CheatOptions>,
   pending: Readonly<CheatOptions> = DEFAULT_CHEATS,

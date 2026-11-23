@@ -222,7 +222,7 @@ describe('cheat groups (HPA-972)', () => {
   it('groups every parameter row once, under the design table’s four groups', () => {
     expect(CHEAT_GROUPS.map((group) => group.name)).toEqual([
       'You · 1P',
-      'Low HP · 1P',
+      'Low HP · all fighters',
       'Partners & enemies',
       'B.R. modes',
     ]);

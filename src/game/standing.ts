@@ -91,10 +91,11 @@ export class StandingVM {
   // truncated. Equal maxima keep every mark native.
   lifeMax = 1;
   lifeNative = 1;
-  // Authored (HPA-972): 1P's Low HP line percent (the native 30 scales
-  // nothing), which moves SIN's and SOU's op 0x11 stance marks — a stance
-  // change the scene moves; the Low-HP supers bypass never touches it.
-  // Held as the raw percent so the mark truncates once, exactly as
+  // Authored (HPA-972, HPA-1251): the Low HP line percent match.ts sets
+  // for every fighter under the battle snapshot's cheats (the native 30
+  // scales nothing), which moves SIN's and SOU's op 0x11 stance marks — a
+  // stance change the scene moves; the Low-HP supers bypass never touches
+  // it. Held as the raw percent so the mark truncates once, exactly as
   // match.ts's lineScaledMark truncates the same product.
   lifeLine = 30;
   collisionRecords: Record<number, number | null> = {};
