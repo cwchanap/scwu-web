@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, stocksOf } from './characters';
 import type { Who } from './characters';
+import { DEFAULT_CHEATS } from './cheats';
 import { Match } from './match';
+import type { Fighter } from './match';
 import { BOSSES, ROSTER } from './select';
 import { opensOnModeSelect } from './story';
-import type { Battle, Step } from './story';
-import { brAnotherStages, bossBrAnotherStory } from './br-another';
+import type { Battle, Slot, Step } from './story';
+import { brAnotherStages, brLongStory, bossBrAnotherStory } from './br-another';
 import type { BrAnotherStages } from './br-another';
 import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
 import type { LineupPair } from './br-lineups';
@@ -382,8 +384,11 @@ describe('BR Another approved lineups', () => {
     expect(arenas.get(ARENAS.get(45)!)).toBe(9);
   });
 
-  it('meets §7 LONG spread in the table: 16 pairs 14-15 times, 2-3 per position, 38 distinct rows, 192 lead/slot combos (36 twice), own pair out', () => {
-    expect(Object.keys(BR_LONG_LINEUPS)).toHaveLength(38);
+  it('meets §7 LONG spread in the table: 16 pairs 14-15 times, 2-3 per position, 38 distinct rows (the 34 plus the four bosses), 192 lead/slot combos (36 twice), own pair out', () => {
+    const keys = Object.keys(BR_LONG_LINEUPS) as Who[];
+    expect([...keys].sort(), 'LONG rows').toEqual(
+      [...ELIGIBLE, ...BOSSES].sort(),
+    );
     const perPair = new Map<string, number>();
     const perSlot = Array.from({ length: 6 }, () => new Map<string, number>());
     const combos = new Map<string, number>();
@@ -394,9 +399,12 @@ describe('BR Another approved lineups', () => {
       const names = row.flat();
       lineups.set(names.join(','), who);
       sets.set([...names].sort().join(','), who);
-      if (ELIGIBLE.includes(who as Who))
-        expect(players, who).not.toContain(ROSTER.indexOf(who as Who));
-      else expect(ELIGIBLE.includes(who as Who)).toBe(false);
+      if ((BOSSES as readonly Who[]).includes(who as Who))
+        expect(
+          BOSSES.some((b) => players.includes(ROSTER.indexOf(b))),
+          `${who} hosts no boss`,
+        ).toBe(false);
+      else expect(players, who).not.toContain(ROSTER.indexOf(who as Who));
       expect(new Set(players).size, who).toBe(12);
       pairsOf(players).forEach(([a, b], pos) => {
         const key = pairKey([a, b]);
@@ -987,5 +995,325 @@ describe('boss B.R. ANOTHER route', () => {
     for (const [who, json] of before)
       expect(JSON.stringify(CHARACTERS[who].scenario), who).toBe(json);
     expect(JSON.stringify(brAnotherStages('masa'))).toBe(regular);
+  });
+});
+
+describe('B.R. LONG route', () => {
+  const rows = Object.entries(BR_LONG_LINEUPS) as [
+    Who,
+    readonly LineupPair[],
+  ][];
+  const isBoss = (who: Who) => (BOSSES as readonly Who[]).includes(who);
+  const opener = sourceStep('ryuko', 63);
+  const longBattle = (who: Who): Battle => {
+    const steps = brLongStory(who);
+    expect(
+      steps.map((s) => s.type),
+      who,
+    ).toEqual([1, 4]);
+    return steps[0] as Battle;
+  };
+  const toFight = (match: Match) => {
+    while (match.roundTicks <= match.fightTick) match.step();
+  };
+  const knockOut = (match: Match, f: Fighter, by: Fighter) => {
+    f.hp = 0;
+    f.caught = by;
+    (
+      match as unknown as { knockOut(f: Fighter, wasOut: boolean): void }
+    ).knockOut(f, false);
+  };
+
+  it('builds the approved one-battle route for all 38 rows on Sakura Street', () => {
+    expect(rows).toHaveLength(38);
+    for (const [who, row] of rows) {
+      const battle = longBattle(who);
+      expect(battle.stage, who).toBe(9);
+      expect(battle.slots, who).toHaveLength(isBoss(who) ? 12 : 13);
+      expect(namesOf(battle).slice(0, 12), who).toEqual(row.flat());
+      for (const key of HEADER_KEYS)
+        expect(battle[key], `${who} ${key}`).toBe(opener[key]);
+    }
+    // Every seat is a fresh spread of its donor role slot.
+    for (const who of ['ryuko', 'dora'] as Who[])
+      for (const slot of longBattle(who).slots)
+        expect(opener.slots).not.toContain(slot);
+  });
+
+  it('seats ryuko’s hard-coded row and dora’s straight from the ticket', () => {
+    expect(namesOf(longBattle('ryuko')).slice(0, 12)).toEqual([
+      'sww',
+      'gigi',
+      'feng',
+      'sean',
+      'kay',
+      'lizard',
+      'kate',
+      'gon',
+      'times',
+      'masa',
+      'dido',
+      'sakuya',
+    ]);
+    expect(namesOf(longBattle('dora')).slice(0, 12)).toEqual([
+      'zoma',
+      'ryuko',
+      'giant',
+      'suneo',
+      'yo',
+      'sin',
+      'alex',
+      'sou',
+      'kiki',
+      'chung',
+      'aya',
+      'yinan',
+    ]);
+  });
+
+  it('adds DoraEmon as the ordinary player’s first-tick ally and gives a boss no ally', () => {
+    for (const [who] of rows) {
+      const battle = longBattle(who);
+      for (const slot of battle.slots)
+        expect(slot!.tough, `${who} tough`).toBe(
+          isBoss(who) ? true : undefined,
+        );
+      if (isBoss(who)) continue;
+      const ally = battle.slots.at(-1)!;
+      expect(ally.player, who).toBe(ROSTER.indexOf('dora'));
+      expect(ally.flags & 0x200, who).toBe(0x200);
+      // Entry bits 1–2 are 0: on stage from the first tick.
+      expect((ally.flags >> 1) & 3, who).toBe(0);
+      expect(ally.watch, who).toBe(0);
+      expect(ally.enemies, who).toBe((((1 << 14) - 1) & ~1 & ~(1 << 13)) >>> 0);
+    }
+  });
+
+  it('paces natively: the first enemy present, each next waiting on its predecessor’s own mark', () => {
+    for (const [who] of rows) {
+      const battle = longBattle(who);
+      const players = battle.slots.slice(0, 12).map((s) => s!.player);
+      expect((battle.slots[0]!.flags >> 1) & 3, `${who} first enemy`).toBe(0);
+      for (let i = 1; i < 12; i++) {
+        const slot = battle.slots[i]!;
+        expect((slot.flags >> 1) & 3, `${who} entry ${i}`).toBe(2);
+        expect(slot.watch, `${who} watch ${i}`).toBe(i);
+        expect(slot.below, `${who} below ${i}`).toBe(
+          desperationOf(ROSTER[players[i - 1]!]!),
+        );
+      }
+      expect(
+        battle.slots.slice(0, 12).map((s) => s!.x),
+        who,
+      ).toEqual(players.map((_, i) => (i % 2 === 0 ? 850 : 450)));
+    }
+  });
+
+  it('seats symmetric hostility: mates allied, the others hostile, the ally against all twelve', () => {
+    for (const [who] of rows) {
+      const battle = longBattle(who);
+      const last = battle.slots.length - 1;
+      const all = (1 << (last + 2)) - 1;
+      for (const [i, a] of battle.slots.entries()) {
+        expect(a!.enemies, `${who} range ${i}`).toBeLessThanOrEqual(all);
+        expect(a!.enemies & (1 << (i + 1)), `${who} self ${i}`).toBe(0);
+        expect(!!(a!.enemies & 1), `${who} vs 1P ${i}`).toBe(
+          !(a!.flags & 0x200),
+        );
+        for (const [j, b] of battle.slots.entries())
+          expect(
+            !!(a!.enemies & (1 << (j + 1))),
+            `${who} ${i + 1}->${j + 1}`,
+          ).toBe(!!(b!.enemies & (1 << (i + 1))));
+        const mate = i % 2 === 0 ? i + 1 : i - 1;
+        for (let j = 0; j <= last; j++)
+          expect(
+            !!(a!.enemies & (1 << (j + 1))),
+            `${who} seat ${i + 1}->${j + 1}`,
+          ).toBe(j !== i && j !== mate);
+      }
+    }
+  });
+
+  it('meets §7 LONG spread through the builder: 16 pairs 14-15 times, 2-3 per position, 38 distinct rows, 192 combos (36 twice)', () => {
+    const perPair = new Map<string, number>();
+    const perSlot = Array.from({ length: 6 }, () => new Map<string, number>());
+    const combos = new Map<string, number>();
+    const lineups = new Map<string, Who>();
+    for (const [who] of rows) {
+      const players = longBattle(who)
+        .slots.slice(0, 12)
+        .map((s) => s!.player);
+      lineups.set(players.join(','), who);
+      pairsOf(players).forEach(([a, b], pos) => {
+        const key = pairKey([a, b]);
+        perPair.set(key, (perPair.get(key) ?? 0) + 1);
+        perSlot[pos]!.set(key, (perSlot[pos]!.get(key) ?? 0) + 1);
+        const combo = leaderPosKey([a, b], pos);
+        combos.set(combo, (combos.get(combo) ?? 0) + 1);
+      });
+    }
+    expect(lineups.size, 'distinct ordered LONG lineups').toBe(38);
+    expect(perPair.size).toBe(16);
+    for (const key of perPair.keys())
+      countIn(perPair, key, 14, 15, 'built long pair');
+    for (const slot of perSlot)
+      for (const key of slot.keys())
+        countIn(slot, key, 2, 3, 'built long position');
+    expect(combos.size, 'lead/slot combos').toBe(192);
+    expect([...combos.values()].filter((n) => n === 1)).toHaveLength(156);
+    expect([...combos.values()].filter((n) => n === 2)).toHaveLength(36);
+  });
+
+  it('seats 14 native fighters for an ordinary player and 13 for a boss, Dora present from the first tick', () => {
+    const ordinary = Match.story(
+      'ryuko',
+      longBattle('ryuko'),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    expect(ordinary.fighters.map((f) => f.who)).toEqual([
+      'ryuko',
+      'sww',
+      'gigi',
+      'feng',
+      'sean',
+      'kay',
+      'lizard',
+      'kate',
+      'gon',
+      'times',
+      'masa',
+      'dido',
+      'sakuya',
+      'dora',
+    ]);
+    // The 1P, the first enemy and Dora are in; the other eleven wait.
+    expect(ordinary.fighters.map((f) => f.present)).toEqual([
+      true,
+      true,
+      ...Array<boolean>(11).fill(false),
+      true,
+    ]);
+    const boss = Match.story('dora', longBattle('dora'));
+    expect(boss.fighters.map((f) => f.who)).toEqual([
+      'dora',
+      'zoma',
+      'ryuko',
+      'giant',
+      'suneo',
+      'yo',
+      'sin',
+      'alex',
+      'sou',
+      'kiki',
+      'chung',
+      'aya',
+      'yinan',
+    ]);
+    expect(boss.fighters.map((f) => f.present)).toEqual([
+      true,
+      true,
+      ...Array<boolean>(11).fill(false),
+    ]);
+  });
+
+  it('enters each next enemy below its predecessor’s own mark, unstalled at a 0% cheat line', () => {
+    const match = Match.story(
+      'ryuko',
+      longBattle('ryuko'),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    match.useCheats({ ...DEFAULT_CHEATS, enabled: true, lowHpLine: 0 });
+    toFight(match);
+    const [, first, second] = match.fighters;
+    expect(second.present).toBe(false);
+    // The native mark of the watched fighter, never 1P's cheat line.
+    first.hp = desperationOf(first.who) - 1;
+    match.step();
+    expect(second.present).toBe(true);
+  });
+
+  it('keeps HPA-972’s no-partner cheat removing Dora without corrupting the waits', () => {
+    const match = Match.story(
+      'ryuko',
+      longBattle('ryuko'),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    match.useCheats({ ...DEFAULT_CHEATS, enabled: true, brNoPartner: true });
+    expect(match.fighters.map((f) => f.who)).not.toContain('dora');
+    expect(match.fighters).toHaveLength(13);
+    const waits = (match as unknown as { waits: (Slot | null)[] }).waits;
+    expect(waits).toHaveLength(13);
+    expect(waits.slice(0, 2).every((w) => w === null)).toBe(true);
+    expect(waits.slice(2).every((w) => w !== null)).toBe(true);
+    toFight(match);
+    const [, first, second] = match.fighters;
+    expect(second.present).toBe(false);
+    first.hp = desperationOf(first.who) - 1;
+    match.step();
+    expect(second.present).toBe(true);
+  });
+
+  it('marks a boss LONG tough through Match and leaves the ordinary native', () => {
+    const boss = Match.story('dora', longBattle('dora'));
+    expect(boss.fighters[0]).toMatchObject({ maxHp: lifeOf('dora') });
+    for (const f of boss.fighters.slice(1))
+      expect(f, f.who).toMatchObject({
+        hp: 2 * lifeOf(f.who),
+        maxHp: 2 * lifeOf(f.who),
+        maxStock: 5,
+        enGainMultiplier: 2,
+      });
+    const ordinary = Match.story('kiki', longBattle('kiki'));
+    for (const f of ordinary.fighters)
+      expect(f, f.who).toMatchObject({
+        hp: lifeOf(f.who),
+        maxHp: lifeOf(f.who),
+        maxStock: stocksOf(f.who),
+        enGainMultiplier: 1,
+      });
+  });
+
+  it('wins by defeating all twelve, never six, and loses on the 1P’s KO', () => {
+    const match = Match.story(
+      'ryuko',
+      longBattle('ryuko'),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    toFight(match);
+    const [one] = match.fighters;
+    for (let i = 1; i <= 12; i++) {
+      const enemy = match.fighters[i]!;
+      expect(enemy.present, `enemy ${i} in place`).toBe(true);
+      knockOut(match, enemy, one);
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, `after ${i} KOs`).toBe(i === 12 ? 'player' : null);
+    }
+    expect(one.points).toBe(100);
+    expect(match).toMatchObject({ winner: 'player', wins: [1, 0], lost: 0 });
+    const loss = Match.story(
+      'ryuko',
+      longBattle('ryuko'),
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    toFight(loss);
+    knockOut(loss, loss.fighters[0]!, loss.fighters[1]!);
+    for (let t = 0; t < 3; t++) loss.step();
+    expect(loss).toMatchObject({ winner: 'opponent', wins: [0, 1], lost: 1 });
   });
 });

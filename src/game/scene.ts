@@ -656,7 +656,9 @@ export class TrainingScene extends Phaser.Scene {
       this.story = new Story(who, done === 'boss-br' ? 'boss-br' : null);
       if (done === 'boss-br' || done === 'story') {
         this.runStory(this.story.next());
-      } else {
+      } else if (done !== 'br-long') {
+        // br-long has no sign route yet; the selector task (HPA-1251) will
+        // pass it straight into Story, so only native signs enter here.
         [this.storyLife, this.storyLost] = [routeLife(who, done), 0];
         this.runStory(this.story.startOnRoute(done));
       }

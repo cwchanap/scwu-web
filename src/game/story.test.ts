@@ -4,7 +4,7 @@ import { script } from './animations';
 import { CHARACTERS, desperationOf, lifeOf, STAGES } from './characters';
 import type { Who } from './characters';
 import { Match } from './match';
-import { ROSTER } from './select';
+import { BOSSES, ROSTER } from './select';
 import {
   isModeSelectBattle,
   opensOnModeSelect,
@@ -15,6 +15,7 @@ import {
 } from './story';
 import type { Battle, Next, SignRoute, Step } from './story';
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
+import { BR_LONG_LINEUPS } from './br-lineups';
 
 const at = (story: Story) => story.step;
 
@@ -1433,5 +1434,41 @@ describe('source route reachability', () => {
         }
       }
     });
+  });
+});
+
+describe('B.R. LONG route', () => {
+  const rows = Object.keys(BR_LONG_LINEUPS) as Who[];
+
+  it('keys one row by the 34 ordinary players and the four bosses', () => {
+    const ordinary = (Object.keys(CHARACTERS) as Who[]).filter(
+      opensOnModeSelect,
+    );
+    expect(ordinary).toHaveLength(34);
+    expect([...rows].sort(), 'LONG rows').toEqual(
+      [...ordinary, ...BOSSES].sort(),
+    );
+  });
+
+  it('marks the route B.R. and walks every row: its battle, then the end', () => {
+    expect(rows).toHaveLength(38);
+    for (const who of rows) {
+      const story = new Story(who, 'br-long');
+      expect([story.route, story.br], who).toEqual(['br-long', true]);
+      const next = story.next();
+      expect(at(story), who).toBe(0);
+      expect(next.kind, who).toBe('battle');
+      if (next.kind !== 'battle') continue;
+      // Sakura Street, bit 0 keeping the Continue screen on a player KO.
+      expect(next.battle.stage, who).toBe(9);
+      expect(next.battle.flags & 1, who).toBe(1);
+      // The route marker survives the walk, a retry replays the same
+      // lineup and a winner's run ends at the title.
+      expect([story.route, story.br], who).toEqual(['br-long', true]);
+      expect(story.retry(), `retry ${who}`).toEqual(next);
+      expect(story.next(lifeOf(who), 0), `win ${who}`).toEqual({
+        kind: 'title',
+      });
+    }
   });
 });
