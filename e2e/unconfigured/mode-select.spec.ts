@@ -2,10 +2,10 @@ import { expect, test, type Page } from '@playwright/test';
 
 // The quick mode select (HPA-765): SINGLE's story pick opens the authored
 // two-step selector — STORY/B.R. sign boards, then the mode's routes — and a
-// confirmed route starts in the original's demos and battles. The four
-// bosses (HPA-858) confirm on that first step — STORY starts their story,
-// B.R. their generated route — so their cases also watch that no route
-// substep ever appears. The boards
+// confirmed route starts in the original's demos and battles. A boss's STORY
+// sign still confirms on that first step, starting her story; her B.R. now
+// opens the route step too (HPA-1251), two boards — ANOTHER, LONG — where a
+// regular fighter's offers three. The boards
 // draw only on the canvas, so beyond the DOM health/pad signals this spec
 // samples scene pixels: a sign board's region is white-bright when lit
 // (full alpha), far dimmer when tinted, and the route step's small
@@ -20,14 +20,35 @@ interface Rect {
   h: number;
 }
 // The inner — always opaque — area of each sign's drawn box in the 960×720
-// scene's pixels (select.ts SIGN_SPOTS/HEADER_SPOT, any pick's scale):
-// mode-step boards hang at top 250, route boards at 285, the mode's
-// smaller header at (414..546, 40..144).
+// scene's pixels (select.ts signRow/HEADER_SPOT at any pick's scale):
+// the mode step's two boards keep HPA-765's 300/660 spots at 0.8×/0.85×
+// hanging at top 250, a two-board route step (a boss's, or STORY's) the
+// same spots at top 285, and a regular B.R. route step's three boards
+// spread their centres 240/480/720 at ≈0.52×/≈0.57× (HPA-1251) — so the
+// middle board is ANOTHER and the right one LONG. The mode's smaller
+// header sits at (414..546, 40..144).
 const MODE_LEFT: Rect = { x: 160, y: 320, w: 180, h: 140 };
 const MODE_RIGHT: Rect = { x: 620, y: 320, w: 180, h: 140 };
 const ROUTE_LEFT: Rect = { x: 160, y: 390, w: 180, h: 130 };
 const ROUTE_RIGHT: Rect = { x: 620, y: 390, w: 180, h: 130 };
+const B3_LEFT: Rect = { x: 160, y: 300, w: 160, h: 130 };
+const B3_MID: Rect = { x: 400, y: 300, w: 160, h: 130 };
+const B3_RIGHT: Rect = { x: 640, y: 300, w: 160, h: 130 };
 const HEADER: Rect = { x: 440, y: 65, w: 80, h: 65 };
+// The route steps' cursor bands — the bobbing 1P arrow rides 35px lower
+// than on the mode step (boards at top 285, not 250). ROW3 covers the
+// three-sign row (centres 240/480/720), ROW2 the boss two-sign row
+// (300/660) with 'c' the plain gap between its two boards.
+const ROW3: Record<'a' | 'b' | 'c', Rect> = {
+  a: { x: 200, y: 240, w: 80, h: 40 },
+  b: { x: 440, y: 240, w: 80, h: 40 },
+  c: { x: 680, y: 240, w: 80, h: 40 },
+};
+const ROW2: Record<'a' | 'b' | 'c', Rect> = {
+  a: { x: 260, y: 240, w: 80, h: 40 },
+  b: { x: 620, y: 240, w: 80, h: 40 },
+  c: { x: 440, y: 240, w: 80, h: 40 },
+};
 // A board lighting means a whole screen chain ran — several opens and the
 // picked select's hundred-tick wait — so the pixel polls share the slack
 // the route check already gives confirmRoute, not the five-second default.
@@ -141,6 +162,17 @@ const openArena = async (page: Page) => {
       r: { x: 620, y: 205, w: 80, h: 45 },
     });
     return side === 'l' ? s.l.lum - s.r.lum : s.r.lum - s.l.lum;
+  };
+  // The route steps' cursor: only the pick's band holds the bobbing
+  // arrow, the others plain dim backdrop, so the pick's band must
+  // out-shine both others.
+  const routeCursorOver = async (
+    bands: Record<'a' | 'b' | 'c', Rect>,
+    pick: 'a' | 'b' | 'c',
+  ) => {
+    const s = await sample(bands);
+    const others = (['a', 'b', 'c'] as const).filter((k) => k !== pick);
+    return Math.min(...others.map((k) => s[pick].lum - s[k].lum));
   };
 
   // A canvas tap at a 960×720 game point — the same conversion Phaser's
@@ -281,6 +313,7 @@ const openArena = async (page: Page) => {
     lum,
     boards,
     cursorOver,
+    routeCursorOver,
     tap,
     confirmRoute,
     confirmDirect,
@@ -411,11 +444,14 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   expect(await lum('h', HEADER)).toBeLessThan(160);
   await tap(720, 300);
   await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
-  await confirmRoute(() => tap(720, 400));
+  // Three boards now (HPA-1251): the middle one is ANOTHER, its box
+  // centred on 480 at top 285 — the old right-hand spot holds LONG.
+  await confirmRoute(() => tap(480, 400));
   await skipToBattle();
-  // B.R. ANOTHER's brawl seats HISO first (480), also untimed.
+  // B.R. ANOTHER's brawl seats G SUNEO first (500) out of the approved
+  // lineup table, also untimed.
   await expect(player).toHaveAttribute('aria-valuemax', '510');
-  await expect(opponent).toHaveAttribute('aria-valuemax', '480', {
+  await expect(opponent).toHaveAttribute('aria-valuemax', '500', {
     timeout: 30_000,
   });
   await expect(health).toContainText('Time: Unlimited');
@@ -423,12 +459,200 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
   expect(errors).toEqual([]);
 });
 
-// The four bosses (HPA-858) reach the same two signs, but confirm on that
-// first step: STORY starts their own story, B.R. the generated route — no
-// route substep ever shows, so while the selector is up the route step's
-// header band must stay the mode step's dark backdrop, and it is not read
-// once the arena renders.
-test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice native', async ({
+// The regular B.R. route step offers three signs (HPA-1251): B.R. ZERO,
+// ANOTHER and the blank LONG board. The keyboard walk lights each board
+// under its arrow, LONG starts the twelve-enemy brawl (its first-tick
+// Dora ally shows only on the canvas HUD, whose bars scene tests pin —
+// the DOM meters here hold the initial fighter and first enemy), and the
+// remembered LONG survives on the step until a tap confirms ANOTHER.
+test('regular B.R.: three signs walk to LONG, then a remembered tap to ANOTHER', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const {
+    errors,
+    player,
+    opponent,
+    health,
+    press,
+    lum,
+    boards,
+    routeCursorOver,
+    tap,
+    confirmRoute,
+    skipToBattle,
+    backToModeSelect,
+  } = await openArena(page);
+
+  // Title → SINGLE → Ryuko's cell opens the selector; once STORY MODE
+  // has drawn (the pick's own closing wait runs first — keys before it
+  // are cleared), right to B.R. and Enter opens its three-sign route
+  // step, ZERO picked over ANOTHER.
+  await press('g');
+  await press('g');
+  await press('g');
+  await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(40);
+  await press('d');
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await press('Enter');
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
+  await expect.poll(() => boards(B3_LEFT, B3_MID), VIEW).toBeGreaterThan(30);
+  await expect.poll(() => routeCursorOver(ROW3, 'a'), VIEW).toBeGreaterThan(5);
+
+  // Right twice walks ANOTHER then LONG, each board lighting under the
+  // arrow as the previous dims.
+  await press('d');
+  await expect.poll(() => boards(B3_MID, B3_LEFT), VIEW).toBeGreaterThan(30);
+  await expect.poll(() => routeCursorOver(ROW3, 'b'), VIEW).toBeGreaterThan(5);
+  await press('d');
+  await expect.poll(() => boards(B3_RIGHT, B3_MID), VIEW).toBeGreaterThan(30);
+  await expect.poll(() => routeCursorOver(ROW3, 'c'), VIEW).toBeGreaterThan(5);
+
+  // LONG confirmed: the twelve-enemy brawl on Sakura Street, SWW first
+  // (460), untimed — Ryuko's 510 bar beside it.
+  await confirmRoute(() => press('Enter'));
+  await skipToBattle();
+  await expect(player).toHaveAttribute('aria-valuemax', '510');
+  await expect(opponent).toHaveAttribute('aria-valuemax', '460', {
+    timeout: 30_000,
+  });
+  await expect(health).toContainText('Time: Unlimited');
+
+  // Session memory: the selector reopens on B.R., whose route step
+  // remembers LONG — lit, arrow over it. The reopen rides the pick's
+  // closing wait, which clears input, so Enter is re-sent while the
+  // route step's header reads dark: a re-send can only fire when the
+  // one before was swallowed (a landed Enter lights the header and ends
+  // the poll before another is sent). A tap on the middle board then
+  // confirms ANOTHER through the same geometry the walk used.
+  await backToModeSelect();
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await expect
+    .poll(async () => {
+      await press('Enter');
+      return lum('h', HEADER);
+    }, VIEW)
+    .toBeGreaterThan(160);
+  await expect.poll(() => boards(B3_RIGHT, B3_MID), VIEW).toBeGreaterThan(30);
+  await expect.poll(() => routeCursorOver(ROW3, 'c'), VIEW).toBeGreaterThan(5);
+  await confirmRoute(() => tap(480, 400));
+  await skipToBattle();
+  // B.R. ANOTHER's brawl seats G SUNEO first (500), also untimed.
+  await expect(player).toHaveAttribute('aria-valuemax', '510');
+  await expect(opponent).toHaveAttribute('aria-valuemax', '500', {
+    timeout: 30_000,
+  });
+  await expect(health).toContainText('Time: Unlimited');
+
+  expect(errors).toEqual([]);
+});
+
+// Remembered routes ride value, not index (HPA-1251): a regular LONG
+// remembered on the three-sign step resolves to the boss route step's own
+// second board — the same two signs ANOTHER shares — instead of an
+// out-of-range index, and Enter there starts the boss's twelve-enemy LONG:
+// no ally, twelve tough seats.
+test('regular→boss: the remembered LONG lands on the boss route step', async ({
+  page,
+}) => {
+  test.setTimeout(300_000);
+  const {
+    errors,
+    player,
+    opponent,
+    health,
+    press,
+    lum,
+    boards,
+    routeCursorOver,
+    confirmRoute,
+    skipToBattle,
+    backToModeSelect,
+  } = await openArena(page);
+
+  // Ryuko's B.R. route step: right, right to LONG, Enter starts it —
+  // SWW first (460), untimed. STORY draws first; the pick's closing wait
+  // clears earlier keys.
+  await press('g');
+  await press('g');
+  await press('g');
+  await expect.poll(() => lum('l', MODE_LEFT), VIEW).toBeGreaterThan(170);
+  await expect
+    .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
+    .toBeGreaterThan(40);
+  await press('d');
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await press('Enter');
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
+  await press('d');
+  await press('d');
+  await expect.poll(() => boards(B3_RIGHT, B3_MID), VIEW).toBeGreaterThan(30);
+  await confirmRoute(() => press('Enter'));
+  await skipToBattle();
+  await expect(opponent).toHaveAttribute('aria-valuemax', '460', {
+    timeout: 30_000,
+  });
+
+  // Back out and pick ZENKA on the same session — the selector reopens
+  // on Ryuko's mode step with B.R. still lit (the remembered mode; the
+  // poll also waits out the pick's own hundred-tick closing wait before
+  // anything else is pressed); Escape to the grid and walk to ZENKA
+  // (cell 6,3), whose pick opens the boss selector on the same session.
+  await backToModeSelect();
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await press('Escape');
+  for (const key of ['d', 'd', 'd', 'd', 'd', 'd', 's', 's', 's'])
+    await press(key);
+  await press('g');
+  // ZENKA's selector opens on the remembered B.R. — its boards drawing
+  // is also the wait that her pick's closing wait has run. Enter into
+  // her two-sign route step is re-sent while the header reads dark, in
+  // case the closing wait drained the first one.
+  await expect
+    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await expect
+    .poll(async () => {
+      await press('Enter');
+      return lum('h', HEADER);
+    }, VIEW)
+    .toBeGreaterThan(160);
+  // The boss step resolves the remembered LONG onto its own second
+  // board — lit under the arrow, ANOTHER dimmed beside it.
+  await expect
+    .poll(() => boards(ROUTE_RIGHT, ROUTE_LEFT), VIEW)
+    .toBeGreaterThan(30);
+  await expect.poll(() => routeCursorOver(ROW2, 'b'), VIEW).toBeGreaterThan(5);
+
+  // Enter confirms it: ZENKA's LONG brawl — no ally, twelve tough
+  // enemies, ERUS first at twice his native 450 — 900 — untimed.
+  await confirmRoute(() => press('Enter'));
+  await skipToBattle();
+  await expect(player).toHaveAttribute('aria-valuemax', '480');
+  await expect(opponent).toHaveAttribute('aria-valuemax', '900', {
+    timeout: 30_000,
+  });
+  await expect(health).toContainText('Time: Unlimited');
+  expect(errors).toEqual([]);
+});
+
+// The four bosses (HPA-858) joined the selector with a direct B.R. start;
+// HPA-1251 keeps their STORY confirm on the first step — while the
+// selector is up after it the route step's header band must stay the mode
+// step's dark backdrop, and it is not read once the arena renders — but
+// routes her B.R. through the two-sign step like any fighter's.
+test('bosses: B.R. MODE opens the two-sign route step, ANOTHER starts stage 1 twice native', async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -442,7 +666,8 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
     boards,
     cursorOver,
     tap,
-    confirmDirect,
+    confirmRoute,
+    skipToBattle,
   } = await openArena(page);
 
   // Title → SINGLE → the grid: six rights and three downs put the cursor
@@ -459,13 +684,18 @@ test('bosses: B.R. MODE starts the generated route straight off, stage 1 twice n
     .toBeGreaterThan(40);
   await expect.poll(() => cursorOver('l'), VIEW).toBeGreaterThan(5);
 
-  // A tap on the B.R. sign picks and confirms it, and a boss's confirm is
-  // the start itself. confirmDirect reads the header band dark before the
-  // tap and resumes sampling with no settle gap, so a route step could
-  // not appear and leave unobserved in the old 150 ms blind window; the
-  // band is sampled only while the select pad is still the eight
-  // controls, never the arena's.
-  await confirmDirect(() => tap(720, 300, 0), false);
+  // A tap on the B.R. sign picks and confirms it, and the confirm opens
+  // the boss route step (HPA-1251): two boards — ANOTHER picked, LONG
+  // dimmed — under the lit mode header, where a regular fighter's offers
+  // three. The header lighting after the tap proves the step, and Enter
+  // then confirms ANOTHER off it.
+  await tap(720, 300, 0);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
+  await expect
+    .poll(() => boards(ROUTE_LEFT, ROUTE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
+  await confirmRoute(() => press('Enter'));
+  await skipToBattle();
 
   // The route's stage 1 seats ZENKA native (480) over the drawn pair's
   // first fighter KIKI at twice her native 490 — 980 — and the opener
@@ -539,10 +769,11 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
   expect(errors).toEqual([]);
 });
 
-// The other two bosses confirm like the first pair — SHIN-Z straight into
-// his generated route, DoraEmon into his own story — so all four take an
-// automated direct choice, each to its expected battle HUD.
-test('bosses: SHIN-Z starts B.R. straight off, DoraEmon his own story', async ({
+// The other two bosses take the same automated choices — SHIN-Z's B.R.
+// through his two-sign route step to ANOTHER (by tap, the touch route
+// start), DoraEmon straight into his own story — each to its expected
+// battle HUD.
+test('bosses: SHIN-Z routes to B.R. ANOTHER, DoraEmon his own story', async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -557,6 +788,7 @@ test('bosses: SHIN-Z starts B.R. straight off, DoraEmon his own story', async ({
     boards,
     tap,
     confirmDirect,
+    confirmRoute,
     skipToBattle,
   } = await openArena(page);
 
@@ -571,10 +803,18 @@ test('bosses: SHIN-Z starts B.R. straight off, DoraEmon his own story', async ({
     .poll(() => boards(MODE_LEFT, MODE_RIGHT), VIEW)
     .toBeGreaterThan(40);
 
-  // B.R. confirmed straight to the route's stage 1: SHIN-Z native (800)
-  // over the drawn pair's first fighter feng at twice her native 470 —
-  // 940 — and the donor header's time 0 runs untimed.
-  await confirmDirect(() => tap(720, 300, 0), false);
+  // B.R. opens his two-sign route step (HPA-1251), then a tap on
+  // ANOTHER's drawn box confirms it — the touch route start — and the
+  // route's stage 1 seats SHIN-Z native (800) over the drawn pair's
+  // first fighter feng at twice her native 470 — 940 — the donor
+  // header's time 0 running untimed.
+  await tap(720, 300, 0);
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
+  await expect
+    .poll(() => boards(ROUTE_LEFT, ROUTE_RIGHT), VIEW)
+    .toBeGreaterThan(30);
+  await confirmRoute(() => tap(300, 400));
+  await skipToBattle();
   await expect(player).toBeVisible();
   await expect(opponent).toBeVisible();
   await expect(player).toHaveAttribute('aria-valuemax', '800');
