@@ -7,9 +7,12 @@
 # and the game's export: its sprites (public/assets; ASSETS overrides the path) and the donors' move scripts
 # (src/game/generated; GENERATED overrides it), which tools/donor_data.py copies into out/data/.
 set -euo pipefail
+# A relative ASSETS or GENERATED is read from where the command runs, so both are made absolute before the cd.
+abs() { case $1 in /*) echo "$1" ;; *) echo "$PWD/$1" ;; esac; }
+A=$(abs "${ASSETS:-$(dirname "$0")/../../public/assets}")
+G=$(abs "${GENERATED:-$(dirname "$0")/../../src/game/generated}")
 cd "$(dirname "$0")"
-A=${ASSETS:-../../public/assets}
-python3 -I tools/donor_data.py "${GENERATED:-../../src/game/generated}" out/data
+python3 -I tools/donor_data.py "$G" out/data
 python3 -I tools/b1.py out/raw refs round7 out/b1
 python3 -I tools/b2.py out/raw refs out/b1 out/b2 out/data/ryuko.json "$A/ryuko"
 python3 -I tools/b3.py out/raw refs out/b2 out/b3 out/data/donors.json out/data/ryuko.json "$A"
