@@ -719,22 +719,22 @@ describe('B.R. No partner (HPA-972)', () => {
     // finale's donated ally (3-TIMES) — everyone in place, the ally gone.
     expect(withAlly).toEqual([
       'masa',
-      'ogi',
+      'sww',
+      'gigi',
       'ziro',
+      'ogi',
       'yinan',
       'aya',
-      'gigi',
-      'sww',
       'times',
     ]);
     expect(without).toEqual([
       'masa',
-      'ogi',
+      'sww',
+      'gigi',
       'ziro',
+      'ogi',
       'yinan',
       'aya',
-      'gigi',
-      'sww',
     ]);
     const ally = withAlly.find((who) => !without.includes(who));
     expect(withAlly.filter((who) => who === ally)).toHaveLength(1);
