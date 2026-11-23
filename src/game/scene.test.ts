@@ -5,6 +5,7 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
+import { createHud } from './hud';
 import { ART_SCALE, Match } from './match';
 import type { Fighter } from './match';
 import {
@@ -1020,16 +1021,28 @@ describe('cheats (HPA-767)', () => {
         get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
       },
     ) as unknown as Phaser.GameObjects.Image;
-    const texts: { text: string; x: number; y: number; visible: boolean }[] =
-      [];
+    const texts: {
+      text: string;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      visible: boolean;
+    }[] = [];
     const text = () => {
       const t = {
         text: '',
         x: 0,
         y: 0,
+        width: 0,
+        height: 0,
         visible: false,
         setText: (value: string) => {
           t.text = value;
+          // Phaser's Text measures itself on setText; monospace at a
+          // glance — the production clamp reads these.
+          t.width = value.length * 8;
+          t.height = 16;
           return t;
         },
         setPosition: (x: number, y: number) => {
@@ -1093,10 +1106,12 @@ describe('cheats (HPA-767)', () => {
     const cut = texts[0]!;
     expect(cut.visible).toBe(true);
     expect(cut.text).toBe('Damage cut: 45%');
+    // The whole label sits inside the canvas, its right and bottom edges
+    // included (the label's origin is its top-left corner).
     expect(cut.x).toBeGreaterThanOrEqual(0);
-    expect(cut.x).toBeLessThanOrEqual(960);
+    expect(cut.x + cut.width).toBeLessThanOrEqual(960);
     expect(cut.y).toBeGreaterThanOrEqual(0);
-    expect(cut.y).toBeLessThanOrEqual(720);
+    expect(cut.y + cut.height).toBeLessThanOrEqual(720);
     // One point above the line the wash clears; the tick and label stay.
     drawn.length = 0;
     bar.hp = 121;
@@ -1104,13 +1119,303 @@ describe('cheats (HPA-767)', () => {
     expect(drawn.some((r) => r.color === 0xff3020)).toBe(false);
     expect(drawn.some((r) => r.color === 0xffd24a)).toBe(true);
     expect(texts[0]!.text).toBe('Damage cut: 45%');
-    // And a bar far past the canvas clamps its label inside [0,960] ×
-    // [0,720].
+    // And a bar far past the canvas clamps its whole label and gold tick
+    // inside [0,960] × [0,720], right and bottom edges included — x 960
+    // alone would hold nothing of an origin-0 label.
+    drawn.length = 0;
     bar.bar.x = 9000;
+    bar.bar.y = 1000;
     bar.hp = 120;
     (view.drawLifeBars as () => void)();
-    expect(texts[texts.length - 1]!.x).toBe(960);
-    expect(texts[texts.length - 1]!.visible).toBe(true);
+    const far = texts[texts.length - 1]!;
+    expect(far.visible).toBe(true);
+    expect(far.x).toBeGreaterThanOrEqual(0);
+    expect(far.x).toBeLessThan(960);
+    expect(far.x + far.width).toBeLessThanOrEqual(960);
+    expect(far.y).toBeGreaterThanOrEqual(0);
+    expect(far.y + far.height).toBeLessThanOrEqual(720);
+    const farTick = drawn.find((r) => r.color === 0xffd24a)!;
+    expect(farTick).toBeDefined();
+    expect(farTick.x).toBeGreaterThanOrEqual(0);
+    expect(farTick.x + farTick.w).toBeLessThanOrEqual(960);
+    expect(farTick.y).toBeGreaterThanOrEqual(0);
+    expect(farTick.y + farTick.h).toBeLessThanOrEqual(720);
+    // One far off the canvas's left clamps the label's left edge at 0.
+    bar.bar.x = -5000;
+    (view.drawLifeBars as () => void)();
+    const farLeft = texts[texts.length - 1]!;
+    expect(farLeft.x).toBe(0);
+    expect(farLeft.x + farLeft.width).toBeLessThanOrEqual(960);
+  });
+
+  it('hides an arena label when its bar leaves and grows the pool for a summon', () => {
+    const { view, artIn } = boot();
+    artIn();
+    const drawn: {
+      color: number;
+      alpha: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }[] = [];
+    let color = 0;
+    let alpha = 1;
+    const graphics = {
+      clear: () => {},
+      fillStyle: (next: number, fade?: number) => {
+        color = next;
+        alpha = fade ?? 1;
+      },
+      fillRect: (x: number, y: number, w: number, h: number) =>
+        void drawn.push({ color, alpha, x, y, w, h }),
+      setScrollFactor: () => graphics,
+      setDepth: () => graphics,
+    };
+    const anySprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    const texts: { text: string; x: number; y: number; visible: boolean }[] =
+      [];
+    const text = () => {
+      const t = {
+        text: '',
+        x: 0,
+        y: 0,
+        visible: false,
+        setText: (value: string) => {
+          t.text = value;
+          return t;
+        },
+        setPosition: (x: number, y: number) => {
+          t.x = x;
+          t.y = y;
+          return t;
+        },
+        setVisible: (v: boolean) => {
+          t.visible = v;
+          return t;
+        },
+        setOrigin: () => t,
+        setScrollFactor: () => t,
+        setDepth: () => t,
+      };
+      texts.push(t);
+      return t;
+    };
+    view.add = { graphics: () => graphics, image: () => anySprite, text };
+    const match = new Match('cpu', true);
+    match.useCheats(
+      cheats({ enabled: true, lowHpLine: 100, damageCutMultiplier: 0 }),
+    );
+    match.practice = { ...match.practice, enemyBars: true };
+    view.match = match;
+    (view.drawLifeBars as () => void)();
+    // The Enemy HP bars option adds the hostile rival's bar (a Vs. match
+    // seats the 1P without the bar bit), with its label under the 100%
+    // line — and at Damage cut ×0 the wash still lights, reading 0%.
+    expect(match.lifeBars.length).toBe(1);
+    expect(texts).toHaveLength(1);
+    expect(texts[0]!.visible).toBe(true);
+    expect(texts[0]!.text).toBe('Damage cut: 0%');
+    const wash = drawn.find((r) => r.color === 0xff3020)!;
+    expect(wash).toBeDefined();
+    expect(wash.alpha).toBe(0.4);
+    // Enemy HP bars off: the bar leaves the visible set and its label
+    // hides on the redraw.
+    match.practice = { ...match.practice, enemyBars: false };
+    (view.drawLifeBars as () => void)();
+    expect(match.lifeBars.length).toBe(0);
+    expect(texts).toHaveLength(1);
+    expect(texts[0]!.visible).toBe(false);
+    // A dead fighter's bar leaves too, and living again brings the label
+    // back.
+    match.practice = { ...match.practice, enemyBars: true };
+    match.fighters[1]!.hp = 0;
+    (view.drawLifeBars as () => void)();
+    expect(match.lifeBars.length).toBe(0);
+    expect(texts[0]!.visible).toBe(false);
+    match.fighters[1]!.hp = 1;
+    (view.drawLifeBars as () => void)();
+    expect(match.lifeBars.length).toBe(1);
+    expect(texts[0]!.visible).toBe(true);
+    // A late summon joins with its own bar: the pool grows one label for
+    // it, and it reads the same Match-derived cut.
+    const summon = match.summon('zoma', 1)!;
+    (view.drawLifeBars as () => void)();
+    expect(match.lifeBars.length).toBe(2);
+    expect(texts).toHaveLength(2);
+    expect(texts[1]!.visible).toBe(true);
+    expect(texts[1]!.text).toBe(
+      `Damage cut: ${100 - match.lossKeptPercent(summon)}%`,
+    );
+    // And the pool never shrinks: a later draw only hides spare labels —
+    // with the bars option off the summon's is the one bar left, and its
+    // label takes the first pool slot, rewritten from the same Match
+    // accessors.
+    match.practice = { ...match.practice, enemyBars: false };
+    (view.drawLifeBars as () => void)();
+    expect(match.lifeBars.map((f) => f.who)).toEqual(['zoma']);
+    expect(texts).toHaveLength(2);
+    expect(texts.filter((t) => t.visible)).toHaveLength(1);
+    expect(texts[0]!.visible).toBe(true);
+    expect(texts[0]!.text).toBe(
+      `Damage cut: ${100 - match.lossKeptPercent(summon)}%`,
+    );
+  });
+
+  it('shows a rival in both renderers the same line and cut', () => {
+    const { view, artIn } = boot();
+    artIn();
+    const drawn: { color: number; alpha: number }[] = [];
+    let color = 0;
+    let alpha = 1;
+    const graphics = {
+      clear: () => {},
+      fillStyle: (next: number, fade?: number) => {
+        color = next;
+        alpha = fade ?? 1;
+      },
+      fillRect: () => void drawn.push({ color, alpha }),
+      setScrollFactor: () => graphics,
+      setDepth: () => graphics,
+    };
+    const anySprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    const arena: { text: string; visible: boolean }[] = [];
+    view.add = {
+      graphics: () => graphics,
+      image: () => anySprite,
+      text: () => {
+        const t = {
+          text: '',
+          x: 0,
+          y: 0,
+          visible: false,
+          setText: (value: string) => {
+            t.text = value;
+            return t;
+          },
+          setPosition: () => t,
+          setVisible: (v: boolean) => {
+            t.visible = v;
+            return t;
+          },
+          setOrigin: () => t,
+          setScrollFactor: () => t,
+          setDepth: () => t,
+        };
+        arena.push(t);
+        return t;
+      },
+    };
+    // The HUD's own recorders, in createHud's construction order.
+    const make = () => {
+      const s = {
+        texture: '',
+        text: '',
+        x: 0,
+        y: 0,
+        visible: true,
+        crop: { x: 0, width: 0 },
+        setTexture(texture: string) {
+          this.texture = texture;
+          return this;
+        },
+        setText(text: string) {
+          this.text = text;
+          return this;
+        },
+        setVisible(visible: boolean) {
+          this.visible = visible;
+          return this;
+        },
+        setCrop(x: number, _y: number, width: number) {
+          this.crop = { x, width };
+          return this;
+        },
+        setX(x: number) {
+          this.x = x;
+          return this;
+        },
+        setPosition(x: number, y: number) {
+          this.x = x;
+          this.y = y;
+          return this;
+        },
+        setScrollFactor: () => s,
+        setOrigin: () => s,
+        setScale: () => s,
+        setDepth: () => s,
+        setAlpha: () => s,
+        setBlendMode: () => s,
+        setFlipX: () => s,
+      };
+      return s;
+    };
+    const images: ReturnType<typeof make>[] = [];
+    const rects: ReturnType<typeof make>[] = [];
+    const hudTexts: ReturnType<typeof make>[] = [];
+    const hud = {
+      as: {
+        add: {
+          image: () => {
+            const s = make();
+            images.push(s);
+            return s;
+          },
+          rectangle: () => {
+            const s = make();
+            rects.push(s);
+            return s;
+          },
+          text: () => {
+            const s = make();
+            hudTexts.push(s);
+            return s;
+          },
+        },
+      } as unknown as Phaser.Scene,
+      // createHud's order: the marks first, then the highlights and the
+      // CHEAT tag's cut texts.
+      glows: () => [rects[2]!, rects[3]!],
+      cuts: () => [hudTexts[1]!, hudTexts[2]!],
+    };
+    const updateHud = createHud(hud.as, (key) => key);
+    const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
+    match.useCheats(cheats({ enabled: true, lowHpLine: 60 }));
+    match.practice = { ...match.practice, enemyBars: true };
+    const rival = match.fighters[1]!;
+    view.match = match;
+    (view.drawLifeBars as () => void)();
+    updateHud(match);
+    // Both renderers read the rival's own cut — ALPHA's native 45% — and
+    // at full HP neither highlights. The arena's one bar is the rival's
+    // (the 1P seats without the bar bit in a Vs. match).
+    const rivalLabel = arena[0]!;
+    expect(match.lifeBars.map((f) => f.who)).toEqual(['alpha']);
+    expect(rivalLabel.visible).toBe(true);
+    expect(rivalLabel.text).toBe('Damage cut: 55%');
+    expect(hud.cuts()[1].text).toBe(rivalLabel.text);
+    expect(hud.glows()[1].visible).toBe(false);
+    expect(drawn.some((r) => r.color === 0xff3020)).toBe(false);
+    // At the line both highlight together, still reading the same cut.
+    rival.hp = match.lifeLineMark(rival);
+    drawn.length = 0;
+    (view.drawLifeBars as () => void)();
+    updateHud(match);
+    expect(hud.glows()[1].visible).toBe(true);
+    expect(drawn.some((r) => r.color === 0xff3020)).toBe(true);
+    expect(hud.cuts()[1].text).toBe(rivalLabel.text);
+    // 1P's strip reads its own, different cut.
+    expect(hud.cuts()[0].text).toBe('Damage cut: 40%');
   });
 
   it('leaves the arena bars native with cheats off', () => {

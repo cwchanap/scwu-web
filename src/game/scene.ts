@@ -1470,6 +1470,19 @@ export class TrainingScene extends Phaser.Scene {
       const [right, bottom] = screen(x + w, y + h);
       bars.fillRect(left, top, right - left, bottom - top);
     };
+    // Authored (HPA-1251): the cheat displays keep their whole bounds
+    // inside the canvas — labels and the gold tick alike — where the
+    // native bars may lie partly off-screen.
+    const clampedRect = (x: number, y: number, w: number, h: number) => {
+      const [left, top] = screen(x, y);
+      const [right, bottom] = screen(x + w, y + h);
+      bars.fillRect(
+        Math.max(0, Math.min(960 - (right - left), left)),
+        Math.max(0, Math.min(720 - (bottom - top), top)),
+        right - left,
+        bottom - top,
+      );
+    };
     const digits: { key: string; digit: number; x: number; y: number }[] = [];
     const labels: { text: string; x: number; y: number }[] = [];
     const count = (value: number, x: number, y: number, key: string) => {
@@ -1494,7 +1507,7 @@ export class TrainingScene extends Phaser.Scene {
       if (this.match.cheats.enabled) {
         const mark = this.match.lifeLineMark(f);
         bars.fillStyle(0xffd24a, 0.9);
-        rect(x + (50 * mark) / life - 1, y, 2, 10);
+        clampedRect(x + (50 * mark) / life - 1, y, 2, 10);
         if (f.hp <= mark) {
           bars.fillStyle(0xff3020, 0.4);
           rect(x, y + 1, green, 8);
@@ -1502,8 +1515,8 @@ export class TrainingScene extends Phaser.Scene {
         const [tx, ty] = screen(x, y - 12);
         labels.push({
           text: `Damage cut: ${100 - this.match.lossKeptPercent(f)}%`,
-          x: Math.max(0, Math.min(960, tx)),
-          y: Math.max(0, Math.min(720, ty)),
+          x: tx,
+          y: ty,
         });
       }
       if (!(TITLE.flags & 0x20)) continue;
@@ -1514,7 +1527,14 @@ export class TrainingScene extends Phaser.Scene {
       const cut = labels[index];
       label.setVisible(!!cut);
       if (!cut) return;
-      label.setText(cut.text).setPosition(cut.x, cut.y);
+      // The origin-0 label clamps by its measured bounds, so its right
+      // and bottom edges stay inside too.
+      label
+        .setText(cut.text)
+        .setPosition(
+          Math.max(0, Math.min(960 - label.width, cut.x)),
+          Math.max(0, Math.min(720 - label.height, cut.y)),
+        );
     });
     this.pool(this.digitSprites, digits.length).forEach((sprite, index) => {
       const digit = digits[index];

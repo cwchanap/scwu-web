@@ -473,14 +473,10 @@ export function createHud(
     // In a story the 2P side shows the enemy, and nothing while there is
     // none (0x40ddf5, 0x40de53, 0x40a50e).
     [match.fighters[0], match.rival].forEach((f, index) => {
-      // The fixed glow shows natively, and hides for the cheat line.
+      // The fixed glow shows natively, and hides for the cheat line —
+      // with or without a fighter, as the layout keeps the strip drawn.
       const cheated = match.cheats.enabled;
       underPower[index].setVisible(!cheated);
-      underPower[index].setTexture(
-        Math.floor(match.ticks / 15) % 2
-          ? tint('ui-135', { r: 10, g: 10, b: 10 })
-          : 'ui-135',
-      );
       if (!f) {
         for (const part of [
           life[index],
@@ -530,6 +526,11 @@ export function createHud(
         .setVisible(true)
         .setTexture(stockTexture(f.stock))
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
+      underPower[index].setTexture(
+        Math.floor(match.ticks / 15) % 2
+          ? tint('ui-135', { r: 10, g: 10, b: 10 })
+          : 'ui-135',
+      );
       const face = faces[index]
         .setVisible(true)
         .setTexture(`${f.who}-${faceImage(f.face, f.who)}`);

@@ -21,6 +21,8 @@ import {
   stockTexture,
 } from './hud';
 import { Match } from './match';
+import { scenarioOf } from './story';
+import type { Battle } from './story';
 
 // A stand-in Phaser scene for createHud: every image, rectangle and text
 // records the texture, text, position, crop and visibility the HUD sets on
@@ -169,6 +171,32 @@ it('keeps the native UNDER PW glow with cheats off', () => {
   expect(hud.marks().map((mark) => mark.visible)).toEqual([false, false]);
   expect(hud.glows().map((glow) => glow.visible)).toEqual([false, false]);
   expect(hud.cuts().map((cut) => cut.visible)).toEqual([false, false]);
+});
+
+it('freezes the absent rival’s glow across a blink boundary', () => {
+  const hud = hudScene();
+  // A tint stub that marks every tinted key, so the blink reads off the
+  // recorded textures.
+  const update = createHud(hud.as, (key) => `${key}·`);
+  // A story round before its enemy sits: the 2P side has no fighter.
+  const first = scenarioOf('ryuko')[0] as Battle;
+  const match = Match.story('ryuko', first, 0);
+  expect(match.rival).toBeNull();
+  update(match);
+  // The layout keeps the strip drawn with no enemy (0x40de7f), but its
+  // blink only runs where a fighter does — the absent texture stays put.
+  const [one, two] = hud.underPower();
+  expect([one.visible, two.visible]).toEqual([true, true]);
+  expect(one.texture).toBe('ui-135');
+  expect(two.texture).toBe('');
+  match.ticks = 15;
+  update(match);
+  expect(one.texture).toBe('ui-135·');
+  expect(two.texture).toBe('');
+  match.ticks = 30;
+  update(match);
+  expect(one.texture).toBe('ui-135');
+  expect(two.texture).toBe('');
 });
 
 it('hides the fixed glow under cheats and marks the real line (10%–60%)', () => {
