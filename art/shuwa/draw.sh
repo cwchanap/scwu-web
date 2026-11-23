@@ -24,12 +24,14 @@ for a in "$@"; do
   poses+=($m)
 done
 poses=($(printf '%s\n' "${poses[@]}" | awk '!seen[$0]++')) # a pose named on its own and in its batch is drawn once
-python3 -I tools/donor_data.py "$G" out/data || exit 1
-# Guides are remade for every pose drawn, so a changed export is always picked up.
+# Guides are remade for every pose drawn, so a changed export is always picked up. The donor data they need is made
+# once, before the first guided pose, so drawing only unguided poses needs no export.
+data=
 for k in "${poses[@]}"; do
   read -r _ _ guide form size < <(awk -v k="$k" '$1 == k' poses.txt)
-  [ "$guide" = - ] ||
-    python3 -I tools/posref.py "$A/${guide%-*}" "${guide%-*}" "${guide##*-}" "$form" "$size" || exit 1
+  [ "$guide" = - ] && continue
+  [ -n "$data" ] || { python3 -I tools/donor_data.py "$G" out/data || exit 1; data=1; }
+  python3 -I tools/posref.py "$A/${guide%-*}" "${guide%-*}" "${guide##*-}" "$form" "$size" || exit 1
 done
 
 draw() {
