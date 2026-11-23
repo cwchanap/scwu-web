@@ -7,6 +7,8 @@ import { opensOnModeSelect } from './story';
 import type { Battle, Step } from './story';
 import { brAnotherStages, bossBrAnotherStory } from './br-another';
 import type { BrAnotherStages } from './br-another';
+import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
+import type { LineupPair } from './br-lineups';
 
 const ELIGIBLE = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
   opensOnModeSelect(who),
@@ -74,10 +76,29 @@ const pairsOf = (players: readonly number[]) =>
     (_, i) => [players[2 * i]!, players[2 * i + 1]!] as const,
   );
 
-const built = (stages: BrAnotherStages): Battle[] =>
-  [stages.stage1, stages.stage2, stages.stage3].filter(
-    (battle): battle is Battle => battle !== null,
-  );
+const built = (stages: BrAnotherStages): Battle[] => [
+  stages.stage1,
+  stages.stage2,
+  stages.stage3,
+];
+const seatsOf = (pairs: readonly LineupPair[]) =>
+  pairs.flat().map((who) => ROSTER.indexOf(who));
+const namesOf = (battle: Battle) => battle.slots.map((s) => ROSTER[s!.player]!);
+const countIn = (
+  map: Map<string, number>,
+  key: string,
+  lo: number,
+  hi: number,
+  label: string,
+) => {
+  const n = map.get(key) ?? 0;
+  expect(n, `${label} ${key}`).toBeGreaterThanOrEqual(lo);
+  expect(n, `${label} ${key}`).toBeLessThanOrEqual(hi);
+};
+const pairKey = (players: readonly number[]) =>
+  [...players].sort((a, b) => a - b).join(',');
+const leaderPosKey = (players: readonly number[], pos: number) =>
+  `${Math.floor(players[0]! / 2)},${players[0]! % 2},${pos}`;
 
 const enemyMask = (battle: Battle, i: number, paired: boolean) => {
   const last = battle.slots.length - 1;
@@ -141,91 +162,297 @@ const expectRoles = (
   ]);
 };
 
-describe('BR Another seeded lineup builder', () => {
-  it('rebuilds the same seeded lineups for a fighter on every call', () => {
-    expect(brAnotherStages('masa')).toEqual(brAnotherStages('masa'));
-    expect(brAnotherStages('ryuko')).toEqual(brAnotherStages('ryuko'));
-    expect(brAnotherStages('rario')).toEqual(brAnotherStages('rario'));
+describe('BR Another approved lineups', () => {
+  it('rebuilds the same approved lineups for a fighter on every call', () => {
+    for (const who of ELIGIBLE)
+      expect(brAnotherStages(who), who).toEqual(brAnotherStages(who));
   });
 
-  it('lets different fighters draw different orders from their roster seeds', () => {
+  // The one table-driven check: every constructed battle equals its approved
+  // HPA-1035 §7 row — pairs with their leader, the ordered boss sequence and
+  // the last boss's arena — with the family's own role/header donors.
+  it('constructs each approved §7 row for all 34 fighters', () => {
     expect(ELIGIBLE).toHaveLength(34);
-    const orders = new Set(
-      ELIGIBLE.map((who) =>
-        brAnotherStages(who)
-          .stage3.slots.slice(0, 4)
-          .map((s) => s!.player)
-          .join(','),
-      ),
-    );
-    expect(orders.size).toBeGreaterThan(1);
-    const pairs = new Set(
-      ELIGIBLE.map((who) =>
-        brAnotherStages(who)
-          .stage2.slots.map((s) => s!.player)
-          .join(','),
-      ),
-    );
-    expect(pairs.size).toBeGreaterThan(1);
+    for (const who of ELIGIBLE) {
+      const row = BR_ANOTHER_LINEUPS[who];
+      if (!row) throw new Error(`${who} has no approved row`);
+      const { stage1, stage2, stage3 } = brAnotherStages(who);
+      const finale = finaleOf(who);
+      const folded = FOLDED.includes(who);
+      const fin = folded ? 49 : TWINS.includes(who) ? 67 : 65;
+      const opener = folded ? sourceStep(who, 45) : sourceStep(who, fin - 2);
+      const roles = folded ? sourceStep('ryuko', 63) : opener;
+      expect(namesOf(stage1).slice(0, 6), `${who} stage 1`).toEqual(
+        row.stage1.flat(),
+      );
+      expect(stage1.stage, who).toBe(9);
+      for (const key of HEADER_KEYS)
+        expect(stage1[key], `${who} stage1 ${key}`).toBe(opener[key]);
+      expectRoles(who, stage1, roles, true);
+      expect(namesOf(stage2).slice(0, 6), `${who} stage 2`).toEqual(
+        row.stage2.flat(),
+      );
+      expect(stage2.stage, who).toBe(3);
+      for (const key of HEADER_KEYS)
+        expect(stage2[key], `${who} stage2 ${key}`).toBe(finale[key]);
+      expectRoles(who, stage2, finale, true);
+      expect(namesOf(stage3).slice(0, 4), `${who} stage 3`).toEqual([
+        ...row.stage3,
+      ]);
+      expect(stage3.stage, who).toBe(
+        ARENAS.get(ROSTER.indexOf(row.stage3.at(-1)!)),
+      );
+      for (const key of HEADER_KEYS)
+        expect(stage3[key], `${who} stage3 ${key}`).toBe(finale[key]);
+      expectRoles(who, stage3, finale, false);
+      for (const battle of [stage1, stage2, stage3])
+        expect(battle.slots.at(-1)!.player, `${who} ally`).toBe(
+          finale.slots[6]!.player,
+        );
+    }
   });
 
-  it('builds stage 1 only for the folded fighters on the twelve regular pairs', () => {
-    const template = sourceStep('ryuko', 63);
-    for (const who of ELIGIBLE.filter((who) => !FOLDED.includes(who)))
-      expect(brAnotherStages(who).stage1, who).toBeNull();
-    for (const who of FOLDED) {
-      const { stage1 } = brAnotherStages(who);
-      expect(stage1).not.toBeNull();
-      expect(stage1!.slots).toHaveLength(7);
-      const enemies = stage1!.slots.slice(0, -1).map((s) => s!.player);
-      const drawn = pairsOf(enemies);
-      expect(new Set(enemies).size, who).toBe(6);
-      for (const [a, b] of drawn)
-        expect(
-          STAGE_ONE_POOL.some(([pa, pb]) => pa === a && pb === b),
-          `${who} drew [${a}, ${b}]`,
-        ).toBe(true);
-      expect(stage1!.slots.at(-1)!.player, who).toBe(
-        finaleOf(who).slots[6]!.player,
-      );
-      expectRoles(who, stage1!, template, true);
-      const opener = sourceStep(who, 45);
-      for (const key of HEADER_KEYS)
-        expect(stage1![key], `${who} ${key}`).toBe(opener[key]);
-      expect(stage1!.stage).toBe(9);
+  // Independent of the typed table: RYUKO's rows straight from the ticket.
+  it('seats RYUKO’s hard-coded rows: G SUNEO+GIANT / LIZARD+KAY / ERUS+HISO, OGI+ZIRO / GIGI+SWW / YINAN+AYA, SHIN-Z, ALPHA, DoraEmon, ZENKA', () => {
+    const { stage1, stage2, stage3 } = brAnotherStages('ryuko');
+    expect(stage1.slots.map((s) => s!.player)).toEqual([
+      7, 6, 10, 11, 17, 16, 1,
+    ]);
+    expect(stage2.slots.map((s) => s!.player)).toEqual([
+      26, 27, 24, 25, 40, 41, 1,
+    ]);
+    expect(stage3.slots.map((s) => s!.player)).toEqual([33, 32, 45, 30, 1]);
+    expect(stage3.stage).toBe(ARENAS.get(30));
+    expect(stage1.stage).toBe(9);
+    expect(stage2.stage).toBe(3);
+    expect(namesOf(stage1).slice(0, 6)).toEqual([
+      'suneo',
+      'giant',
+      'lizard',
+      'kay',
+      'erus',
+      'hiso',
+    ]);
+  });
+
+  it('meets §7 stage-1 spread: every pair 8-9 times, 2-3 per position, all 72 lead/slot combos, 34 distinct rows, never the own pair', () => {
+    const perPair = new Map<string, number>();
+    const perSlot = Array.from({ length: 3 }, () => new Map<string, number>());
+    const combos = new Map<string, number>();
+    const lineups = new Map<string, Who>();
+    const sets = new Map<string, Who>();
+    for (const who of ELIGIBLE) {
+      const players = brAnotherStages(who)
+        .stage1.slots.slice(0, 6)
+        .map((s) => s!.player);
+      const names = players.map((p) => ROSTER[p]!);
+      lineups.set(names.join(','), who);
+      sets.set([...names].sort().join(','), who);
+      expect(players, who).not.toContain(ROSTER.indexOf(who));
+      pairsOf(players).forEach(([a, b], pos) => {
+        const key = pairKey([a, b]);
+        perPair.set(key, (perPair.get(key) ?? 0) + 1);
+        perSlot[pos]!.set(key, (perSlot[pos]!.get(key) ?? 0) + 1);
+        const combo = leaderPosKey([a, b], pos);
+        combos.set(combo, (combos.get(combo) ?? 0) + 1);
+      });
     }
+    expect(lineups.size, 'distinct ordered stage-1 lineups').toBe(34);
+    expect(sets.size, 'distinct stage-1 pair sets').toBe(34);
+    expect(perPair.size).toBe(12);
+    for (const key of perPair.keys())
+      countIn(perPair, key, 8, 9, 'stage1 pair');
+    for (const slot of perSlot)
+      for (const key of slot.keys())
+        countIn(slot, key, 2, 3, 'stage1 position');
+    expect(combos.size, 'lead/slot combos').toBe(72);
+    for (const [key, n] of combos) {
+      expect(n, `combo ${key}`).toBeGreaterThanOrEqual(1);
+      expect(n, `combo ${key}`).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it('meets §7 stage-2 spread: each pair seated 25-26 times, 8-9 per position, 24 orders shared only with opposite leaders, never pair mates', () => {
+    const perPair = new Map<string, number>();
+    const perSlot = Array.from({ length: 3 }, () => new Map<string, number>());
+    const combos = new Map<string, number>();
+    const orders = new Map<string, Who[]>();
+    for (const who of ELIGIBLE) {
+      const players = brAnotherStages(who)
+        .stage2.slots.slice(0, 6)
+        .map((s) => s!.player);
+      expect(players, who).not.toContain(ROSTER.indexOf(who));
+      const drawn = pairsOf(players);
+      const orderKey = drawn.map(([a, b]) => pairKey([a, b])).join('>');
+      orders.set(orderKey, [...(orders.get(orderKey) ?? []), who]);
+      drawn.forEach(([a, b], pos) => {
+        const key = pairKey([a, b]);
+        perPair.set(key, (perPair.get(key) ?? 0) + 1);
+        perSlot[pos]!.set(key, (perSlot[pos]!.get(key) ?? 0) + 1);
+        const combo = leaderPosKey([a, b], pos);
+        combos.set(combo, (combos.get(combo) ?? 0) + 1);
+      });
+    }
+    expect(perPair.size).toBe(4);
+    // The approved table seats each pair 25 or 26 times over the 34 rows
+    // (102 pair slots); the prose's exact 26/26/25/25 split differs from the
+    // table itself, and the table is the approved data.
+    for (const key of [
+      pairKey([24, 25]),
+      pairKey([26, 27]),
+      pairKey([28, 29]),
+      pairKey([40, 41]),
+    ])
+      countIn(perPair, key, 25, 26, 'stage2 pair seated');
+    for (const slot of perSlot)
+      for (const key of slot.keys())
+        countIn(slot, key, 8, 9, 'stage2 position');
+    expect(combos.size, 'lead/slot combos').toBe(24);
+    for (const [key, n] of combos) {
+      expect(n, `combo ${key}`).toBeGreaterThanOrEqual(4);
+      expect(n, `combo ${key}`).toBeLessThanOrEqual(5);
+    }
+    expect(orders.size, 'stage-2 pair orders').toBe(24);
+    const repeated = [...orders.entries()].filter(([, ws]) => ws.length > 1);
+    expect(repeated).toHaveLength(10);
+    for (const [, ws] of repeated) {
+      expect(ws).toHaveLength(2);
+      const [a, b] = ws as [Who, Who];
+      const pa = pairsOf(
+        brAnotherStages(a)
+          .stage2.slots.slice(0, 6)
+          .map((s) => s!.player),
+      );
+      const pb = pairsOf(
+        brAnotherStages(b)
+          .stage2.slots.slice(0, 6)
+          .map((s) => s!.player),
+      );
+      pa.forEach(([x], i) =>
+        expect(x, `${a}/${b} pair ${i}`).not.toBe(pb[i]![0]),
+      );
+      expect(
+        Math.abs(ROSTER.indexOf(a) - ROSTER.indexOf(b)),
+        `${a}/${b} pair mates`,
+      ).not.toBe(1);
+    }
+  });
+
+  it('meets §7 stage-3 spread: all 24 boss orders (10 twice, never pair mates), 8-9 per boss per position, arenas 8/9/8/9', () => {
+    const perPos = Array.from({ length: 4 }, () => new Map<string, number>());
+    const orders = new Map<string, Who[]>();
+    const arenas = new Map<number, number>();
+    for (const who of ELIGIBLE) {
+      const { stage3 } = brAnotherStages(who);
+      const bosses = stage3.slots.slice(0, 4).map((s) => s!.player);
+      expect(
+        [...bosses].sort((a, b) => a - b),
+        who,
+      ).toEqual(BOSS_SEATS);
+      expect(stage3.stage, who).toBe(ARENAS.get(bosses.at(-1)!));
+      arenas.set(stage3.stage, (arenas.get(stage3.stage) ?? 0) + 1);
+      orders.set(bosses.join(','), [
+        ...(orders.get(bosses.join(',')) ?? []),
+        who,
+      ]);
+      bosses.forEach((b, pos) =>
+        perPos[pos]!.set(String(b), (perPos[pos]!.get(String(b)) ?? 0) + 1),
+      );
+    }
+    expect(orders.size, 'boss orders').toBe(24);
+    const repeated = [...orders.entries()].filter(([, ws]) => ws.length > 1);
+    expect(repeated).toHaveLength(10);
+    for (const [, ws] of repeated) {
+      expect(ws).toHaveLength(2);
+      const [a, b] = ws as [Who, Who];
+      expect(
+        Math.abs(ROSTER.indexOf(a) - ROSTER.indexOf(b)),
+        `${a}/${b} pair mates`,
+      ).not.toBe(1);
+    }
+    for (const slot of perPos)
+      for (const boss of slot.keys())
+        countIn(slot, boss, 8, 9, 'boss position');
+    expect(arenas.get(ARENAS.get(30)!)).toBe(8);
+    expect(arenas.get(ARENAS.get(32)!)).toBe(9);
+    expect(arenas.get(ARENAS.get(33)!)).toBe(8);
+    expect(arenas.get(ARENAS.get(45)!)).toBe(9);
+  });
+
+  it('meets §7 LONG spread in the table: 16 pairs 14-15 times, 2-3 per position, 38 distinct rows, 192 lead/slot combos (36 twice), own pair out', () => {
+    expect(Object.keys(BR_LONG_LINEUPS)).toHaveLength(38);
+    const perPair = new Map<string, number>();
+    const perSlot = Array.from({ length: 6 }, () => new Map<string, number>());
+    const combos = new Map<string, number>();
+    const lineups = new Map<string, string>();
+    const sets = new Map<string, string>();
+    for (const [who, row] of Object.entries(BR_LONG_LINEUPS)) {
+      const players = seatsOf(row);
+      const names = row.flat();
+      lineups.set(names.join(','), who);
+      sets.set([...names].sort().join(','), who);
+      if (ELIGIBLE.includes(who as Who))
+        expect(players, who).not.toContain(ROSTER.indexOf(who as Who));
+      else expect(ELIGIBLE.includes(who as Who)).toBe(false);
+      expect(new Set(players).size, who).toBe(12);
+      pairsOf(players).forEach(([a, b], pos) => {
+        const key = pairKey([a, b]);
+        perPair.set(key, (perPair.get(key) ?? 0) + 1);
+        perSlot[pos]!.set(key, (perSlot[pos]!.get(key) ?? 0) + 1);
+        const combo = leaderPosKey([a, b], pos);
+        combos.set(combo, (combos.get(combo) ?? 0) + 1);
+      });
+    }
+    expect(lineups.size, 'distinct ordered LONG lineups').toBe(38);
+    expect(sets.size, 'distinct LONG pair sets').toBe(38);
+    expect(perPair.size).toBe(16);
+    for (const key of perPair.keys())
+      countIn(perPair, key, 14, 15, 'long pair');
+    for (const slot of perSlot)
+      for (const key of slot.keys()) countIn(slot, key, 2, 3, 'long position');
+    expect(combos.size, 'lead/slot combos').toBe(192);
+    expect([...combos.values()].filter((n) => n === 1)).toHaveLength(156);
+    expect([...combos.values()].filter((n) => n === 2)).toHaveLength(36);
+  });
+
+  it('donates stage-1 roles and headers from the fighter’s own stage-9 opener, or ryuko 63 and own 45 for the folded', () => {
+    for (const who of ELIGIBLE) {
+      const { stage1 } = brAnotherStages(who);
+      const folded = FOLDED.includes(who);
+      const fin = folded ? 49 : TWINS.includes(who) ? 67 : 65;
+      const opener = folded ? sourceStep(who, 45) : sourceStep(who, fin - 2);
+      if (!folded) expect(opener.stage, who).toBe(9);
+      expect(stage1.stage, who).toBe(9);
+      for (const key of HEADER_KEYS)
+        expect(stage1[key], `${who} ${key}`).toBe(opener[key]);
+      expectRoles(who, stage1, folded ? sourceStep('ryuko', 63) : opener, true);
+    }
+    // The folded openers are native stage battles — the folded stage 1 must
+    // not inherit their arena.
+    expect(FOLDED.map((who) => sourceStep(who, 45).stage)).toEqual([
+      6, 9, 1, 2,
+    ]);
     expect(brAnotherStages('times').stage1!.x).toBe(300);
     expect(brAnotherStages('times').stage1!.slots[0]!.delay).toBe(0);
-    expect(
-      Object.fromEntries(
-        FOLDED.map((who) => [
-          who,
-          brAnotherStages(who).stage1!.slots.map((s) => s?.player),
-        ]),
-      ),
-    ).toEqual({
-      masa: [12, 13, 0, 1, 22, 23, 29],
-      times: [14, 15, 20, 21, 12, 13, 28],
-      zmega: [4, 5, 0, 1, 12, 13, 46],
-      rario: [4, 5, 2, 3, 22, 23, 31],
-    });
   });
 
-  it('seats the seeded stage-2 pairs on sakuranight minus the pair holding the fighter', () => {
+  it('seats the approved stage-2 pairs on sakuranight, three pairs for everyone', () => {
     for (const who of ELIGIBLE) {
       const { stage2 } = brAnotherStages(who);
-      const index = ROSTER.indexOf(who);
-      const expectedPairs = STAGE_TWO_PAIRS.filter(
-        (pair) => !pair.includes(index),
-      );
+      const row = BR_ANOTHER_LINEUPS[who]!;
       const enemies = stage2.slots.slice(0, -1).map((s) => s!.player);
       const actualPairs = pairsOf(enemies);
       const finale = finaleOf(who);
-      expect(stage2.slots, who).toHaveLength(expectedPairs.length * 2 + 1);
-      expect(new Set(enemies).size, who).toBe(expectedPairs.length * 2);
+      expect(stage2.slots, who).toHaveLength(7);
+      expect(new Set(enemies).size, who).toBe(6);
+      expect(actualPairs, who).toEqual(
+        row.stage2.map((p) => p.map((w) => ROSTER.indexOf(w))),
+      );
       for (const [a, b] of actualPairs)
         expect(
-          expectedPairs.some(([pa, pb]) => pa === a && pb === b),
+          STAGE_TWO_PAIRS.some(
+            ([pa, pb]) => pairKey([a, b]) === pairKey([pa, pb]),
+          ),
           `${who} stage2 pair [${a}, ${b}]`,
         ).toBe(true);
       expect(stage2.slots.at(-1)!.player, who).toBe(finale.slots[6]!.player);
@@ -242,11 +469,11 @@ describe('BR Another seeded lineup builder', () => {
         ]),
       ),
     ).toEqual({
-      ryuko: [28, 29, 26, 27, 24, 25, 40, 41, 1],
-      kiki: [26, 27, 24, 25, 40, 41, 28, 29, 3],
-      gigi: [28, 29, 40, 41, 26, 27, 25],
-      yinan: [24, 25, 26, 27, 28, 29, 41],
-      masa: [26, 27, 40, 41, 24, 25, 29],
+      ryuko: [26, 27, 24, 25, 40, 41, 1],
+      kiki: [29, 28, 24, 25, 41, 40, 3],
+      gigi: [28, 29, 26, 27, 41, 40, 25],
+      yinan: [25, 24, 27, 26, 29, 28, 41],
+      masa: [25, 24, 27, 26, 40, 41, 29],
     });
   });
 
@@ -264,23 +491,23 @@ describe('BR Another seeded lineup builder', () => {
     }
   });
 
-  it('seats ten fighters in stage 2 for Z-MEGA, RARIO and regulars facing all four pairs', () => {
+  it('seats seven fighters in stage 2: three pairs and the finale ally, allies hostile only to the pairs', () => {
     for (const who of ['zmega', 'rario', 'ryuko'] as Who[]) {
       const { stage2 } = brAnotherStages(who);
-      expect(stage2.slots, who).toHaveLength(9);
-      expect(stage2.slots[8]!.enemies, who).toBe(0b111111110);
+      expect(stage2.slots, who).toHaveLength(7);
+      expect(stage2.slots[6]!.enemies, who).toBe(0b1111110);
       if (who === 'zmega')
         expect(stage2.slots.map((s) => s?.player)).toEqual([
-          24, 25, 28, 29, 26, 27, 40, 41, 46,
+          29, 28, 25, 24, 27, 26, 46,
         ]);
       if (who === 'rario')
         expect(stage2.slots.map((s) => s?.player)).toEqual([
-          28, 29, 40, 41, 24, 25, 26, 27, 31,
+          40, 41, 27, 26, 24, 25, 31,
         ]);
       for (const [i, slot] of stage2.slots.entries()) {
-        expect(slot!.enemies, `${who} ${i}`).toBeLessThan(1 << 10);
-        if (i < 8)
-          expect(slot!.enemies & (1 << 9), `${who} ${i} vs ally`).toBe(1 << 9);
+        expect(slot!.enemies, `${who} ${i}`).toBeLessThan(1 << 8);
+        if (i < 6)
+          expect(slot!.enemies & (1 << 7), `${who} ${i} vs ally`).toBe(1 << 7);
       }
     }
   });
@@ -322,7 +549,7 @@ describe('BR Another seeded lineup builder', () => {
     }
   });
 
-  it('shuffles the four bosses and picks the arena by the last one', () => {
+  it('seats the approved four-boss sequence and picks the arena by the last one', () => {
     const landed = new Map<number, Who[]>();
     for (const who of ELIGIBLE) {
       const { stage3 } = brAnotherStages(who);
@@ -348,10 +575,10 @@ describe('BR Another seeded lineup builder', () => {
         return [who, stage3.stage, stage3.slots.map((s) => s?.player)];
       }),
     ).toEqual([
-      ['times', 12, [45, 32, 33, 30, 28]],
-      ['ryuko', 14, [30, 45, 33, 32, 1]],
-      ['masa', 15, [45, 32, 30, 33, 29]],
-      ['kiki', 18, [32, 33, 30, 45, 3]],
+      ['times', 12, [32, 33, 45, 30, 28]],
+      ['ryuko', 12, [33, 32, 45, 30, 1]],
+      ['masa', 12, [45, 33, 32, 30, 29]],
+      ['kiki', 18, [33, 30, 32, 45, 3]],
     ]);
   });
 
@@ -388,11 +615,11 @@ describe('BR Another seeded lineup builder', () => {
     expect(desperationOf('shinz')).toBe(240);
     expect(desperationOf('dora')).toBe(180);
     const times = brAnotherStages('times').stage3;
-    expect(times.slots.map((s) => s?.player)).toEqual([45, 32, 33, 30, 28]);
-    expect(times.slots.map((s) => s?.below)).toEqual([0, 180, 150, 240, 120]);
+    expect(times.slots.map((s) => s?.player)).toEqual([32, 33, 45, 30, 28]);
+    expect(times.slots.map((s) => s?.below)).toEqual([0, 150, 240, 180, 120]);
     const masa = brAnotherStages('masa').stage3;
-    expect(masa.slots.map((s) => s?.player)).toEqual([45, 32, 30, 33, 29]);
-    expect(masa.slots.map((s) => s?.below)).toEqual([0, 180, 150, 144, 135]);
+    expect(masa.slots.map((s) => s?.player)).toEqual([45, 33, 32, 30, 29]);
+    expect(masa.slots.map((s) => s?.below)).toEqual([0, 180, 240, 150, 135]);
     for (const who of ELIGIBLE)
       for (const battle of built(brAnotherStages(who))) {
         const players = battle.slots.map((s) => s!.player);

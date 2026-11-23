@@ -1141,66 +1141,58 @@ describe('source route reachability', () => {
                 [45, 'battle'],
                 [46, 'demo'],
                 [47, 'battle'],
-                [48, 'battle'],
-                [55, 'demo'],
-                [56, 'title'],
+                [48, 'demo'],
+                [len, 'battle'],
+                [len + 1, 'demo'],
+                [len + 2, 'title'],
               ]
-            : who === 'zmega'
+            : family === 'mini-bosses'
               ? [
                   [44, 'demo'],
                   [45, 'battle'],
                   [46, 'demo'],
                   [47, 'battle'],
-                  [48, 'battle'],
+                  [48, 'demo'],
+                  [49, 'battle'],
                   [50, 'demo'],
-                  [51, 'demo'],
-                  [52, 'title'],
+                  ...(who === 'zmega'
+                    ? [
+                        [51, 'demo'],
+                        [52, 'title'],
+                      ]
+                    : [[51, 'title']]),
                 ]
-              : family === 'mini-bosses'
+              : family === 'twins'
                 ? [
-                    [44, 'demo'],
-                    [45, 'battle'],
-                    [46, 'demo'],
-                    [47, 'battle'],
-                    [48, 'battle'],
-                    [50, 'demo'],
-                    [51, 'title'],
+                    [64, 'demo'],
+                    [65, 'battle'],
+                    [66, 'demo'],
+                    [67, 'battle'],
+                    [len, 'demo'],
+                    [len + 1, 'battle'],
+                    [62, 'demo'],
+                    [63, 'title'],
                   ]
-                : family === 'twins'
-                  ? [
-                      [64, 'demo'],
-                      [65, 'battle'],
-                      [66, 'demo'],
-                      [67, 'battle'],
-                      [len, 'battle'],
-                      [62, 'demo'],
-                      [63, 'title'],
-                    ]
-                  : [
-                      [62, 'demo'],
-                      [63, 'battle'],
-                      [64, 'demo'],
-                      [65, 'battle'],
-                      [len, 'battle'],
-                      [60, 'demo'],
-                      [61, 'title'],
-                    ],
+                : [
+                    [62, 'demo'],
+                    [63, 'battle'],
+                    [64, 'demo'],
+                    [65, 'battle'],
+                    [len, 'demo'],
+                    [len + 1, 'battle'],
+                    [60, 'demo'],
+                    [61, 'title'],
+                  ],
         );
         const battles = path.flatMap((p) =>
           p.next.kind === 'battle' ? [p.next.battle] : [],
         );
-        expect(battles, who).toEqual([
-          family === 'mini-bosses'
-            ? stage1
-            : source(who)[family === 'twins' ? 65 : 63],
-          stage2,
-          stage3,
-        ]);
+        expect(battles, who).toEqual([stage1, stage2, stage3]);
         const demos = path.flatMap((p) =>
           p.next.kind === 'demo' ? [p.next.demo] : [],
         );
         expect(demos, who).toEqual(
-          who === 'zmega' ? [4, 7, 25, 89] : [4, 7, 25],
+          who === 'zmega' ? [4, 5, 7, 25, 89] : [4, 5, 7, 25],
         );
       }
     });
@@ -1214,30 +1206,34 @@ describe('source route reachability', () => {
         expect(steps.length, who).toBeLessThanOrEqual(100);
         if (familyOf(who) === 'mini-bosses') {
           expect(steps.length, who).toBe(
-            base.length + (who === 'rario' ? 2 : 0),
+            base.length + (who === 'rario' ? 3 : 0),
           );
           expect(steps.slice(44, 50), who).toEqual([
             { type: 2, demo: 4 },
             stage1,
-            { type: 2, demo: 7 },
+            { type: 2, demo: 5 },
             stage2,
-            stage3,
+            { type: 2, demo: 7 },
             who === 'rario'
               ? { type: 3, condition: 0, value: 0, offset: base.length - 49 }
-              : { type: 2, demo: 0 },
+              : stage3,
           ]);
           if (who === 'rario')
             expect(steps.slice(50), who).toEqual([
               ...base.slice(50),
+              stage3,
               { type: 2, demo: 25 },
               { type: 4 },
             ]);
         } else {
           const finale = familyOf(who) === 'twins' ? 67 : 65;
           const ending = finale - 5;
-          expect(steps.length, who).toBe(base.length + 2);
-          for (let i = finale - 3; i < finale; i++)
-            expect(steps[i], `${who} step ${i}`).toBe(chars[i]);
+          expect(steps.length, who).toBe(base.length + 3);
+          expect(steps[finale - 3], `${who} intro demo`).toBe(
+            chars[finale - 3],
+          );
+          expect(steps[finale - 2], who).toEqual(stage1);
+          expect(steps[finale - 1], who).toEqual({ type: 2, demo: 5 });
           expect(steps[finale], who).toEqual(stage2);
           expect(steps[finale + 1], who).toEqual({
             type: 3,
@@ -1246,12 +1242,13 @@ describe('source route reachability', () => {
             offset: base.length - (finale + 1),
           });
           expect(steps.slice(base.length), who).toEqual([
+            { type: 2, demo: 7 },
             stage3,
             {
               type: 3,
               condition: 0,
               value: 0,
-              offset: ending - (base.length + 1),
+              offset: ending - (base.length + 2),
             },
           ]);
         }
@@ -1274,54 +1271,59 @@ describe('source route reachability', () => {
         ).toEqual(
           who === 'rario'
             ? {
-                battles: [45, 47, 48],
+                battles: [45, 47, 55],
                 demos: [
                   [44, 4],
-                  [46, 7],
-                  [55, 25],
+                  [46, 5],
+                  [48, 7],
+                  [56, 25],
                 ],
-                ends: [56],
+                ends: [57],
               }
-            : who === 'zmega'
-              ? {
-                  battles: [45, 47, 48],
-                  demos: [
-                    [44, 4],
-                    [46, 7],
-                    [50, 25],
-                    [51, 89],
-                  ],
-                  ends: [52],
-                }
-              : family === 'mini-bosses'
+            : family === 'mini-bosses'
+              ? who === 'zmega'
                 ? {
-                    battles: [45, 47, 48],
+                    battles: [45, 47, 49],
                     demos: [
                       [44, 4],
-                      [46, 7],
+                      [46, 5],
+                      [48, 7],
+                      [50, 25],
+                      [51, 89],
+                    ],
+                    ends: [52],
+                  }
+                : {
+                    battles: [45, 47, 49],
+                    demos: [
+                      [44, 4],
+                      [46, 5],
+                      [48, 7],
                       [50, 25],
                     ],
                     ends: [51],
                   }
-                : family === 'twins'
-                  ? {
-                      battles: [65, 67, len],
-                      demos: [
-                        [62, 25],
-                        [64, 4],
-                        [66, 7],
-                      ],
-                      ends: [63],
-                    }
-                  : {
-                      battles: [63, 65, len],
-                      demos: [
-                        [60, 25],
-                        [62, 4],
-                        [64, 7],
-                      ],
-                      ends: [61],
-                    },
+              : family === 'twins'
+                ? {
+                    battles: [65, 67, len + 1],
+                    demos: [
+                      [62, 25],
+                      [64, 4],
+                      [66, 5],
+                      [len, 7],
+                    ],
+                    ends: [63],
+                  }
+                : {
+                    battles: [63, 65, len + 1],
+                    demos: [
+                      [60, 25],
+                      [62, 4],
+                      [64, 5],
+                      [len, 7],
+                    ],
+                    ends: [61],
+                  },
         );
       }
     });
@@ -1356,7 +1358,7 @@ describe('source route reachability', () => {
         expect(path, route).not.toContain(55);
         expect(path, route).not.toContain(56);
       }
-      expect(run('br-another')).toEqual([44, 45, 46, 47, 48, 55, 56]);
+      expect(run('br-another')).toEqual([44, 45, 46, 47, 48, 55, 56, 57]);
     });
 
     it('lands every route on its native entry step', () => {
@@ -1390,7 +1392,7 @@ describe('source route reachability', () => {
         return battles;
       };
       const another = battlesOf('br-another');
-      expect(another.map((b) => b.step)).toEqual([45, 47, 48]);
+      expect(another.map((b) => b.step)).toEqual([45, 47, 55]);
       for (const { step, battle } of another)
         expect(battle, `step ${step}`).toBe(scenarioOf('rario')[step]);
       for (const route of ['story-easy', 'br-zero'] as SignRoute[]) {

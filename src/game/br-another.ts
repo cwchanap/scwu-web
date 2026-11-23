@@ -1,11 +1,12 @@
 import { CHARACTERS, desperationOf } from './characters';
 import type { Who } from './characters';
+import { BR_ANOTHER_LINEUPS } from './br-lineups';
 import { BOSSES, ROSTER } from './select';
 import { rand } from './standing';
 import type { Battle, Slot, Step } from './story';
 
 export interface BrAnotherStages {
-  stage1: Battle | null;
+  stage1: Battle;
   stage2: Battle;
   stage3: Battle;
 }
@@ -70,6 +71,11 @@ const finaleIndex = (who: Who) =>
 const sourceStep = (who: Who, index: number) =>
   (CHARACTERS[who].scenario as readonly Step[])[index] as Battle;
 
+// Approved (HPA-1035 §7): the seats are the typed row's Who names in entering
+// order, mapped back to ROSTER seats.
+const seats = (row: readonly (readonly Who[])[]) =>
+  row.flat().map((who) => ROSTER.indexOf(who));
+
 const assemble = (
   roles: Battle,
   header: Battle,
@@ -121,25 +127,35 @@ const assemble = (
   };
 };
 
+// Authored (HPA-1035 §7, owner-approved 16 Nov 2026): every fighter's three
+// ANOTHER stages come from the approved lineup table. Stage 1 seats three of
+// the twelve regular pairs; the roles and header come from the fighter's own
+// source stage-1 opener (finale − 2, itself a stage-9 battle), except the
+// folded four, whose source stage-1 slot (45) is a native stage battle —
+// they keep HPA-766's donation: ryuko's step 63 for roles, their own step 45
+// for the header, stage 9. Stage 2 seats three of the four extra pairs (the
+// fighter's own is out), stage 3 the four bosses in approved order with the
+// last boss's arena; assemble derives each seat's watch/below from its
+// actual predecessor and every stage keeps the source finale's ally.
 export const brAnotherStages = (who: Who): BrAnotherStages => {
-  const shuffle = seededShuffle(ROSTER.indexOf(who));
+  const row = BR_ANOTHER_LINEUPS[who];
+  if (!row) throw new Error(`${who} has no approved B.R. ANOTHER row`);
   const finale = sourceStep(who, finaleIndex(who));
   const ally = finale.slots[6]!;
-  const stage1 = FOLDED.includes(who)
-    ? assemble(
-        sourceStep('ryuko', 63),
-        sourceStep(who, 45),
-        shuffle(STAGE_ONE_POOL).slice(0, 3).flat(),
-        true,
-        9,
-        ally,
-      )
-    : null;
-  const pairs = STAGE_TWO_PAIRS.filter(
-    (pair) => !pair.includes(ROSTER.indexOf(who)),
+  const folded = FOLDED.includes(who);
+  const opener = folded
+    ? sourceStep(who, 45)
+    : sourceStep(who, finaleIndex(who) - 2);
+  const stage1 = assemble(
+    folded ? sourceStep('ryuko', 63) : opener,
+    opener,
+    seats(row.stage1),
+    true,
+    9,
+    ally,
   );
-  const stage2 = assemble(finale, finale, shuffle(pairs).flat(), true, 3, ally);
-  const bosses = shuffle(BOSS_SEATS);
+  const stage2 = assemble(finale, finale, seats(row.stage2), true, 3, ally);
+  const bosses = seats([row.stage3]);
   const stage3 = assemble(
     finale,
     finale,
@@ -192,31 +208,42 @@ export const bossBrAnotherStory = (who: Who): readonly Step[] => {
   return [stage1, stage2, stage3, { type: 4 }];
 };
 
+// Authored (HPA-1035 §5): the ANOTHER route now runs stage-1 intro → stage 1
+// → demo 5 (SEEDED PLAYERS) → stage 2 → demo 7 (NEXT CHALLENGER) → stage 3 →
+// the source finale, without shifting shared source indices. Non-folded
+// fighters overwrite finale−2..finale+1 (all BR-Another-only steps) and
+// append [demo 7, stage 3, jump → the original ending]; the folded four fill
+// their 44..49 block with [demo 4, stage 1, demo 5, stage 2, demo 7, stage 3]
+// and fall through to their source finale — except RARIO, whose unrelated
+// shared tail (demo 91/Dora) starts at 50, so slot 49 jumps past it to the
+// appended [stage 3, demo 25, end].
 export const brAnotherStory = (who: Who): readonly Step[] => {
   const source = CHARACTERS[who].scenario as readonly Step[];
   const { stage1, stage2, stage3 } = brAnotherStages(who);
   const finale = finaleIndex(who);
   const steps: Step[] = [...source];
-  if (stage1 !== null) {
+  if (FOLDED.includes(who)) {
     steps.splice(
       FOLDED_START,
       finale - FOLDED_START + 1,
       { type: 2, demo: 4 },
       stage1,
-      { type: 2, demo: 7 },
+      { type: 2, demo: 5 },
       stage2,
-      stage3,
+      { type: 2, demo: 7 },
       who === 'rario'
         ? { type: 3, condition: 0, value: 0, offset: source.length - finale }
-        : { type: 2, demo: 0 },
+        : stage3,
     );
-    if (who === 'rario') steps.push({ type: 2, demo: 25 }, { type: 4 });
+    if (who === 'rario') steps.push(stage3, { type: 2, demo: 25 }, { type: 4 });
     return steps;
   }
   const returnJump = source[finale + 1];
   if (returnJump?.type !== 3)
     throw new Error(`${who} step ${finale + 1} is not a return jump`);
   const ending = finale + 1 + returnJump.offset;
+  steps[finale - 2] = stage1;
+  steps[finale - 1] = { type: 2, demo: 5 };
   steps[finale] = stage2;
   steps[finale + 1] = {
     type: 3,
@@ -224,11 +251,11 @@ export const brAnotherStory = (who: Who): readonly Step[] => {
     value: 0,
     offset: source.length - (finale + 1),
   };
-  steps.push(stage3, {
+  steps.push({ type: 2, demo: 7 }, stage3, {
     type: 3,
     condition: 0,
     value: 0,
-    offset: ending - (source.length + 1),
+    offset: ending - (source.length + 2),
   });
   return steps;
 };
