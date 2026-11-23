@@ -2867,9 +2867,9 @@ export class Match {
   // outgoing damage keep the source's 1; a self-transfer's caller passes
   // its scaled share (0 for a balanced drain pair under a shrink, so the
   // pair keeps its native net; 1 for a take-only drain, so it still
-  // reaches 1). Authored (HPA-972): 1P's reduction follows the Low HP line
-  // and the Damage cut × over the fighter's native scale; every other
-  // fighter, and 1P with the master off, stays native.
+  // reaches 1). Authored (HPA-972, HPA-1251): under the battle snapshot's
+  // cheats every fighter's reduction follows the Low HP line and the
+  // Damage cut × over its native scale; the master off stays native.
   private loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
     if (loss && f.hp <= this.lifeLineMark(f)) {
       const kept = this.lossKeptPercent(f);
@@ -2884,13 +2884,12 @@ export class Match {
     return loss;
   }
 
-  // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's idle stance
-  // marks (a stance change, never the supers bypass); every other fighter,
-  // and 1P with the master off, stays at the native 30.
-  idleLifeLine(f: Fighter): number {
-    return f === this.fighters[0] && this.cheats.enabled
-      ? this.cheats.lowHpLine
-      : 30;
+  // Authored (HPA-972, HPA-1251): the Low HP line moves SIN's and SOU's
+  // idle stance marks (a stance change, never the supers bypass) for every
+  // fighter under the battle snapshot's cheats; the master off stays at
+  // the native 30.
+  idleLifeLine(): number {
+    return this.cheats.enabled ? this.cheats.lowHpLine : 30;
   }
 
   // The free state's program (action 1), which reads the fighter's variable 0
@@ -2908,17 +2907,17 @@ export class Match {
         life: f.hp,
         lifeMax: f.maxHp,
         lifeNative: lifeOf(f.who),
-        lifeLine: this.idleLifeLine(f),
+        lifeLine: this.idleLifeLine(),
       },
     );
   }
 
-  // Authored (HPA-972): the low-life line in effective-HP units — 1P under
-  // cheats reads the Low HP line percent off its own effective maximum,
-  // everyone else the native 30% (desperationOf).
-  private lifeLineMark(f: Fighter): number {
-    if (f !== this.fighters[0] || !this.cheats.enabled)
-      return lifeMark(f, desperationOf(f.who));
+  // Authored (HPA-972, HPA-1251): the low-life line in effective-HP units —
+  // under the battle snapshot's cheats every fighter reads the Low HP line
+  // percent off its own effective maximum, the master off the native 30%
+  // (desperationOf). Exposed read-only for the HUD and arena displays.
+  lifeLineMark(f: Fighter): number {
+    if (!this.cheats.enabled) return lifeMark(f, desperationOf(f.who));
     return this.lineScaledMark(f, lifeOf(f.who), 100);
   }
 
@@ -2940,13 +2939,15 @@ export class Match {
     );
   }
 
-  // Authored (HPA-972): the percent a loss keeps under the line — 1P under
-  // cheats keeps its native reduction (100 − scale) scaled by the Damage
-  // cut ×, floored at none and capped at all; native whole-point flooring
-  // otherwise, so only the full 100% reduces a loss to nothing.
-  private lossKeptPercent(f: Fighter): number {
+  // Authored (HPA-972, HPA-1251): the percent a loss keeps under the line —
+  // under the battle snapshot's cheats every fighter keeps its native
+  // reduction (100 − scale) scaled by the Damage cut ×, floored at none and
+  // capped at all; native whole-point flooring otherwise, so only the full
+  // 100% reduces a loss to nothing. Exposed read-only for the HUD and
+  // arena displays, which show the cut as 100 − this.
+  lossKeptPercent(f: Fighter): number {
     const scale = CHARACTERS[f.who].scale;
-    if (f !== this.fighters[0] || !this.cheats.enabled) return scale;
+    if (!this.cheats.enabled) return scale;
     return Math.max(
       0,
       Math.min(100, 100 - (100 - scale) * this.cheats.damageCutMultiplier),
@@ -4205,21 +4206,22 @@ export class Match {
         if (self.stock === self.maxStock) self.power = 0;
         break;
       case 'life': {
-        // Authored (HPA-972): 1P's tabled super gates (superGateOf) follow
-        // the Low HP line — their marks scale by line / 30 — and, with
-        // Low-HP supers on, a below:true gate always jumps for the super
-        // while a below:false one never jumps away to the normal move.
-        // Unrelated life checks, the HP0 sentinels and every other
-        // fighter's checks stay native; SIN's and SOU's idle op 0x11s are
-        // the StandingVM's stance changes and are never bypassed.
+        // Authored (HPA-972, HPA-1251): every fighter's tabled super gates
+        // (superGateOf) follow the Low HP line — their marks scale by
+        // line / 30 — while the at-any-HP bypass (Low-HP supers) stays
+        // 1P-only: with it on, the 1P's below:true gate always jumps for
+        // the super and its below:false one never jumps away to the
+        // normal move. Unrelated life checks, the HP0 sentinels and a
+        // non-1P seat's gate direction stay native; SIN's and SOU's idle
+        // op 0x11s are the StandingVM's stance changes and are never
+        // bypassed.
         const gate =
           !('clip' in actor) &&
           actor === self &&
-          self === this.fighters[0] &&
           actor.action === 'script' &&
           this.cheats.enabled &&
           superGateOf(self.who, String(actor.branch ?? ''));
-        if (gate && this.cheats.lowHpSupers) {
+        if (gate && self === this.fighters[0] && this.cheats.lowHpSupers) {
           if (gate.below)
             return this.branchTo(actor, sourceKey(event.target, event.offset));
           break;

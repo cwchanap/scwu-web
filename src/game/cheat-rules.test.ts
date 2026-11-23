@@ -376,15 +376,31 @@ describe('low-life line and damage cut (HPA-972)', () => {
     expect(punchedAt(1, 152)).toBe(146);
   });
 
-  it('moves 1P’s reduction line with the Low HP line, others native', () => {
+  it('moves every fighter’s reduction line with the Low HP line', () => {
     // 60% of the effective maximum: the reduction now reaches 306.
     expect(punched(306, { lowHpLine: 60 })).toBe(300);
     expect(punched(308, { lowHpLine: 60 })).toBe(298);
-    // The opponent's line stays the native 30%: at 306 of its 510 the
-    // punch lands whole, far above the 153 mark.
-    expect(punchedAt(1, 306, { lowHpLine: 60 })).toBe(296);
-    // A line of 0 never reduces.
+    // The opponent's own line moves too: at 306 of its 510 the mark is
+    // 306, so the punch shrinks to 6; one above the line lands whole.
+    expect(punchedAt(1, 306, { lowHpLine: 60 })).toBe(300);
+    expect(punchedAt(1, 308, { lowHpLine: 60 })).toBe(298);
+    // A line of 0 never reduces, on either seat.
     expect(punched(152, { lowHpLine: 0 })).toBe(142);
+    expect(punchedAt(1, 152, { lowHpLine: 0 })).toBe(142);
+  });
+
+  it('scales every fighter’s mark by its own effective maximum', () => {
+    // The hostile dummy's ×2 bar: the 60% line reads 612 of 1020, with
+    // the truncation boundary at the mark itself.
+    expect(punchedAt(1, 612, { lowHpLine: 60, enemyHpMultiplier: 2 })).toBe(
+      606,
+    );
+    expect(punchedAt(1, 613, { lowHpLine: 60, enemyHpMultiplier: 2 })).toBe(
+      603,
+    );
+    expect(punchedAt(1, 614, { lowHpLine: 60, enemyHpMultiplier: 2 })).toBe(
+      604,
+    );
   });
 
   it('scales the reduction by Damage cut ×, from none to all of it', () => {
@@ -396,6 +412,10 @@ describe('low-life line and damage cut (HPA-972)', () => {
     expect(punched(10, { damageCutMultiplier: 2.5 })).toBe(10);
     // ×1 stays the native 60%.
     expect(punched(152, { damageCutMultiplier: 1 })).toBe(146);
+    // The enemy seat takes the same scale, through none and the cap.
+    expect(punchedAt(1, 152, { damageCutMultiplier: 0 })).toBe(142);
+    expect(punchedAt(1, 152, { damageCutMultiplier: 5 })).toBe(152);
+    expect(punchedAt(1, 10, { damageCutMultiplier: 5 })).toBe(10);
   });
 
   it('cuts CHUNG’s and ALPHA’s native reductions by the same rule', () => {
@@ -423,6 +443,62 @@ describe('low-life line and damage cut (HPA-972)', () => {
     expect(struck('alpha', 150, { damageCutMultiplier: 2 })).toBe(150);
     // A mid cut keeps the native floor: ALPHA at ×1.5 keeps 17.5%, so 1.
     expect(struck('alpha', 150, { damageCutMultiplier: 1.5 })).toBe(149);
+    // The enemy seat reads its own scale the same way: CHUNG keeps 6 of
+    // 10 at ×1, ALPHA's ×2 cap leaves her untouched there too.
+    const struckAt = (
+      who: Who,
+      hp: number,
+      fields: Partial<CheatOptions> = {},
+    ) => {
+      const match = new Match('practice', false, 0, ['ryuko', who]);
+      match.useCheats(cheats({ enabled: true, ...fields }));
+      const [one, victim] = match.fighters;
+      victim.x = one.x + 200;
+      victim.hp = hp;
+      strike(match, one, RYUKO.punch);
+      ticks(match, 2);
+      return victim.hp;
+    };
+    expect(struckAt('chung', 152)).toBe(146);
+    expect(struckAt('alpha', 150, { damageCutMultiplier: 2 })).toBe(150);
+  });
+
+  it('moves a boss seat by its own maximum and native cut', () => {
+    const struck = (hp: number, fields: Partial<CheatOptions> = {}) => {
+      const match = new Match('practice', false, 0, ['ryuko', 'shinz']);
+      match.useCheats(
+        cheats({ enabled: true, enemyHpMultiplier: 2, ...fields }),
+      );
+      const [one, boss] = match.fighters;
+      boss.x = one.x + 200;
+      boss.hp = hp;
+      strike(match, one, RYUKO.punch);
+      ticks(match, 2);
+      return boss.hp;
+    };
+    // SHIN-Z's ×2 bar: the 60% line reads 960 of 1600 — at it the punch
+    // shrinks to his 55%-kept share (5 of 10), above it lands whole.
+    expect(struck(960, { lowHpLine: 60 })).toBe(955);
+    expect(struck(962, { lowHpLine: 60 })).toBe(952);
+    // The native line keeps his 55% at the 30% mark of 480: 240 cuts to
+    // 5, 482 above it lands whole.
+    expect(struck(240)).toBe(235);
+    expect(struck(482)).toBe(472);
+  });
+
+  it('cuts a summoned ally under its own line and native scale', () => {
+    const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+    match.useCheats(cheats({ enabled: true, lowHpLine: 60 }));
+    const ally = match.summon('chung', 1)!;
+    const [, dummy] = match.fighters;
+    dummy.x = ally.x - 200;
+    dummy.facing = 1;
+    ally.hp = 306;
+    strike(match, dummy, RYUKO.punch);
+    ticks(match, 2);
+    // CHUNG's native 35% cut at ×1: 6 of the 10-point punch, at his own
+    // 60% mark of 306.
+    expect(ally.hp).toBe(300);
   });
 
   it('holds practice Low health just under the moved line', () => {
@@ -544,7 +620,11 @@ describe('low-HP super gates (HPA-972)', () => {
   it('keeps the super gates 1P-only: Zoma’s BOMB conversion is enemy-native', () => {
     // Zoma’s Shin Spark (279, below:false 147) is tabled too, so a seat
     // check can run the same command on both sides of the roster.
-    const shinSpark = (one: boolean, fields: Partial<CheatOptions> = {}) => {
+    const shinSpark = (
+      one: boolean,
+      fields: Partial<CheatOptions> = {},
+      hp = 400,
+    ) => {
       const match = new Match(
         'practice',
         false,
@@ -553,7 +633,7 @@ describe('low-HP super gates (HPA-972)', () => {
       );
       match.useCheats(cheats({ enabled: true, lowHpSupers: true, ...fields }));
       const zoma = match.fighters[one ? 0 : 1];
-      zoma.hp = 400;
+      zoma.hp = hp;
       zoma.stock = 3;
       match.step();
       match.step();
@@ -570,8 +650,36 @@ describe('low-HP super gates (HPA-972)', () => {
     // The option only ever suppresses the 1P seat's escape (below:false
     // never jumps there): Shin Spark walks on past its check (233).
     expect(shinSpark(true)).toBe('233');
-    // An enemy keeps its native conversion — the gates are 1P-only.
+    // An enemy keeps its native conversion — the bypass is 1P-only.
     expect(shinSpark(false)).toBe(native);
+    // The enemy seat's threshold moves with the Low HP line all the same:
+    // at 60% Zoma's 147 conversion reads 294 of his own bar — 294 still
+    // converts to BOMB (222), 293 keeps Shin Spark playing (279).
+    expect(shinSpark(false, { lowHpLine: 60 }, 294)).toBe('222');
+    expect(shinSpark(false, { lowHpLine: 60 }, 293)).toBe('279');
+  });
+
+  it('keeps the any-HP bypass 1P-only while every threshold moves', () => {
+    // An enemy Ryuko with the option on: her below:true gate keeps its
+    // native direction at 250 — the bypass never forces a non-1P seat.
+    const enemy = () => {
+      const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
+      const her = match.fighters[1];
+      her.stock = 3;
+      return { match, her };
+    };
+    const beam = enemy();
+    beam.match.useCheats(cheats({ enabled: true, lowHpSupers: true }));
+    beam.her.hp = 250;
+    beam.match.step({}, { getterBeam: true });
+    expect(named(beam.her)).toBe('getterBeam');
+    // Her threshold still moves: at the 60% line the axe-throw gate
+    // (below:false 153) reads 306, so 300 keeps the hidden super.
+    const axe = enemy();
+    axe.match.useCheats(cheats({ enabled: true, lowHpLine: 60 }));
+    axe.her.hp = 300;
+    axe.match.step({}, { blackRush: true });
+    expect(named(axe.her)).toBe('blackRush');
   });
 
   it('moves the tabled thresholds with the Low HP line', () => {
@@ -669,28 +777,56 @@ describe('low-HP super gates (HPA-972)', () => {
     expect(stance(100, 0)).toBe(false);
   });
 
-  it('sets 1P’s idleVM lifeLine before its first tick, keeping opponents and summons at 30', () => {
+  it('sets every fighter’s idleVM lifeLine before its first tick', () => {
     const match = new Match('practice', false, 0, ['sou', 'sou']);
     match.useCheats(cheats({ enabled: true, lowHpLine: 100 }));
-    const summon = match.summon('sou', 1)!;
+    match.summon('sou', 1);
     const [oneVm, twoVm, summonVm] = match.fighters.map((f, i) =>
       match.idleVM(f, i),
     );
     expect([oneVm.lifeLine, twoVm.lifeLine, summonVm.lifeLine]).toEqual([
-      100, 30, 30,
+      100, 100, 100,
     ]);
-    // SOU checks life only on his first idle tick (PC 8): with a 100% line,
-    // 1P enters the tired stand (image 360) at full HP on tick 1, while 2P
-    // and the summoned ally stay on the normal stand.
+    // SOU checks life only on his first idle tick (PC 8): with a 100% line
+    // every seat enters the tired stand (image 360) at full HP on tick 1.
     for (let t = 0; t < 40; t++) {
       oneVm.tick();
       twoVm.tick();
       summonVm.tick();
     }
     expect(oneVm.events.some((e) => e.image === 360)).toBe(true);
-    expect(twoVm.events.some((e) => e.image === 360)).toBe(false);
-    expect(summonVm.events.some((e) => e.image === 360)).toBe(false);
-    expect(match.idleLifeLine(summon)).toBe(30);
+    expect(twoVm.events.some((e) => e.image === 360)).toBe(true);
+    expect(summonVm.events.some((e) => e.image === 360)).toBe(true);
+    expect(match.idleLifeLine()).toBe(100);
+  });
+
+  it('gives a late summon the snapshot’s Low HP, not the pending values', () => {
+    // A summon into a battle whose snapshot is cheat-enabled lends it the
+    // Low HP rules, read off its own bar and scale.
+    const cheated = new Match('practice', false, 0, ['sou', 'sou']);
+    cheated.useCheats(
+      cheats({ enabled: true, partnerHpMultiplier: 2, lowHpLine: 60 }),
+    );
+    const ally = cheated.summon('sou', 1)!;
+    expect(ally.maxHp).toBe(960);
+    expect(cheated.idleLifeLine()).toBe(60);
+    expect(cheated.idleVM(ally).lifeLine).toBe(60);
+    expect(cheated.lifeLineMark(ally)).toBe(576);
+    expect(cheated.lossKeptPercent(ally)).toBe(CHARACTERS.sou.scale);
+
+    // A summon into a native battle keeps native Low HP even though its
+    // HP follows the pending values alone.
+    const native = new Match('practice', false, 0, ['sou', 'sou']);
+    const late = native.summon(
+      'sou',
+      1,
+      cheats({ enabled: true, partnerHpMultiplier: 2, lowHpLine: 60 }),
+    )!;
+    expect(late.maxHp).toBe(960);
+    expect(native.idleLifeLine()).toBe(30);
+    expect(native.idleVM(late).lifeLine).toBe(30);
+    expect(native.lifeLineMark(late)).toBe(288);
+    expect(native.lossKeptPercent(late)).toBe(CHARACTERS.sou.scale);
   });
 });
 

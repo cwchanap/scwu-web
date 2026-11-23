@@ -198,7 +198,7 @@ export const CHEAT_GROUPS: { name: string; rows: CheatRow[] }[] = [
     ],
   },
   {
-    name: 'Low HP · 1P',
+    name: 'Low HP · all fighters',
     rows: [
       {
         field: 'lowHpLine',
@@ -208,7 +208,7 @@ export const CHEAT_GROUPS: { name: string; rows: CheatRow[] }[] = [
         max: 100,
         step: 10,
         suffix: '%',
-        help: 'The share of max HP where 1P’s low-HP state starts.',
+        help: 'The share of max HP where every fighter’s low-HP state starts.',
       },
       {
         field: 'damageCutMultiplier',
@@ -218,11 +218,11 @@ export const CHEAT_GROUPS: { name: string; rows: CheatRow[] }[] = [
         max: 5,
         step: 1,
         suffix: '×',
-        help: 'Scales 1P’s low-HP damage reduction, 0–5; ×0 removes it, and it caps at 100%.',
+        help: 'Scales every fighter’s low-HP damage reduction, 0–5; ×0 removes it, and it caps at 100%.',
       },
       {
         field: 'lowHpSupers',
-        label: 'Low-HP supers at any HP',
+        label: 'Supers at any HP · 1P only',
         kind: 'switch',
         help: 'Lets 1P cast the supers whose source gates them behind low HP at any HP.',
       },

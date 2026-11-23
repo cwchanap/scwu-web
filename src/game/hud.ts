@@ -438,11 +438,49 @@ export function createHud(
     .setScrollFactor(0)
     .setDepth(screenDepth(0x19))
     .setVisible(false);
+  // Authored (HPA-1251): under cheats the fixed ~29% UNDER PW glow gives
+  // way to each side's real line — a gold tick at the fighter's mark, a
+  // red wash over the strip at or under it, and its own Damage cut label.
+  const lines = [0, 1].map(() =>
+    scene.add
+      .rectangle(0, 0, 2 * scale, 14 * scale, 0xffd24a, 0.9)
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(screenDepth(0x16))
+      .setVisible(false),
+  );
+  const glows = [22, 364].map((x) =>
+    scene.add
+      .rectangle(x * scale, 20 * scale, 254 * scale, 14 * scale, 0xff3020, 0.4)
+      .setOrigin(0, 0)
+      .setScrollFactor(0)
+      .setDepth(screenDepth(0x16))
+      .setVisible(false),
+  );
+  const cuts = [22, 364].map((x) =>
+    scene.add
+      .text(x * scale, 35 * scale, '', {
+        fontFamily: 'monospace',
+        fontSize: '10px',
+        color: '#ffd24a',
+      })
+      .setScrollFactor(0)
+      .setDepth(screenDepth(0x16))
+      .setVisible(false),
+  );
 
   return (match: Match) => {
     // In a story the 2P side shows the enemy, and nothing while there is
     // none (0x40ddf5, 0x40de53, 0x40a50e).
     [match.fighters[0], match.rival].forEach((f, index) => {
+      // The fixed glow shows natively, and hides for the cheat line.
+      const cheated = match.cheats.enabled;
+      underPower[index].setVisible(!cheated);
+      underPower[index].setTexture(
+        Math.floor(match.ticks / 15) % 2
+          ? tint('ui-135', { r: 10, g: 10, b: 10 })
+          : 'ui-135',
+      );
       if (!f) {
         for (const part of [
           life[index],
@@ -450,12 +488,38 @@ export function createHud(
           stocks[index],
           faces[index],
           names[index],
+          lines[index],
+          glows[index],
+          cuts[index],
         ])
           part.setVisible(false);
         return;
       }
       const bar = healthCrop(f.hp, index === 1, f.maxHp);
       life[index].setCrop(bar.x, 0, bar.width, 14).setVisible(bar.width > 0);
+      // Authored (HPA-1251): the cheat line rides the same fighter the
+      // strip already shows — no bar, no line.
+      if (!cheated || bar.width === 0) {
+        lines[index].setVisible(false);
+        glows[index].setVisible(false);
+        cuts[index].setVisible(false);
+      } else {
+        const mark = match.lifeLineMark(f);
+        const share = (254 * mark) / f.maxHp;
+        // 1P's bar keeps its right columns (draining toward the outer
+        // edge), the rival's its left ones: the mark measures from the
+        // strip's inner end either way.
+        lines[index]
+          .setVisible(true)
+          .setPosition(
+            (index ? 364 + share : 22 + 254 - share) * scale,
+            20 * scale,
+          );
+        glows[index].setVisible(f.hp <= mark);
+        cuts[index]
+          .setVisible(true)
+          .setText(`Damage cut: ${100 - match.lossKeptPercent(f)}%`);
+      }
       const crop = gaugeCrop(f.power, perStockOf(f.who));
       gauges[index]
         .setTexture(`ui-${gaugeImage(match.ticks)}`)
@@ -466,11 +530,6 @@ export function createHud(
         .setVisible(true)
         .setTexture(stockTexture(f.stock))
         .setPosition(((index ? 545 : 49) + dx) * scale, (434 + dy) * scale);
-      underPower[index].setTexture(
-        Math.floor(match.ticks / 15) % 2
-          ? tint('ui-135', { r: 10, g: 10, b: 10 })
-          : 'ui-135',
-      );
       const face = faces[index]
         .setVisible(true)
         .setTexture(`${f.who}-${faceImage(f.face, f.who)}`);

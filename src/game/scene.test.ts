@@ -5,7 +5,7 @@ import { CHARACTERS, lifeOf, STAGES } from './characters';
 import type { Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { Match } from './match';
+import { ART_SCALE, Match } from './match';
 import type { Fighter } from './match';
 import {
   MODE_SELECT_SIGN_KEYS,
@@ -77,14 +77,21 @@ const boot = () => {
   };
   const silent = { play: () => {}, stop: () => {}, pause: () => {} };
   // A chainable game object: every setter returns the object itself, enough
-  // for the draw loop to run for real (poses, depths, life bars).
+  // for the draw loop to run for real (poses, depths, life bars). Text and
+  // position setters record what they were given, so a test can read back
+  // drawLifeBars' pooled Damage cut labels.
   const object = () => {
-    const o: { texture: string; visible: boolean; [key: string]: unknown } = {
-      texture: '',
-      visible: true,
-    };
+    const o: {
+      texture: string;
+      text: string;
+      x: number;
+      y: number;
+      visible: boolean;
+      [key: string]: unknown;
+    } = { texture: '', text: '', x: 0, y: 0, visible: true };
     for (const method of [
       'setTexture',
+      'setText',
       'setVisible',
       'setCrop',
       'setX',
@@ -101,9 +108,16 @@ const boot = () => {
       'fillStyle',
       'fillRect',
     ])
-      o[method] = (arg?: unknown) => {
-        if (method === 'setTexture' && typeof arg === 'string') o.texture = arg;
-        if (method === 'setVisible') o.visible = !!arg;
+      o[method] = (...args: unknown[]) => {
+        if (method === 'setTexture' && typeof args[0] === 'string')
+          o.texture = args[0];
+        if (method === 'setText' && typeof args[0] === 'string')
+          o.text = args[0];
+        if (method === 'setVisible') o.visible = !!args[0];
+        if (method === 'setPosition') {
+          o.x = args[0] as number;
+          o.y = args[1] as number;
+        }
         return o;
       };
     return o;
@@ -935,7 +949,11 @@ describe('cheats (HPA-767)', () => {
         get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
       },
     ) as unknown as Phaser.GameObjects.Image;
-    view.add = { graphics: () => graphics, image: () => anySprite };
+    view.add = {
+      graphics: () => graphics,
+      image: () => anySprite,
+      text: () => anySprite,
+    };
     // Ryuko's first story battle, its slot-0 seat (fighters[1]: the 1P's
     // own slot is null) given a life bar.
     const first = scenarioOf('ryuko')[0] as Battle;
@@ -969,6 +987,184 @@ describe('cheats (HPA-767)', () => {
     expect(green.h).toBe(12);
     expect(backing.w - green.w).toBeGreaterThanOrEqual(37);
     expect(backing.w - green.w).toBeLessThanOrEqual(38);
+  });
+
+  it('marks the arena bars from Match under cheats', () => {
+    const { view, artIn } = boot();
+    artIn();
+    // drawLifeBars' graphics recorder, and the pooled cut labels it grows.
+    const drawn: {
+      color: number;
+      alpha: number;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+    }[] = [];
+    let color = 0;
+    let alpha = 1;
+    const graphics = {
+      clear: () => {},
+      fillStyle: (next: number, fade?: number) => {
+        color = next;
+        alpha = fade ?? 1;
+      },
+      fillRect: (x: number, y: number, w: number, h: number) =>
+        void drawn.push({ color, alpha, x, y, w, h }),
+      setScrollFactor: () => graphics,
+      setDepth: () => graphics,
+    };
+    const anySprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    const texts: { text: string; x: number; y: number; visible: boolean }[] =
+      [];
+    const text = () => {
+      const t = {
+        text: '',
+        x: 0,
+        y: 0,
+        visible: false,
+        setText: (value: string) => {
+          t.text = value;
+          return t;
+        },
+        setPosition: (x: number, y: number) => {
+          t.x = x;
+          t.y = y;
+          return t;
+        },
+        setVisible: (v: boolean) => {
+          t.visible = v;
+          return t;
+        },
+        setOrigin: () => t,
+        setScrollFactor: () => t,
+        setDepth: () => t,
+      };
+      texts.push(t);
+      return t;
+    };
+    view.add = { graphics: () => graphics, image: () => anySprite, text };
+    // Ryuko's first story battle, its slot-0 seat (fighters[1]) given a
+    // life bar over the enemy seats' ×2 bar.
+    const first = scenarioOf('ryuko')[0] as Battle;
+    const match = Match.story(
+      'ryuko',
+      {
+        ...first,
+        slots: [
+          { ...first.slots[0]!, flags: 1 },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      },
+      0,
+    );
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
+    while (!match.lifeBars.length) match.step();
+    const bar = match.lifeBars[0];
+    // The seat's ×2 bar: the native 30% line reads 120 of 400, and ZAKU
+    // keeps 55% of a loss there.
+    bar.hp = 120;
+    view.match = match;
+    (view.drawLifeBars as () => void)();
+    const tick = drawn.find((r) => r.color === 0xffd24a)!;
+    const wash = drawn.find((r) => r.color === 0xff3020)!;
+    expect(tick).toBeDefined();
+    expect(wash).toBeDefined();
+    expect(wash.alpha).toBe(0.4);
+    // The gold tick stands at the mark's share of the 50-pixel bar (±1px
+    // of edge rounding), the wash over the life row.
+    const left = Math.round(
+      (Math.trunc(bar.bar.x / ART_SCALE) - 25) * ART_SCALE - match.cameraX,
+    );
+    const markShare = (50 * match.lifeLineMark(bar)) / bar.maxHp;
+    expect(
+      Math.abs(tick.x + tick.w / 2 - (left + markShare * ART_SCALE)),
+    ).toBeLessThanOrEqual(2);
+    const cut = texts[0]!;
+    expect(cut.visible).toBe(true);
+    expect(cut.text).toBe('Damage cut: 45%');
+    expect(cut.x).toBeGreaterThanOrEqual(0);
+    expect(cut.x).toBeLessThanOrEqual(960);
+    expect(cut.y).toBeGreaterThanOrEqual(0);
+    expect(cut.y).toBeLessThanOrEqual(720);
+    // One point above the line the wash clears; the tick and label stay.
+    drawn.length = 0;
+    bar.hp = 121;
+    (view.drawLifeBars as () => void)();
+    expect(drawn.some((r) => r.color === 0xff3020)).toBe(false);
+    expect(drawn.some((r) => r.color === 0xffd24a)).toBe(true);
+    expect(texts[0]!.text).toBe('Damage cut: 45%');
+    // And a bar far past the canvas clamps its label inside [0,960] ×
+    // [0,720].
+    bar.bar.x = 9000;
+    bar.hp = 120;
+    (view.drawLifeBars as () => void)();
+    expect(texts[texts.length - 1]!.x).toBe(960);
+    expect(texts[texts.length - 1]!.visible).toBe(true);
+  });
+
+  it('leaves the arena bars native with cheats off', () => {
+    const { view, artIn } = boot();
+    artIn();
+    const drawn: { color: number }[] = [];
+    let color = 0;
+    const graphics = {
+      clear: () => {},
+      fillStyle: (next: number) => (color = next),
+      fillRect: () => void drawn.push({ color }),
+      setScrollFactor: () => graphics,
+      setDepth: () => graphics,
+    };
+    const anySprite = new Proxy(
+      {},
+      {
+        get: (_target, prop) => (prop === 'then' ? undefined : () => anySprite),
+      },
+    ) as unknown as Phaser.GameObjects.Image;
+    const texts: unknown[] = [];
+    view.add = {
+      graphics: () => graphics,
+      image: () => anySprite,
+      text: () => {
+        const t = {};
+        texts.push(t);
+        return t;
+      },
+    };
+    const first = scenarioOf('ryuko')[0] as Battle;
+    const match = Match.story(
+      'ryuko',
+      {
+        ...first,
+        slots: [
+          { ...first.slots[0]!, flags: 1 },
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+        ],
+      },
+      0,
+    );
+    while (!match.lifeBars.length) match.step();
+    view.match = match;
+    (view.drawLifeBars as () => void)();
+    expect(
+      drawn.some((r) => r.color === 0xffd24a || r.color === 0xff3020),
+    ).toBe(false);
+    expect(texts).toHaveLength(0);
   });
 
   it('reads the story route from the 1P’s native-equivalent life', async () => {
@@ -1030,9 +1226,9 @@ describe('cheats (HPA-767)', () => {
       cheats({ enabled: true, playerHpMultiplier: 2, lowHpLine: 100 }),
     );
     scene.setFighter('sou');
-    // begin seated the fighters and set 1P's lifeLine before resetIdle
-    // ticked their idle programs, so SOU's first-tick op 0x11 check (PC 8)
-    // already sees the 100% line while 2P stays at 30.
+    // begin seated the fighters and set every seat's lifeLine before
+    // resetIdle ticked their idle programs, so SOU's first-tick op 0x11
+    // check (PC 8) already sees the 100% line on both seats.
     const [vm, opponentVm] = view.idle as {
       life: number;
       lifeMax: number;
@@ -1045,7 +1241,7 @@ describe('cheats (HPA-767)', () => {
     expect(vm.lifeMax).toBe(960);
     expect(vm.lifeNative).toBe(lifeOf('sou'));
     expect(vm.lifeLine).toBe(100);
-    expect(opponentVm.lifeLine).toBe(30);
+    expect(opponentVm.lifeLine).toBe(100);
     for (let t = 0; t < 40; t++) vm.tick();
     expect(vm.events.some((e) => e.image === 360)).toBe(true);
   });

@@ -22,17 +22,26 @@ import {
 } from './hud';
 import { Match } from './match';
 
-// A stand-in Phaser scene for createHud: every image and text records the
-// texture, crop and visibility the HUD sets on it. `lifeBars`, `stocks`
-// and `tag` follow createHud's construction order (hud.ts).
+// A stand-in Phaser scene for createHud: every image, rectangle and text
+// records the texture, text, position, crop and visibility the HUD sets on
+// it. `lifeBars`, `stocks`, `underPower` and `tag` follow createHud's
+// construction order (hud.ts), as do the cheat marks, highlights and cut
+// texts.
 const hudScene = () => {
   const sprite = () => {
     const s = {
       texture: '',
+      text: '',
+      x: 0,
+      y: 0,
       visible: true,
       crop: { x: 0, width: 0 },
       setTexture(texture: string) {
         this.texture = texture;
+        return this;
+      },
+      setText(text: string) {
+        this.text = text;
         return this;
       },
       setVisible(visible: boolean) {
@@ -43,8 +52,15 @@ const hudScene = () => {
         this.crop = { x, width };
         return this;
       },
-      setX: () => s,
-      setPosition: () => s,
+      setX(x: number) {
+        this.x = x;
+        return this;
+      },
+      setPosition(x: number, y: number) {
+        this.x = x;
+        this.y = y;
+        return this;
+      },
       setScrollFactor: () => s,
       setOrigin: () => s,
       setScale: () => s,
@@ -56,12 +72,18 @@ const hudScene = () => {
     return s;
   };
   const images: ReturnType<typeof sprite>[] = [];
+  const rects: ReturnType<typeof sprite>[] = [];
   const texts: ReturnType<typeof sprite>[] = [];
   const scene = {
     add: {
       image: () => {
         const s = sprite();
         images.push(s);
+        return s;
+      },
+      rectangle: () => {
+        const s = sprite();
+        rects.push(s);
         return s;
       },
       text: () => {
@@ -77,7 +99,13 @@ const hudScene = () => {
     // counters (23rd/24th).
     lifeBars: () => [images[5], images[6]],
     stocks: () => [images[22], images[23]],
+    // The UNDER PW glow (2nd/3rd image), the cheat line's markers and
+    // highlights, and the CHEAT tag plus the two Damage cut texts.
+    underPower: () => [images[1], images[2]],
+    marks: () => [rects[0], rects[1]],
+    glows: () => [rects[2], rects[3]],
     tag: () => texts[0],
+    cuts: () => [texts[1], texts[2]],
   };
 };
 
@@ -130,6 +158,92 @@ it('crops the HUD life bar by the battle’s effective maximum', () => {
   cheated.fighters[0].hp = 510;
   update(cheated);
   expect(hud.lifeBars()[0].crop).toEqual({ x: 127, width: 127 });
+});
+
+it('keeps the native UNDER PW glow with cheats off', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  update(match);
+  expect(hud.underPower().map((bar) => bar.visible)).toEqual([true, true]);
+  expect(hud.marks().map((mark) => mark.visible)).toEqual([false, false]);
+  expect(hud.glows().map((glow) => glow.visible)).toEqual([false, false]);
+  expect(hud.cuts().map((cut) => cut.visible)).toEqual([false, false]);
+});
+
+it('hides the fixed glow under cheats and marks the real line (10%–60%)', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  match.useCheats({ ...DEFAULT_CHEATS, enabled: true, lowHpLine: 60 });
+  update(match);
+  expect(hud.underPower().map((bar) => bar.visible)).toEqual([false, false]);
+  // 1P's bar keeps its right columns: the 60% mark (306 of 510) sits at
+  // 22 + 254·(1 − 306/510) in source pixels, at the 1.5× HUD scale.
+  const [one] = match.fighters;
+  expect(hud.marks()[0].x).toBeCloseTo(
+    (22 + 254 - (254 * match.lifeLineMark(one)) / 510) * 1.5,
+  );
+  expect(hud.marks().map((mark) => mark.visible)).toEqual([true, true]);
+  // Full HP stays above the line: no highlight yet.
+  expect(hud.glows().map((glow) => glow.visible)).toEqual([false, false]);
+  expect(hud.cuts()[0].text).toBe('Damage cut: 40%');
+  // At the line the 1P side lights up; the rival at full HP stays dark.
+  one.hp = 306;
+  update(match);
+  expect(hud.glows().map((glow) => glow.visible)).toEqual([true, false]);
+  // One point above the line it goes out again.
+  one.hp = 307;
+  update(match);
+  expect(hud.glows()[0].visible).toBe(false);
+  // The 10% line reads 51 of 510: the marker sits just inside the bar.
+  const low = new Match('cpu', true);
+  low.useCheats({ ...DEFAULT_CHEATS, enabled: true, lowHpLine: 10 });
+  low.fighters[0].hp = 51;
+  update(low);
+  expect(hud.glows()[0].visible).toBe(true);
+  low.fighters[0].hp = 52;
+  update(low);
+  expect(hud.glows()[0].visible).toBe(false);
+  // A dead fighter's strip draws no line, and a native battle restores
+  // the fixed glow.
+  one.hp = 0;
+  update(match);
+  expect(hud.marks()[0].visible).toBe(false);
+  expect(hud.cuts()[0].visible).toBe(false);
+  update(new Match('cpu', true));
+  expect(hud.underPower()[0].visible).toBe(true);
+  expect(hud.marks()[0].visible).toBe(false);
+});
+
+it('keeps the low-HP highlight independent of a 0× Damage cut', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  match.useCheats({
+    ...DEFAULT_CHEATS,
+    enabled: true,
+    damageCutMultiplier: 0,
+    lowHpLine: 60,
+  });
+  match.fighters[0].hp = 100;
+  update(match);
+  expect(hud.glows()[0].visible).toBe(true);
+  expect(hud.cuts()[0].visible).toBe(true);
+  expect(hud.cuts()[0].text).toBe('Damage cut: 0%');
+});
+
+it('shows each side its own Damage cut', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('practice', false, 0, ['ryuko', 'alpha']);
+  match.useCheats({ ...DEFAULT_CHEATS, enabled: true, lowHpLine: 100 });
+  update(match);
+  // Ryuko keeps 60% of a loss, ALPHA her native 45%: at the 100% line
+  // both sides light up with their own number.
+  expect(hud.cuts()[0].text).toBe('Damage cut: 40%');
+  expect(hud.cuts()[1].text).toBe('Damage cut: 55%');
+  expect(hud.glows().map((glow) => glow.visible)).toEqual([true, true]);
 });
 
 it('draws the stock count from the source 0–6 digits and the authored 7–10 art', () => {
