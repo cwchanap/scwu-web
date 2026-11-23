@@ -79,6 +79,9 @@ def sky_beam(length, thick, phase):
 
 def main(prev, out, raw4):
     prev, out, raw4 = map(Path, (prev, out, raw4))
+    # GIANT STEP's drawing is required: fail before the last build is replaced rather than build a page without it.
+    if not (raw4 / "giant-foot.png").exists():
+        sys.exit(f"missing {raw4 / 'giant-foot.png'}: draw it first with draw.sh giant-foot")
     if out.exists():
         shutil.rmtree(out)
     shutil.copytree(prev, out)
@@ -220,9 +223,6 @@ def main(prev, out, raw4):
     meta["threeMinutes"] = save("threeMinutes", frames, out, False)
 
     # ---------------- GIANT STEP: he jumps off the top, a giant foot stamps ahead ----------------
-    foot = raw4 / "giant-foot.png"
-    if not foot.exists():  # a required drawing: fail rather than build a page without GIANT STEP
-        sys.exit(f"missing {foot}: draw it first with draw.sh giant-foot")
     a, bg = load(raw4, "giant-foot")
     F, _ = pixel(a, bg, 330 / a.shape[0])  # the leg fills the canvas height; about 330 px in the game
     Fax, Fay = feet(F)

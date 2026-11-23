@@ -19,7 +19,8 @@ Drawings land in `out/raw/<pose>.png` (not committed; about 1.5 MB each).
 Nothing cut from the game is committed here. The guides (`out/posrefs/`, made by `tools/posref.py`) are the game's
 sprites scaled up, and the donors' frame offsets and move scripts (`out/data/`, copied by `tools/donor_data.py`) come
 from its export, so both scripts make them from your checkout's `public/assets` and `src/game/generated`
-(`ASSETS` and `GENERATED` point elsewhere).
+(`ASSETS` and `GENERATED` point elsewhere). A pose with no guide (`-` in `poses.txt`, such as `timeover` or
+`giant-foot`, so all of `b4`) needs neither.
 
 It needs `OPENAI_API_KEY` in the environment and never prints it. The model is `gpt-image-2.6-sunburst`
 (`IMAGE_MODEL` overrides it). Four requests run at once; a refused pose prints `FAILED <pose>` and the rest carry on.
