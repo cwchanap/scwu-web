@@ -4,7 +4,7 @@ import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
-import { brIntro, named } from './testing';
+import { brIntro, enter, named } from './testing';
 import { brAnotherStages, brLongStory } from './br-another';
 import type { Battle } from './story';
 
@@ -526,5 +526,48 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
       rose ||= boss.action === 'idle';
     }
     expect([flat, rose, boss.downed]).toEqual([true, false, true]);
+  });
+
+  // The exclusion must reach the lose action's prefix records too: with
+  // global 10 at 0 and global 0 at 10, the scan skips the global-10 tests
+  // (into 84) for the later global-0 test (into 96), but every record
+  // before the chosen jump still runs — and the first passing global-10
+  // test enters its own jump there, because the test handler takes jumps
+  // while the action is script (this KO lands mid-punch). The skipped
+  // tests play KO Boss (84, its freeze and its 85 branch through variable
+  // 3) before the entry into 96 that selection chose.
+  it('runs none of the excluded KO Boss tests in his B.R. lose prefix', () => {
+    const br = Match.story(
+      'alpha',
+      brLongStory('alpha')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    const [boss] = br.fighters;
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    br.globals[10] = 0;
+    br.globals[0] = 10;
+    boss.variables[0] = 0;
+    boss.variables[3] = 0;
+    boss.variables[15] = 0;
+    boss.stock = 1;
+    enter(br, boss, 270);
+    boss.hp = 0;
+    (br as unknown as { knockOut(f: Fighter): void }).knockOut(boss);
+    br.step();
+    // The entry the selection chose lands: 96 plays, never 84 or its 85
+    // branch.
+    expect(now(boss)).toBe(96);
+    let idle = false;
+    let rose = false;
+    for (let t = 0; t < 600; t++) {
+      br.step();
+      idle ||= boss.action === 'idle';
+      rose ||= boss.hp > 0;
+    }
+    expect([boss.hp, boss.downed, idle, rose]).toEqual([0, true, false, false]);
   });
 });
