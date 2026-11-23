@@ -5,6 +5,8 @@ import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro, named } from './testing';
+import { brAnotherStages, brLongStory } from './br-another';
+import type { Battle } from './story';
 
 // ALPHA as player 1, `gap` from a standing Ryuko as player 2.
 function alphaPlayer(gap = 90) {
@@ -426,5 +428,103 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
       if (alpha.action === 'script') entered.add(alpha.branch);
     }
     expect([...entered]).toEqual(expect.arrayContaining(wanted));
+  });
+
+  // Authored (HPA-1251): on a B.R. route his lose action's global-10 KO Boss
+  // jumps (PCs 1029–1030, action 84) stay shut, so kiki's B.R. ANOTHER stage
+  // 3 KOs him into the ordinary fall — while DoraEmon's watch (seat 4) still
+  // brings the next seat in behind him.
+  it('denies his B.R. KO the KO Boss jump (global 10), and the next seat still enters', () => {
+    const match = Match.story(
+      'kiki',
+      brAnotherStages('kiki').stage3,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    expect(match.fighters.map((f) => f.who)).toEqual([
+      'kiki',
+      'shinz',
+      'zenka',
+      'alpha',
+      'dora',
+      'chung',
+    ]);
+    for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+    while (match.roundTicks <= match.fightTick) match.step();
+    const [kiki, shinz, zenka, alpha, dora] = match.fighters;
+    for (const [watched, next] of [
+      [shinz, zenka],
+      [zenka, alpha],
+    ] as const) {
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present).toBe(true);
+      watched.hp = watched.maxHp;
+    }
+    alpha.hp = 0;
+    alpha.caught = kiki;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(alpha);
+    const path: unknown[] = [];
+    for (let t = 0; t < 400; t++) {
+      match.step();
+      if (path.at(-1) !== now(alpha)) path.push(now(alpha));
+    }
+    expect(dora.present).toBe(true);
+    expect(path.some((a) => a === 84 || a === 92 || a === 87 || a === 90)).toBe(
+      false,
+    );
+    expect([now(alpha), alpha.hp, alpha.downed]).toEqual(['koLand', 0, true]);
+  });
+
+  // His ordinary branch refills through the full 96 entry — the yowai jump
+  // (83 + 13) takes its global-0 test (PC 1027) into it, whose 450 life and
+  // 449 back (PCs 1043–1044) need a stock to pass the leading op 0x10s.
+  // Authored (HPA-1251): on a B.R. route the gain does nothing for a downed
+  // fighter, and he never stands; outside the route it stands him at 1 life.
+  it('blocks the 450/449 refill on a B.R. KO, keeping it outside the route', () => {
+    const knock = (match: Match, f: Fighter) => {
+      f.hp = 0;
+      (match as unknown as { knockOut(f: Fighter): void }).knockOut(f);
+    };
+    const plain = new Match('practice', false, 3, ['alpha', 'ryuko']);
+    const [alpha] = plain.fighters;
+    plain.step({}, {});
+    plain.globals[0] = 10;
+    alpha.variables[14] = 10;
+    alpha.stock = 1;
+    knock(plain, alpha);
+    let idle = false;
+    for (let t = 0; t < 900 && !idle; t++) {
+      plain.step();
+      idle = alpha.action === 'idle';
+    }
+    expect(idle).toBe(true);
+    expect(alpha.hp).toBeGreaterThan(0);
+
+    const br = Match.story(
+      'alpha',
+      brLongStory('alpha')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    const [boss] = br.fighters;
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    br.globals[0] = 10;
+    boss.variables[14] = 10;
+    boss.stock = 1;
+    knock(br, boss);
+    let flat = true;
+    let rose = false;
+    for (let t = 0; t < 600; t++) {
+      br.step();
+      flat &&= boss.hp === 0;
+      rose ||= boss.action === 'idle';
+    }
+    expect([flat, rose, boss.downed]).toEqual([true, false, true]);
   });
 });

@@ -2953,6 +2953,17 @@ export class Match {
     );
   }
 
+  // Authored (HPA-1251): on a B.R. route a downed fighter's KO stands — a
+  // positive scripted (op 0x15) or KO-award gain does nothing for one
+  // already downed, so ALPHA's 450/449 revival (PCs 1043–1044) and every
+  // story bonus leave him lying while his recovery gate (koRecovery,
+  // HPA-973) is closed. A take runs, and outside B.R. the source gain runs
+  // unchanged.
+  private gainLife(f: Fighter, life: number) {
+    if (this.br && f.downed && life > 0) return;
+    gainLife(f, life);
+  }
+
   // 0x40e7c0 queues the lose action as a loss empties life (0x40e84b), and in
   // a story scores the step's points (0x40e863): the 1P's KO gives its +0x13
   // to +0x12's player (0 the striker, +0xdef9's, n seat n − 1), another's its
@@ -3007,9 +3018,10 @@ export class Match {
     // award.
     if (bonus === this.fighters[0] && this.br && this.cheats.enabled) {
       const { brHpPerKill, brEnPerKill } = this.cheats;
-      if (brHpPerKill === null) gainLife(bonus, lifeAmount(bonus, slot.life));
+      if (brHpPerKill === null)
+        this.gainLife(bonus, lifeAmount(bonus, slot.life));
       else if (brHpPerKill > 0)
-        gainLife(
+        this.gainLife(
           bonus,
           lifeAmountOf(brHpPerKill, bonus.maxHp, lifeOf(bonus.who)),
         );
@@ -3021,7 +3033,7 @@ export class Match {
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
     // 0, but every paid story bonus is 30 to 100: a gain. Authored (HPA-767): like
     // any scripted gain it reads as its share of the taker's bar.
-    gainLife(bonus, lifeAmount(bonus, slot.life));
+    this.gainLife(bonus, lifeAmount(bonus, slot.life));
     addPower(bonus, slot.power);
   }
 
@@ -4111,7 +4123,7 @@ export class Match {
         // run outgoingDamage (×Player damage), its gains scale with the
         // receiver — TRAINING's K's 1000, a refill either way.
         if (event.selfLife > 0)
-          gainLife(self, lifeAmount(self, event.selfLife));
+          this.gainLife(self, lifeAmount(self, event.selfLife));
         if (event.selfLife < 0) {
           const take = actor === self && reactionTake(self);
           const floor = take
@@ -4134,7 +4146,7 @@ export class Match {
           break;
         }
         if (event.otherLife > 0)
-          gainLife(other, lifeAmount(other, event.otherLife));
+          this.gainLife(other, lifeAmount(other, event.otherLife));
         if (event.otherLife < 0) {
           const damage = this.loseLife(
             other,
@@ -4586,7 +4598,12 @@ export class Match {
     }
     f.gravity = 0.24;
     if (f.action === 'down' || f.action === 'koAgain') {
-      if (KO_SCRIPTS.has(f.who)) {
+      // Authored (HPA-1251): on a B.R. route ZAKU's and PAC-HELO's landing
+      // never enters their native KO down — its variable-11 branch (61 into
+      // KO Down BR 62/63) would stand them back up past the HP guard — so
+      // they take the shared lying KO, which the koRecovery gate (HPA-973)
+      // keeps down. Outside the route their native timeline stands.
+      if (!this.br && KO_SCRIPTS.has(f.who)) {
         this.enterSource(f, twin(f.who, KO_DOWN));
         return true;
       }
@@ -5049,10 +5066,13 @@ export class Match {
   // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) takes the
   // ordinary KO in every mode, B.R. included, never KO RELOAD (72) —
   // whichever of its two entries (KO Normal's check, PC 775, or the lose
-  // action's 77) the source reaches first.
+  // action's 77) the source reaches first. Authored (HPA-1251): on a B.R.
+  // route every DoraEmon seat's entries close with the player's, CPU seats
+  // included.
   private koReloadBlocked(f: Fighter) {
     return (
-      Boolean(SEAT_GATES[f.who]?.koReload) && this.fighters.indexOf(f) === 0
+      Boolean(SEAT_GATES[f.who]?.koReload) &&
+      (this.br || this.fighters.indexOf(f) === 0)
     );
   }
 
@@ -5094,11 +5114,12 @@ export class Match {
       );
       // Authored (HPA-858): a player-controlled DoraEmon (fighter 0) skips
       // KO RELOAD's stock test (PC 775, action 72) and takes the ordinary
-      // KO in every mode, B.R. included; a CPU DoraEmon still reloads, and
-      // every other fighter's checks stand (HPA-1035 owns switching revival
-      // off for all of them in B.R.). The same restriction guards the stock
-      // handler itself, because the lose action's global-0 jump (68 into
-      // 77) runs its own stock test past this loop.
+      // KO in every mode, B.R. included; a CPU DoraEmon still reloads off
+      // the route — HPA-1251 closes every DoraEmon seat on it, with ALPHA's
+      // global-10 KO Boss jump skipped below and ZAKU's and PAC-HELO's
+      // scripted landing kept to the shared koLand. The same restriction
+      // guards the stock handler itself, because the lose action's global-0
+      // jump (68 into 77) runs its own stock test past this loop.
       const plainKo = this.koReloadBlocked(f);
       const koReload = SEAT_GATES[f.who]?.koReload;
       const check = checks.find((e) =>
@@ -5110,7 +5131,13 @@ export class Match {
       const jump =
         lose.find(
           (e): e is Extract<ScriptEvent, { op: 'test' }> =>
-            e.op === 'test' && this.passes(f, f, e),
+            e.op === 'test' &&
+            // Authored (HPA-1251): on a B.R. route ALPHA's KO Boss revive
+            // jump — his lose action's global-10 tests (PCs 1029–1030, into
+            // 84) — stays shut; his ordinary branch (yowai, the variable-15
+            // KOs) stands as outside the route.
+            !(this.br && f.who === 'alpha' && e.selector === 0x8a) &&
+            this.passes(f, f, e),
         ) ??
         (check?.op === 'stock'
           ? { action: check.target, offset: check.offset }
