@@ -205,7 +205,10 @@ describe('BR Another approved lineups', () => {
       for (const key of HEADER_KEYS)
         expect(stage3[key], `${who} stage3 ${key}`).toBe(finale[key]);
       expectRoles(who, stage3, finale, false);
-      for (const battle of [stage1, stage2, stage3])
+      expect(stage1.slots.at(-1)!.player, `${who} stage1 ally`).toBe(
+        (folded ? finale : opener).slots[6]!.player,
+      );
+      for (const battle of [stage2, stage3])
         expect(battle.slots.at(-1)!.player, `${who} ally`).toBe(
           finale.slots[6]!.player,
         );
@@ -630,18 +633,51 @@ describe('BR Another approved lineups', () => {
       }
   });
 
-  it('keeps the fighter-specific finale ally watching the 1P at its own threshold', () => {
+  it('donates stage 1’s ally from its opener — the finale’s for the folded four — and the finale’s on stages 2–3, watching the 1P at their threshold', () => {
     for (const who of ELIGIBLE) {
+      const folded = FOLDED.includes(who);
+      const fin = folded ? 49 : TWINS.includes(who) ? 67 : 65;
       const finale = finaleOf(who);
-      for (const battle of built(brAnotherStages(who))) {
+      const donors = [
+        (folded ? finale : sourceStep(who, fin - 2)).slots[6]!,
+        finale.slots[6]!,
+        finale.slots[6]!,
+      ];
+      for (const [battle, donor] of built(brAnotherStages(who)).map(
+        (battle, i) => [battle, donors[i]!] as const,
+      )) {
         const ally = battle.slots.at(-1)!;
-        expect(ally.player, who).toBe(finale.slots[6]!.player);
+        expect(ally.player, who).toBe(donor.player);
         expect(ally.flags & 0x200, who).toBe(0x200);
         expect(ally.watch, who).toBe(0);
         expect(ally.below, who).toBe(desperationOf(who));
-        expect(ally.x, who).toBe(finale.slots[6]!.x);
+        expect(ally.x, who).toBe(donor.x);
         expect(ally.enemies, who).toBe(((1 << battle.slots.length) - 1) & ~1);
       }
+    }
+    // The rebuilt slot binds the ally donor, not its stale thresholds: sww is
+    // the one fighter whose opener ally differs from the finale's (below 160
+    // vs 138), so give the opener a sentinel ally and follow it through.
+    const opener = (CHARACTERS['sww'].scenario as Step[])[63] as Battle;
+    const original = opener.slots[6]!;
+    opener.slots[6] = {
+      ...original,
+      player: ROSTER.indexOf('kay'),
+      below: 999,
+      life: 77,
+    };
+    try {
+      const { stage1, stage2, stage3 } = brAnotherStages('sww');
+      const ally = stage1.slots.at(-1)!;
+      expect(ally.player).toBe(ROSTER.indexOf('kay'));
+      expect(ally.life).toBe(77);
+      expect(ally.watch).toBe(0);
+      expect(ally.below).toBe(desperationOf('sww'));
+      expect(ally.enemies).toBe(((1 << stage1.slots.length) - 1) & ~1);
+      for (const battle of [stage2, stage3])
+        expect(battle.slots.at(-1)!.player).toBe(original.player);
+    } finally {
+      opener.slots[6] = original;
     }
     for (const [who, ally] of [
       ['zmega', 'rario'],
