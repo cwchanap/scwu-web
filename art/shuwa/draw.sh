@@ -8,11 +8,14 @@
 # Needs OPENAI_API_KEY in the environment; the key is never printed. Writes out/raw/<pose>.png beside this script.
 # IMAGE_MODEL overrides the model (default gpt-image-2.6-sunburst).
 set -uo pipefail
+# A relative ASSETS or GENERATED is read from where the command runs, so both are made absolute before the cd.
+abs() { case $1 in /*) echo "$1" ;; *) echo "$PWD/$1" ;; esac; }
+A=$(abs "${ASSETS:-$(dirname "$0")/../../public/assets}")
+G=$(abs "${GENERATED:-$(dirname "$0")/../../src/game/generated}")
 cd "$(dirname "$0")"
 : "${OPENAI_API_KEY:?OPENAI_API_KEY is not set}"
 [ $# -gt 0 ] || { echo "usage: draw.sh BATCH|POSE..."; exit 1; }
 export IMAGE_MODEL=${IMAGE_MODEL:-gpt-image-2.6-sunburst} OUT=out/raw
-A=${ASSETS:-../../public/assets}
 mkdir -p "$OUT"
 poses=()
 for a in "$@"; do
@@ -20,10 +23,12 @@ for a in "$@"; do
   [ -n "$m" ] || { echo "unknown batch or pose: $a"; exit 1; }
   poses+=($m)
 done
-python3 -I tools/donor_data.py "${GENERATED:-../../src/game/generated}" out/data || exit 1
+poses=($(printf '%s\n' "${poses[@]}" | awk '!seen[$0]++')) # a pose named on its own and in its batch is drawn once
+python3 -I tools/donor_data.py "$G" out/data || exit 1
+# Guides are remade for every pose drawn, so a changed export is always picked up.
 for k in "${poses[@]}"; do
   read -r _ _ guide form size < <(awk -v k="$k" '$1 == k' poses.txt)
-  [ "$guide" = - ] || [ -f "out/posrefs/$guide.png" ] ||
+  [ "$guide" = - ] ||
     python3 -I tools/posref.py "$A/${guide%-*}" "${guide%-*}" "${guide##*-}" "$form" "$size" || exit 1
 done
 

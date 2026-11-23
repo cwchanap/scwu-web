@@ -125,10 +125,12 @@ def main(prev, out, raw4):
     frames = [Frame(fr[0][3]).add(*fr[0][:3])]
     a, ax, ay, d = fr[1]
     hx, hy = front(a, 0.35, 0.6)
-    heights = [50, 100, 150] + [160] * ((d - 150) // 80)
-    for i, h in enumerate(heights):
+    ms = [50] * 3 + [80] * ((d - 150) // 80)
+    ms[-1] += d - sum(ms)  # the last wall frame keeps what is left, so the push holds its full time
+    heights = [50, 100, 150] + [160] * (len(ms) - 3)
+    for i, (h, t) in enumerate(zip(heights, ms)):
         g = wall(h, i)
-        frames.append(Frame(50 if i < 3 else 80).add(a, ax, ay).add(g, -(hx - ax + 10), g.shape[0] // 2 - (hy - ay)))
+        frames.append(Frame(t).add(a, ax, ay).add(g, -(hx - ax + 10), g.shape[0] // 2 - (hy - ay)))
     g = wall(160, 9, w=20)
     frames.append(Frame(fr[2][3]).add(*fr[2][:3]).add(g, -(hx - ax + 10), g.shape[0] // 2 - (hy - ay)))
     frames.append(Frame(fr[3][3]).add(*fr[3][:3]))
