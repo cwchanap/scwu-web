@@ -28,7 +28,7 @@ for k in "${poses[@]}"; do
 done
 
 draw() {
-  local k guide form size tmp
+  local k guide form size tmp status
   read -r k _ guide form size < <(awk -v k="$1" '$1 == k' poses.txt)
   local imgs=(-F "image[]=@refs/$form.png")
   [ "$guide" = - ] || imgs+=(-F "image[]=@out/posrefs/$guide.png")
@@ -43,7 +43,9 @@ if "error" in d:
 open(sys.argv[2], "wb").write(base64.b64decode(d["data"][0]["b64_json"]))
 print("wrote", sys.argv[2])
 ' "$tmp" "$OUT/$k.png" "$k"
+  status=$?
   rm -f "$tmp"
+  return $status
 }
 export -f draw
 echo "model $IMAGE_MODEL, ${#poses[@]} poses"
