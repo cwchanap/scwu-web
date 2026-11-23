@@ -17,9 +17,9 @@ fetch fixtures src/game/__fixtures__
 
 # The tarballs are mutable and live outside git: refuse data that a different
 # export_assets.py produced (a missed `bun run upload:r2`). The fingerprint is
-# the exporter's: script bytes, then the committed name PNG it reads — keep in
-# step with scripts/build.sh's script_sha.
-want=$(cat scripts/export_assets.py art/dora/name.png | sha256sum | awk '{print $1}')
+# the exporter's: script bytes, then the committed art it reads (AUTHORED_ART,
+# same order) — keep in step with scripts/build.sh's script_sha.
+want=$(cat scripts/export_assets.py art/hud/en-700.png art/hud/en-800.png art/hud/en-900.png art/hud/en-1000.png art/dora/name.png | sha256sum | awk '{print $1}')
 have=$(cat src/game/generated/.exporter 2>/dev/null || true)
 if [ "$have" != "$want" ]; then
   echo "generated.tar.gz does not match this commit's scripts/export_assets.py; run bun run assets && bun run upload:r2" >&2

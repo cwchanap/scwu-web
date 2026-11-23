@@ -3,17 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import type { Who } from '../game/characters';
 import { itWithArt } from '../game/testing';
-import { ROSTER } from './fighters';
+import { NAMEPLATES, ROSTER } from './fighters';
 import { GRID, GUIDES_DATA, FACES, SHARED, STOCKS, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
 // `import type` lines are erased at build and so cannot pull the bundle in.
 const stripTypeImports = (text: string) =>
   text.replace(/^\s*import type [^;]+;/gm, '');
-// The art paths the DOM names: the same scan as export_assets.py's dom_art().
+// The art paths the DOM names: the same scan as export_assets.py's dom_art()
+// (App and Menu, the Instructions sources' select and gauge art, moves.ts's
+// guide art and nameplates, and the shared page.ts backdrop the profile page
+// reuses). Whole nested paths: a stage thumbnail is stages/<stage>/<n>.png.
 const domNamed = () =>
   [
     here + '../App.svelte',
+    here + '../Menu.svelte',
     ...readdirSync(here)
       .filter((name) => name.endsWith('.svelte'))
       .map((name) => here + name),
@@ -23,7 +27,8 @@ const domNamed = () =>
       .filter((name) => /\.(svelte|ts)$/.test(name))
       .map((name) => here + '../profile/' + name),
   ].flatMap(
-    (file) => readFileSync(file, 'utf8').match(/[a-z0-9]+\/[0-9]+\.png/g) ?? [],
+    (file) =>
+      readFileSync(file, 'utf8').match(/(?:[a-z0-9]+\/)+[0-9]+\.png/g) ?? [],
   );
 
 describe('instructions page', () => {
@@ -208,5 +213,12 @@ describe('instructions page', () => {
     expect(readFileSync(here + '../App.svelte', 'utf8')).not.toMatch(
       /instructions\/(guides|moves)/,
     );
+  });
+
+  it('keeps the Menu nameplate table identical to the guide’s', () => {
+    for (const entry of ROSTER)
+      expect(NAMEPLATES[entry.id], entry.id).toBe(
+        GUIDES_DATA[entry.id].nameplate,
+      );
   });
 });

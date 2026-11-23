@@ -1,6 +1,8 @@
 // Test helpers. Ryuko's moves play from their own timelines, entered by
 // source action; these name the ones the tests drive, and the objects they
 // spawn (the axe, DST's missiles).
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { it } from 'vitest';
 import type { ObjectKey } from './animations';
 import { CHARACTERS } from './characters';
@@ -14,6 +16,23 @@ import type { Effect, Fighter, Input } from './match';
 // the art is published to R2 (the export has about 28,000 files), so they skip
 // when CI is set.
 export const itWithArt = it.skipIf(!!process.env.CI);
+
+// export_assets.py's exporter() fingerprint, which build.sh's script_sha and
+// CI's fetch-generated.sh must reproduce: the script bytes, then AUTHORED_ART
+// (the committed art it reads) in the same order.
+export const exporterSha = () => {
+  const hash = createHash('sha256');
+  for (const name of [
+    'scripts/export_assets.py',
+    'art/hud/en-700.png',
+    'art/hud/en-800.png',
+    'art/hud/en-900.png',
+    'art/hud/en-1000.png',
+    'art/dora/name.png',
+  ])
+    hash.update(readFileSync(new URL(`../../${name}`, import.meta.url)));
+  return hash.digest('hex');
+};
 
 export const RYUKO = {
   fall: 7,

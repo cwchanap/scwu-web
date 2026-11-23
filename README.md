@@ -115,10 +115,11 @@ Runners have no handoff, so `.github/scripts/fetch-generated.sh` downloads `gene
 | Enter                        | Confirm on the mode select (or click / tap a sign board)                                   |
 | P / Escape                   | Pause / resume; Escape steps back on mode select, or goes to the title on character select |
 | R                            | Reset the current mode, or return to the title from mode select / demos                    |
+| Ctrl + Backquote             | Open the summon dialog over a running match (Cheat mode on)                                |
 
 Specials and supers are motion commands (↓→ G, →↓↘ G, ↓→↓→ H, …), read toward the opponent. The **Controls guide** link in the in-game **Menu** opens [instructions.html](instructions.html): one page per fighter with every move in table form.
 
-The title opens SINGLE (story), VS and TEAM VS; the **Menu** button at the arena's top right chooses the fighter, opponent, stage, music and mode (free practice with a practice partner, Vs. CPU, or story), and the cheat settings (HP, EN and damage) that apply from the next match or battle. Leaving the window pauses the match. Touch buttons cover every control; landscape is recommended on phones.
+The title opens SINGLE (story), VS and TEAM VS; the **Menu** button at the arena's top right pauses the fight and chooses the fighter, opponent, stage, music and mode (free practice with a practice partner, Vs. CPU, or story), the practice toggles, the live Enemy HP bars option and the cheat settings — HP, EN, damage, low-HP and B.R. rules — that apply from the next match or battle. With Cheat mode on, **Ctrl + Backquote** summons a CPU enemy or partner into the running match. Leaving the window pauses the match. Touch buttons cover every control; landscape is recommended on phones.
 
 [docs/gameplay.md](docs/gameplay.md) describes how each mode, move, chain, cancel, reaction and round rule plays.
 

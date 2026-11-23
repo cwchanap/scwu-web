@@ -325,3 +325,134 @@ export const SEAT_GATES: Partial<Record<Who, SeatGate>> = {
     koReload: 72,
   },
 };
+
+// Authored (HPA-972): the verified low-HP super gates — the op 0x11 life
+// checks (value above 1) on the fighters' move scripts whose jump selects
+// or unblocks a super's desperation form, keyed by (who, sourceKey). Each
+// timeline holds exactly one such event, so no target or tick is needed to
+// find it. The generated SourceEvent records carry no source PC: the PCs
+// below are provenance from the engine reads (docs/evidence.md), not
+// runtime keys. `below` true jumps into the super at the mark or under;
+// false jumps away to the normal move at the mark or over, so the super is
+// the fall-through.
+export interface SuperGate {
+  readonly below: boolean;
+  readonly value: number;
+}
+export const SUPER_GATES: Partial<Record<Who, Record<string, SuperGate>>> = {
+  // G BEAM EVIL (278/280) at 153 or less (Supers); the hidden super throws
+  // the axe (226) at 153 or more, and its cancel bails to NO SUPER (251)
+  // at 150 or more (Supers).
+  ryuko: {
+    '263': { below: true, value: 153 },
+    '264': { below: true, value: 153 },
+    '265': { below: true, value: 153 },
+    '254+9': { below: false, value: 150 },
+    '286': { below: false, value: 153 },
+  },
+  // Shin Spark (279) turns into BOMB at 147 or more (Zoma's supers).
+  zoma: { '279': { below: false, value: 147 } },
+  // lee and gesar turn into Evil Lee (295) and Evil gesar (307) at 153 or
+  // less (Chung).
+  chung: {
+    '281': { below: true, value: 153 },
+    '282+13': { below: true, value: 153 },
+    '305': { below: true, value: 153 },
+  },
+  // funnal, NT and EN3 (medeo) turn into evil funnal (279), EVIL NT (295)
+  // and Evil En3 (331) at 141 or less (Amiro).
+  amiro: {
+    '275': { below: true, value: 141 },
+    '311': { below: true, value: 141 },
+    '324': { below: true, value: 141 },
+  },
+  // At 165 or less Fire Start enters EVIL Fire (310, PC 4675), which rolls
+  // into hidden fire start (318), and Air Fire EVIL Fire air (311,
+  // PC 4645) (Giant).
+  giant: {
+    '300': { below: true, value: 165 },
+    '304': { below: true, value: 165 },
+    '305': { below: true, value: 165 },
+  },
+  // BP START enters BP EVIL (288) at 150 or less (PC 4209), and HH Start
+  // enters no super at 150 or more (PC 5436) (G Suneo).
+  suneo: {
+    '279': { below: true, value: 150 },
+    '281': { below: true, value: 150 },
+    '345': { below: false, value: 150 },
+  },
+  // HIDDEN runs only below 150 on its SC path (PC 3180), and hidden start
+  // throws the tofu (225) at 144 or more (PC 3361) (Yo).
+  yo: {
+    '233+9': { below: false, value: 150 },
+    '245': { below: false, value: 144 },
+  },
+  // At 165 or less NOZAN takes its desperation form (252), otherwise its
+  // start plays RUN CHUCK (PC 4537) (SIN).
+  sin: {
+    '250': { below: true, value: 165 },
+    '310': { below: false, value: 165 },
+  },
+  // HID START plays as FIRE BALL START (214) at 153 or more
+  // (PC 3749, LIZARD).
+  lizard: { '279': { below: false, value: 153 } },
+  // Hidden En300 (334) enters Sliding start (231) at 147 or more
+  // (PC 4526, DIDO).
+  dido: { '334': { below: false, value: 147 } },
+  // Hidden EN3 (416) enters No super (357) above 135
+  // (PC 6782, ERUS).
+  erus: { '416': { below: false, value: 135 } },
+  // Below 30% health SUPER SHOOT START takes EXIL SS (316) at 150 or less
+  // (PC 4490, OS FENG).
+  feng: {
+    '309': { below: true, value: 150 },
+    '311': { below: true, value: 150 },
+  },
+  // Below 30% health Super shoot start (241) takes EVIL SHOOT START (249)
+  // at 150 or less (PC 3579, SEAN); its SC path (245) takes the same.
+  sean: {
+    '241': { below: true, value: 150 },
+    '245': { below: true, value: 150 },
+  },
+  // Hidden en300 (446) enters Chuck (241) at 141 or more
+  // (PC 7543, GON).
+  gon: { '446': { below: false, value: 141 } },
+  // At 129 or less EN slash start (268) enters EN slash evil start (275)
+  // (PC 3859, KATE); its SC path (252+6) takes the same.
+  kate: {
+    '252+6': { below: true, value: 129 },
+    '268': { below: true, value: 129 },
+  },
+  // NANAMI start (329) enters CALL DRILL (256) at 156 or more
+  // (PC 4745, REMU), and its SC path (305+9) enters No super (302) at 156
+  // or more (PC 4389).
+  remu: {
+    '305+9': { below: false, value: 156 },
+    '329': { below: false, value: 156 },
+  },
+  // Evil EN3 (282) enters No super at 141 or more
+  // (PC 4149, REAR).
+  rear: { '282': { below: false, value: 141 } },
+  // Above 138 roll crash start (371) enters no super (284)
+  // (PC 5853, SWW).
+  sww: { '371': { below: false, value: 138 } },
+  // HiddenEN3 (494) enters CC START at 141 or more
+  // (PC 8353, ZIRO).
+  ziro: { '494': { below: false, value: 141 } },
+  // R100 (519) and R300 (532) jump to Driver at 150 or more (PCs 9971 and
+  // 10272, YINAN); 520, their shared second form, checks the same.
+  yinan: {
+    '519': { below: false, value: 150 },
+    '520': { below: false, value: 150 },
+    '532': { below: false, value: 150 },
+  },
+  // DANKU SHOT (373) takes EVIL DANKU LOW (375) at 144 or less
+  // (PC 5870), and KOKAKEN (438) enters No super (353) at 144 or more
+  // (PC 7014) (SOU).
+  sou: {
+    '373': { below: true, value: 144 },
+    '438': { below: false, value: 144 },
+  },
+};
+export const superGateOf = (who: Who, key: string): SuperGate | undefined =>
+  SUPER_GATES[who]?.[key];

@@ -35,6 +35,7 @@ import {
   CHARACTERS,
   countersOf,
   desperationOf,
+  superGateOf,
   twinOf,
   lifeOf,
   neutralTestsOf,
@@ -59,7 +60,12 @@ import {
   scan,
 } from './commands';
 import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM } from './cpu';
-import { DEFAULT_CHEATS, normalizeCheats } from './cheats';
+import {
+  DEFAULT_CHEATS,
+  effectiveSummonCheats,
+  enGainOf,
+  normalizeCheats,
+} from './cheats';
 import type { CheatOptions } from './cheats';
 import { lifeAmountOf, lifeMarkOf, lifeShareOf } from './life';
 import { dummyInput } from './dummy';
@@ -81,6 +87,7 @@ import {
   WIN_TICK,
 } from './hud';
 import { ROSTER, takePalette } from './select';
+import { StandingVM } from './standing';
 import ui from './generated/ui.json';
 import type { Battle, Slot } from './story';
 const toughSeat = (slot: Slot | null | undefined) =>
@@ -125,6 +132,9 @@ export interface PracticeOptions {
   partner: DummyBehavior;
   maxStock: boolean;
   lowHealth: boolean;
+  // Live enemy HP bars (authored, HPA-972): a session option, off by
+  // default, applied through TrainingScene.setPractice in every mode.
+  enemyBars: boolean;
 }
 export const TICK_MS = 10;
 export const WIDTH = 960;
@@ -135,6 +145,9 @@ export const GROUND = 636;
 export const ART_SCALE = 1.5;
 // The walls with the camera at either end of the stage: 50 source pixels in.
 export const FIGHTER_MARGIN = 50 * 1.5;
+// Authored (HPA-972): the roster cap for summons, beyond which `summon`
+// refuses — the palette and bit-mask paths have no automatic safe cap.
+export const MAX_FIGHTERS = 10;
 const blankHistory = () => Array<number>(HISTORY_TICKS).fill(0);
 // Opcode 1 uses 16.16 velocity scaled by floor(65536 / 100) at speed 10.
 // Convert the recovered source velocities to the web's 1.5-scale arena.
@@ -603,21 +616,6 @@ const lifeAmount = (f: Fighter, amount: number) =>
 const lifeShare = (f: Fighter, amount: number) =>
   lifeShareOf(amount, f.maxHp, lifeOf(f.who));
 
-// A loss's low-HP reduction keeps at least `floor` whole points: hit and
-// outgoing damage keep the source's 1; a self-transfer's caller passes its
-// scaled share (0 for a balanced drain pair under a shrink, so the pair
-// keeps its native net; 1 for a take-only drain, so it still reaches 1).
-function loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
-  if (loss && f.hp <= lifeMark(f, desperationOf(f.who)))
-    loss = Math.max(floor, Math.trunc((loss * CHARACTERS[f.who].scale) / 100));
-  if (guardOne) loss = Math.min(loss, Math.max(0, f.hp - 1));
-  f.hp = Math.max(0, f.hp - loss);
-  if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
-  // A loss that leaves no life drops the player to priority 0x3c (0x40e8cd),
-  // behind the other.
-  if (f.hp === 0) f.z = 0x3c;
-  return loss;
-}
 // A gain, up to full life (0x40ea9f) — the effective maximum — takes from
 // what the bar shows lost, even one of 0.
 function gainLife(f: Fighter, life: number) {
@@ -1169,7 +1167,7 @@ export interface Fighter {
   hp: number;
   // Authored (HPA-767 cheats): the fighter's maximum life — `lifeOf(who)`
   // natively, scaled by the effective cheat snapshot — and its stock cap,
-  // `stocksOf(who)` natively, 1P's `playerEnLimit` under cheats.
+  // `stocksOf(who)` natively, 1P's `playerMaxEn / 100` under cheats.
   maxHp: number;
   maxStock: number;
   // Authored (HPA-858): the boss B.R. ANOTHER route's tough seats gain EN
@@ -1838,6 +1836,7 @@ export class Match {
     partner: 'stand',
     maxStock: false,
     lowHealth: false,
+    enemyBars: false,
   };
   // Authored (HPA-767): this battle's Cheats settings, the frozen snapshot
   // `useCheats` installs once, before the first step. With `enabled` off
@@ -1851,6 +1850,21 @@ export class Match {
   get cheats(): Readonly<CheatOptions> {
     return this.cheatsSnapshot;
   }
+  // Authored (HPA-972): the fighters the round seated natively, in their
+  // original indices; a summon appends beyond this slice and every scoring
+  // and outcome path reads only it. Refreshed whenever native fighters are
+  // seated (the constructor, a round's or battle's reseating).
+  private nativeCount = 0;
+  private summoned = false;
+
+  get natives() {
+    return this.fighters.slice(0, this.nativeCount);
+  }
+  // Authored (HPA-972): the in-arena CHEAT badge reads this, not the
+  // frozen snapshot alone — a summon marks the battle cheated too.
+  get cheated() {
+    return this.cheats.enabled || this.summoned;
+  }
   // Each player's CPU (+0xdf5d), player 2's in VS.
   cpus: (CpuVM | null)[];
   // A story's seat for each fighter (+0x156: the 1P 0, slot n's player n +
@@ -1861,6 +1875,8 @@ export class Match {
   private slots: (Slot | null)[] = [];
   private waits: (Slot | null)[] = [];
   private results: number[] = [];
+  private readonly initialHeld: number[];
+  private summonPalettes: number[] = [];
   lost = 0;
   // VS multi's teams (0x47006c) and the member each side fights with
   // (0x4700ec, 0x4700f0).
@@ -1886,7 +1902,9 @@ export class Match {
   constructor(
     public mode: Mode = 'practice',
     intro = false,
-    seed = 0,
+    // Kept for the B.R. No partner re-seat (HPA-972): the CPUs rebuild on
+    // the constructor's shared seed.
+    private readonly seed = 0,
     // Player 1's and player 2's characters: in VS multi, the round's members.
     public characters: [Who, Who] = ['ryuko', 'ryuko'],
     readonly stage: Stage = 'court',
@@ -1938,11 +1956,19 @@ export class Match {
       this.seat(battle, seed);
       while (this.held.length < battle.slots.length + 1) this.held.push(-1);
     }
+    this.initialHeld = [...this.held];
     this.fighters = battle
       ? this.storyFighters()
       : intro
         ? this.entrants()
         : [fighter(300, 1, characters[0]), fighter(660, -1, characters[1])];
+    this.nativeCount = this.fighters.length;
+    // The Vs. modes seat no slot data: nulls, so every per-fighter array
+    // stays aligned with the fighters (HPA-972's summons append to these).
+    if (!battle) {
+      this.slots = this.fighters.map(() => null);
+      this.waits = this.fighters.map(() => null);
+    }
     // Authored: with no 開始時, whose OP super Charge follows its player into
     // VS CHARGE at once in VS single (Ryuko's 39 into 38, PCs 320–321, 417),
     // each player starts with its VS CHARGE (TRAINING's VS CHANGE, which his
@@ -2098,10 +2124,11 @@ export class Match {
     return this.battle ? storyFightTick(this.battle.letterings) : FIGHT_TICK;
   }
 
-  // The fighters hostile to the 1P, by seat.
+  // The fighters hostile to the 1P, by seat. Authored (HPA-972): only the
+  // natives — a summon never decides whether the native hostiles are beaten.
   private get enemiesOfOne() {
-    const [one] = this.fighters;
-    return one ? this.fighters.filter((_, i) => one.enemies & (1 << i)) : [];
+    const [one] = this.natives;
+    return one ? this.natives.filter((_, i) => one.enemies & (1 << i)) : [];
   }
 
   // Authored: all hostile seats count.
@@ -2128,14 +2155,16 @@ export class Match {
       const first = this.bySeat(1);
       if (first && perMille(one) < perMille(first))
         first.points += battle.timeUp;
-      this.fighters.forEach((f, i) => {
+      // Authored (HPA-972): the natives alone — a summon holds no slot for
+      // the +0x14 read.
+      this.natives.forEach((f, i) => {
         if (i && perMille(f) < perMille(one))
           one.points += this.slots[i]!.timeUp;
       });
     }
-    const ally = (i: number) => !i || this.slots[i]!.flags & 0x200;
+    const ally = (i: number) => !this.hostile(0, i);
     let [ours, theirs] = [one.points, 0];
-    this.fighters.forEach((f, i) => {
+    this.natives.forEach((f, i) => {
       if (!i || f.points < 100) return;
       if (ally(i)) ours = Math.max(ours, f.points);
       else theirs = Math.max(theirs, f.points);
@@ -2193,12 +2222,24 @@ export class Match {
   private takeSeat(i: number) {
     const seat = this.seats[i];
     if (seat) this.held[seat] = -1;
-    takePalette(this.held, seat, Math.max(0, this.held[seat] ?? -1));
+    // Authored (HPA-972): a summon's palette is used too, so an arriving
+    // native keeps off it; the summons sit past a seat-indexed copy.
+    const taken = [...this.held];
+    taken.length = Math.max(taken.length, seat + 1);
+    taken.push(...this.summonPalettes);
+    takePalette(taken, seat, Math.max(0, this.held[seat] ?? -1));
+    this.held[seat] = taken[seat]!;
   }
 
-  // Each fighter's palette.
+  // Each fighter's palette: native seats read the session's held palettes,
+  // while story summons keep their own per-round palettes so a departed
+  // summon never leaks into later rounds or battles (HPA-972).
   get palettes() {
-    return this.seats.map((seat) => Math.max(0, this.held[seat] ?? -1));
+    return this.seats.map((seat, i) =>
+      i < this.nativeCount
+        ? Math.max(0, this.held[seat] ?? -1)
+        : (this.summonPalettes[i - this.nativeCount] ?? 0),
+    );
   }
   get cpu() {
     return this.cpus[1]!;
@@ -2271,10 +2312,19 @@ export class Match {
 
   // 0x404e2d: in a story, a life bar under each player past the 1P whose
   // slot sets bit 0 (+0xdf0d), the allies, once it has entered and shown a
-  // display, while it has life.
+  // display, while it has life. Authored (HPA-972): the Enemy HP bars
+  // option adds the present, shown living hostiles in every mode — a
+  // session option, no cheats needed; a summoned ally always keeps one
+  // too, holding no slot and no hostile mask toward the 1P.
   get lifeBars() {
     return this.fighters.filter(
-      (f, i) => (this.slots[i]?.flags ?? 0) & 1 && f.present && f.shown && f.hp,
+      (f, i) =>
+        ((this.slots[i]?.flags ?? 0) & 1 ||
+          (this.practice.enemyBars && this.hostile(0, i)) ||
+          (i >= this.nativeCount && !this.hostile(0, i))) &&
+        f.present &&
+        f.shown &&
+        f.hp,
     );
   }
 
@@ -2333,19 +2383,33 @@ export class Match {
         blockedCpuCommands(who, this.br),
       );
     }
+    // Authored (HPA-972): the natives reseat — drop the summons' extensions
+    // (their slot, wait, seat, palette and CPU entries) before the rebuild
+    // reads them.
+    this.slots.length = this.nativeCount;
+    this.waits.length = this.nativeCount;
+    this.seats.length = this.nativeCount;
+    this.cpus.length = this.nativeCount;
+    this.summonPalettes = [];
     const fighters = this.battle ? this.storyFighters() : this.entrants();
     fighters.forEach((f, i) => {
       f.stock = this.fighters[i].stock;
       f.power = this.fighters[i].power;
     });
     // Authored (HPA-767): the next round seats under the same snapshot —
-    // fresh Menu values cannot reach a running match — and 1P's carried
-    // stock fits the EN cap; the enemy's stock carries as it was. The new
-    // seats are installed first, so hostility reads their own masks.
+    // fresh Menu values cannot reach a running match — and each fighter's
+    // carried stock fits its new seat's EN cap, a smaller cap emptying a
+    // full gauge's power as addPower leaves it. The new seats are
+    // installed first, so hostility reads their own masks.
+    // Authored (HPA-972): the seating is native, which clears the summons
+    // and every fighter-indexed array they extended.
     this.fighters = fighters;
+    this.nativeCount = fighters.length;
     if (this.cheats.enabled) {
-      fighters.forEach((f, i) => this.cheatSeat(f, i));
-      fighters[0].stock = Math.min(fighters[0].stock, fighters[0].maxStock);
+      fighters.forEach((f, i) => {
+        this.cheatSeat(f, i);
+        if (f.stock >= f.maxStock) [f.stock, f.power] = [f.maxStock, 0];
+      });
     }
     this.round++;
     this.ticks = 0;
@@ -2414,33 +2478,217 @@ export class Match {
   // only ever the first call, which the scene makes before the battle's
   // first tick (step seals installation) — so no later call can seat or
   // disable cheats mid-battle (fresh values wait for the next battle).
+  // Authored (HPA-972): a B.R. battle's No partner omits the native ally
+  // here, at snapshot installation — the constructor had seated before the
+  // scene could pass the pending values.
   useCheats(options: CheatOptions) {
     if (this.cheatsInstalled) return;
     this.cheatsInstalled = true;
     this.cheatsSnapshot = Object.freeze(normalizeCheats(options));
     if (!this.cheatsSnapshot.enabled) return;
+    if (this.battle && this.br && this.cheatsSnapshot.brNoPartner)
+      this.reseatWithoutAlly();
     this.fighters.forEach((f, i) => this.cheatSeat(f, i));
+  }
+
+  // Authored (HPA-972): re-runs the constructor's seating once with every
+  // ally slot (bit 9) left empty on the existing null-slot path, then
+  // rebuilds the seat's CPUs, inputs and opening objects so none of the old
+  // seating's pre-fight objects remain. The story's slot indices keep
+  // their places — a slot is dropped, not renumbered — and the session's
+  // held palettes stay as asset loading left them.
+  private reseatWithoutAlly() {
+    const battle = this.battle!;
+    this.held.splice(0, this.held.length, ...this.initialHeld);
+    this.summonPalettes = [];
+    this.cpus = [null];
+    this.seat(
+      {
+        ...battle,
+        slots: battle.slots.map((slot) =>
+          slot && slot.flags & 0x200 ? null : slot,
+        ),
+      },
+      this.seed,
+    );
+    this.effects = [];
+    this.freeing = [];
+    this.kgt = [];
+    this.fighters = this.storyFighters();
+    this.nativeCount = this.fighters.length;
+    if (this.calls) this.hold(0x65, openingLife(this));
+    this.clearInput();
   }
 
   // Authored (HPA-767): seats a fighter under the effective snapshot: the 1P
   // by the Player HP multiplier and the EN limit, every hostile of the 1P
-  // (the passive practice partner included) by the Enemy HP multiplier —
-  // allies stay native — with life at the effective maximum. Freshly created
-  // fighters start native, so an enabled-off battle never passes here.
+  // (the passive practice partner included) by the Enemy HP multiplier and
+  // the Enemy EN stocks × cap, and every other ally by the Partner HP
+  // multiplier (HPA-972) — each derived from the seat's route base, so
+  // re-seating never compounds. Freshly created fighters start native, so
+  // an enabled-off battle never passes here. Positive EN gain follows each
+  // fighter's final cap (HPA-972), assigned — never multiplied onto a
+  // route's own ×2.
   private cheatSeat(f: Fighter, i: number) {
     if (!i) {
       f.maxHp = Math.max(
         1,
         Math.round(lifeOf(f.who) * this.cheats.playerHpMultiplier),
       );
-      f.maxStock = this.cheats.playerEnLimit;
+      f.maxStock = this.cheats.playerMaxEn / 100;
     } else if (this.hostile(0, i)) {
-      // Authored (HPA-858): derive from the seat's route base — 2× on a
-      // tough seat, 1× otherwise — so re-seating never compounds.
-      const base = (toughSeat(this.slots[i]) ? 2 : 1) * lifeOf(f.who);
-      f.maxHp = Math.max(1, Math.round(base * this.cheats.enemyHpMultiplier));
+      // Authored (HPA-858): derive from the seat's route base — 2× life on
+      // a tough seat with its five stocks, native otherwise.
+      const tough = toughSeat(this.slots[i]);
+      f.maxHp = Math.max(
+        1,
+        Math.round(
+          (tough ? 2 : 1) * lifeOf(f.who) * this.cheats.enemyHpMultiplier,
+        ),
+      );
+      f.maxStock = Math.min(
+        10,
+        (tough ? 5 : stocksOf(f.who)) * this.cheats.enemyStocksMultiplier,
+      );
+    } else {
+      f.maxHp = Math.max(
+        1,
+        Math.round(lifeOf(f.who) * this.cheats.partnerHpMultiplier),
+      );
     }
+    f.enGainMultiplier = enGainOf(f.maxStock);
     f.hp = f.maxHp;
+  }
+
+  // Authored (HPA-972): appends one CPU fighter beyond the native seats for
+  // the rest of this battle, or returns null at MAX_FIGHTERS. `side` 1
+  // joins the 1P's side (behind the 1P, facing toward the enemies), −1 the
+  // enemies' (past the farthest present, living same-side fighter).
+  // `pendingCheats` combines with the battle's snapshot through
+  // `effectiveSummonCheats` to scale the new fighter alone — full HP by its
+  // side, the enemy EN cap included — leaving the frozen battle snapshot
+  // and every seated fighter as they are. Native indices and all
+  // per-fighter arrays keep their places; the summons leave at the next
+  // native seating (nextRound, a battle's new Match).
+  summon(
+    who: Who,
+    side: -1 | 1,
+    pendingCheats: CheatOptions = DEFAULT_CHEATS,
+  ): Fighter | null {
+    if (this.fighters.length >= MAX_FIGHTERS) return null;
+    const index = this.fighters.length;
+    const [one] = this.fighters;
+    // Each fighter's side: a native by its hostility to the 1P, an earlier
+    // summon by its own mask's 1P bit (the natives' masks toward summons
+    // move as the sides demand, so they cannot re-derive a side).
+    const onOneSide = (i: number) =>
+      i < this.nativeCount
+        ? !this.hostile(0, i)
+        : (this.fighters[i]!.enemies & 1) === 0;
+    const sameSide = (i: number) => onOneSide(i) === (side === 1);
+    const target = this.nearest(one);
+    const dir: -1 | 1 = target
+      ? one.x < target.x
+        ? 1
+        : one.x > target.x
+          ? -1
+          : one.facing
+      : one.facing;
+    const clampX = (x: number) => Math.min(1845, Math.max(75, x));
+    // ponytail: with no present, living same-side fighter to stand past (an
+    // all-ally battle, or all hostiles fallen or waiting), the far side
+    // falls back to 135 past the 1P. `downed` stays out of this: it holds
+    // through a ZAKU or PAC-HELO revival for the brawl's elimination
+    // count, and a hostile back on its feet is a living anchor again.
+    const far = this.fighters
+      .filter((n, i) => sameSide(i) && n.present && n.hp > 0)
+      .map((n) => n.x);
+    const anchor = far.length
+      ? dir === 1
+        ? Math.max(...far)
+        : Math.min(...far)
+      : one.x;
+    const f = fighter(
+      clampX(side === 1 ? one.x - dir * 135 : anchor + dir * 135),
+      side === 1 ? dir : (-dir as -1 | 1),
+      who,
+    );
+    this.fighters.push(f);
+    // Hostility by side, both directions: the summon strikes the natives
+    // across its side, and each native's mask gains or loses its bit.
+    f.enemies = this.fighters
+      .slice(0, index)
+      .reduce<number>(
+        (mask, _, i) => (sameSide(i) ? mask : mask | (1 << i)),
+        0,
+      );
+    this.fighters.forEach((n, i) => {
+      if (i === index) return;
+      n.enemies = sameSide(i)
+        ? n.enemies & ~(1 << index)
+        : n.enemies | (1 << index);
+    });
+    this.previous.push({});
+    this.inputs.push({});
+    this.history.push(blankHistory());
+    this.keyed.push(false);
+    this.spent.push(-1);
+    this.slots.push(null);
+    this.waits.push(null);
+    // Authored (HPA-972): a seat no native of this battle can ever hold —
+    // past every battle slot, so a No-partner reseat's dropped ally seat,
+    // every native scorer/watch seat and every native held-palette entry
+    // keep their original identity in this and later battles. The summon's
+    // palette stays in `summonPalettes`, never mutating `this.held`.
+    const seat = this.battle
+      ? Math.max(this.battle.slots.length, ...this.seats) + 1
+      : Math.max(...this.seats) + 1;
+    this.seats.push(seat);
+    if (this.battle) {
+      const taken = [...this.held, ...this.summonPalettes];
+      takePalette(taken, taken.length, 0);
+      this.summonPalettes.push(taken.at(-1)!);
+    }
+    const vm = new CpuVM(
+      CPU_TABLES[who],
+      CPU_LEVEL,
+      this.seed,
+      CPU_CONTROLS[who],
+      blockedCpuCommands(who, this.br),
+    );
+    if (this.cpus[1]) vm.shared = this.cpus[1];
+    this.cpus[index] = vm;
+    const summonCheats = effectiveSummonCheats(this.cheats, pendingCheats);
+    if (summonCheats.enabled) {
+      const enemy = side === -1;
+      f.maxHp = Math.max(
+        1,
+        Math.round(
+          lifeOf(who) *
+            (enemy
+              ? summonCheats.enemyHpMultiplier
+              : summonCheats.partnerHpMultiplier),
+        ),
+      );
+      f.maxStock = enemy
+        ? Math.min(10, stocksOf(who) * summonCheats.enemyStocksMultiplier)
+        : stocksOf(who);
+      f.enGainMultiplier = enGainOf(f.maxStock);
+      f.hp = f.maxHp;
+    }
+    // Its normal VS CHARGE, so the sensors reach its body (op 0x11's 9900
+    // down, PC 410) as any seated player's does.
+    this.spawnObject(f, index, {
+      flags: 0x24,
+      action: CHARACTERS[f.who].charge,
+      offset: 0,
+      x: 0,
+      y: 0,
+      slot: 0,
+      z: 0,
+    });
+    this.summoned = true;
+    return f;
   }
 
   // Authored (HPA-767): the 1P's positive outgoing damage to a hostile
@@ -2589,9 +2837,16 @@ export class Match {
     );
   }
 
-  // Whether a CPU plays this player this tick (+0xdf5d).
+  // Whether a CPU plays this player this tick (+0xdf5d). Authored
+  // (HPA-972): a summoned CPU plays from phase 1 whatever the mode's usual
+  // drive — a practice dummy or a human 2P leaves it on.
   private driven(f: Fighter) {
     const i = this.fighters.indexOf(f);
+    if (i >= this.nativeCount)
+      return (
+        Boolean(this.cpus[i]) &&
+        !(this.calls && this.roundTicks <= this.fightTick)
+      );
     return i > 0 && this.cpuDriven && Boolean(this.cpus[i]);
   }
 
@@ -2608,6 +2863,96 @@ export class Match {
     return target;
   }
 
+  // A loss's low-HP reduction keeps at least `floor` whole points: hit and
+  // outgoing damage keep the source's 1; a self-transfer's caller passes
+  // its scaled share (0 for a balanced drain pair under a shrink, so the
+  // pair keeps its native net; 1 for a take-only drain, so it still
+  // reaches 1). Authored (HPA-972): 1P's reduction follows the Low HP line
+  // and the Damage cut × over the fighter's native scale; every other
+  // fighter, and 1P with the master off, stays native.
+  private loseLife(f: Fighter, loss: number, floor = 1, guardOne = false) {
+    if (loss && f.hp <= this.lifeLineMark(f)) {
+      const kept = this.lossKeptPercent(f);
+      loss = kept === 0 ? 0 : Math.max(floor, Math.trunc((loss * kept) / 100));
+    }
+    if (guardOne) loss = Math.min(loss, Math.max(0, f.hp - 1));
+    f.hp = Math.max(0, f.hp - loss);
+    if (loss) [f.lost, f.lostDelay] = f.hp ? [f.lost + loss, 20] : [0, 0];
+    // A loss that leaves no life drops the player to priority 0x3c
+    // (0x40e8cd), behind the other.
+    if (f.hp === 0) f.z = 0x3c;
+    return loss;
+  }
+
+  // Authored (HPA-972): 1P's Low HP line moves SIN's and SOU's idle stance
+  // marks (a stance change, never the supers bypass); every other fighter,
+  // and 1P with the master off, stays at the native 30.
+  idleLifeLine(f: Fighter): number {
+    return f === this.fighters[0] && this.cheats.enabled
+      ? this.cheats.lowHpLine
+      : 30;
+  }
+
+  // The free state's program (action 1), which reads the fighter's variable 0
+  // (EX mode) and, for SIN and SOU, its life: SOU's on its first tick (PC 8).
+  // The life reads in scaled units against the seat's effective maximum and
+  // native life, so SIN-style op 0x11 marks (standing.ts) scale exactly as
+  // lifeMark does (HPA-767), and lifeLine is set before the first tick
+  // (HPA-972).
+  idleVM(f: Fighter, seed?: number) {
+    return Object.assign(
+      new StandingVM(CHARACTERS[f.who].idle, seed, 10, {
+        0x40: f.variables[0] ?? 0,
+      }),
+      {
+        life: f.hp,
+        lifeMax: f.maxHp,
+        lifeNative: lifeOf(f.who),
+        lifeLine: this.idleLifeLine(f),
+      },
+    );
+  }
+
+  // Authored (HPA-972): the low-life line in effective-HP units — 1P under
+  // cheats reads the Low HP line percent off its own effective maximum,
+  // everyone else the native 30% (desperationOf).
+  private lifeLineMark(f: Fighter): number {
+    if (f !== this.fighters[0] || !this.cheats.enabled)
+      return lifeMark(f, desperationOf(f.who));
+    return this.lineScaledMark(f, lifeOf(f.who), 100);
+  }
+
+  // Authored (HPA-972): `value` native HP scaled by the Low HP line over
+  // the native share it replaces (`lineOver`: 100 for the percent line, 30
+  // for a 30% gate). The percent keeps full precision through the
+  // effective-maximum scaling and truncates once, at the threshold — 1% of
+  // a ×100 bar reads 510, not the 500 a mark truncated before scaling
+  // gives — while the native sentinels (nonpositive, exact 1) stay
+  // un-scaled, exactly as lifeMark treats them.
+  private lineScaledMark(f: Fighter, value: number, lineOver: number): number {
+    const native = (value * this.cheats.lowHpLine) / lineOver;
+    if (native <= 0 || native === 1) return native;
+    return Math.max(
+      1,
+      Math.trunc(
+        (value * this.cheats.lowHpLine * f.maxHp) / (lineOver * lifeOf(f.who)),
+      ),
+    );
+  }
+
+  // Authored (HPA-972): the percent a loss keeps under the line — 1P under
+  // cheats keeps its native reduction (100 − scale) scaled by the Damage
+  // cut ×, floored at none and capped at all; native whole-point flooring
+  // otherwise, so only the full 100% reduces a loss to nothing.
+  private lossKeptPercent(f: Fighter): number {
+    const scale = CHARACTERS[f.who].scale;
+    if (f !== this.fighters[0] || !this.cheats.enabled) return scale;
+    return Math.max(
+      0,
+      Math.min(100, 100 - (100 - scale) * this.cheats.damageCutMultiplier),
+    );
+  }
+
   // 0x40e7c0 queues the lose action as a loss empties life (0x40e84b), and in
   // a story scores the step's points (0x40e863): the 1P's KO gives its +0x13
   // to +0x12's player (0 the striker, +0xdef9's, n seat n − 1), another's its
@@ -2620,6 +2965,10 @@ export class Match {
     // check for lives emptied outside this routine.
     f.downed = true;
     this.queue(f, 'down');
+    // Authored (HPA-972): a summoned fighter's fall scores and awards
+    // nothing — it holds no slot; the downed flag and KO action above still
+    // ran for combat.
+    if (this.fighters.indexOf(f) >= this.nativeCount) return;
     const { battle } = this;
     if (!battle) return;
     const slot = this.slots[this.fighters.indexOf(f)];
@@ -2628,11 +2977,46 @@ export class Match {
       caught && ('clip' in caught ? this.fighters[caught.owner] : caught);
     const pick = (n: number) =>
       n === 0 ? striker : n <= 8 ? this.bySeat(n - 1) : null;
-    const scorer = pick(slot ? slot.scorer : battle.koScorer);
+    let scorer = pick(slot ? slot.scorer : battle.koScorer);
+    // Authored (HPA-972): a summon never scores a native KO. The source's
+    // striker (0) resolves to a native of the striker's own side — the 1P
+    // for its allies, the first native hostile otherwise — so the points
+    // land where the natives-only outcome checks can read them and the
+    // round ends as the source would end it; the summon's own points stay
+    // empty. A seat-named scorer only names native seats.
+    if (scorer && this.fighters.indexOf(scorer) >= this.nativeCount)
+      scorer = this.hostile(0, this.fighters.indexOf(scorer))
+        ? (this.natives.find((n, i) => i > 0 && this.hostile(0, i)) ?? null)
+        : this.fighters[0];
     if (scorer) scorer.points += slot ? slot.points : battle.koPoints;
+    const award = slot ? (slot.flags >> 7) & 3 : 0;
+    const picked = slot && [null, this.fighters[0], striker][award];
+    // Authored (HPA-972): the striker's share of a KO bonus passes a
+    // summon by — it holds no seat and takes no native award.
     const bonus =
-      slot && [null, this.fighters[0], striker][(slot.flags >> 7) & 3];
-    if (!bonus) return;
+      picked && this.fighters.indexOf(picked) >= this.nativeCount
+        ? null
+        : picked;
+    if (!slot || !bonus) return;
+    // Authored (HPA-972): a B.R. battle's award the 1P itself receives —
+    // paid to it by the slot or struck by it as the striker — can be
+    // replaced by the per-kill overrides — null keeps the source amounts, a
+    // positive HP award scales by lifeAmount, and 0 skips the gain
+    // (lifeAmountOf(0) would force 1); the EN 0 skips addPower. Every other
+    // recipient, every other battle and the master-off path keep the source
+    // award.
+    if (bonus === this.fighters[0] && this.br && this.cheats.enabled) {
+      const { brHpPerKill, brEnPerKill } = this.cheats;
+      if (brHpPerKill === null) gainLife(bonus, lifeAmount(bonus, slot.life));
+      else if (brHpPerKill > 0)
+        gainLife(
+          bonus,
+          lifeAmountOf(brHpPerKill, bonus.maxHp, lifeOf(bonus.who)),
+        );
+      if (brEnPerKill === null) addPower(bonus, slot.power);
+      else if (brEnPerKill > 0) addPower(bonus, brEnPerKill);
+      return;
+    }
     // The life, a signed byte (0x40e984), goes through the life routine
     // (0x40e7c0), which would take a loss or KO a taker at 0 for a bonus of
     // 0, but every paid story bonus is 30 to 100: a gain. Authored (HPA-767): like
@@ -2690,7 +3074,7 @@ export class Match {
     if (f.who === 'dora' && action !== 'script') f.pierceCastTick = undefined;
     if (action !== 'jump') f.jump = 0;
     // KO Normal's PC 607 adds ten stop ticks to the other fighter.
-    if (action === 'down') this.pauseOthers(f, 10);
+    if (action === 'down' && this.koHolds(f)) this.pauseOthers(f, 10);
     f.action = action;
     f.age = 0;
     f.connected = false;
@@ -2701,7 +3085,7 @@ export class Match {
       branch === undefined ? this.roll(f.who, rolls(f.who)[action]) : branch;
     if (action === 'down') {
       f.branch ??= this.koTest(f);
-      this.koFreeze(f);
+      if (this.koHolds(f)) this.koFreeze(f);
     }
     f.copy = null;
     f.slideBase = 0;
@@ -2755,13 +3139,29 @@ export class Match {
   // The action of a standing fighter's round result (+0xe007): 1 win (57),
   // or 3 draw (65), which the result states (0x409444, 0x409519) also give
   // the loser once the timer (0x470050) has run out. A story's may be 2, the
-  // lose action (0x411038).
+  // lose action (0x411038). Authored (HPA-972): a summon takes its side's
+  // result, in Vs., practice and story alike.
   private result(f: Fighter) {
     const index = this.fighters.indexOf(f);
-    if (this.battle)
-      return (['win', 'lose', 'draw'] as const)[this.results[index] - 1];
-    return this.winner !== 'draw' &&
-      (this.winner === 'player') === (index === 0)
+    const ally = !this.hostile(0, index);
+    if (this.battle) {
+      const lose = this.seconds === 0 ? 3 : 2;
+      const code =
+        this.results[index] ??
+        (this.winner === 'draw'
+          ? 3
+          : this.winner === 'player'
+            ? ally
+              ? 1
+              : lose
+            : !index
+              ? lose
+              : ally
+                ? 3
+                : 1);
+      return (['win', 'lose', 'draw'] as const)[code - 1];
+    }
+    return this.winner !== 'draw' && (this.winner === 'player') === ally
       ? 'win'
       : 'draw';
   }
@@ -2908,6 +3308,15 @@ export class Match {
     return test?.op === 'test' ? sourceKey(test.action, test.offset) : null;
   }
 
+  // Whether the fighter's KO stops the arena: the others' ten ticks (PC
+  // 607), its freeze to global 6 (PCs 606, 610) and PC 611's 40-tick
+  // hold. Authored (HPA-972): once the round is decided, a losing summon
+  // adds no arena stop, which would otherwise chain 40 ticks per summon
+  // over the celebration. A native loser's hold stays.
+  private koHolds(f: Fighter) {
+    return !this.winner || this.fighters.indexOf(f) < this.nativeCount;
+  }
+
   // KO Normal's freeze (global 6) at the fighter's age, from the timeline
   // it draws: Ryuko's adds 10 (PC 606), then 40 at age 5 (PC 610). ASURA's
   // voice roll (PC 416) jumps past its 10 to + 15 (PC 418) when it fails.
@@ -2993,7 +3402,7 @@ export class Match {
     }
     const launch = f.action === 'down' ? 14 : f.action === 'koAgain' ? 6 : 0;
     if (!launch) return false;
-    if (f.action === 'down' && f.age === 5) {
+    if (f.action === 'down' && f.age === 5 && this.koHolds(f)) {
       this.koFreeze(f);
       this.koStop += 40;
     }
@@ -3094,7 +3503,7 @@ export class Match {
       if (event.t !== end) continue;
       if (event.op === 'test' && this.passes(f, f, event)) break;
       if (event.op !== 'power') continue;
-      const damage = loseLife(
+      const damage = this.loseLife(
         f,
         this.outgoingDamage(striker, f, -event.selfLife),
       );
@@ -3710,7 +4119,7 @@ export class Match {
             : pairedTake(actor)
               ? lifeShare(self, 1)
               : lifeAmount(self, 1);
-          loseLife(
+          this.loseLife(
             self,
             take
               ? this.outgoingDamage(this.met(self), self, -event.selfLife)
@@ -3727,7 +4136,7 @@ export class Match {
         if (event.otherLife > 0)
           gainLife(other, lifeAmount(other, event.otherLife));
         if (event.otherLife < 0) {
-          const damage = loseLife(
+          const damage = this.loseLife(
             other,
             this.outgoingDamage(self, other, -event.otherLife),
           );
@@ -3783,16 +4192,37 @@ export class Match {
         );
         if (self.stock === self.maxStock) self.power = 0;
         break;
-      case 'life':
+      case 'life': {
+        // Authored (HPA-972): 1P's tabled super gates (superGateOf) follow
+        // the Low HP line — their marks scale by line / 30 — and, with
+        // Low-HP supers on, a below:true gate always jumps for the super
+        // while a below:false one never jumps away to the normal move.
+        // Unrelated life checks, the HP0 sentinels and every other
+        // fighter's checks stay native; SIN's and SOU's idle op 0x11s are
+        // the StandingVM's stance changes and are never bypassed.
+        const gate =
+          !('clip' in actor) &&
+          actor === self &&
+          self === this.fighters[0] &&
+          actor.action === 'script' &&
+          this.cheats.enabled &&
+          superGateOf(self.who, String(actor.branch ?? ''));
+        if (gate && this.cheats.lowHpSupers) {
+          if (gate.below)
+            return this.branchTo(actor, sourceKey(event.target, event.offset));
+          break;
+        }
+        const mark = gate
+          ? this.lineScaledMark(self, gate.value, 30)
+          : lifeMark(self, event.value);
         if (
           ('clip' in actor || actor.action === 'script') &&
           event.target &&
-          (event.below
-            ? self.hp <= lifeMark(self, event.value)
-            : self.hp >= lifeMark(self, event.value))
+          (event.below ? self.hp <= mark : self.hp >= mark)
         )
           return this.branchTo(actor, sourceKey(event.target, event.offset));
         break;
+      }
       case 'screen':
         // Op 0x0e flag 1 (0x41330b) starts the owner's fader from the
         // actor's colour, and flag 2 (0x41336c) that of the player whatever
@@ -4397,14 +4827,18 @@ export class Match {
             // Projectiles run their own clash handler; fighters queue none.
             if ((box.kind | met.kind) & 0x100) {
               if (!box.damage && !met.damage) continue;
-              if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
+              // Authored (HPA-972): the story HUD's target is a native seat
+              // — a met summon never displaces it.
+              if (owner === 0 && other < this.nativeCount)
+                [this.enemy, this.enemyTicks] = [other, 1000];
               for (const o of [a, b])
                 if ('clip' in o && o.onClash)
                   [o.pending, o.onClash] = [o.onClash, undefined];
               strip(a, b);
               return;
             }
-            if (owner === 0) [this.enemy, this.enemyTicks] = [other, 1000];
+            if (owner === 0 && other < this.nativeCount)
+              [this.enemy, this.enemyTicks] = [other, 1000];
             if (!box.damage && !met.damage) {
               strip(a, b);
               continue;
@@ -5060,8 +5494,10 @@ export class Match {
     this.sounds = [];
     if (this.enemyTicks && !--this.enemyTicks) this.enemy = -1;
     // The story HUD (0x40a36e) takes the only other player with life.
+    // Authored (HPA-972): of the natives — a living summon keeps a lone
+    // native opponent's mark from lapsing back onto it.
     if (this.battle) {
-      const alive = this.fighters.flatMap((f, i) => (i && f.hp ? [i] : []));
+      const alive = this.natives.flatMap((f, i) => (i && f.hp ? [i] : []));
       if (alive.length === 1) this.enemy = alive[0];
     }
     // 0x412271: before its script each tick, frozen or not, an object with
@@ -5425,7 +5861,22 @@ export class Match {
       this.hitTest();
       return;
     }
-    if (!this.winner && !this.picking) this.ticks++;
+    if (!this.winner && !this.picking) {
+      this.ticks++;
+      // Authored (HPA-972): round 1's first active tick grants 1P its
+      // starting EN — one stock under the cap and no stored power — after
+      // the intro's phase 0 has returned, which no-intro practice reaches
+      // on its first step. Nested in the count's increment so a round
+      // already picking its result — a pre-FIGHT KO like SHIN-Z's VS
+      // start leaves `ticks` at 1 — cannot re-grant it under the
+      // celebration. Unlimited EN below refills over it; later rounds
+      // keep the native carryover.
+      if (this.cheats.enabled && this.round === 1 && this.ticks === 1) {
+        const one = this.fighters[0];
+        one.stock = one.maxStock - 1;
+        one.power = 0;
+      }
+    }
     // Authored (HPA-767): Unlimited EN tops the 1P up to its effective cap
     // every active tick, before the tick's inputs — the source's pays and
     // deductions still run, so a spend within the tick stands until the
@@ -5441,14 +5892,17 @@ export class Match {
           f.stock = f.maxStock;
           f.power = 0;
         }
-      // Authored: just under 30%, as Ryuko's hidden super, Zoma's Shin
-      // Spark, G Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300
-      // enter their desperation forms only below it (op 0x11 at 153, 147,
-      // 150, 144, 165 and 141 or more; the rest at it or below). Authored
+      // Authored: just under the low-life line — the native 30%, or 1P's
+      // HPA-972 Low HP line — as Ryuko's hidden super, Zoma's Shin Spark, G
+      // Suneo's hh, Yo's HIDDEN, SIN's NOZAN and GON's Hidden en300 enter
+      // their desperation forms only below it (op 0x11 at 153, 147, 150,
+      // 144, 165 and 141 or more; the rest at it or below). Authored
       // (HPA-767): the mark scales with the effective maximum.
       if (this.practice.lowHealth) {
         const one = this.fighters[0];
-        one.hp = Math.min(one.hp, lifeMark(one, desperationOf(one.who)) - 1);
+        // A 0% line's mark is 0: the hold keeps 1 HP instead of writing a
+        // negative, truthy life.
+        one.hp = Math.min(one.hp, Math.max(1, this.lifeLineMark(one) - 1));
       }
     }
     const inputs = this.fighters.map((_, i) =>
@@ -5523,7 +5977,7 @@ export class Match {
       ? !one.hp ||
         (enemies
           ? enemies.every((f) => f.downed)
-          : this.fighters.some((f) => f.points >= 100))
+          : this.natives.some((f) => f.points >= 100))
       : !one.hp || !two.hp;
     if (this.picking?.winner) {
       this.winner = this.picking.winner;
@@ -5579,8 +6033,12 @@ export class Match {
       // A 1P's box, its objects' too, marks the player it met (0x40f2e6).
       const by =
         'clip' in striker ? striker.owner : this.fighters.indexOf(striker);
-      if (by === 0 && !('clip' in victim))
-        [this.enemy, this.enemyTicks] = [this.fighters.indexOf(victim), 1000];
+      if (by === 0 && !('clip' in victim)) {
+        const at = this.fighters.indexOf(victim);
+        // Authored (HPA-972): the mark a 1P's box leaves names a native
+        // seat — striking a summon never steals the story HUD's target.
+        if (at < this.nativeCount) [this.enemy, this.enemyTicks] = [at, 1000];
+      }
       if (!('clip' in victim)) victim.z = FIGHTER_Z - 1;
       if ('clip' in striker) return;
       striker.z = FIGHTER_Z + 1;
@@ -5636,7 +6094,7 @@ export class Match {
         target,
         boxDamage(box, taken, blocked, f.who, target.struck),
       );
-      const loss = loseLife(target, strength);
+      const loss = this.loseLife(target, strength);
       if (!blocked && strength) target.struck++;
       f.damage += loss;
       if (!blocked) f.hits++;

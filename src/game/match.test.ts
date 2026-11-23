@@ -1387,6 +1387,15 @@ describe('practice partner', () => {
     return { match, ryuko, target };
   }
 
+  it('defaults the live Enemy HP bars session option off (HPA-972)', () => {
+    const match = new Match();
+    expect(match.practice.enemyBars).toBe(false);
+    // The option rides the practice settings that App passes through
+    // TrainingScene.setPractice, session-local and not persisted.
+    match.practice = { ...match.practice, enemyBars: true };
+    expect(match.practice.enemyBars).toBe(true);
+  });
+
   it('plays the original CPU, guard roll included', () => {
     const { match, ryuko, target } = partner('cpu');
     match.cpu = new CpuVM([], 100);
@@ -1581,8 +1590,8 @@ describe('cheat options (HPA-767)', () => {
     match.useCheats(
       cheats({
         playerHpMultiplier: 5,
-        enemyHpMultiplier: 0.1,
-        playerEnLimit: 6,
+        enemyHpMultiplier: 100,
+        playerMaxEn: 600,
       }),
     );
     for (const f of match.fighters)
@@ -1596,13 +1605,13 @@ describe('cheat options (HPA-767)', () => {
       cheats({
         enabled: true,
         playerHpMultiplier: 2,
-        playerEnLimit: 6,
-        enemyHpMultiplier: 0.1,
+        playerMaxEn: 600,
+        enemyHpMultiplier: 3,
       }),
     );
     const [player, dummy] = match.fighters;
     expect(player).toMatchObject({ hp: 1020, maxHp: 1020, maxStock: 6 });
-    expect(dummy).toMatchObject({ hp: 51, maxHp: 51, maxStock: 3 });
+    expect(dummy).toMatchObject({ hp: 1530, maxHp: 1530, maxStock: 3 });
   });
 
   it('copies the options defensively, once, before the first step', () => {
@@ -1619,7 +1628,7 @@ describe('cheat options (HPA-767)', () => {
   it('installs once: a second call before the first step changes nothing', () => {
     const match = new Match();
     match.useCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, playerMaxEn: 600 }),
     );
     // A later disabled call must not undo the installed seating.
     match.useCheats(cheats({ enabled: false }));
@@ -1638,7 +1647,7 @@ describe('cheat options (HPA-767)', () => {
     const match = new Match();
     match.step();
     match.useCheats(
-      cheats({ enabled: true, playerHpMultiplier: 2, playerEnLimit: 6 }),
+      cheats({ enabled: true, playerHpMultiplier: 2, playerMaxEn: 600 }),
     );
     // The battle already ran native; a late first call seats no one.
     expect(match.cheats).toEqual(DEFAULT_CHEATS);
@@ -1711,7 +1720,7 @@ describe('cheat options (HPA-767)', () => {
   it("scales the enemy's desperation damage reduction with its maximum (0x40e7c0)", () => {
     const punched = (hp: number) => {
       const match = new Match('practice', false, 0, ['ryuko', 'ryuko']);
-      match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+      match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
       const [f, victim] = match.fighters;
       victim.x = f.x + 200;
       pose(match, victim, 'idle', 12);
@@ -1720,10 +1729,10 @@ describe('cheat options (HPA-767)', () => {
       ticks(match, 2);
       return victim.hp;
     };
-    // The scaled maximum is 51, so 30% is 15: above it punch 1's 10 lands
-    // whole, at it the loss shrinks to 60%.
-    expect(punched(16)).toBe(6);
-    expect(punched(15)).toBe(9);
+    // The scaled maximum is 1020, so 30% is 306: above it punch 1's 10
+    // lands whole, at it the loss shrinks to 60%.
+    expect(punched(307)).toBe(297);
+    expect(punched(306)).toBe(300);
   });
 
   it('scales a story CPU but no ally, seating by hostility', () => {
@@ -1733,12 +1742,12 @@ describe('cheat options (HPA-767)', () => {
         slots: [storySlot(), storySlot({ flags: 0x201 }), storySlot()],
       }),
     );
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 3 }));
     const [one, enemy, ally, other] = match.fighters;
     expect([one.maxHp, enemy.maxHp, ally.maxHp, other.maxHp]).toEqual([
-      510, 20, 200, 20,
+      510, 600, 200, 600,
     ]);
-    expect([one.hp, enemy.hp, ally.hp, other.hp]).toEqual([510, 20, 200, 20]);
+    expect([one.hp, enemy.hp, ally.hp, other.hp]).toEqual([510, 600, 200, 600]);
   });
 
   it("composes with the boss route's tough slots: Enemy HP ×3 seats a tough enemy ×6, at its five-stock cap", () => {
@@ -1759,7 +1768,7 @@ describe('cheat options (HPA-767)', () => {
       }),
     );
     match.useCheats(
-      cheats({ enabled: true, enemyHpMultiplier: 3, playerEnLimit: 6 }),
+      cheats({ enabled: true, enemyHpMultiplier: 3, playerMaxEn: 600 }),
     );
     const [one, tough, plain, ally, waiting] = match.fighters;
     // ZAKU's native 200: the route's ×2 under ×3 seats 1200, full, at the
@@ -1840,25 +1849,25 @@ describe('cheat options (HPA-767)', () => {
         ],
       }),
     );
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
     toFight(match);
     const [, zaku, waiting] = match.fighters;
-    // ZAKU's scaled maximum is 20, so the mark is ⌊153 × 20 / 200⌋ = 15.
-    zaku.hp = 15;
+    // ZAKU's scaled maximum is 400, so the mark is ⌊153 × 400 / 200⌋ = 306.
+    zaku.hp = 306;
     match.step();
     expect(waiting.present).toBe(false);
-    zaku.hp = 14;
+    zaku.hp = 305;
     match.step();
     expect(waiting.present).toBe(true);
   });
 
-  it('floors a scaled mark at 1: a zero-HP watched fighter still reinforces', () => {
+  it('keeps the 1-HP mark exact under scaling: a zero-HP watched fighter still reinforces', () => {
     const match = Match.story(
       'ryuko',
       storyBattle({
         slots: [
           storySlot(),
-          storySlot({ flags: 4, watch: 1, below: 2 }),
+          storySlot({ flags: 4, watch: 1, below: 1 }),
           null,
           null,
           null,
@@ -1867,11 +1876,11 @@ describe('cheat options (HPA-767)', () => {
         ],
       }),
     );
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.1 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 3 }));
     toFight(match);
     const [, zaku, waiting] = match.fighters;
-    // ZAKU's scaled maximum is 20 of native 200: the mark 2 scales to
-    // ⌊2 × 20 / 200⌋ = 0 but floors at 1, so only zero life passes below it.
+    // The literal 1-HP sentinel never scales: at ZAKU's 600 maximum the
+    // mark stays 1, so only zero life passes below it.
     zaku.hp = 1;
     match.step();
     expect(waiting.present).toBe(false);
@@ -1975,8 +1984,8 @@ describe('cheat options (HPA-767)', () => {
       cheats({
         enabled: true,
         playerHpMultiplier: 2,
-        playerEnLimit: 2,
-        enemyHpMultiplier: 0.1,
+        playerMaxEn: 200,
+        enemyHpMultiplier: 3,
       }),
     );
     toFight(match);
@@ -1994,8 +2003,8 @@ describe('cheat options (HPA-767)', () => {
     });
     expect(match.fighters[1]).toMatchObject({
       who: 'zaku',
-      hp: 20,
-      maxHp: 20,
+      hp: 600,
+      maxHp: 600,
       maxStock: 1,
     });
   });
@@ -2018,26 +2027,25 @@ describe('cheat options (HPA-767)', () => {
       return alpha;
     };
     // He stands through the revival and KO Boss Down drains him back to a
-    // full bar — native 500 of 500 reads as 2500 of 2500 at ×5, and ×0.1's
-    // 1-a-pass drain (2 native below its 1-HP floor) climbs to 50 of 50
-    // just as the native 2-a-pass climbs to 500 of 500.
+    // full bar — native 500 of 500 reads as 2500 of 2500 at ×5, and ×2's
+    // pair reads 1000 of 1000 just as the native reads 500 of 500.
     expect(revival(5).hp).toBe(2500);
+    expect(revival(2).hp).toBe(1000);
     expect(revival(1).hp).toBe(500);
-    expect(revival(0.1).hp).toBe(50);
   });
 
-  it("keeps ALPHA's drain climbing below 30% at Enemy HP ×0.5", () => {
-    // VS single leaves global 3 at 50, so KO Boss Down's take runs; at 0.5
-    // the native +2/−2 pass is +1/−1 after scaling, and the low-HP
-    // reduction's floor scales to 0, keeping the native +1 net.
+  it("keeps ALPHA's drain climbing below 30% at Enemy HP ×2", () => {
+    // VS single leaves global 3 at 50, so KO Boss Down's take runs; at 2
+    // the native +2/−2 pass is +4/−4 after scaling, and the low-HP
+    // reduction's floor keeps the pass from diving past the line.
     const match = new Match('cpu', false, 0, ['ryuko', 'alpha'], 'court', true);
-    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
+    match.useCheats(cheats({ enabled: true, enemyHpMultiplier: 2 }));
     const alpha = match.fighters[1];
     alpha.hp = 1;
     enter(match, alpha, 93);
     for (let t = 0; t < 200; t++) match.step();
-    // Native settles just above 30% (151 of 500); halved, 76 of 250.
-    expect(alpha.hp).toBe(76);
+    // The passes settle against the scaled 30% line: 30% of 1000.
+    expect(alpha.hp).toBe(301);
   });
 
   it("keeps a reaction's own life take on the striker's damage route (YARA, PC 1519)", () => {
@@ -2091,16 +2099,16 @@ describe('cheat options (HPA-767)', () => {
     const zmega = drain.fighters[0];
     enter(drain, zmega, 195);
     expect(zmega.hp).toBe(zmega.maxHp - 5);
-    // A take-only drain keeps its whole point under a shrink, so HP0 still
-    // reaches 1 where a balanced pair's take may round to 0.
-    const shrink = new Match('practice', false, 0, ['ryuko', 'zmega']);
-    shrink.useCheats(cheats({ enabled: true, enemyHpMultiplier: 0.5 }));
-    const enemy = shrink.fighters[1];
-    shrink.step();
+    // A take-only drain keeps its whole point at the switch-on neutral, so
+    // HP0 still reaches 1 without a balanced gain rounding the pass away.
+    const takeOnly = new Match('practice', false, 0, ['ryuko', 'zmega']);
+    takeOnly.useCheats(cheats({ enabled: true, enemyHpMultiplier: 1 }));
+    const enemy = takeOnly.fighters[1];
+    takeOnly.step();
     enemy.hp = 5;
     enemy.variables[3] = 30;
-    spawn(shrink, 1, 196, { x: 480, y: 0 });
-    for (let t = 0; t < 100 && enemy.hp > 1; t++) shrink.step();
+    spawn(takeOnly, 1, 196, { x: 480, y: 0 });
+    for (let t = 0; t < 100 && enemy.hp > 1; t++) takeOnly.step();
     expect(enemy.hp).toBe(1);
   });
 
@@ -2109,8 +2117,8 @@ describe('cheat options (HPA-767)', () => {
     // marks — already lifeMark-scaled — and the next round's start takes
     // 102/204/306 of it (46 + 5, 47 + 5, 48 + 4): the take scales with the
     // same maximum, so a returning winner lands at its bucket's share of
-    // the bar. At ×0.1 the native 102 would KO it at once; at ×5 it would
-    // take too little.
+    // the bar. At ×2 the enemy's bar doubles, and the take scales with it:
+    // the returning winner keeps its bucket's share of the doubled bar.
     const carries = (
       fields: Partial<CheatOptions>,
       life: number,
@@ -2141,16 +2149,16 @@ describe('cheat options (HPA-767)', () => {
     // 1P ×5 (full 2550): a win at 2000 — native 400, the second fifth —
     // comes back at 2040, the native 102 scaled to 510.
     expect(carries({ playerHpMultiplier: 5 }, 2000, 1)).toEqual([2040, 2040]);
-    // The enemy ×0.1 (full 51): a win at 39 — native 390 — comes back at
-    // 41, the native 102 scaled to 10 off the full bar, alive where the
-    // native take KOs it at once.
-    expect(carries({ enemyHpMultiplier: 0.1 }, 39, 0)).toEqual([41, 41]);
+    // The enemy ×2 (full 1020): a win at 800 — native 400 — comes back at
+    // 816, the native 102 scaled to 204 off the full bar, where the native
+    // take would land far lower.
+    expect(carries({ enemyHpMultiplier: 2 }, 800, 0)).toEqual([816, 816]);
   });
 
   it("caps the 1P's gauge at the EN limit, native-1 and native-6 fighters alike", () => {
     const cap = (who: Who, limit: number) => {
       const match = new Match('practice', false, 0, [who, 'ryuko']);
-      match.useCheats(cheats({ enabled: true, playerEnLimit: limit }));
+      match.useCheats(cheats({ enabled: true, playerMaxEn: limit * 100 }));
       const f = match.fighters[0];
       addPower(f, 650);
       return f;
@@ -2171,7 +2179,7 @@ describe('cheat options (HPA-767)', () => {
 
   it('borrows back below the EN limit as the source does', () => {
     const match = new Match();
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 2 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 200 }));
     const f = match.fighters[0];
     addPower(f, 250);
     expect(f).toMatchObject({ stock: 2, power: 0 });
@@ -2185,7 +2193,7 @@ describe('cheat options (HPA-767)', () => {
 
   it('keeps every hostile gauge capped natively', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 600 }));
     const zaku = match.fighters[1];
     expect(zaku.maxStock).toBe(1);
     addPower(zaku, 650);
@@ -2195,7 +2203,7 @@ describe('cheat options (HPA-767)', () => {
   it("refills the 1P to its cap every active tick, before the tick's inputs", () => {
     const match = new Match();
     match.useCheats(
-      cheats({ enabled: true, playerEnLimit: 3, unlimitedEn: true }),
+      cheats({ enabled: true, playerMaxEn: 300, unlimitedEn: true }),
     );
     const [one, dummy] = match.fighters;
     [one.stock, one.power, dummy.stock] = [0, 37, 0];
@@ -2214,7 +2222,7 @@ describe('cheat options (HPA-767)', () => {
   it('tops practice Max stock to the EN limit and the partner to its cap', () => {
     const match = new Match('practice', false, 0, ['ryuko', 'zaku']);
     match.practice.maxStock = true;
-    match.useCheats(cheats({ enabled: true, playerEnLimit: 6 }));
+    match.useCheats(cheats({ enabled: true, playerMaxEn: 600 }));
     match.step();
     expect(match.fighters[0].stock).toBe(6);
     expect(match.fighters[1].stock).toBe(1);
@@ -2229,7 +2237,7 @@ describe('cheat options (HPA-767)', () => {
       'court',
     );
     match.useCheats(
-      cheats({ enabled: true, playerEnLimit: 2, unlimitedEn: true }),
+      cheats({ enabled: true, playerMaxEn: 200, unlimitedEn: true }),
     );
     toFight(match);
     expect(match.fighters[0]).toMatchObject({ stock: 2, power: 0 });
@@ -2268,21 +2276,21 @@ describe('cheat options (HPA-767)', () => {
     const x2 = cheats({ enabled: true, playerDamageMultiplier: 2 });
     expect(struckLoss(x2)).toBe(20);
     expect(
-      struckLoss(cheats({ enabled: true, playerDamageMultiplier: 0.5 })),
-    ).toBe(5);
+      struckLoss(cheats({ enabled: true, playerDamageMultiplier: 4 })),
+    ).toBe(40);
     // A blocked punch 1 (kind 3) carries no strength to scale.
     expect(struckLoss(x2, { guard: true })).toBe(0);
-    // IORI's box chips 3 (20% of 15); ×2 rounds 6, ×0.5 rounds 2.
+    // IORI's box chips 3 (20% of 15); ×2 rounds 6, ×4 lands 12.
     expect(struckLoss(x2, { guard: true }, 'iori')).toBe(6);
     expect(
       struckLoss(
-        cheats({ enabled: true, playerDamageMultiplier: 0.5 }),
+        cheats({ enabled: true, playerDamageMultiplier: 4 }),
         {
           guard: true,
         },
         'iori',
       ),
-    ).toBe(2);
+    ).toBe(12);
   });
 
   it("multiplies the 1P's projectile damage", () => {
@@ -2341,7 +2349,7 @@ describe('cheat options (HPA-767)', () => {
     expect(run(1)).toBe(471);
     // The self route never passes the multiplier.
     expect(run(2)).toBe(471);
-    expect(run(0.5)).toBe(471);
+    expect(run(100)).toBe(471);
   });
 
   it("leaves the opponent's strikes native", () => {

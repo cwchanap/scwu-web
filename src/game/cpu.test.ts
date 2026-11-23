@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { CPU_CONTROLS, CPU_TABLES, CpuVM, RYUKO_CPU } from './cpu';
+import { CPU_CONTROLS, CPU_LEVEL, CPU_TABLES, CpuVM, RYUKO_CPU } from './cpu';
 import type { CpuEntry, CpuStep } from './cpu';
+import { DEFAULT_CHEATS } from './cheats';
 import { Match } from './match';
 import { rand } from './standing';
 
@@ -212,5 +213,18 @@ describe('CPU decision and playback', () => {
     const vm = new CpuVM(RYUKO_CPU);
     expect(vm.level).toBe(50);
     expect(run(vm, 200).some((input) => Object.keys(input).length)).toBe(true);
+  });
+
+  it('gives each summon its own table at the authored level, sharing the match CPU (HPA-972)', () => {
+    const match = new Match('cpu', false, 7, ['ryuko', 'zoma']);
+    match.summon('shinz', 1, DEFAULT_CHEATS);
+    match.summon('zoma', -1, DEFAULT_CHEATS);
+    const { cpus } = match as unknown as { cpus: (CpuVM | null)[] };
+    expect(cpus).toHaveLength(4);
+    expect(cpus[2]!.level).toBe(CPU_LEVEL);
+    expect(cpus[3]!.level).toBe(CPU_LEVEL);
+    // The engines share one random source (0x411270's shared rand).
+    expect(cpus[2]!.shared).toBe(cpus[1]);
+    expect(cpus[3]!.shared).toBe(cpus[1]);
   });
 });
