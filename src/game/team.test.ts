@@ -833,15 +833,20 @@ describe('story battles', () => {
       expect(seen[2][0] - seen[1][0]).toBe(60);
     });
 
-    it('wakes no paid 1P on a B.R. route, where the authored !br gate stands', () => {
+    it('pays no same-tick bonus to a downed 1P on a B.R. route (HPA-1251)', () => {
+      // HPA-1251: the guarded gain does nothing for a downed 1P, so the
+      // paying seat's slot award no longer lands here — the HPA-973 !br
+      // wake gate itself stays, covered by the state-set koLand rows in
+      // match.test.ts and this suite's other B.R. rows.
       const { match, one } = trade('ryuko', true);
-      expect(one).toMatchObject({ hp: 50, downed: true });
+      expect(one).toMatchObject({ hp: 0, downed: true });
       for (let t = 0; t < 200; t++) {
         match.step();
-        expect(match.winner).toBeNull();
         expect(one.action).not.toBe('getUp');
       }
-      expect(one).toMatchObject({ action: 'koLand', hp: 50, downed: true });
+      // Nothing restores the 1P, so the trade's KO stands as a loss.
+      expect(match.winner).toBe('opponent');
+      expect(one).toMatchObject({ action: 'koLand', hp: 0, downed: true });
     });
 
     it('lets no bonus a tick late undo a picked loss', () => {
@@ -1530,9 +1535,11 @@ describe('BR Another stages', () => {
     }
   });
 
-  it('denies stage-3 boss DoraEmon his EN charge but keeps his KO RELOAD in a B.R. stage 3', () => {
-    // Authored (HPA-858): on a B.R. route the charge is dead for any
-    // DoraEmon seat, CPU included, while the KO RELOAD stocks stay live.
+  it('denies stage-3 boss DoraEmon his EN charge and his KO RELOAD in a B.R. stage 3', () => {
+    // Authored (HPA-858, HPA-1251): on a B.R. route the charge is dead for
+    // any DoraEmon seat, CPU included, and the KO RELOAD stocks stay unspent
+    // — every DoraEmon seat takes the ordinary KO and lies at 0 life, the
+    // next seat still entering behind him.
     const match = Match.story(
       'kiki',
       brAnotherStages('kiki').stage3,
@@ -1579,19 +1586,13 @@ describe('BR Another stages', () => {
     dora.stock = 4;
     knockOut(match, dora, one);
     const path: unknown[] = [];
-    for (let t = 0; t < 2000 && dora.hp < lifeOf('dora'); t++) {
+    for (let t = 0; t < 2000; t++) {
       match.step();
       const current = playing(dora);
       if (path.at(-1) !== current) path.push(current);
     }
-    expect(path.indexOf(72)).toBeGreaterThanOrEqual(0);
-    expect(path.indexOf(74)).toBeGreaterThan(path.indexOf(72));
-    expect([dora.hp, dora.stock, dora.downed, match.winner]).toEqual([
-      lifeOf('dora'),
-      1,
-      true,
-      null,
-    ]);
+    expect(path.some((a) => a === 72 || a === 74)).toBe(false);
+    expect([dora.hp, dora.stock, dora.downed]).toEqual([0, 4, true]);
     for (const boss of [first, second, third]) {
       knockOut(match, boss, one);
       match.step();

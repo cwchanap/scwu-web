@@ -16,7 +16,7 @@ import {
   pushboxes,
   script,
 } from './animations';
-import { bossBrAnotherStory, brAnotherStages } from './br-another';
+import { bossBrAnotherStory, brAnotherStages, brLongStory } from './br-another';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, fighterPose, firstStrike, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
@@ -1882,6 +1882,38 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     expect(reload).toBeGreaterThanOrEqual(0);
     expect(kept.path.indexOf(74)).toBeGreaterThan(reload);
     expect(kept).toMatchObject({ hp: lifeOf('dora'), stock: 1 });
+  });
+
+  it('keeps the global-0 KO path (77) from reloading the B.R. LONG CPU ally too', () => {
+    // Authored (HPA-1251): the B.R. restriction now covers every DoraEmon
+    // seat, so the generated B.R. LONG's CPU ally — his 77 entry reached the
+    // same way, global 0 held at 10 — loses both KO RELOAD entries with the
+    // player's and stays down at 0 life, his stocks unspent.
+    const match = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    const dora = match.fighters[13];
+    expect(dora.who).toBe('dora');
+    driveCpus(match, 13, {});
+    while (match.roundTicks <= match.fightTick) match.step();
+    match.globals[0] = 10;
+    dora.stock = 4;
+    dora.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(dora);
+    const path: unknown[] = [];
+    for (let t = 0; t < 2000; t++) {
+      match.step();
+      const action = now(dora);
+      if (path.at(-1) !== action) path.push(action);
+    }
+    expect(path).toContain(77);
+    expect(path.some((a) => a === 72 || a === 74)).toBe(false);
+    expect([dora.hp, dora.stock, dora.downed]).toEqual([0, 4, true]);
   });
 
   it('skips the CPU’s EN command (42) in B.R. — seed 4 — without stalling, and still blocks injected 42', () => {

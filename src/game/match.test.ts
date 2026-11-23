@@ -20,6 +20,7 @@ import type { CpuEntry } from './cpu';
 import { FIGHT_TICK, ROUND_END_TICKS, roundEndTick } from './hud';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
+import { brLongStory } from './br-another';
 import { scenarioOf } from './story';
 import type { Battle, Slot } from './story';
 import {
@@ -32,7 +33,8 @@ import {
   script,
 } from './animations';
 import { rand } from './standing';
-import { CHARACTERS, STAGES, twin, twinOf } from './characters';
+import { CHARACTERS, lifeOf, STAGES, twin, twinOf } from './characters';
+import { lifeAmountOf } from './life';
 import type { Stage, Who } from './characters';
 import {
   base,
@@ -999,6 +1001,94 @@ describe('KO Down life checks', () => {
       for (let t = 0; t < 80; t++) match.step();
       expect(f.action, end).toBe('koLand');
     }
+  });
+});
+
+// Authored (HPA-1251): on a B.R. route a KO stands — no scripted or bonus
+// gain raises a downed fighter, and the native revival branches stay shut.
+describe('strict B.R. no-revive (authored, HPA-1251)', () => {
+  // A forced KO queues the same lose action a hit's KO does; golf's 101 is
+  // his own scripted self-gain (+31).
+  const knockOut = (match: Match, f: Fighter) => {
+    f.hp = 0;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(f);
+  };
+  const zeroBattle = (scenarioOf('golf')[1] as Battle) ?? null;
+
+  it('blocks a scripted gain on a downed B.R. fighter, and only there', () => {
+    const battle = zeroBattle!;
+    // On the route, standing golf still heals; downed golf does not.
+    const br = Match.story('golf', battle, 0, undefined, undefined, true);
+    expect(br.br).toBe(true);
+    const [golf] = br.fighters;
+    while (br.roundTicks <= br.fightTick) br.step();
+    golf.hp = 100;
+    enter(br, golf, 101);
+    br.step();
+    expect(golf.hp).toBe(131);
+    knockOut(br, golf);
+    for (let t = 0; t < 30; t++) br.step();
+    expect([golf.hp, golf.downed]).toEqual([0, true]);
+    enter(br, golf, 101);
+    br.step();
+    expect(golf.hp).toBe(0);
+    // Off the route the same downed fighter takes the same gain.
+    const plain = Match.story('golf', battle);
+    const [him] = plain.fighters;
+    while (plain.roundTicks <= plain.fightTick) plain.step();
+    knockOut(plain, him);
+    for (let t = 0; t < 30; t++) plain.step();
+    enter(plain, him, 101);
+    plain.step();
+    expect(him.hp).toBe(31);
+  });
+
+  it('leaves an ordinary knockdown on a B.R. route to recover', () => {
+    const br = Match.story('golf', zeroBattle!, 0, undefined, undefined, true);
+    const [, pachelo] = br.fighters;
+    pose(br, pachelo, 'knockdown', 0);
+    let up = false;
+    for (let t = 0; t < 200 && !up; t++) {
+      br.step();
+      up = pachelo.action === 'getUp';
+    }
+    expect(up).toBe(true);
+  });
+
+  it('pays the KO bonus to the winner while the fallen stays down', () => {
+    // golf's stage seats ZAKU with the slot's own 1P award (flags 0x80,
+    // life 50): the KO still pays golf on the route, and ZAKU lies on.
+    const br = Match.story('golf', zeroBattle!, 0, undefined, undefined, true);
+    const [golf, zaku] = br.fighters;
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    golf.hp = 100;
+    zaku.hp = 0;
+    zaku.caught = golf;
+    knockOut(br, zaku);
+    for (let t = 0; t < 60; t++) br.step();
+    expect(golf.hp).toBe(
+      Math.min(golf.maxHp, 100 + lifeAmountOf(50, golf.maxHp, lifeOf('golf'))),
+    );
+    expect([zaku.hp, zaku.downed]).toEqual([0, true]);
+  });
+
+  it('keeps the boss seat down on the generated boss B.R. LONG', () => {
+    const br = Match.story(
+      'zenka',
+      brLongStory('zenka')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    const [zenka] = br.fighters;
+    while (br.roundTicks <= br.fightTick) br.step();
+    knockOut(br, zenka);
+    for (let t = 0; t < 600; t++) br.step();
+    expect([zenka.hp, zenka.downed]).toEqual([0, true]);
+    expect(playing(zenka)).toBe('koLand');
+    expect(br.winner).toBe('opponent');
   });
 });
 

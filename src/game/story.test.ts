@@ -188,8 +188,13 @@ describe('story runner', () => {
     // marks the battles it starts B.R.
     story.startOnRoute('br-zero');
     expect([story.route, story.br]).toEqual(['br-zero', true]);
+    story.startOnRoute('br-another');
+    expect([story.route, story.br]).toEqual(['br-another', true]);
     story.startOnRoute('story-easy');
     expect([story.route, story.br]).toEqual(['story-easy', false]);
+    // The generated B.R. LONG route marks B.R. like the rest (HPA-1251).
+    const long = new Story('ryuko', 'br-long');
+    expect([long.route, long.br]).toEqual(['br-long', true]);
     // The bosses' generated B.R. ANOTHER route caches its steps by route (HPA-858).
     const boss = new Story('shinz', 'boss-br');
     expect([boss.route, boss.br]).toEqual(['boss-br', true]);

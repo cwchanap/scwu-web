@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CHARACTERS, desperationOf, lifeOf, responsesOf } from './characters';
+import { lifeAmountOf } from './life';
 import { animationDuration, animationFrame, BLACK } from './animations';
 import { faceImage } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { StandingVM } from './standing';
 import { brIntro } from './testing';
+import { scenarioOf } from './story';
+import type { Battle } from './story';
 
 // ZAKU as player 1, `gap` from a standing Ryuko as player 2.
 function zakuPlayer(gap = 90) {
@@ -227,5 +230,64 @@ describe('ZAKU (35 ZAKU.PLAYER)', () => {
       }
       expect([...entered]).toEqual(expect.arrayContaining([...wanted]));
     }
+  });
+
+  // His native B.R. round behaviour, unchanged outside a B.R. route
+  // (HPA-1251 keeps it out of B.R. only): with variable 11 armed as Round BR
+  // 2 leaves it (PCs 342, 344), KO down 61 takes KO Down BR (62), which lies
+  // 500 ticks, then — the round not being over — spawns KO BR HP (63), whose
+  // 2-life passes fill him, and stands into neutral. Golf's stage outside
+  // the route hosts it: a lone KO there ends a practice match before 62 can
+  // run, so PAC-HELO's living seat keeps the round open.
+  it('revives from a KO through his native 62 outside B.R., at full life', () => {
+    const battle = scenarioOf('golf')[1] as Battle;
+    const match = Match.story('golf', battle, 0, undefined, undefined, false);
+    const [golf, zaku] = match.fighters;
+    for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+    while (match.roundTicks <= match.fightTick) match.step();
+    golf.hp = 100;
+    zaku.variables[11] = 2;
+    zaku.hp = 0;
+    zaku.caught = golf;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(zaku);
+    const path: unknown[] = [];
+    for (let t = 0; t < 1200; t++) {
+      match.step();
+      if (path.at(-1) !== now(zaku)) path.push(now(zaku));
+    }
+    // The landing takes his native down's variable-11 branch (KO Down BR)
+    // at once, so 62 is the first timeline the path samples.
+    expect(path).toContain(62);
+    expect([now(zaku), zaku.hp, zaku.downed]).toEqual(['idle', 200, true]);
+    expect(golf.hp).toBe(
+      Math.min(golf.maxHp, 100 + lifeAmountOf(50, golf.maxHp, lifeOf('golf'))),
+    );
+  });
+
+  // Authored (HPA-1251): on a B.R. route the landing never enters his native
+  // down — its 62/63 chain would stand him up past the HP guard — so golf's
+  // B.R. ZERO stage KOs him into the shared lying KO at 0 life, the winner's
+  // slot award (his seat's flags 0x80) still paid to golf.
+  it('stays down at 0 life in B.R. ZERO, the KO bonus still paid to the winner', () => {
+    const battle = scenarioOf('golf')[1] as Battle;
+    const match = Match.story('golf', battle, 0, undefined, undefined, true);
+    const [golf, zaku] = match.fighters;
+    for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+    while (match.roundTicks <= match.fightTick) match.step();
+    golf.hp = 100;
+    zaku.variables[11] = 2;
+    zaku.hp = 0;
+    zaku.caught = golf;
+    (match as unknown as { knockOut(f: Fighter): void }).knockOut(zaku);
+    const path: unknown[] = [];
+    for (let t = 0; t < 1200; t++) {
+      match.step();
+      if (path.at(-1) !== now(zaku)) path.push(now(zaku));
+    }
+    expect(path.some((a) => a === 61 || a === 62)).toBe(false);
+    expect([now(zaku), zaku.hp, zaku.downed]).toEqual(['koLand', 0, true]);
+    expect(golf.hp).toBe(
+      Math.min(golf.maxHp, 100 + lifeAmountOf(50, golf.maxHp, lifeOf('golf'))),
+    );
   });
 });
