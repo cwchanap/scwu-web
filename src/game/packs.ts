@@ -52,11 +52,12 @@ export const bytesOf = (
 
 // The boards the mode select's Chii signs show (docs/evidence.md, Globals):
 // shipped in their own on-demand `mode-select` pack, loaded when ModeSelect
-// opens and unloaded when it leaves. The blank 8004 boards stay with the
-// fighter packs.
+// opens and unloaded when it leaves. PAC-HELO's blank 8004 rides along as
+// the temporary B.R. LONG sign (HPA-1251) until HPA-1034's lettered sign
+// replaces it; ZAKU's blank 8004 stays with his fighter pack.
 export const MODE_SELECT_SIGNS: Partial<Record<Who, readonly number[]>> = {
   zaku: [8001, 8005, 8006],
-  pachelo: [8001, 8005, 8006],
+  pachelo: [8001, 8004, 8005, 8006],
 };
 export const MODE_SELECT_SIGN_KEYS = Object.entries(MODE_SELECT_SIGNS).flatMap(
   ([who, images]) => (images ?? []).map((index) => `${who}-${index}`),

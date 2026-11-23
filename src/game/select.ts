@@ -12,7 +12,7 @@ import { ART_SCALE } from './match';
 import type { Input } from './match';
 import { rand } from './standing';
 import type { Frame } from './standing';
-import type { Route, SignRoute } from './story';
+import type { Route } from './story';
 import ui from './generated/ui.json';
 import select from './generated/select.json';
 import t2 from './generated/t2.json';
@@ -795,10 +795,10 @@ export class Continue extends Screen {
 // Authored (HPA-765): the quick mode select an eligible story pick opens
 // over the finished select screen. Step one offers STORY and B.R. by their
 // sign boards (the ZAKU's and PAC-HELO's image 8001), step two that mode's
-// two routes (8005, 8006) under the mode's smaller board; the KGT's 1P
-// cursor (action 84) bobs over the pick. The finished select keeps
-// stepping untouched underneath. The last mode and each mode's route stand
-// for the page session.
+// routes under the mode's smaller board; the KGT's 1P cursor (action 84)
+// bobs over the pick. The finished select keeps stepping untouched
+// underneath. The last mode and each mode's route stand for the page
+// session.
 interface ModeBoard {
   who: 'zaku' | 'pachelo';
   image: number;
@@ -807,32 +807,54 @@ export const MODE_BOARDS: readonly ModeBoard[] = [
   { who: 'zaku', image: 8001 },
   { who: 'pachelo', image: 8001 },
 ];
-export const ROUTE_BOARDS: readonly (readonly (ModeBoard & {
-  route: SignRoute;
-})[])[] = [
-  [
-    { who: 'zaku', image: 8005, route: 'story-easy' },
-    { who: 'pachelo', image: 8005, route: 'story-hard' },
-  ],
-  [
-    { who: 'zaku', image: 8006, route: 'br-zero' },
-    { who: 'pachelo', image: 8006, route: 'br-another' },
-  ],
-];
-// The boards are 260×204 source pixels. Each step's two hang side by
-// side by the centre of their top edge — the spots below, in the
-// 960×720 game's canvas pixels — the pick's a size larger, and the
-// chosen mode's heads the route step at a smaller size. bounds() gives the
-// box a spot and scale draw: the same box put() stands the sign in AND
-// tap() hit-tests (authored, HPA-765). The pair is spaced so even the
-// pick's larger box stays on-canvas and clear of the other's. The
-// 0.8×/0.85× scales multiply on top of the game's 1.5× art scale (so
-// the signs draw at 1.2×/1.275× their source 260×204 size), leaving room
-// for the surrounding select screen, as in the mockup.
+// The route step's boards per fighter and mode (authored, HPA-1251): a
+// regular fighter's STORY offers the two native signs, its B.R. ZERO,
+// ANOTHER and the generated LONG; a boss's B.R. drops ZERO for its
+// generated ANOTHER ('boss-br') and the same LONG; its STORY confirms on
+// the mode step, so no boards. LONG rides PAC-HELO's blank 8004 board
+// until HPA-1034's lettered sign replaces it.
+const STORY_ROUTE_BOARDS = [
+  { who: 'zaku', image: 8005, route: 'story-easy' },
+  { who: 'pachelo', image: 8005, route: 'story-hard' },
+] as const;
+const BR_ROUTE_BOARDS = [
+  { who: 'zaku', image: 8006, route: 'br-zero' },
+  { who: 'pachelo', image: 8006, route: 'br-another' },
+  { who: 'pachelo', image: 8004, route: 'br-long' },
+] as const;
+const BOSS_ROUTE_BOARDS = [
+  { who: 'pachelo', image: 8006, route: 'boss-br' },
+  { who: 'pachelo', image: 8004, route: 'br-long' },
+] as const;
+export const routeBoards = (
+  who: Who,
+  mode: 'story' | 'br',
+): readonly (ModeBoard & { route: Route })[] =>
+  (BOSSES as readonly Who[]).includes(who)
+    ? mode === 'br'
+      ? BOSS_ROUTE_BOARDS
+      : []
+    : mode === 'br'
+      ? BR_ROUTE_BOARDS
+      : STORY_ROUTE_BOARDS;
+// The boards are 260×204 source pixels. A step's boards hang side by side
+// by the centre of their top edge — the spots below, in the 960×720 game's
+// canvas pixels — the pick's a size larger, and the chosen mode's heads the
+// route step at a smaller size. bounds() gives the box a spot and scale
+// draw: the same box put() stands the sign in AND tap() hit-tests
+// (authored, HPA-765). signRow() spreads the count's centres evenly and
+// caps the scale so even the pick's larger box stays on-canvas and clear
+// of its neighbours (authored, HPA-1251) — two boards keep HPA-765's
+// 300/660 spots and 0.8×/0.85× scales, which multiply on top of the game's
+// 1.5× art scale, leaving room for the surrounding select screen, as in
+// the mockup.
 const SIGN_W = 260;
 const SIGN_H = 204;
 const SIGN_SCALE = 0.8;
-const ACTIVE_SCALE = 0.85;
+const ACTIVE_BUMP = 0.05;
+// 0.8 + 0.05 computes as 0.8500000000000001; scaled, the active scale
+// stays the exact literal the source boards draw at.
+const ACTIVE_SCALE = (SIGN_SCALE * 10 + ACTIVE_BUMP * 10) / 10;
 // 150 ms cooldown between taps so a double-click/double-tap cannot confirm
 // both overlapping steps at once.
 const TAP_COOLDOWN = 15;
@@ -854,34 +876,45 @@ const bounds = (spot: Spot, scale: number): Rect => ({
   w: SIGN_W * ART_SCALE * scale,
   h: SIGN_H * ART_SCALE * scale,
 });
-const SIGN_SPOTS: readonly (readonly [Spot, Spot])[] = [
-  [
-    { cx: 300, top: 250 },
-    { cx: 660, top: 250 },
-  ],
-  [
-    { cx: 300, top: 285 },
-    { cx: 660, top: 285 },
-  ],
-];
+const SIGN_MARGIN = 120;
+const SIGN_GAP = 16;
+const SIGN_TOPS = [250, 285] as const;
 const HEADER_SPOT: Spot = { cx: 480, top: 40 };
 const SIGN_Z = 0x110;
 const CURSOR_Z = 0x120;
 let modePlace = 0;
-const routePlace = [0, 0];
+const routePlace: (Route | null)[] = [null, null];
+// A row of count boards hung at top: their evenly spread spots and the
+// dim/active draw scales, capped so the active boxes fit their slot minus
+// a gap. The caps keep the literals exact when they don't bind — two
+// boards draw at 0.8×/0.85×.
+export const signRow = (count: number, top: number) => {
+  const slot = (960 - SIGN_MARGIN * 2) / count;
+  const cap = (slot - SIGN_GAP) / (SIGN_W * ART_SCALE);
+  return {
+    spots: Array.from({ length: count }, (_, i) => ({
+      cx: SIGN_MARGIN + slot * (i + 0.5),
+      top,
+    })),
+    scale: Math.min(SIGN_SCALE, cap - ACTIVE_BUMP),
+    active: Math.min(ACTIVE_SCALE, cap),
+  };
+};
 
 export class ModeSelect extends Screen {
-  // The route a route sign picked (authored, HPA-765) — or, for a boss
-  // (authored, HPA-858), the mode its first sign picked: bosses have no
-  // route step, and B.R. is their generated ANOTHER route.
+  // The route a route sign picked (authored, HPA-765) — or a generated
+  // route: a boss's B.R. ANOTHER ('boss-br', HPA-858) or either fighter's
+  // B.R. LONG ('br-long', HPA-1251) from their route steps, and 'story'
+  // for a boss's direct STORY confirm.
   done: Route | 'story' | null = null;
-  // 0 picks STORY or B.R., 1 that mode's route. A boss confirms on the
-  // first sign, so stage never leaves 0.
+  // 0 picks STORY or B.R., 1 that mode's route. Only a boss's STORY sign
+  // confirms on the first step; its B.R. sign opens the route step too.
   stage = 0;
   // The fighter the finished select took.
   readonly who: Who;
   choice = modePlace;
   private signs: SelectObject[] = [];
+  private row: ReturnType<typeof signRow> = signRow(2, SIGN_TOPS[0]);
   private cursor: SelectObject | null = null;
   private latch = false;
   private previous = 0;
@@ -906,7 +939,11 @@ export class ModeSelect extends Screen {
     }
     if (!now) this.latch = false;
     else if (pressed & 0xf && !this.latch) {
-      this.choice ^= 1;
+      // Left/Up steps back a board, Right/Down forward, wrapping; a fresh
+      // press only (authored, HPA-1251).
+      const count = this.boards().length;
+      if (pressed & (1 | 4)) this.choice = (this.choice + count - 1) % count;
+      else if (pressed & (2 | 8)) this.choice = (this.choice + 1) % count;
       this.latch = true;
     } else if (pressed & BUTTONS && !this.latch) {
       this.confirm();
@@ -928,30 +965,46 @@ export class ModeSelect extends Screen {
 
   private confirm() {
     this.latch = true;
-    // A boss's first sign confirms the mode outright (authored, HPA-858):
-    // STORY, or B.R.'s generated ANOTHER route ('boss-br').
-    if ((BOSSES as readonly Who[]).includes(this.who)) {
+    // A boss's STORY sign confirms the mode outright (authored, HPA-858);
+    // its B.R. sign opens the generated ANOTHER/LONG route step (authored,
+    // HPA-1251).
+    if (
+      (BOSSES as readonly Who[]).includes(this.who) &&
+      !this.stage &&
+      !this.choice
+    ) {
       modePlace = this.choice;
-      this.done = this.choice ? 'boss-br' : 'story';
+      this.done = 'story';
       return;
     }
     if (!this.stage) {
       modePlace = this.choice;
       this.stage = 1;
-      this.choice = routePlace[modePlace];
+      this.choice = this.recall();
       this.show();
       return;
     }
-    routePlace[modePlace] = this.choice;
-    this.done = ROUTE_BOARDS[modePlace][this.choice].route;
+    const boards = routeBoards(this.who, modePlace ? 'br' : 'story');
+    routePlace[modePlace] = boards[this.choice].route;
+    this.done = boards[this.choice].route;
+  }
+
+  // The remembered route's board on this step: remembered by value, so a
+  // route another fighter's list saved resolves where this list offers it
+  // — the first board when it doesn't (authored, HPA-1251).
+  private recall() {
+    const boards = routeBoards(this.who, modePlace ? 'br' : 'story');
+    const i = boards.findIndex((b) => b.route === routePlace[modePlace]);
+    return i < 0 ? 0 : i;
   }
 
   // The step's sign boards — the modes', or its routes under the mode's
   // smaller board — and the cursor over the pick.
   private show() {
     for (const o of this.objects) if (o !== this.cursor) o.alive = false;
+    this.row = signRow(this.boards().length, SIGN_TOPS[this.stage]);
     this.signs = this.boards().map((board, i) =>
-      this.sign(board.who, board.image, SIGN_SPOTS[this.stage][i]),
+      this.sign(board.who, board.image, this.row.spots[i], this.row.scale),
     );
     if (this.stage) {
       const mode = MODE_BOARDS[modePlace];
@@ -962,7 +1015,9 @@ export class ModeSelect extends Screen {
   }
 
   private boards(): readonly ModeBoard[] {
-    return this.stage ? ROUTE_BOARDS[modePlace] : MODE_BOARDS;
+    return this.stage
+      ? routeBoards(this.who, modePlace ? 'br' : 'story')
+      : MODE_BOARDS;
   }
 
   // A canvas tap (game pixels) lands on the box its board draws — the
@@ -972,7 +1027,7 @@ export class ModeSelect extends Screen {
     if (!this.cursor || this.done || this.tick - this.tapTick < TAP_COOLDOWN)
       return false;
     const i = this.signs.findIndex((o, j) => {
-      const b = bounds(SIGN_SPOTS[this.stage][j], o.scale ?? SIGN_SCALE);
+      const b = bounds(this.row.spots[j], o.scale ?? this.row.scale);
       return x >= b.x && x < b.x + b.w && y >= b.y && y < b.y + b.h;
     });
     if (i < 0) return false;
@@ -982,21 +1037,17 @@ export class ModeSelect extends Screen {
     return true;
   }
 
-  // The pick's board lit and slightly larger, the other dark, the arrow
+  // The pick's board lit and slightly larger, the others dark, the arrow
   // over the pick's box.
   private place() {
     this.signs.forEach((o, i) => {
       const active = i === this.choice;
-      this.put(
-        o,
-        SIGN_SPOTS[this.stage][i],
-        active ? ACTIVE_SCALE : SIGN_SCALE,
-      );
+      this.put(o, this.row.spots[i], active ? this.row.active : this.row.scale);
       o.color = active
         ? NORMAL_COLOR
         : { mode: 0, r: -16, g: -16, b: -16, fade: 0 };
     });
-    const spot = SIGN_SPOTS[this.stage][this.choice];
+    const spot = this.row.spots[this.choice];
     this.cursor!.x = spot.cx / ART_SCALE - 15;
     this.cursor!.y = spot.top / ART_SCALE - 10;
   }

@@ -14,8 +14,9 @@ import {
   ModeSelect,
   MODES,
   ROSTER,
-  ROUTE_BOARDS,
+  routeBoards,
   selectable,
+  signRow,
   StoryDemo,
   takePalette,
   TEAM_SIZE,
@@ -23,6 +24,7 @@ import {
   TITLE,
 } from './select';
 import type { Demo } from './select';
+import type { Who } from './characters';
 import type { Input } from './match';
 import { scenarioOf, TAKES } from './story';
 import type { Battle } from './story';
@@ -698,17 +700,21 @@ describe('mode select (authored, HPA-765)', () => {
     // button press does.
     expect(mode.tap(720, 394)).toBe(true);
     expect(mode.stage).toBe(1);
-    expect(signs(mode).map((o) => o.frame!.image)).toEqual([8006, 8006, 8001]);
+    // B.R.'s three routes hang beside each other under the mode's board.
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([
+      8006, 8006, 8004, 8001,
+    ]);
     // A second tap within the 15-tick cooldown does not confirm the
     // overlapping route board immediately.
     for (let i = 0; i < 14; i++) mode.step();
-    expect(mode.tap(720, 469)).toBe(false);
+    const mid = signs(mode).map(boxOf)[1];
+    expect(mode.tap(mid.x + mid.w / 2, mid.y + mid.h / 2)).toBe(false);
     expect(mode.done).toBeNull();
-    // Once the cooldown elapses, the right route board lands its route.
+    // Once the cooldown elapses, the middle route board lands its route.
     mode.step();
-    expect(mode.tap(720, 469)).toBe(true);
+    expect(mode.tap(mid.x + mid.w / 2, mid.y + mid.h / 2)).toBe(true);
     expect(mode.done).toBe('br-another');
-    expect(mode.tap(240, 469)).toBe(false);
+    expect(mode.tap(4, 394)).toBe(false);
   });
 
   it('forwards sounds queued by its finished background select', () => {
@@ -719,7 +725,7 @@ describe('mode select (authored, HPA-765)', () => {
     expect(mode.sounds).toContainEqual({ container: 'select', index: 1 });
   });
 
-  it('pins MODE_BOARDS and ROUTE_BOARDS to the Chii sign actors and scripts', () => {
+  it('pins MODE_BOARDS and the native route boards to the Chii sign actors and scripts', () => {
     const chii = scenarioOf('ryuko')[0] as Battle;
     const owners = chii.slots
       .filter(
@@ -744,18 +750,36 @@ describe('mode select (authored, HPA-765)', () => {
       expect(board.who).toBe(owners[i]);
       expect(board.image).toBe(spawnImage(board.who, 75));
     }
-    // Route boards match script 80 (STORY, 5 -> 8005) and 83 (B.R., 8 -> 8006)
-    // and their exact power takes in zaku and pachelo.
-    const routeScripts = [80, 83] as const;
-    for (const [m, boards] of ROUTE_BOARDS.entries()) {
-      for (const [r, board] of boards.entries()) {
+    // Native route boards match script 80 (STORY, 5 -> 8005) and 83
+    // (B.R., 8 -> 8006) and their exact power takes in zaku and pachelo —
+    // only the SignRoute boards: the generated LONG route has no native
+    // Chii sign or take (HPA-1251).
+    const checkNative = (
+      boards: readonly {
+        who: 'zaku' | 'pachelo';
+        image: number;
+        route: string;
+      }[],
+      actorScript: 80 | 83,
+    ) => {
+      boards.forEach((board, r) => {
         expect(board.who).toBe(owners[r]);
-        expect(board.image).toBe(spawnImage(board.who, routeScripts[m]));
-        expect(-otherLife(board.who, routeScripts[m])!).toBe(
-          TAKES[board.route],
+        expect(board.image).toBe(spawnImage(board.who, actorScript));
+        expect(-otherLife(board.who, actorScript)!).toBe(
+          TAKES[board.route as keyof typeof TAKES],
         );
-      }
-    }
+      });
+    };
+    checkNative([...routeBoards('ryuko', 'story')], 80);
+    checkNative(
+      routeBoards('ryuko', 'br').filter((b) => b.route in TAKES),
+      83,
+    );
+    // The generated routes ride existing boards instead: boss B.R.
+    // ANOTHER the PAC-HELO 8006 sign, LONG the blank 8004.
+    expect(routeBoards('zenka', 'br').map((b) => b.image)).toEqual([
+      8006, 8004,
+    ]);
   });
 
   // A sign's drawn box, read off its object as the sprite draws it: the
@@ -770,8 +794,8 @@ describe('mode select (authored, HPA-765)', () => {
     };
   };
 
-  it('keeps every sign’s drawn box on-canvas and clear of the other', () => {
-    // The pick's larger board must leave the other's box alone and stay
+  it('keeps every sign’s drawn box on-canvas and clear of the others', () => {
+    // The pick's larger board must leave the others' boxes alone and stay
     // on the 960×720 canvas: the review caught the ~1.3× sign drawn
     // over the left board's tap area and past the canvas edge.
     const expectClear = (mode: ModeSelect) => {
@@ -782,7 +806,14 @@ describe('mode select (authored, HPA-765)', () => {
         expect(b.y).toBeGreaterThanOrEqual(0);
         expect(b.y + b.h).toBeLessThanOrEqual(720);
       }
-      expect(boxes[0].x + boxes[0].w).toBeLessThan(boxes[1].x);
+      // The route boards (the header board hangs above them) keep apart.
+      const ordered = (mode.stage ? boxes.slice(0, -1) : boxes).sort(
+        (a, b) => a.x - b.x,
+      );
+      for (let i = 1; i < ordered.length; i++)
+        expect(ordered[i - 1].x + ordered[i - 1].w).toBeLessThanOrEqual(
+          ordered[i].x,
+        );
     };
     for (const pick of [0, 1]) {
       const mode = new ModeSelect(picked());
@@ -791,8 +822,9 @@ describe('mode select (authored, HPA-765)', () => {
       mode.step();
       expectClear(mode);
       press(mode, { punch: true });
-      // Both route picks' placements on the second step too.
-      for (const route of [0, 1]) {
+      // Every route pick's placement on the second step too.
+      const count = signs(mode).length - (mode.stage ? 1 : 0);
+      for (let route = 0; route < count; route++) {
         mode.choice = route;
         mode.step();
         expectClear(mode);
@@ -850,6 +882,16 @@ describe('mode select (authored, HPA-858 bosses)', () => {
   };
   const signs = (mode: ModeSelect) =>
     mode.objects.filter((o) => o.alive && o.frame && o.container !== 'kgt');
+  // A sign's drawn box, read off its object as the sprite draws it.
+  const boxOf = (o: { x: number; y: number; scale?: number }) => {
+    const s = o.scale ?? 1;
+    return {
+      x: (o.x - 130) * 1.5,
+      y: (o.y - 204) * 1.5,
+      w: 390 * s,
+      h: 306 * s,
+    };
+  };
   // A fresh press: the tick before lets any held keys — and with them the
   // latch — go.
   const press = (mode: ModeSelect, input: Input) => run(mode, [{}, input]);
@@ -866,33 +908,218 @@ describe('mode select (authored, HPA-858 bosses)', () => {
     }
   });
 
-  it('confirms a boss’s B.R. sign straight to boss-br, by key and by tap', () => {
+  it('opens a boss’s B.R. sign onto its ANOTHER/LONG route step, by key and by tap', () => {
     for (const who of BOSSES) {
       const mode = new ModeSelect(bossPicked(who));
       mode.step();
       mode.choice = 1;
       press(mode, { punch: true });
-      expect([mode.stage, mode.done]).toEqual([0, 'boss-br']);
-      // A tap on the right board lands the same pick on the first step.
-      const tapped = new ModeSelect(bossPicked(who));
-      tapped.step();
-      expect(tapped.tap(720, 394)).toBe(true);
-      expect([tapped.stage, tapped.done]).toEqual([0, 'boss-br']);
+      expect([mode.stage, mode.done]).toEqual([1, null]);
+      // Two boards under the mode's smaller header: the generated
+      // ANOTHER and LONG routes.
+      expect(signs(mode).map((o) => o.frame!.image)).toEqual([
+        8006, 8004, 8001,
+      ]);
+      mode.choice = 0;
+      press(mode, { punch: true });
+      expect(mode.done).toBe('boss-br');
     }
+    // A tap on the blank LONG board lands the generated route.
+    const tapped = new ModeSelect(bossPicked('shinz'));
+    tapped.step();
+    tapped.choice = 1;
+    press(tapped, { punch: true });
+    const long = signs(tapped).map(boxOf)[1];
+    expect(tapped.tap(long.x + 1, long.y + 1)).toBe(true);
+    expect(tapped.done).toBe('br-long');
   });
 
-  it('backs a confirmed boss pick out to the mode step, the pick kept', () => {
+  it('backs a confirmed boss STORY pick out to the mode step, the pick kept', () => {
+    const mode = new ModeSelect(bossPicked('shinz'));
+    mode.step();
+    mode.choice = 0;
+    press(mode, { punch: true });
+    expect(mode.done).toBe('story');
+    mode.back();
+    expect([mode.stage, mode.done, mode.choice]).toEqual([0, null, 0]);
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
+    // The same sign confirms again.
+    press(mode, { punch: true });
+    expect(mode.done).toBe('story');
+  });
+
+  it('backs the boss B.R. route step out to the mode step, the pick kept', () => {
     const mode = new ModeSelect(bossPicked('shinz'));
     mode.step();
     mode.choice = 1;
     press(mode, { punch: true });
-    expect(mode.done).toBe('boss-br');
+    expect([mode.stage, mode.done]).toEqual([1, null]);
     mode.back();
     expect([mode.stage, mode.done, mode.choice]).toEqual([0, null, 1]);
     expect(signs(mode).map((o) => o.frame!.image)).toEqual([8001, 8001]);
-    // The same sign confirms again.
+    // The same sign reopens the route step.
     press(mode, { punch: true });
-    expect(mode.done).toBe('boss-br');
+    expect([mode.stage, mode.done]).toEqual([1, null]);
+  });
+});
+
+// HPA-1251: the selector's generated routes — B.R. LONG beside ZERO and
+// ANOTHER, the bosses' ANOTHER/LONG step — remembered by route value.
+describe('mode select (HPA-1251 generated routes)', () => {
+  // A finished story select whose pick is the given fighter, for the menu
+  // to sit over.
+  const picked = (who: Who = 'ryuko') => {
+    if (who === 'ryuko') {
+      const select = new CharacterSelect([[0, 0]], true);
+      select.step();
+      run(select, tap({ punch: true }));
+      while (!select.done) select.step();
+      return select;
+    }
+    const background = new CharacterSelect(undefined, true);
+    background.done = [who, who];
+    return background;
+  };
+  const signs = (mode: ModeSelect) =>
+    mode.objects.filter((o) => o.alive && o.frame && o.container !== 'kgt');
+  // A sign's drawn box, read off its object as the sprite draws it.
+  const boxOf = (o: { x: number; y: number; scale?: number }) => {
+    const s = o.scale ?? 1;
+    return {
+      x: (o.x - 130) * 1.5,
+      y: (o.y - 204) * 1.5,
+      w: 390 * s,
+      h: 306 * s,
+    };
+  };
+  const press = (mode: ModeSelect, input: Input) => run(mode, [{}, input]);
+  // Confirm B.R. on the mode step (the first step() arms the screen).
+  const toRoutes = (mode: ModeSelect) => {
+    mode.step();
+    mode.choice = 1;
+    press(mode, { punch: true });
+    expect(mode.stage).toBe(1);
+  };
+
+  it('offers STORY two routes, regular B.R. three and boss B.R. two; boss STORY confirms outright', () => {
+    expect(routeBoards('ryuko', 'story').map((b) => b.route)).toEqual([
+      'story-easy',
+      'story-hard',
+    ]);
+    expect(routeBoards('ryuko', 'br').map((b) => b.route)).toEqual([
+      'br-zero',
+      'br-another',
+      'br-long',
+    ]);
+    for (const boss of BOSSES) {
+      expect(routeBoards(boss, 'br').map((b) => b.route)).toEqual([
+        'boss-br',
+        'br-long',
+      ]);
+      // A boss's STORY picks on the mode step — no route boards at all.
+      expect(routeBoards(boss, 'story')).toEqual([]);
+    }
+  });
+
+  it('hangs PAC-HELO’s blank 8004 board as the LONG sign until HPA-1034 lettering lands', () => {
+    expect(routeBoards('ryuko', 'br').at(-1)).toEqual({
+      who: 'pachelo',
+      image: 8004,
+      route: 'br-long',
+    });
+    expect(routeBoards('dora', 'br').at(-1)).toEqual({
+      who: 'pachelo',
+      image: 8004,
+      route: 'br-long',
+    });
+  });
+
+  it('confirms B.R. LONG on the three-board step by key and by tap', () => {
+    const mode = new ModeSelect(picked());
+    toRoutes(mode);
+    expect(signs(mode).map((o) => o.frame!.image)).toEqual([
+      8006, 8006, 8004, 8001,
+    ]);
+    mode.choice = 2;
+    mode.step();
+    // The lit blank board draws a size larger than its dim neighbours.
+    expect(signs(mode)[2].scale).toBeGreaterThan(signs(mode)[1].scale!);
+    press(mode, { punch: true });
+    expect(mode.done).toBe('br-long');
+
+    // A tap on the blank board's drawn box lands the same route.
+    const tapped = new ModeSelect(picked());
+    toRoutes(tapped);
+    const long = signs(tapped).map(boxOf)[2];
+    expect(tapped.tap(long.x + 1, long.y + 1)).toBe(true);
+    expect(tapped.done).toBe('br-long');
+  });
+
+  it('steps any direction across the three B.R. boards, wrapping — no XOR', () => {
+    const mode = new ModeSelect(picked());
+    toRoutes(mode);
+    const start = mode.choice;
+    press(mode, { left: true });
+    expect(mode.choice).toBe((start + 2) % 3);
+    press(mode, { jump: true }); // up
+    expect(mode.choice).toBe((start + 1) % 3);
+    press(mode, { right: true });
+    expect(mode.choice).toBe((start + 2) % 3);
+    press(mode, { crouch: true }); // down
+    expect(mode.choice).toBe(start);
+  });
+
+  it('remembers the route by value: regular LONG resolves on the boss step and back', () => {
+    // Regular B.R.: remember LONG.
+    const regular = new ModeSelect(picked());
+    toRoutes(regular);
+    regular.choice = 2;
+    press(regular, { punch: true });
+    expect(regular.done).toBe('br-long');
+    // A boss's two-board step resolves the remembered LONG where it
+    // offers it — not an out-of-range index.
+    const boss = new ModeSelect(picked('zenka'));
+    toRoutes(boss);
+    expect(boss.choice).toBe(1);
+    expect(signs(boss)[1].scale).toBeGreaterThan(signs(boss)[0].scale!);
+    // Back on a regular step the same value sits on its third board.
+    const again = new ModeSelect(picked());
+    toRoutes(again);
+    expect(again.choice).toBe(2);
+    // …and picking ANOTHER there is what the next boss step remembers —
+    // absent from its boards, it falls back to the first (ANOTHER).
+    again.choice = 1;
+    press(again, { punch: true });
+    expect(again.done).toBe('br-another');
+    const last = new ModeSelect(picked('shinz'));
+    toRoutes(last);
+    expect(last.choice).toBe(0);
+    press(last, { punch: true });
+    expect(last.done).toBe('boss-br');
+  });
+
+  it('lays two, three and four boards on-canvas and clear of each other, lit and dim', () => {
+    for (const count of [2, 3, 4]) {
+      const { spots, scale } = signRow(count, 285);
+      for (const pick of spots.keys()) {
+        const boxes = spots.map((spot, i) => {
+          const s = i === pick ? scale + 0.05 : scale;
+          return { x: spot.cx - 195 * s, y: spot.top, w: 390 * s, h: 306 * s };
+        });
+        for (const b of boxes) {
+          expect(b.x, `${count} boards`).toBeGreaterThanOrEqual(0);
+          expect(b.x + b.w, `${count} boards`).toBeLessThanOrEqual(960);
+          expect(b.y, `${count} boards`).toBeGreaterThanOrEqual(0);
+          expect(b.y + b.h, `${count} boards`).toBeLessThanOrEqual(720);
+        }
+        const ordered = [...boxes].sort((a, b) => a.x - b.x);
+        for (let i = 1; i < ordered.length; i++)
+          expect(
+            ordered[i - 1].x + ordered[i - 1].w,
+            `${count} boards`,
+          ).toBeLessThanOrEqual(ordered[i].x);
+      }
+    }
   });
 });
 

@@ -4997,8 +4997,9 @@ def assets_version(files):
 # player's select programs (select.ts) show or play, within what the player exports. Boot holds them,
 # since the select screen uses them from the start; the rest of a player's files go to its fighter pack.
 # ZAKU's and PAC-HELO's Chii sign boards go to the on-demand mode-select pack (excluded from both boot
-# and fighter packs); the blank 8004 boards stay in the fighter packs.
-SIGNS = {"zaku": {8001, 8005, 8006}, "pachelo": {8001, 8005, 8006}}
+# and fighter packs), PAC-HELO's blank 8004 with them as the temporary B.R. LONG board (HPA-1251) until
+# HPA-1034's lettered sign replaces it; ZAKU's blank 8004 stays in his fighter pack.
+SIGNS = {"zaku": {8001, 8005, 8006}, "pachelo": {8001, 8004, 8005, 8006}}
 
 
 def export_packs():

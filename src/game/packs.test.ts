@@ -217,15 +217,31 @@ describe('exported packs', () => {
   );
 
   itWithArt(
-    'mode-select holds exactly the six Chii sign boards and no sounds',
+    'mode-select holds exactly the seven Chii sign boards (the blank LONG 8004 included) and no sounds',
     () => {
       const pack = readPack('mode-select.bin');
       expect(Object.keys(pack.images).sort()).toEqual(
         [...MODE_SELECT_SIGN_KEYS].sort(),
       );
+      // PAC-HELO's blank board ships here as the temporary LONG sign
+      // (HPA-1251) — moved out of his fighter pack until HPA-1034's
+      // lettered sign replaces it.
+      expect(pack.images['pachelo-8004']).toBeDefined();
       expect(pack.sounds).toEqual({});
     },
   );
+
+  itWithArt('the fighter packs hold no mode-select sign boards', () => {
+    for (const who of fighters) {
+      if (!hasAny(split(who).rest)) continue;
+      const pack = readPack(`fighter-${who}.bin`);
+      const signs = MODE_SELECT_SIGNS[who] ?? [];
+      const boarded = Object.keys(pack.images)
+        .map((key) => Number(key.replace(/^.*-/, '')))
+        .filter((index) => signs.includes(index));
+      expect(boarded, who).toEqual([]);
+    }
+  });
 
   itWithArt('each fighter pack holds exactly the rest', () => {
     for (const who of fighters) {
