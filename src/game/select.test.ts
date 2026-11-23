@@ -1100,10 +1100,10 @@ describe('mode select (HPA-1251 generated routes)', () => {
 
   it('lays two, three and four boards on-canvas and clear of each other, lit and dim', () => {
     for (const count of [2, 3, 4]) {
-      const { spots, scale } = signRow(count, 285);
+      const { spots, scale, active } = signRow(count, 285);
       for (const pick of spots.keys()) {
         const boxes = spots.map((spot, i) => {
-          const s = i === pick ? scale + 0.05 : scale;
+          const s = i === pick ? active : scale;
           return { x: spot.cx - 195 * s, y: spot.top, w: 390 * s, h: 306 * s };
         });
         for (const b of boxes) {
