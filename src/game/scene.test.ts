@@ -24,7 +24,7 @@ import {
 import type { Demo } from './select';
 import { scenarioOf, Story, TAKES } from './story';
 import type { Battle } from './story';
-import { bossBrAnotherStory, brAnotherStages } from './br-another';
+import { bossBrAnotherStory, brAnotherStages, brLongStory } from './br-another';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { itWithArt } from './testing';
@@ -1869,6 +1869,212 @@ describe('mode select (HPA-858 bosses)', () => {
     expect(statuses.at(-1)?.cheated).toBe(true);
     finishLoad();
     expect(statuses.at(-1)?.cheated).toBe(true);
+  });
+});
+
+// HPA-1251: the generated B.R. LONG route through the selector — the real
+// select → scene → Story → Match path keeps the route marker, Story.br and
+// the HPA-972 no-partner behavior.
+describe('mode select (HPA-1251 LONG route)', () => {
+  // A finished story select whose pick is the given fighter, with the
+  // selector's sign pack resident, for the menu to sit over.
+  const openPick = (view: { [key: string]: unknown }, who: Who) => {
+    const textures = view.textures as { exists: (key: string) => boolean };
+    const origExists = textures.exists;
+    textures.exists = () => true;
+    const select = new CharacterSelect(undefined, true);
+    view.select = select;
+    select.done = [who, who];
+    stepSelect(view);
+    textures.exists = origExists;
+    return view.select as ModeSelect;
+  };
+  // Keyboard to B.R.'s route step and onto its index-th board: each press
+  // waits a release tick first — a press is a fresh edge — and the walk
+  // wraps so any remembered cursor lands there.
+  const confirmRoute = (mode: ModeSelect, index: number) => {
+    mode.step(); // the arm tick
+    mode.choice = 1;
+    mode.step({});
+    mode.step({ punch: true });
+    expect(mode.stage).toBe(1);
+    for (let i = 0; i < 4 && mode.choice !== index; i++) {
+      mode.step({});
+      mode.step({ right: true });
+    }
+    expect(mode.choice).toBe(index);
+    mode.step({});
+    mode.step({ punch: true });
+  };
+  // The sign's drawn box, read off its object as the sprite draws it.
+  const boxOf = (o: { x: number; y: number; scale?: number }) => {
+    const s = o.scale ?? 1;
+    return {
+      x: (o.x - 130) * 1.5,
+      y: (o.y - 204) * 1.5,
+      w: 390 * s,
+      h: 306 * s,
+    };
+  };
+
+  it('carries a keyboard LONG pick through Story into a B.R. match with its Dora ally', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true; // the sign pack and stage are resident
+    const mode = openPick(view, 'ryuko');
+    confirmRoute(mode, 2); // ZERO, ANOTHER, LONG
+    expect(mode.done).toBe('br-long');
+    stepSelect(view);
+    const story = view.story as Story;
+    // The generated route a fresh Story owns, marked B.R. from the pick.
+    expect(story.who).toBe('ryuko');
+    expect(story.route).toBe('br-long');
+    expect(story.br).toBe(true);
+    // It starts straight in — no routeLife take, no Chii-sign jumps.
+    expect(story.step).toBe(0);
+    expect(view.storyLife).toBe(0);
+    expect(view.storyLost).toBe(0);
+    // The route's first battle is on: Sakura Street, marked B.R., with
+    // the 1P, its twelve enemies and the first-tick Dora ally (14 seats).
+    expect(view.select).toBeNull();
+    expect(scene.match.br).toBe(true);
+    expect(scene.match.battle).toEqual(brLongStory('ryuko')[0]);
+    expect(scene.match.stage).toBe('sakura');
+    expect(scene.match.fighters).toHaveLength(14);
+    expect(scene.match.fighters.at(-1)?.who).toBe('dora');
+    expect(scene.match.fighters.at(-1)?.present).toBe(true);
+  });
+
+  it('a lost LONG battle runs the scene’s Continue into an identical retry, the route kept', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    const mode = openPick(view, 'ryuko');
+    confirmRoute(mode, 2);
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('br-long');
+    const first = scene.match;
+    // The 1P falls: the battle's Continue flag (bit 0) opens the screen.
+    first.fighters[0]!.hp = 0;
+    for (let i = 0; i < 4000 && !first.resultReady; i++) first.step();
+    (view.matchOver as () => void)();
+    await vi.waitFor(() => expect(completes).toHaveLength(1));
+    finishLoad();
+    expect(view.select).toBeInstanceOf(Continue);
+    // YES replays the same battle through the runner, still on the route.
+    stepSelect(view); // the arm tick
+    (view.stepSelect as (input: object) => void)({ kick: true });
+    const second = scene.match;
+    expect(second).not.toBe(first);
+    expect(second.battle).toEqual(brLongStory('ryuko')[0]);
+    expect(second.fighters).toHaveLength(14);
+    expect(second.fighters.at(-1)?.who).toBe('dora');
+    expect(story.route).toBe('br-long');
+  });
+
+  it('the HPA-972 no-partner cheat drops the ally from the LONG match', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true, brNoPartner: true });
+    const mode = openPick(view, 'ryuko');
+    confirmRoute(mode, 2);
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('br-long');
+    expect(story.br).toBe(true);
+    expect(scene.match.br).toBe(true);
+    expect(scene.match.fighters).toHaveLength(13);
+    expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
+  });
+
+  it('a boss’s LONG pick starts the generated route a fresh Story owns', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    const mode = openPick(view, 'shinz');
+    confirmRoute(mode, 1); // ANOTHER, LONG
+    expect(mode.done).toBe('br-long');
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('br-long');
+    expect(story.br).toBe(true);
+    expect(scene.match.br).toBe(true);
+    expect(scene.match.battle).toEqual(brLongStory('shinz')[0]);
+    // No ally: thirteen native seats, the twelve tough hostiles.
+    expect(scene.match.fighters).toHaveLength(13);
+    expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
+    for (const f of scene.match.fighters.slice(1))
+      expect(f, f.who).toMatchObject({ maxStock: 5 });
+  });
+
+  it('a tap on the blank LONG board starts the route (touch)', () => {
+    const { scene, view, artIn } = boot();
+    artIn();
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    const mode = openPick(view, 'ryuko');
+    mode.step(); // the arm tick
+    mode.choice = 1;
+    mode.step({});
+    mode.step({ punch: true }); // B.R.'s three boards
+    const long = (
+      mode.objects.filter(
+        (o) => o.alive && o.frame && o.container !== 'kgt',
+      ) as { x: number; y: number; scale?: number }[]
+    ).map(boxOf)[2];
+    expect(mode.tap(long.x + 1, long.y + 1)).toBe(true);
+    expect(mode.done).toBe('br-long');
+    stepSelect(view);
+    const story = view.story as Story;
+    expect(story.route).toBe('br-long');
+    expect(story.br).toBe(true);
+    expect(scene.match.br).toBe(true);
+  });
+
+  it('Escape backs the boss B.R. route step out and cancels its start', () => {
+    vi.stubGlobal('HTMLElement', class {});
+    const { scene, view, artIn, statuses, finishLoad } = boot();
+    artIn();
+    scene.setCheats({ ...DEFAULT_CHEATS, enabled: true });
+    scene.reset('practice');
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    scene.setCheats({ ...DEFAULT_CHEATS });
+    const textures = view.textures as { exists: (key: string) => boolean };
+    textures.exists = () => true;
+    const mode = openPick(view, 'zenka');
+    mode.step();
+    mode.choice = 1;
+    mode.step({});
+    mode.step({ punch: true });
+    expect([mode.stage, mode.done]).toEqual([1, null]);
+    esc(view);
+    expect([mode.stage, mode.done, mode.choice]).toEqual([0, null, 1]);
+    // The same sign reopens the route step; confirm the generated
+    // ANOTHER route there, then cancel it while loading.
+    mode.step({});
+    mode.step({ punch: true });
+    expect([mode.stage, mode.done]).toEqual([1, null]);
+    mode.choice = 0;
+    mode.step({});
+    mode.step({ punch: true });
+    expect(mode.done).toBe('boss-br');
+    stepSelect(view);
+    expect(view.loading).toBe(true);
+    esc(view);
+    expect(view.loading).toBe(false);
+    expect(view.select).toBe(mode);
+    expect(mode.stage).toBe(0);
+    expect(mode.done).toBeNull();
+    expect(statuses.at(-1)?.cheated).toBe(true);
+    finishLoad();
+    expect(view.select).toBe(mode);
+    expect(view.wanted).toBeUndefined();
   });
 });
 

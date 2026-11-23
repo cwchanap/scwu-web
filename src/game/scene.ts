@@ -639,12 +639,12 @@ export class TrainingScene extends Phaser.Scene {
       return select.done === 'yes'
         ? this.runStory(this.story!.retry())
         : this.openTitle();
-    // The mode select's pick (authored, HPA-765): a regular route enters
-    // as if the 1P struck its Chii sign — the skipped battle's life left
-    // for its jumps — and a fresh run for the cheated mark. A boss's
-    // first sign picks outright (authored, HPA-858): STORY their default
-    // story, B.R. the generated route a new Story owns, whose first step
-    // is a plain battle with no Chii-sign jumps to feed.
+    // The mode select's pick (authored, HPA-765): a native sign route
+    // enters as if the 1P struck its Chii sign — the skipped battle's life
+    // left for its jumps — while the generated routes ('boss-br', HPA-858;
+    // 'br-long', HPA-1251) are a fresh Story's own run, whose first step
+    // is a plain battle with no Chii-sign jumps to feed. STORY starts
+    // plain.
     if (select instanceof ModeSelect) {
       const { who, done } = select;
       const cheated = this.runCheated;
@@ -653,12 +653,13 @@ export class TrainingScene extends Phaser.Scene {
       this.teams = null;
       this.routeLoad = undefined;
       this.cheatedBeforeRoute = undefined;
-      this.story = new Story(who, done === 'boss-br' ? 'boss-br' : null);
-      if (done === 'boss-br' || done === 'story') {
+      this.story = new Story(
+        who,
+        done === 'boss-br' || done === 'br-long' ? done : null,
+      );
+      if (done === 'story' || done === 'boss-br' || done === 'br-long') {
         this.runStory(this.story.next());
-      } else if (done !== 'br-long') {
-        // br-long has no sign route yet; the selector task (HPA-1251) will
-        // pass it straight into Story, so only native signs enter here.
+      } else if (done) {
         [this.storyLife, this.storyLost] = [routeLife(who, done), 0];
         this.runStory(this.story.startOnRoute(done));
       }
