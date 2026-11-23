@@ -221,22 +221,21 @@ def main(prev, out, raw4):
 
     # ---------------- GIANT STEP: he jumps off the top, a giant foot stamps ahead ----------------
     foot = raw4 / "giant-foot.png"
-    if foot.exists():
-        a, bg = load(raw4, "giant-foot")
-        F, _ = pixel(a, bg, 330 / a.shape[0])  # the leg fills the canvas height; about 330 px in the game
-        Fax, Fay = feet(F)
-        fx_ = 230
-        frames = [pose("sw-293", 300)[0], pose("sw-321", 150)[0]] + leave_up() + [Frame(400).add(EMPTY, 0, 0)]
-        frames += [Frame(50).add(F, Fax, Fay, dx=fx_, dy=dy) for dy in (-480, -300, -130)]
-        dust = lambda r, s: fx.glow(r, inner=fx.WARM, outer=fx.AMBER, rays=6, seed=s)
-        frames.append(glow_at(Frame(80).add(F, Fax, Fay, dx=fx_), dust(80, 1), fx_ + 60, -6))
-        frames.append(glow_at(Frame(120).add(F, Fax, Fay, dx=fx_), dust(56, 2), fx_ + 60, -6))
-        frames.append(Frame(500).add(F, Fax, Fay, dx=fx_))
-        frames += [Frame(60).add(F, Fax, Fay, dx=fx_, dy=dy) for dy in (-160, -420)]
-        frames += [Frame(300).add(EMPTY, 0, 0)] + drop_in()
-        meta["giantStep"] = save("giantStep", frames, out, False)
-    else:
-        print("no giant-foot.png yet: giantStep skipped")
+    if not foot.exists():  # a required drawing: fail rather than build a page without GIANT STEP
+        sys.exit(f"missing {foot}: draw it first with draw.sh giant-foot")
+    a, bg = load(raw4, "giant-foot")
+    F, _ = pixel(a, bg, 330 / a.shape[0])  # the leg fills the canvas height; about 330 px in the game
+    Fax, Fay = feet(F)
+    fx_ = 230
+    frames = [pose("sw-293", 300)[0], pose("sw-321", 150)[0]] + leave_up() + [Frame(400).add(EMPTY, 0, 0)]
+    frames += [Frame(50).add(F, Fax, Fay, dx=fx_, dy=dy) for dy in (-480, -300, -130)]
+    dust = lambda r, s: fx.glow(r, inner=fx.WARM, outer=fx.AMBER, rays=6, seed=s)
+    frames.append(glow_at(Frame(80).add(F, Fax, Fay, dx=fx_), dust(80, 1), fx_ + 60, -6))
+    frames.append(glow_at(Frame(120).add(F, Fax, Fay, dx=fx_), dust(56, 2), fx_ + 60, -6))
+    frames.append(Frame(500).add(F, Fax, Fay, dx=fx_))
+    frames += [Frame(60).add(F, Fax, Fay, dx=fx_, dy=dy) for dy in (-160, -420)]
+    frames += [Frame(300).add(EMPTY, 0, 0)] + drop_in()
+    meta["giantStep"] = save("giantStep", frames, out, False)
 
     # ---------------- ULTRA SWING: SWING's grab, twice the spin, the toss, then a beam ----------------
     fr = clip_frames("swing")  # the grab, 13 spin cycles of 4 frames, the toss (ct-111), 3 recovery frames
