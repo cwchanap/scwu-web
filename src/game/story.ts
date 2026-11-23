@@ -3,7 +3,8 @@
 // after the last until one starts a battle or a demo.
 import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
-import { brAnotherStory, bossBrAnotherStory } from './br-another';
+import { BR_LONG_LINEUPS } from './br-lineups';
+import { brAnotherStory, brLongStory, bossBrAnotherStory } from './br-another';
 import { BOSSES, ROSTER } from './select';
 
 export interface Slot {
@@ -100,9 +101,10 @@ export const scenarioOf = (who: Who) =>
 // Globals): striking a sign KO's it into taking the 1P's life by its take —
 // 100 for Easy, 346 for Hard, 347 for BR ZERO and 348 for BR Another —
 // which steps 1–3's jumps read. The four bosses' generated B.R. ANOTHER
-// route ('boss-br') carries no Chii-sign take.
+// route ('boss-br') and the generated B.R. LONG route ('br-long', HPA-1035
+// §3/§8) carry no Chii-sign take.
 export type SignRoute = 'story-easy' | 'story-hard' | 'br-zero' | 'br-another';
-export type Route = SignRoute | 'boss-br';
+export type Route = SignRoute | 'boss-br' | 'br-long';
 export const TAKES: Record<SignRoute, number> = {
   'story-easy': 100,
   'story-hard': 346,
@@ -150,6 +152,12 @@ const BOSS_BR_STORIES = new Map<Who, readonly Step[]>(
   BOSSES.map((who) => [who, bossBrAnotherStory(who)]),
 );
 
+const BR_LONG_STORIES = new Map<Who, readonly Step[]>(
+  (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
+    BR_LONG_LINEUPS[who] ? [[who, brLongStory(who)] as const] : [],
+  ),
+);
+
 export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
@@ -169,7 +177,8 @@ export class Story {
     return (
       this.route === 'br-zero' ||
       this.route === 'br-another' ||
-      this.route === 'boss-br'
+      this.route === 'boss-br' ||
+      this.route === 'br-long'
     );
   }
 
@@ -177,8 +186,11 @@ export class Story {
   // in the last battle (0x424e64) for its jumps.
   next(life = 0, lost = 0): Next {
     const scenario =
-      (this.route === 'boss-br' ? BOSS_BR_STORIES.get(this.who) : undefined) ??
-      scenarioOf(this.who);
+      (this.route === 'boss-br'
+        ? BOSS_BR_STORIES.get(this.who)
+        : this.route === 'br-long'
+          ? BR_LONG_STORIES.get(this.who)
+          : undefined) ?? scenarioOf(this.who);
     // More than 200 steps in one run, a step out of 0–99, an empty step
     // (type 0) or the end (4) return to the title (0x406b75–0x406bcb).
     for (let runs = 1; runs <= 200; runs++) {

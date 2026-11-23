@@ -1,6 +1,6 @@
 import { CHARACTERS, desperationOf } from './characters';
 import type { Who } from './characters';
-import { BR_ANOTHER_LINEUPS } from './br-lineups';
+import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
 import { BOSSES, ROSTER } from './select';
 import { rand } from './standing';
 import type { Battle, Slot, Step } from './story';
@@ -272,4 +272,31 @@ export const brAnotherStory = (who: Who): readonly Step[] => {
     offset: ending - (source.length + 2),
   });
   return steps;
+};
+
+// Authored (HPA-1035 §3, §8): the one-battle B.R. LONG route — the six
+// approved ordered pairs (twelve enemies) on Sakura Street with the header
+// and roles of ryuko's own stage-9 opener (63), followed by the end step; no
+// demos and no Chii sign. An ordinary player adds DoraEmon as the sole
+// partner, rebuilt from the opener's immediate-entry first slot with the
+// ally flag (0x200) so he is on stage from the first tick; a boss player has
+// no ally and all twelve hostile seats marked tough (Slot.tough; match.ts
+// applies the stats). Pacing stays native: the first enemy is present at the
+// start and each next enters once its predecessor falls below its own
+// desperation mark (assemble's watch/below, read through match.ts lifeMark).
+export const brLongStory = (who: Who): readonly Step[] => {
+  const row = BR_LONG_LINEUPS[who];
+  if (!row) throw new Error(`${who} has no approved B.R. LONG row`);
+  const roles = sourceStep('ryuko', 63);
+  const boss = (BOSSES as readonly Who[]).includes(who);
+  const ally: Slot | undefined = boss
+    ? undefined
+    : {
+        ...roles.slots[0]!,
+        player: ROSTER.indexOf('dora'),
+        flags: roles.slots[0]!.flags | 0x200,
+      };
+  const battle = assemble(roles, roles, seats(row), true, 9, ally);
+  if (boss) for (const slot of battle.slots) slot!.tough = true;
+  return [battle, { type: 4 }];
 };
