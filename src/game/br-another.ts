@@ -86,7 +86,7 @@ const assemble = (
 ): Battle => {
   const n = players.length;
   // The hostility bits cover the actual seats: the 1P, the n players and,
-  // when the route's finale donates one, the ally behind them.
+  // when the route donates one, the ally behind them.
   const all = (1 << (n + (ally ? 2 : 1))) - 1;
   const slots: Slot[] = players.map((player, i) => {
     const enemies =
@@ -129,32 +129,46 @@ const assemble = (
 
 // Authored (HPA-1035 §7, owner-approved 16 Nov 2026): every fighter's three
 // ANOTHER stages come from the approved lineup table. Stage 1 seats three of
-// the twelve regular pairs; the roles and header come from the fighter's own
-// source stage-1 opener (finale − 2, itself a stage-9 battle), except the
-// folded four, whose source stage-1 slot (45) is a native stage battle —
-// they keep HPA-766's donation: ryuko's step 63 for roles, their own step 45
-// for the header, stage 9. Stage 2 seats three of the four extra pairs (the
-// fighter's own is out), stage 3 the four bosses in approved order with the
-// last boss's arena; assemble derives each seat's watch/below from its
-// actual predecessor and every stage keeps the source finale's ally.
+// the twelve regular pairs; the roles, header and ally come from the
+// fighter's own source stage-1 opener (finale − 2, itself a stage-9 battle),
+// except the folded four, whose source stage-1 slot (45) is a native stage
+// battle — they keep HPA-766's donation: ryuko's step 63 for roles, their
+// own step 45 for the header, stage 9, the finale's ally. Stage 2 seats
+// three of the four extra pairs (the fighter's own is out), stage 3 the four
+// bosses in approved order with the last boss's arena; both keep the source
+// finale's roles, header and ally. assemble derives each seat's watch/below
+// from its actual predecessor, and a donated ally is rebuilt to watch the
+// 1P at the 1P's own desperation mark rather than keeping the donor's stale
+// threshold (sww's opener ships below 160).
 export const brAnotherStages = (who: Who): BrAnotherStages => {
   const row = BR_ANOTHER_LINEUPS[who];
   if (!row) throw new Error(`${who} has no approved B.R. ANOTHER row`);
   const finale = sourceStep(who, finaleIndex(who));
-  const ally = finale.slots[6]!;
   const folded = FOLDED.includes(who);
   const opener = folded
     ? sourceStep(who, 45)
     : sourceStep(who, finaleIndex(who) - 2);
+  const allyOf = (donor: Battle): Slot => ({
+    ...donor.slots[6]!,
+    watch: 0,
+    below: desperationOf(who),
+  });
   const stage1 = assemble(
     folded ? sourceStep('ryuko', 63) : opener,
     opener,
     seats(row.stage1),
     true,
     9,
-    ally,
+    allyOf(folded ? finale : opener),
   );
-  const stage2 = assemble(finale, finale, seats(row.stage2), true, 3, ally);
+  const stage2 = assemble(
+    finale,
+    finale,
+    seats(row.stage2),
+    true,
+    3,
+    allyOf(finale),
+  );
   const bosses = seats([row.stage3]);
   const stage3 = assemble(
     finale,
@@ -162,7 +176,7 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     bosses,
     false,
     bossArena(bosses.at(-1)!),
-    ally,
+    allyOf(finale),
   );
   return { stage1, stage2, stage3 };
 };
