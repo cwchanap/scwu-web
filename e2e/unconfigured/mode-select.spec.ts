@@ -49,6 +49,16 @@ const ROW2: Record<'a' | 'b' | 'c', Rect> = {
   b: { x: 620, y: 240, w: 80, h: 40 },
   c: { x: 440, y: 240, w: 80, h: 40 },
 };
+// The LONG ally's initial trace on the fight's canvas (HPA-1251): the
+// first-tick Dora is short, so his blue sprite fills the low 'ally' band
+// at his stand and never the 'tall' one above it — which stays clear
+// until the first hostile rises from his entry door (blue too, and tall),
+// so the boss route's ally-less opening can't fake the probe and the
+// hostile's emergence can't read as the ally.
+const ALLY: Record<'ally' | 'tall', Rect> = {
+  ally: { x: 690, y: 505, w: 115, h: 140 },
+  tall: { x: 690, y: 300, w: 115, h: 170 },
+};
 // A board lighting means a whole screen chain ran — several opens and the
 // picked select's hundred-tick wait — so the pixel polls share the slack
 // the route check already gives confirmRoute, not the five-second default.
@@ -107,7 +117,7 @@ const openArena = async (page: Page) => {
         ctx.drawImage(img, 0, 0);
         const out: Record<
           string,
-          { r: number; g: number; b: number; lum: number }
+          { r: number; g: number; b: number; lum: number; blue: number }
         > = {};
         for (const [name, rect] of Object.entries(rects)) {
           const x = Math.round((box.x + (rect.x / 960) * box.width) * ratio);
@@ -120,11 +130,13 @@ const openArena = async (page: Page) => {
           const d = ctx.getImageData(x, y, w, h).data;
           let r = 0,
             g = 0,
-            b = 0;
+            b = 0,
+            blue = 0;
           for (let i = 0; i < d.length; i += 4) {
             r += d[i];
             g += d[i + 1];
             b += d[i + 2];
+            if (d[i + 2] - d[i] > 40) blue++;
           }
           const n = d.length / 4;
           out[name] = {
@@ -132,6 +144,7 @@ const openArena = async (page: Page) => {
             g: g / n,
             b: b / n,
             lum: (r + g + b) / (3 * n),
+            blue: blue / n,
           };
         }
         return out;
@@ -461,11 +474,13 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
 
 // The regular B.R. route step offers three signs (HPA-1251): B.R. ZERO,
 // ANOTHER and the blank LONG board. The keyboard walk lights each board
-// under its arrow, LONG starts the twelve-enemy brawl (its first-tick
-// Dora ally shows only on the canvas HUD, whose bars scene tests pin —
-// the DOM meters here hold the initial fighter and first enemy), and the
-// remembered LONG survives on the step until a tap confirms ANOTHER.
-test('regular B.R.: three signs walk to LONG, then a remembered tap to ANOTHER', async ({
+// under its arrow and a tap on LONG's drawn box starts the twelve-enemy
+// brawl — the touch route start on the third sign (the remembered tap
+// then starts ANOTHER). The brawl's first-tick Dora ally draws no bar
+// (his donated slot carries no life-bar flag) — his sprite is the ally's
+// visible trace, probed at the fight's first second; the DOM meters hold
+// the initial fighter and first enemy.
+test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to ANOTHER', async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -475,6 +490,7 @@ test('regular B.R.: three signs walk to LONG, then a remembered tap to ANOTHER',
     opponent,
     health,
     press,
+    sample,
     lum,
     boards,
     routeCursorOver,
@@ -513,9 +529,27 @@ test('regular B.R.: three signs walk to LONG, then a remembered tap to ANOTHER',
   await expect.poll(() => boards(B3_RIGHT, B3_MID), VIEW).toBeGreaterThan(30);
   await expect.poll(() => routeCursorOver(ROW3, 'c'), VIEW).toBeGreaterThan(5);
 
-  // LONG confirmed: the twelve-enemy brawl on Sakura Street, SWW first
-  // (460), untimed — Ryuko's 510 bar beside it.
-  await confirmRoute(() => press('Enter'));
+  // LONG confirmed by touch: a tap on its drawn box — the blank board's
+  // centre at 720, the spot the walk's arrow sits over — picks and
+  // confirms it like a button. The keyboard confirm of a remembered
+  // regular LONG stays in the next test. The twelve-enemy brawl on
+  // Sakura Street: SWW first (460), untimed — Ryuko's 510 bar beside it.
+  await confirmRoute(() => tap(720, 400));
+  // The ally's own initial trace, polled from the route confirm onward:
+  // the first true sample is the fight's first second — his short blue
+  // sprite at the entry door, with the tall band above it still clear.
+  // Every pre-battle frame fails it (the selector's own right half is
+  // blue, so its tall band reads high), and so do the fight's later
+  // frames once the first hostile — blue too, and tall — rises out of
+  // his door: a missing ally can't fake the probe, and neither can a
+  // sample that arrives after him. No combat loop, no production
+  // API, no ally bar read (his donated slot carries none).
+  await expect
+    .poll(async () => {
+      const s = await sample(ALLY);
+      return s.ally.blue > 0.08 && s.tall.blue < 0.03;
+    }, VIEW)
+    .toBe(true);
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '510');
   await expect(opponent).toHaveAttribute('aria-valuemax', '460', {
@@ -525,21 +559,15 @@ test('regular B.R.: three signs walk to LONG, then a remembered tap to ANOTHER',
 
   // Session memory: the selector reopens on B.R., whose route step
   // remembers LONG — lit, arrow over it. The reopen rides the pick's
-  // closing wait, which clears input, so Enter is re-sent while the
-  // route step's header reads dark: a re-send can only fire when the
-  // one before was swallowed (a landed Enter lights the header and ends
-  // the poll before another is sent). A tap on the middle board then
-  // confirms ANOTHER through the same geometry the walk used.
+  // closing wait, which clears input, so the wait for it is action-free:
+  // the lit B.R. board's own brightness (a character grid never reads
+  // that bright — the mode step only) tells the step is up and taking
+  // input, and ONE Enter then opens the route step. A tap on the middle
+  // board confirms ANOTHER through the same geometry the walk used.
   await backToModeSelect();
-  await expect
-    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
-    .toBeGreaterThan(30);
-  await expect
-    .poll(async () => {
-      await press('Enter');
-      return lum('h', HEADER);
-    }, VIEW)
-    .toBeGreaterThan(160);
+  await expect.poll(() => lum('r', MODE_RIGHT), VIEW).toBeGreaterThan(170);
+  await press('Enter');
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   await expect.poll(() => boards(B3_RIGHT, B3_MID), VIEW).toBeGreaterThan(30);
   await expect.poll(() => routeCursorOver(ROW3, 'c'), VIEW).toBeGreaterThan(5);
   await confirmRoute(() => tap(480, 400));
@@ -572,13 +600,15 @@ test('regular→boss: the remembered LONG lands on the boss route step', async (
     lum,
     boards,
     routeCursorOver,
+    tap,
     confirmRoute,
     skipToBattle,
     backToModeSelect,
   } = await openArena(page);
 
   // Ryuko's B.R. route step: right, right to LONG, Enter starts it —
-  // SWW first (460), untimed. STORY draws first; the pick's closing wait
+  // the keyboard confirm (the previous test taps the same sign). SWW
+  // first (460), untimed. STORY draws first; the pick's closing wait
   // clears earlier keys.
   await press('g');
   await press('g');
@@ -615,19 +645,14 @@ test('regular→boss: the remembered LONG lands on the boss route step', async (
   for (const key of ['d', 'd', 'd', 'd', 'd', 'd', 's', 's', 's'])
     await press(key);
   await press('g');
-  // ZENKA's selector opens on the remembered B.R. — its boards drawing
-  // is also the wait that her pick's closing wait has run. Enter into
-  // her two-sign route step is re-sent while the header reads dark, in
-  // case the closing wait drained the first one.
-  await expect
-    .poll(() => boards(MODE_RIGHT, MODE_LEFT), VIEW)
-    .toBeGreaterThan(30);
-  await expect
-    .poll(async () => {
-      await press('Enter');
-      return lum('h', HEADER);
-    }, VIEW)
-    .toBeGreaterThan(160);
+  // ZENKA's selector opens on the remembered B.R. — its lit board's own
+  // brightness is the action-free readiness check (a character grid never
+  // reads that bright, and while it holds the pick's closing wait may
+  // still be draining input), so the ONE Enter below always lands on the
+  // mode step. Her route step then opens on the remembered LONG.
+  await expect.poll(() => lum('r', MODE_RIGHT), VIEW).toBeGreaterThan(170);
+  await press('Enter');
+  await expect.poll(() => lum('h', HEADER), VIEW).toBeGreaterThan(160);
   // The boss step resolves the remembered LONG onto its own second
   // board — lit under the arrow, ANOTHER dimmed beside it.
   await expect
@@ -635,9 +660,12 @@ test('regular→boss: the remembered LONG lands on the boss route step', async (
     .toBeGreaterThan(30);
   await expect.poll(() => routeCursorOver(ROW2, 'b'), VIEW).toBeGreaterThan(5);
 
-  // Enter confirms it: ZENKA's LONG brawl — no ally, twelve tough
+  // A tap on LONG's drawn box — the blank right board's centre at 660,
+  // the spot the arrow sits over — confirms it: the boss step's touch
+  // route start (the keyboard confirms on this step take ANOTHER in the
+  // bosses' own tests). ZENKA's LONG brawl — no ally, twelve tough
   // enemies, ERUS first at twice his native 450 — 900 — untimed.
-  await confirmRoute(() => press('Enter'));
+  await confirmRoute(() => tap(660, 400));
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '480');
   await expect(opponent).toHaveAttribute('aria-valuemax', '900', {
