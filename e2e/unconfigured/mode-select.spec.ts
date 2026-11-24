@@ -264,37 +264,38 @@ const openArena = async (page: Page) => {
     // the race lets it win from inside a stalled sample. A route whose
     // players are all resident queues no pack either, but it begins at
     // once, and the pixel watch catches it on a next sample.
-    const loaded = page.waitForRequest((req) => req.url().includes('/packs/'), {
-      timeout: 15_000,
-    });
+    const loaded = page
+      .waitForRequest((req) => req.url().includes('/packs/'), {
+        timeout: 15_000,
+      })
+      // A route whose players are all resident fires no request: its
+      // timeout must not out-race the pixel watch — only a seen pack cuts
+      // it short, so a rejection stays pending.
+      .catch(() => new Promise<never>(() => {}));
     let settled = false;
-    try {
-      await send();
-      await Promise.race([
-        expect
-          .poll(
-            async () => {
-              if (settled) return true;
-              const s = await sample(rects);
-              if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
-              // The flip's other proof (HPA-1251): a generated route leaves
-              // for its battle in place — no demo — and the arena under the
-              // header band can read as bright as the sign it replaced, so
-              // the battle's own pad (more than the screens' eight controls,
-              // which a story demo keeps) says the selector left then.
-              return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
-            },
-            {
-              timeout: 15_000,
-            },
-          )
-          .toBe(true),
-        loaded,
-      ]);
-      settled = true;
-    } finally {
-      loaded.catch(() => {});
-    }
+    await send();
+    await Promise.race([
+      expect
+        .poll(
+          async () => {
+            if (settled) return true;
+            const s = await sample(rects);
+            if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
+            // The flip's other proof (HPA-1251): a generated route leaves
+            // for its battle in place — no demo — and the arena under the
+            // header band can read as bright as the sign it replaced, so
+            // the battle's own pad (more than the screens' eight controls,
+            // which a story demo keeps) says the selector left then.
+            return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
+          },
+          {
+            timeout: 15_000,
+          },
+        )
+        .toBe(true),
+      loaded,
+    ]);
+    settled = true;
     return frames;
   };
   // A boss's confirm starts the story or generated route itself, so the
@@ -391,10 +392,11 @@ const openArena = async (page: Page) => {
   };
 
   // A route's opening demo skips on a fresh button once armed; keep
-  // pressing until the battle's own pad shows (an early press queueing
-  // through the load lands on the demo's or battle's first tick).
+  // pressing until the battle's own pad shows. The window must outlast
+  // the whole load — confirmRoute can return at the first pack request,
+  // and the scene drops every key sent before it finishes.
   const skipToBattle = async () => {
-    const deadline = Date.now() + 45_000;
+    const deadline = Date.now() + 90_000;
     while ((await pad.count()) <= 8 && Date.now() < deadline) {
       await page.keyboard.press('g');
       await page.waitForTimeout(300);
