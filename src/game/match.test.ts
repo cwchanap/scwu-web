@@ -1080,6 +1080,46 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect([zaku.hp, zaku.downed]).toEqual([0, true]);
   });
 
+  it('keeps a later same-tick contact from queueing a reaction over the KO (authored, HPA-1251)', () => {
+    // Boss B.R. LONG: ZENKA against the twelve approved enemies, RYUKO's
+    // seat among them so her DST missiles fly as her objects.
+    const br = Match.story(
+      'zenka',
+      brLongStory('zenka')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    br.useCheats({
+      ...DEFAULT_CHEATS,
+      enabled: true,
+      lowHpLine: 1,
+      damageCutMultiplier: 3,
+    });
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const ryuko = br.fighters.find((f) => f.who === 'ryuko')!;
+    const victim = br.fighters.find((f) => f.who === 'erus')!;
+    victim.x = ryuko.x + 200;
+    // Two missiles over the idle body in the same tick. The first (ERUS at
+    // 22, above the 1% line's 4) takes its full 22 and KOs; the second sees
+    // 0 HP, and the ×3 cut keeps nothing of it — it must leave the queued
+    // KO alone rather than raise a 0-HP zombie into a reaction.
+    victim.hp = 22;
+    spawn(br, br.fighters.indexOf(ryuko), RYUKO.dstMissile, {
+      x: victim.x,
+      y: victim.y,
+    });
+    spawn(br, br.fighters.indexOf(ryuko), RYUKO.dstMissile, {
+      x: victim.x,
+      y: victim.y,
+    });
+    for (let t = 0; t < 600; t++) br.step();
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(playing(victim)).toBe('koLand');
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',
