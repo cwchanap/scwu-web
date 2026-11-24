@@ -5,7 +5,7 @@ import { DEFAULT_CHEATS } from './cheats';
 import { Match } from './match';
 import type { Fighter } from './match';
 import { BOSSES, ROSTER } from './select';
-import { opensOnModeSelect } from './story';
+import { opensOnModeSelect, validateLineupCoverage } from './story';
 import type { Battle, Slot, Step } from './story';
 import { brAnotherStages, brLongStory, bossBrAnotherStory } from './br-another';
 import type { BrAnotherStages } from './br-another';
@@ -424,6 +424,38 @@ describe('BR Another approved lineups', () => {
     expect(combos.size, 'lead/slot combos').toBe(192);
     expect([...combos.values()].filter((n) => n === 1)).toHaveLength(156);
     expect([...combos.values()].filter((n) => n === 2)).toHaveLength(36);
+  });
+
+  it('validates the lineup tables against the eligible roster at load (authored, HPA-1251)', () => {
+    const eligibleLong = [...ELIGIBLE, ...(BOSSES as readonly Who[])];
+    // The shipped tables cover exactly their rosters: ANOTHER the 34
+    // mode-select fighters (the bosses route the generated ANOTHER), LONG
+    // them plus the four bosses.
+    expect(() =>
+      validateLineupCoverage(
+        'B.R. ANOTHER',
+        new Set(Object.keys(BR_ANOTHER_LINEUPS)),
+        ELIGIBLE,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateLineupCoverage(
+        'B.R. LONG',
+        new Set(Object.keys(BR_LONG_LINEUPS)),
+        eligibleLong,
+      ),
+    ).not.toThrow();
+    // A doctored map is named: a missing row would silently start the
+    // native story with Story.br set; an extra one would never run.
+    const missing = new Set(Object.keys(BR_LONG_LINEUPS));
+    missing.delete('kay');
+    expect(() =>
+      validateLineupCoverage('B.R. LONG', missing, eligibleLong),
+    ).toThrow(/B\.R\. LONG lineups[\s\S]*missing: kay/);
+    const extra = new Set([...Object.keys(BR_ANOTHER_LINEUPS), 'zenka']);
+    expect(() =>
+      validateLineupCoverage('B.R. ANOTHER', extra, ELIGIBLE),
+    ).toThrow(/B\.R\. ANOTHER lineups[\s\S]*extra: zenka/);
   });
 
   it('donates stage-1 roles and headers from the fighter’s own stage-9 opener, or ryuko 63 and own 45 for the folded', () => {
