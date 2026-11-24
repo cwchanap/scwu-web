@@ -196,6 +196,7 @@
   "drop": {
     "214": [235, 236, 237, 238]
   },
+  "cutInputs": [37],
   "ui": {
     "faceTile": "ui/face-tile.png",
     "hudFace": "ui/hud-face.png",

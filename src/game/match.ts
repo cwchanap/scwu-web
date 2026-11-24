@@ -919,7 +919,6 @@ const timeline = (f: Fighter) => f.branch!;
 // 548) and jumps back (39 + 35, PC 549).
 export const EX_MODE: Partial<Record<Who, number>> = {
   ryuko: 10,
-  shuwa: 10,
   chung: 100,
   amiro: 100,
   anmc: 100,
@@ -938,7 +937,8 @@ export const EX_MODE: Partial<Record<Who, number>> = {
   ziro: 100,
   yinan: 100,
 };
-// Zoma, Kiki and Yo have none, whatever their variable 0 holds.
+// Zoma, Kiki and Yo have none, whatever their variable 0 holds, nor SHUWA,
+// whose export cuts Ryuko's intro jump to Chage Character (37, cutInputs).
 export const exMode = (f: Fighter) => {
   const ex = EX_MODE[f.who];
   return ex !== undefined && f.variables[0] === ex;

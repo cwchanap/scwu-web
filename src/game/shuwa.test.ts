@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
 import { entriesOf, KEYS } from './commands';
-import { LIFE, Match } from './match';
+import { exMode, fighterPose, LIFE, Match } from './match';
 import type { Fighter, Input } from './match';
 import { named, objects, playing, RYUKO } from './testing';
 
@@ -26,27 +26,42 @@ function duel(who: Who, side = 0, gap = 130) {
   return { match, f, other, step };
 }
 
-// Runs `input` for `ticks`: when each action began, the damage RYUKO took,
-// the stocks left and how many DST missiles flew.
+const OWN = new Set(
+  CHARACTERS.shuwa.images.filter((i) => i.own).map(({ index }) => index),
+);
+// Runs `input` for `ticks` from `hp` life: when each action began, the ticks
+// RYUKO lost life on and how much, the stocks left, how many DST missiles
+// flew and, for SHUWA, any image he showed that is not his own (0 and 8191
+// show nothing).
 function run(
   who: Who,
   input: (t: number) => Input,
-  { side = 0, gap = 130, ticks = 1500 } = {},
+  { side = 0, gap = 130, ticks = 1500, hp = 0 } = {},
 ) {
   const { match, f, other, step } = duel(who, side, gap);
+  if (hp) f.hp = hp;
   const path: [number, unknown][] = [];
+  const struck: number[] = [];
+  const foreign = new Set<number>();
   let missiles = 0;
   for (let t = 0; t < ticks; t++) {
+    const before = other.hp;
     step(input(t));
     if (path.at(-1)?.[1] !== playing(f)) path.push([t, playing(f)]);
+    if (other.hp !== before) struck.push(t);
     missiles += objects(match, RYUKO.dstMissile, side).length;
+    const { image } = fighterPose(f);
+    if (who === 'shuwa' && image && image !== 8191 && !OWN.has(image))
+      foreign.add(image);
   }
   return {
     path,
+    struck,
     damage: LIFE - other.hp,
     stock: f.stock,
     hits: f.hits,
     missiles,
+    foreign: [...foreign],
   };
 }
 
@@ -182,7 +197,7 @@ describe('SHUWA (authored, donor RYUKO)', () => {
       const input = (t: number) => ({ [key]: t === 2 });
       const his = run('shuwa', input, { gap: 200 });
       expect(his.path.slice(1, -1).map(([, action]) => action)).toEqual(path);
-      expect(his).toMatchObject({ damage, stock });
+      expect(his).toMatchObject({ damage, stock, foreign: [] });
       expect(his).toEqual(run('ryuko', input, { gap: 200 }));
     },
   );
@@ -191,23 +206,60 @@ describe('SHUWA (authored, donor RYUKO)', () => {
     const input = (t: number) => ({ dst: t === 2 });
     const swing = run('shuwa', input);
     const dst = run('ryuko', input);
-    // Both toss RYUKO (214 into 215) for the toss's 10 (response 31); SWING
-    // drops 215's volley frames, so it ends 98 ticks sooner. Costs nothing.
-    expect(swing).toMatchObject({
+    // Both toss RYUKO (214 into 215) for the toss's 10 (response 31) at
+    // 215's age 185, tick 192. SWING drops 215's volley frames (368 ticks to
+    // 283) and with them the missiles' hit, whose 13-tick stop holds her:
+    // the whole move runs 288 ticks (entered at tick 2, idle at 290), back
+    // 98 ticks after the toss against her 196. Costs nothing.
+    expect(swing).toEqual({
       path: [
         [0, 'idle'],
         [2, RYUKO.dst],
         [7, RYUKO.dstHit],
         [290, 'idle'],
       ],
+      struck: [192],
       damage: 10,
       stock: 3,
+      // The catch and the toss.
+      hits: 2,
       missiles: 0,
+      foreign: [],
     });
-    expect(dst.path.at(-1)).toEqual([388, 'idle']);
+    expect(dst).toMatchObject({
+      path: [
+        [0, 'idle'],
+        [2, RYUKO.dst],
+        [7, RYUKO.dstHit],
+        [388, 'idle'],
+      ],
+      struck: [192, 294],
+      damage: 32,
+    });
     expect(dst.missiles).toBeGreaterThan(0);
     expect(swing.damage).toBeLessThan(dst.damage);
   });
+
+  // Her low-life forms, which his scripts keep (op 0x11 at 153 life, PCs of
+  // 264 and 214): 153 of his 480 is 32%.
+  it.each([
+    ['getterBeam', 'SPECIUM RAY', 'G BEAM EVIL', 200, 264, [278], 120],
+    ['dst', 'SWING', 'Evil DST', 130, 214, [221, 222], 10],
+  ] as const)(
+    '%s turns %s into her %s at 153 life or less, his drawings throughout',
+    (key, _name, _form, gap, normal, path, damage) => {
+      const input = (t: number) => ({ [key]: t === 2 });
+      const low = run('shuwa', input, { gap, hp: 153 });
+      expect(low.path.slice(1).map(([, action]) => action)).toEqual([
+        ...path,
+        'idle',
+      ]);
+      expect(low).toMatchObject({ damage, foreign: [] });
+      expect(firstMove(run('shuwa', input, { gap, hp: 154 }).path)).toBe(
+        normal,
+      );
+    },
+  );
 
   // The ticket's inputs pressed in full from idle, facing either way: ULTRA
   // SWING's ends in RING's ↓←G, and SPECIUM RAY's and THREE MINUTES' end in
@@ -228,6 +280,32 @@ describe('SHUWA (authored, donor RYUKO)', () => {
       expect(firstMove(path)).toBe(action);
     }
   });
+
+  // Her intros' op 0x16s jump to Chage Character (37) while down is held,
+  // which sets variable 0 to 10, her EX mode; his export cuts them
+  // (cutInputs). Vs. CPU's intro (30 into 32) and VS single's (30 + 9 into
+  // 33), against RYUKO's.
+  it.each([false, true])(
+    'never enters EX mode, down held through the intro (VS single %s)',
+    (vs) => {
+      for (const who of ['shuwa', 'ryuko'] as const) {
+        const match = new Match('cpu', true, 0, [who, 'ryuko'], 'court', vs);
+        const f = match.fighters[0];
+        const path = new Set<unknown>();
+        for (let t = 0; t < 700; t++) {
+          match.step({ crouch: true });
+          path.add(playing(f));
+        }
+        const ex = who === 'ryuko';
+        expect(path.has(vs ? 33 : 32)).toBe(true);
+        expect([path.has(37), f.variables[0] ?? 0, exMode(f)]).toEqual([
+          ex,
+          ex ? 10 : 0,
+          ex,
+        ]);
+      }
+    },
+  );
 
   it('counters a blocked punch with Hit Up, spending a stock (174)', () => {
     // As match.test's recovered guard counter: punch 1 blocked at tick 7,

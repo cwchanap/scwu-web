@@ -128,6 +128,9 @@ cut from the game.
 - `drop`: `{action: [image ids]}`. From every script the closure of that action reaches (the fighter's own timeline, not objects), remove the
   frames that show those images together with the events on them (SWING is her Daisetsuzan without the missile volley after the toss).
   The scripts must still end and the throw must still deal its damage.
+- `cutInputs`: donor actions his input checks may not jump to. The exporter removes every op 0x16 (`input` event) of his scripts
+  that jumps to one, and refuses if his own timeline still reaches one. Her intros (30 to 34, 36) jump to Chage Character (37)
+  while down is held, which sets variable 0 to 10, her EX mode; he has none, so 37 is cut.
 - `ui`: the Menu and HUD stand-ins. `hudFaceImages` take `ui/hud-face.png` (their own width and height).
 
 #### Placing a drawing
@@ -146,6 +149,7 @@ so his anchor lands where the donor's position point would, moved by whatever th
 #### What the exporter checks
 
 - every action in `commands` (and Counter Hit, action 174) exists in the donor's scripts;
+- nothing of his reaches a `cutInputs` action once its checks are cut;
 - every fighter-shown image of every script those actions reach maps to a drawing, is blanked or kept (list the exceptions);
 - every `images`/`scriptImages` drawing and every `fx` file exists and has an anchor; each `fx` file has the donor image's size;
 - nothing under `art/` is a file of the game (the test compares hashes with `public/assets`).
