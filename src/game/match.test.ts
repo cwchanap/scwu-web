@@ -1120,6 +1120,49 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
+  it('keeps a same-tick object meet from queueing the victim’s hit handler over the KO (authored, HPA-1251)', () => {
+    // Ordinary B.R. LONG: the 1P's punch KOs an enemy whose own box meets
+    // an object body the same tick. The 0x40f36a hit-handler queue — which
+    // the two-missile test can't reach, its strikers being objects — must
+    // leave the pending KO alone too.
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries())
+      if (i) {
+        vm!.input = () => ({});
+        vm!.guards = () => false;
+      }
+    while (br.roundTicks <= br.fightTick) br.step();
+    const [ryuko] = br.fighters;
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+    )!;
+    victim.x =
+      ryuko.x + firstStrike('ryuko', RYUKO.punch, victim.who).reach - 20;
+    victim.hp = 1;
+    // Hit stop holds the victim's action (and its handler) through the KO
+    // tick: its wide box meets the axe's body wherever the thrown axe
+    // opens it, while the axe itself — spawned high and to the side — is
+    // no contact (an object's would count as a later striker and cover
+    // the pass again).
+    victim.hitStop = 10;
+    victim.box = { x: 0, y: 0, w: 2000, h: 2000, damage: 0, kind: 0 };
+    victim.onHit = RYUKO.punch;
+    spawn(br, 0, RYUKO.axe, { x: victim.x + 300, y: victim.y - 300 });
+    strike(br, ryuko, RYUKO.punch);
+    br.step();
+    expect(victim.pending).toMatchObject({ action: 'down' });
+    for (let t = 0; t < 600; t++) br.step();
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(playing(victim)).toBe('koLand');
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',

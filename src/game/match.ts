@@ -6184,7 +6184,8 @@ export class Match {
     // 0x40f36a: a player's box meeting an object's body queues its hit
     // handler at the contact, over whatever is queued, a reaction or KO an
     // earlier player's box queued among them; only a later striker's (a
-    // later player's or any object's) replaces it.
+    // later player's or any object's) replaces it. On a B.R. route a KO'd
+    // striker's pending KO stands instead (authored, HPA-1251).
     for (const [striker] of objectHits) {
       if ('clip' in striker || !striker.onHit) continue;
       const i = this.fighters.indexOf(striker);
@@ -6195,7 +6196,8 @@ export class Match {
           (c.reaction || c.timeline) &&
           ('clip' in c.source || this.fighters.indexOf(c.f) > i),
       );
-      if (!later) striker.pending = { key: striker.onHit };
+      if (!later && !(this.br && striker.hp === 0))
+        striker.pending = { key: striker.onHit };
     }
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
