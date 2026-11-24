@@ -540,6 +540,34 @@ test('profile shows sign-in unavailable when unconfigured', async ({
   expect(errors).toEqual([]);
 });
 
+test('guide links SHUWA by his own face tile and opens his page', async ({
+  page,
+}) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  await page.goto('/instructions.html');
+  const link = page.getByRole('link', { name: 'SHUWA', exact: true });
+  await expect(link.locator('img')).toBeVisible();
+  await expect
+    .poll(() =>
+      link
+        .locator('img')
+        .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth),
+    )
+    .toBe(24);
+  await link.click();
+  await expect(link).toHaveAttribute('aria-current', 'page');
+  await expect(
+    page.getByRole('heading', { name: 'SHUWA', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('row').filter({
+      has: page.getByRole('cell', { name: 'SPECIUM RAY', exact: true }),
+    }),
+  ).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('guide keeps the backdrop, back link and DoraEmon move descriptions', async ({
   page,
 }) => {
