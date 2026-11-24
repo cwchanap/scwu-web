@@ -9,8 +9,10 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -220,4 +222,214 @@ describe('DOM art publication', () => {
       }
     },
   );
+});
+
+// SHUWA's export (export_authored) against his spec (art/shuwa/game) and
+// RYUKO's, the donor's, export.
+interface Frame {
+  image: number;
+}
+interface Event {
+  op: string;
+  action?: number;
+  offset?: number;
+  busy?: number;
+  busyOffset?: number;
+  target?: number;
+}
+interface Script {
+  end: string;
+  next: number;
+  offset?: number;
+  frames: Frame[];
+  events: Event[];
+}
+interface Export {
+  scripts: Record<string, Script>;
+  clips: Record<string, Frame[]>;
+  held: Frame[];
+  idle: { records: number[][] };
+  images: { index: number; width: number; height: number; own?: boolean }[];
+  commands: { entries: Record<'air' | 'near' | 'far' | 'crouch', number>[] };
+  responses: number[];
+  start: number;
+  jumps: number[];
+  walks: number[];
+  fall: number;
+}
+const json = <T>(path: string) => JSON.parse(readFileSync(path, 'utf8')) as T;
+const ART = 'art/shuwa/game';
+const spec = json<{
+  commands: { keep: number[] };
+  images: Record<string, string>;
+  scriptImages: Record<string, Record<string, string>>;
+  fx: number[];
+  blank: number[];
+  drop: Record<string, number[]>;
+  ui: { portrait: string; faceTile: string; hudFace: string };
+}>(`${ART}/spec.json`);
+const anchors = json<Record<string, { size: [number, number] }>>(
+  `${ART}/anchors.json`,
+);
+const ryuko = json<Export>('src/game/generated/assets.json');
+const shuwa = json<Export>('src/game/generated/shuwa.json');
+const pngSize = (path: string) => {
+  const bytes = readFileSync(path);
+  return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+};
+const actionsOf = (entry: Export['commands']['entries'][number]) =>
+  [entry.air, entry.near, entry.far, entry.crouch].filter(Boolean);
+// The scripts his own timeline plays from `roots`: export_assets.py's
+// fighter_scripts, every edge but a spawn (which makes an object).
+function fighterScripts(scripts: Export['scripts'], roots: number[]) {
+  const key = (action: number, offset = 0) =>
+    offset ? `${action}+${offset}` : `${action}`;
+  const seen = new Set<string>();
+  const todo = roots.map((root) => `${root}`);
+  while (todo.length) {
+    const at = todo.pop()!;
+    const script = scripts[at];
+    if (!script || seen.has(at)) continue;
+    seen.add(at);
+    if (script.end === 'jump') todo.push(key(script.next, script.offset));
+    for (const e of script.events)
+      if (e.op === 'spawn') {
+        if (e.busy) todo.push(key(e.busy, e.busyOffset));
+      } else if (
+        ['handler', 'random', 'input', 'test', 'command'].includes(e.op)
+      ) {
+        if (e.action) todo.push(key(e.action, e.offset));
+      } else if (e.op === 'call') todo.push(`${e.action}`);
+      else if ((e.op === 'stock' || e.op === 'life') && e.target)
+        todo.push(key(e.target, e.offset));
+  }
+  return seen;
+}
+
+describe("SHUWA's authored export", () => {
+  it('keeps only actions the donor has, as its kept entries name them', () => {
+    for (const entry of spec.commands.keep)
+      expect(actionsOf(shuwa.commands.entries[entry - 1]), `${entry}`).toEqual(
+        actionsOf(ryuko.commands.entries[entry - 1]),
+      );
+    const kept = spec.commands.keep.flatMap((entry) =>
+      actionsOf(ryuko.commands.entries[entry - 1]),
+    );
+    // Counter Hit (174), and the actions drop and scriptImages name.
+    for (const action of [
+      ...kept,
+      174,
+      ...Object.keys(spec.drop),
+      ...Object.keys(spec.scriptImages),
+    ])
+      expect(`${action}` in ryuko.scripts, `${action}`).toBe(true);
+  });
+
+  it('shows only images his spec maps to a drawing, a blank or an fx', () => {
+    const moves = shuwa.commands.entries.flatMap(actionsOf);
+    const own = fighterScripts(shuwa.scripts, [
+      ...moves,
+      174,
+      ...shuwa.responses.filter(Boolean),
+      shuwa.start,
+      ...shuwa.jumps,
+      ...shuwa.walks,
+      shuwa.fall,
+    ]);
+    const shown = new Set([
+      ...[...own].flatMap((key) =>
+        shuwa.scripts[key].frames.map((f) => f.image),
+      ),
+      ...Object.entries(shuwa.clips)
+        // The darkening panel behind a super is an object of RYUKO's.
+        .filter(([name]) => name !== 'black')
+        .flatMap(([, frames]) => frames.map((f) => f.image)),
+      ...shuwa.held.map((f) => f.image),
+      ...shuwa.idle.records
+        .filter((r) => r[0] === 0x0c)
+        .map((r) => (r[3] | (r[4] << 8)) & 8191),
+    ]);
+    const mapped = new Set([
+      0,
+      8191,
+      ...Object.keys(spec.images).map(Number),
+      ...spec.fx,
+      ...spec.blank,
+      ...Object.values(spec.scriptImages).flatMap((images) =>
+        Object.keys(images).map((image) => 10000 + Number(image)),
+      ),
+    ]);
+    expect([...shown].filter((image) => !mapped.has(image))).toEqual([]);
+    const ownImages = new Set(
+      shuwa.images.filter((image) => image.own).map(({ index }) => index),
+    );
+    expect(
+      [...shown].filter(
+        (image) => image && image !== 8191 && !ownImages.has(image),
+      ),
+    ).toEqual([]);
+    // The moves he lacks are left out.
+    expect(own.has('256')).toBe(false);
+  });
+
+  it('has every drawing and fx it names, anchored and sized', () => {
+    const drawings = new Set([
+      ...Object.values(spec.images),
+      ...Object.values(spec.scriptImages).flatMap(Object.values),
+      spec.ui.portrait,
+    ]);
+    for (const name of drawings) {
+      const path = `${ART}/drawings/${name}.png`;
+      expect(existsSync(path), path).toBe(true);
+      expect(pngSize(path), path).toEqual(anchors[name]?.size);
+    }
+    // Each fx is the donor image's exact size, so her offsets and boxes stay
+    // true.
+    const donor = new Map(ryuko.images.map((image) => [image.index, image]));
+    for (const id of spec.fx) {
+      const { width, height } = donor.get(id)!;
+      expect(pngSize(`${ART}/fx/${id}.png`), `${id}`).toEqual([width, height]);
+    }
+    for (const id of spec.blank) expect(donor.has(id), `${id}`).toBe(true);
+    for (const path of [spec.ui.faceTile, spec.ui.hudFace])
+      expect(existsSync(`${ART}/${path}`), path).toBe(true);
+  });
+
+  itWithArt('cuts nothing under art/ from the game', () => {
+    const sha = (path: string) =>
+      createHash('sha256').update(readFileSync(path)).digest('hex');
+    const art = new Map<string, string>();
+    const sizes = new Set<number>();
+    for (const name of readdirSync('art', {
+      recursive: true,
+      encoding: 'utf8',
+    }))
+      if (name.endsWith('.png')) {
+        art.set(sha(`art/${name}`), `art/${name}`);
+        sizes.add(statSync(`art/${name}`).size);
+      }
+    // The exporter's own copies of the art: his images, the EN digits and
+    // DoraEmon's name plate.
+    const copies = (path: string) =>
+      path.startsWith('shuwa/') ||
+      [
+        'en/7.png',
+        'en/8.png',
+        'en/9.png',
+        'en/10.png',
+        'dora/247.png',
+      ].includes(path);
+    const found: string[] = [];
+    for (const name of readdirSync('public/assets', {
+      recursive: true,
+      encoding: 'utf8',
+    })) {
+      const path = `public/assets/${name}`;
+      const stat = statSync(path);
+      if (stat.isFile() && sizes.has(stat.size) && art.has(sha(path)))
+        if (!copies(name)) found.push(`${name} = ${art.get(sha(path))}`);
+    }
+    expect(art.size).toBeGreaterThan(100);
+    expect(found).toEqual([]);
+  });
 });
