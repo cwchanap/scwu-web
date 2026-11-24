@@ -300,8 +300,10 @@ describe('BR Another approved lineups', () => {
     }
     expect(perPair.size).toBe(4);
     // The approved table seats each pair 25 or 26 times over the 34 rows
-    // (102 pair slots); the prose's exact 26/26/25/25 split differs from the
-    // table itself, and the table is the approved data.
+    // (102 pair slots): the recount is OGI+ZIRO 26, YINAN+AYA 26, GIGI+SWW
+    // 25, MASA+3-TIMES 25, which the corrected design prose now matches.
+    // The 25–26 bound stays the invariant; the per-row comparison pins the
+    // data.
     for (const key of [
       pairKey([24, 25]),
       pairKey([26, 27]),
