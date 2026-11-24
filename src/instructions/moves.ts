@@ -5112,7 +5112,7 @@ export const GUIDES_DATA = {
           {
             name: 'SWING',
             input: '<span class="motion">←↓→</span><kbd>H</kbd>',
-            desc: 'Command throw: spins the opponent overhead and hurls them skyward. Long recovery on a miss.',
+            desc: 'Command throw: spins the opponent overhead and hurls them skyward. Long recovery on a miss. At about a third of his life or less it plays a longer form.',
             cost: 0,
           },
         ],
@@ -5125,7 +5125,7 @@ export const GUIDES_DATA = {
           {
             name: 'SPECIUM RAY',
             input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
-            desc: 'A beam across the arena, also in the air. At 30% health or less takes its stronger form.',
+            desc: 'A beam across the arena, also in the air. At about a third of his life or less takes its stronger form.',
             cost: 1,
           },
           {
