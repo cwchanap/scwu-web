@@ -295,6 +295,8 @@ const NAMES: Record<Who, number | null> = {
   dora: 247,
   rario: 235,
   training: null,
+  // SHUWA (authored) has no name plate.
+  shuwa: null,
 };
 
 // The stock count picks its digits from the word at 0x445202 + stock × 2

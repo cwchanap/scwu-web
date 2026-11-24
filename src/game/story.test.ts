@@ -142,7 +142,8 @@ describe('story runner', () => {
       '4/21/47/62',
       '6/23/49/64',
     ]);
-    // Stories without the Chii opener never open this menu.
+    // Stories without the Chii opener never open this menu, nor SHUWA's
+    // empty one (export_authored).
     expect(excluded.sort()).toEqual([
       'alpha',
       'astroman',
@@ -151,6 +152,7 @@ describe('story runner', () => {
       'golf',
       'pachelo',
       'shinz',
+      'shuwa',
       'training',
       'ttro',
       'zaku',

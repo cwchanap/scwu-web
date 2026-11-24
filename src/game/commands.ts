@@ -50,6 +50,7 @@ import aya from './generated/aya.json';
 import dora from './generated/dora.json';
 import rario from './generated/rario.json';
 import training from './generated/training.json';
+import shuwa from './generated/shuwa.json';
 import type { Control, Input } from './match';
 
 export interface CommandEntry {
@@ -160,6 +161,8 @@ const TABLES: Record<Who, { entries: readonly CommandEntry[]; near: number }> =
     },
     rario: rario.commands,
     training: training.commands,
+    // SHUWA's: RYUKO's, but the entries he lacks are inert (export_authored).
+    shuwa: shuwa.commands,
   };
 export const entriesOf = (who: Who) => TABLES[who].entries;
 export const nearOf = (who: Who) => TABLES[who].near;
@@ -877,6 +880,11 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['drill', 6],
     ['dash', 4],
   ],
+  // SHUWA's: Ryuko's keys for the entries he has (spec.json's keep).
+  shuwa: RYUKO_KEYS.filter(([, entry]) => {
+    const { air, near, far, crouch } = shuwa.commands.entries[entry - 1];
+    return air || near || far || crouch;
+  }),
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,
@@ -924,6 +932,7 @@ export const BACK_DASH: Record<Who, number> = {
   dora: 29,
   rario: 12,
   training: 5,
+  shuwa: 14,
 };
 // Long enough for the longest window (PAC-HELO's elertic, 100) and the tick
 // before it.

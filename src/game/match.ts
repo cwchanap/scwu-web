@@ -420,8 +420,8 @@ const doraFall = (age: number) => {
 const LOSE = 59;
 // Ryuko's and LIZARD's HISA Down Down lands into Chuck DOWN DOWN (147, PC
 // 1664); every other player's into their Down normal (Zoma's 146, PC 1585),
-// which lies 30 ticks less.
-const BOUNCE_DOWN: readonly Who[] = ['ryuko', 'lizard'];
+// which lies 30 ticks less. SHUWA plays Ryuko's.
+const BOUNCE_DOWN: readonly Who[] = ['ryuko', 'lizard', 'shuwa'];
 // The KOs that launch straight up and sink without sliding (moveKO).
 const STRAIGHT_KO: readonly Who[] = ['rario', 'training'];
 // Ryuko's knockdown, 'DOWN normal', and its get-up, 'Down Get up': Z-MEGA's
@@ -919,6 +919,7 @@ const timeline = (f: Fighter) => f.branch!;
 // 548) and jumps back (39 + 35, PC 549).
 export const EX_MODE: Partial<Record<Who, number>> = {
   ryuko: 10,
+  shuwa: 10,
   chung: 100,
   amiro: 100,
   anmc: 100,
