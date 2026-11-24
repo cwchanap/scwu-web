@@ -266,6 +266,7 @@ const spec = json<{
   fx: number[];
   blank: number[];
   drop: Record<string, number[]>;
+  cutInputs: number[];
   ui: { portrait: string; faceTile: string; hudFace: string };
 }>(`${ART}/spec.json`);
 const anchors = json<Record<string, { size: [number, number] }>>(
@@ -368,7 +369,16 @@ describe("SHUWA's authored export", () => {
         (image) => image && image !== 8191 && !ownImages.has(image),
       ),
     ).toEqual([]);
-    // The moves he lacks are left out.
+    // The moves he lacks are left out, and with her intro's input checks to
+    // them cut (cutInputs), so is Chage Character (37), her EX mode.
+    const cut = new Set(spec.cutInputs);
+    expect(cut).toEqual(new Set([37]));
+    expect([...own].filter((key) => cut.has(parseInt(key)))).toEqual([]);
+    expect(
+      Object.values(shuwa.scripts).flatMap(({ events }) =>
+        events.filter((e) => e.op === 'input' && cut.has(e.action!)),
+      ),
+    ).toEqual([]);
     expect(own.has('256')).toBe(false);
   });
 

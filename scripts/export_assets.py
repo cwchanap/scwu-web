@@ -4367,8 +4367,8 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
 
 
 # SHUWA (HPA-1304), the authored fighter: no original file, so his data is
-# RYUKO's export with his own drawings, effects and stats (art/shuwa/game,
-# whose README.md is the contract).
+# RYUKO's export with his own drawings, effects and stats (art/shuwa/game;
+# art/shuwa/README.md, "The game's spec", is the contract).
 SHUWA = ROOT / "art/shuwa/game"
 # The scripts his drawings were placed against first (art/shuwa/tools/
 # donor_data.py's RYUKO): a donor image's reference placement is its first
@@ -4418,6 +4418,8 @@ def drop_frames(script, images):
             cut += f["duration"]
         else:
             frames.append(dict(f, t=f["t"] - cut))
+    if not spans:
+        return script
 
     def moved(t):
         return t - sum(end - start for start, end in spans if end <= t)
@@ -4434,7 +4436,7 @@ def png_size(content):
 
 def export_authored(ryuko, roots):
     """SHUWA's shuwa.json and his images under public/assets/shuwa/: RYUKO's export (`ryuko`, as main() writes it)
-    with spec.json's stats, command table, drawings, effects, blanks and drops. `roots` are the actions her own
+    with spec.json's stats, command table, drawings, effects, blanks, drops and cut input checks. `roots` are the actions her own
     timeline plays besides her moves (main()'s queue without the moves and hit effects)."""
     spec = json.loads((SHUWA / "spec.json").read_text(encoding="utf8"))
     anchors = json.loads((SHUWA / "anchors.json").read_text(encoding="utf8"))
@@ -4451,11 +4453,18 @@ def export_authored(ryuko, roots):
     moves = {e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]} | {174}
     if missing := sorted(m for m in moves if str(m) not in scripts):
         sys.exit(f"SHUWA's moves {missing} are not RYUKO's scripts; refusing to export.")
+    # The input checks (op 0x16) that jump to actions he lacks: her intro's down-held jump to Chage Character (37),
+    # which sets variable 0 to 10, her EX mode.
+    cut_inputs = set(spec["cutInputs"])
+    for script in scripts.values():
+        script["events"] = [e for e in script["events"] if not (e["op"] == "input" and e["action"] in cut_inputs)]
     own = fighter_scripts(scripts, [*roots, *moves])
+    if reached := sorted({k for k in own if int(k.split("+")[0]) in cut_inputs}):
+        sys.exit(f"SHUWA still reaches {reached}, which spec.json's cutInputs cuts; refusing to export.")
     for action, images in spec["drop"].items():
         for key in fighter_scripts(scripts, [action]):
             scripts[key] = drop_frames(scripts[key], set(images))
-    # Each donor image's reference placement (README "Placing a drawing"), from her unchanged export.
+    # Each donor image's reference placement (art/shuwa/README.md, "Placing a drawing"), from her unchanged export.
     refs = {}
     for s in [ryuko["scripts"][k] for k in SHUWA_FIRST] + list(ryuko["scripts"].values()) + list(ryuko["clips"].values()):
         for f in s["frames"] if isinstance(s, dict) else s:
