@@ -1383,15 +1383,19 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // The pooled Damage cut labels the arena bars show under cheats
-  // (authored, HPA-1251).
+  // (authored, HPA-1251). The 15px stroked style keeps them legible at a
+  // 480-wide viewport, where a hairline 13px face antialiases away.
   private cutPool(count: number) {
     while (this.cutTexts.length < count)
       this.cutTexts.push(
         this.add
           .text(0, 0, '', {
             fontFamily: 'monospace',
-            fontSize: '13px',
+            fontSize: '15px',
+            fontStyle: 'italic bold',
             color: '#ffd24a',
+            stroke: '#7a2d00',
+            strokeThickness: 3,
           })
           .setOrigin(0)
           .setScrollFactor(0)

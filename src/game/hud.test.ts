@@ -244,6 +244,27 @@ it('hides the fixed glow under cheats and marks the real line (10%–60%)', () =
   expect(hud.marks()[0].visible).toBe(false);
 });
 
+it('keeps the low-HP line visible on a living fighter whose bar crops to 0 wide', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  match.useCheats({ ...DEFAULT_CHEATS, enabled: true, lowHpLine: 10 });
+  // 2 of 510 rounds the fill to floor(254·2/510) = 0 — the strip draws
+  // nothing natively, but the fighter is alive: the line, highlight and
+  // cut stay.
+  match.fighters[0].hp = 2;
+  update(match);
+  expect(hud.marks()[0].visible).toBe(true);
+  expect(hud.glows()[0].visible).toBe(true);
+  expect(hud.cuts()[0].visible).toBe(true);
+  // A dead fighter keeps every part hidden.
+  match.fighters[0].hp = 0;
+  update(match);
+  expect(hud.marks()[0].visible).toBe(false);
+  expect(hud.glows()[0].visible).toBe(false);
+  expect(hud.cuts()[0].visible).toBe(false);
+});
+
 it('keeps the low-HP highlight independent of a 0× Damage cut', () => {
   const hud = hudScene();
   const update = createHud(hud.as, (key) => key);
