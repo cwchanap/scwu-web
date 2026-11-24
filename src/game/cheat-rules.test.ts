@@ -802,25 +802,42 @@ describe('low-HP super gates (HPA-972)', () => {
 
   it('gives a late summon the snapshot’s Low HP, not the pending values', () => {
     // A summon into a battle whose snapshot is cheat-enabled lends it the
-    // Low HP rules, read off its own bar and scale.
+    // Low HP rules, read off its own bar and scale — the battle runs first,
+    // so the snapshot is what a mid-fight summon reads, and the pending
+    // values would say something else on every setting.
     const cheated = new Match('practice', false, 0, ['sou', 'sou']);
     cheated.useCheats(
-      cheats({ enabled: true, partnerHpMultiplier: 2, lowHpLine: 60 }),
+      cheats({
+        enabled: true,
+        partnerHpMultiplier: 2,
+        lowHpLine: 60,
+        damageCutMultiplier: 3,
+      }),
     );
+    ticks(cheated, 30);
     const ally = cheated.summon('sou', 1)!;
     expect(ally.maxHp).toBe(960);
     expect(cheated.idleLifeLine()).toBe(60);
     expect(cheated.idleVM(ally).lifeLine).toBe(60);
     expect(cheated.lifeLineMark(ally)).toBe(576);
-    expect(cheated.lossKeptPercent(ally)).toBe(CHARACTERS.sou.scale);
+    // The snapshot's ×3 cut keeps SOU nothing of a loss (100 − 35 × 3,
+    // clamped); the pending defaults would keep his native 50%.
+    expect(cheated.lossKeptPercent(ally)).toBe(0);
 
     // A summon into a native battle keeps native Low HP even though its
-    // HP follows the pending values alone.
+    // HP follows the pending values alone — the pending ×2 cut and 60%
+    // line change neither the line nor the kept share.
     const native = new Match('practice', false, 0, ['sou', 'sou']);
+    ticks(native, 30);
     const late = native.summon(
       'sou',
       1,
-      cheats({ enabled: true, partnerHpMultiplier: 2, lowHpLine: 60 }),
+      cheats({
+        enabled: true,
+        partnerHpMultiplier: 2,
+        lowHpLine: 60,
+        damageCutMultiplier: 3,
+      }),
     )!;
     expect(late.maxHp).toBe(960);
     expect(native.idleLifeLine()).toBe(30);
