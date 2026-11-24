@@ -1,6 +1,6 @@
 # SCWU Web MVP
 
-Browser fighting-game prototype rebuilt from reverse-engineered data of the Windows game SCWU: 45 fighters (Ryuko … RARIO, TRAINING) on 18 stages, behind the original's title, character select, story mode and continue screens, plus free practice and Vs. CPU. Each fighter's moves play from their own recovered action scripts and command table. Built with TypeScript, Svelte 5, Phaser 4, Vite and Vitest.
+Browser fighting-game prototype rebuilt from reverse-engineered data of the Windows game SCWU: 45 fighters (Ryuko … RARIO, TRAINING), plus SHUWA, an authored fighter with his own drawings on Ryuko's data, on 18 stages, behind the original's title, character select, story mode and continue screens, plus free practice and Vs. CPU. Each fighter's moves play from their own recovered action scripts and command table. Built with TypeScript, Svelte 5, Phaser 4, Vite and Vitest.
 
 ## Run
 
@@ -125,10 +125,10 @@ The title opens SINGLE (story), VS and TEAM VS; the **Menu** button at the arena
 
 ## Evidence
 
-Behavior recovered from the source (each fighter's moves, objects, reactions, commands, boxes, damage, the camera, HUD, KO and CPU) is kept apart from rules authored for training (single-key bindings, the Shift dash, practice partners and settings). Vitest pins each rule's ticks and positions and compares the idle interpreter with independent Python traces; the original Windows game has not been run here. Scope: all 45 fighters and 18 stages, local single-player; no gamepad, multiplayer or full gameplay VM. [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule.
+Behavior recovered from the source (each fighter's moves, objects, reactions, commands, boxes, damage, the camera, HUD, KO and CPU) is kept apart from rules authored for training (single-key bindings, the Shift dash, practice partners and settings). Vitest pins each rule's ticks and positions and compares the idle interpreter with independent Python traces; the original Windows game has not been run here. Scope: all 45 fighters (and the authored SHUWA) and 18 stages, local single-player; no gamepad, multiplayer or full gameplay VM. [docs/evidence.md](docs/evidence.md) cites the action indices, PCs, opcodes and engine addresses behind each rule.
 
 ## Files and assets
 
 [AGENTS.md](AGENTS.md) maps the source tree: `src/game/` (rules, rendering, select screens, CPU), `src/instructions/` (the controls guide), `scripts/export_assets.py` (asset export) and `docs/`.
 
-The original handoff stays unchanged and Vite refuses to serve it. Only selected PNGs and WAVs enter `public/assets/`; generated assets and fixtures are gitignored and regenerated locally. The deployed game serves them from the public R2 bucket, which is the owner's choice and does not establish redistribution rights.
+The original handoff stays unchanged and Vite refuses to serve it. Only selected PNGs and WAVs enter `public/assets/`, with the authored art under `art/` (the EN digits 700–1000, DoraEmon's name plate, SHUWA's drawings and effects), none of it cut from the game; generated assets and fixtures are gitignored and regenerated locally. The deployed game serves them from the public R2 bucket, which is the owner's choice and does not establish redistribution rights.

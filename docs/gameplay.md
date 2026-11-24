@@ -101,3 +101,15 @@ While a standing or crouching guard reaction plays and Ryuko has a stock, press 
 ## Throws
 
 Press J or the Throw touch button to grab an opponent, including one holding back to guard. The grab checks after 70 ms: its box reaches a standing, crouching or attacking opponent on the ground up to about 167 arena pixels away, but not one airborne, turning, reeling from a hit or blocking. A miss plays a 620 ms recovery. Ryuko cannot be struck on the grab tick, so a punch landing then passes through her, and two simultaneous grabs both miss. A grab holds the opponent in front for 50 ms and spins them through three 200 ms cycles, as the Daisetsuzan's first spins do, then tosses them into the air for 30 damage. Ryuko's recovery lasts 1.4 seconds. The opponent tumbles, bounces into knockdown and gets up before control returns. The held opponent cannot be hit; the tossed one can, until knockdown (its 129–131 body boxes are kind 2). A lying fighter's body sits below the floor and a rising one has none, so neither can be hit or grabbed. Knockdown and get-up keep push boxes, so bodies still push apart. Z-MEGA and SHIN-Z can rise into a counter, RAMDOM GET UP: if the opponent stands within about 450 and 510 arena pixels in front as they start to get up, the screen darkens and a blow strikes for 40 and 50. SHIN-Z counters five times in six, Z-MEGA half the time. It costs no power and works in every mode, free practice included. Fighters stay 75 arena pixels inside the view's edges, as the engine clamps them, so a stage end's wall is 75 pixels in; a wide pose keeps its anchor when the pose changes. A hit on the thrower before the toss leaves the opponent held until the thrower's hit stop has counted down, then it stands free where it was held, without the toss's damage. A lethal toss KOs the victim where it was tossed; reset releases held fighters.
+
+## SHUWA
+
+SHUWA is an authored fighter: he has no original file. He plays Ryuko's moves on her timing with his own drawings, 480 life and three stocks. He joins from the Menu's fighter lists and the summon grid; he has no seat on the select sheet and no story. He has Ryuko's chains, jumps and dashes, Hit Up and its chase, Chuck and COUNTER HIT. His five specials and supers take Ryuko's motions, read toward the opponent, or their keys:
+
+- **RING**, ↓← G: Ryuko's axe throw (30), free.
+- **SWING**, ←↓→ H: her Daisetsuzan Oroshi without the missile volley. The toss deals 10, and he is back 98 ticks (about a second) sooner.
+- **SPECIUM RAY**, ↓→↓→ G, also in the air: her G BEAM, 100 over 20 hits, for a stock.
+- **ULTRA SWING**, →↓←→↓← G: her CGA (100), for a stock. The full motion enters it though it ends in RING's ↓← G.
+- **THREE MINUTES**, ↓→↓→ H: her B G (240), for three stocks.
+
+At 153 life or less (about a third of his), SPECIUM RAY becomes G BEAM EVIL (120) and SWING her Evil DST, still without the volley. He has no Drill Punch, IORI, MUSASHI, hidden super or EX mode: holding down through his intro changes nothing. In Vs. CPU he plays Ryuko's CPU table, whose picks of the moves he lacks enter nothing.
