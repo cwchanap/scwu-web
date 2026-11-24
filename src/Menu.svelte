@@ -461,10 +461,7 @@
                 void confirmSummon();
               }}
             >
-              <i
-                class="tile"
-                style={tileStyle(entry.id, ASSET_BASE)}
-              ></i>
+              <i class="tile" style={tileStyle(entry.id, ASSET_BASE)}></i>
               {#if entry.plate}
                 <img
                   class="plate"
@@ -599,9 +596,7 @@
                         onselect();
                       }}
                     >
-                      <i
-                        class="tile"
-                        style={tileStyle(fighter, ASSET_BASE)}
+                      <i class="tile" style={tileStyle(fighter, ASSET_BASE)}
                       ></i>
                     </button>
                     <strong class="pickname">{nameOf(fighter)}</strong>
@@ -633,9 +628,7 @@
                         onselect();
                       }}
                     >
-                      <i
-                        class="tile"
-                        style={tileStyle(opponent, ASSET_BASE)}
+                      <i class="tile" style={tileStyle(opponent, ASSET_BASE)}
                       ></i>
                     </button>
                     <strong class="pickname">{nameOf(opponent)}</strong>
