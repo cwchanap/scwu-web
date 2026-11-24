@@ -3,7 +3,7 @@
 // after the last until one starts a battle or a demo.
 import { CHARACTERS, lifeOf } from './characters';
 import type { Who } from './characters';
-import { BR_LONG_LINEUPS } from './br-lineups';
+import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
 import { brAnotherStory, brLongStory, bossBrAnotherStory } from './br-another';
 import { BOSSES, ROSTER } from './select';
 
@@ -140,6 +140,26 @@ export const opensOnModeSelect = (who: Who) =>
 export const hasModeSelect = (who: Who) =>
   opensOnModeSelect(who) || (BOSSES as readonly Who[]).includes(who);
 
+// Authored (HPA-1251): the lineup tables must cover exactly the fighters
+// they route — a missing row would silently start the native story with
+// Story.br set, an extra one would never run. ANOTHER seats the mode-select
+// fighters (the bosses route the generated ANOTHER instead); LONG seats
+// them and the four bosses.
+export const validateLineupCoverage = (
+  name: string,
+  keys: ReadonlySet<string>,
+  eligible: readonly string[],
+) => {
+  const missing = eligible.filter((who) => !keys.has(who));
+  const extra = [...keys].filter((who) => !eligible.includes(who));
+  if (missing.length || extra.length)
+    throw new Error(
+      `${name} lineups must cover exactly the eligible roster` +
+        (missing.length ? `; missing: ${missing.join(', ')}` : '') +
+        (extra.length ? `; extra: ${extra.join(', ')}` : ''),
+    );
+};
+
 const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
   (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
     isModeSelectBattle((CHARACTERS[who].scenario as readonly Step[])[0])
@@ -151,6 +171,21 @@ const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
 const BOSS_BR_STORIES = new Map<Who, readonly Step[]>(
   BOSSES.map((who) => [who, bossBrAnotherStory(who)]),
 );
+
+// Authored (HPA-1251): load-time roster coverage — after BR_ANOTHER_STORIES
+// (opensOnModeSelect reads it), before BR_LONG_STORIES quietly skips a row.
+const MODE_SELECT_FIGHTERS = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
+  opensOnModeSelect(who),
+);
+validateLineupCoverage(
+  'B.R. ANOTHER',
+  new Set(Object.keys(BR_ANOTHER_LINEUPS)),
+  MODE_SELECT_FIGHTERS,
+);
+validateLineupCoverage('B.R. LONG', new Set(Object.keys(BR_LONG_LINEUPS)), [
+  ...MODE_SELECT_FIGHTERS,
+  ...(BOSSES as readonly Who[]),
+]);
 
 const BR_LONG_STORIES = new Map<Who, readonly Step[]>(
   (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
