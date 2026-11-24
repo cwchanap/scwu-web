@@ -49,8 +49,10 @@ const bossArena = (seat: number): number => {
 
 const FOLDED_START = 44;
 
-// The seeded Fisher–Yates draw both route builders share: one stream per
-// fighter, seeded by its ROSTER seat, every stage drawn in order.
+// The seeded Fisher–Yates draw only the bosses' generated ANOTHER runs
+// (HPA-858): one stream per boss, seeded by its ROSTER seat, every stage
+// drawn in order. The approved table rows (br-lineups.ts) seat everyone
+// else's B.R. stages and every B.R. LONG.
 const seededShuffle = (start: number) => {
   let seed = start;
   return <T>(units: readonly T[]): T[] => {

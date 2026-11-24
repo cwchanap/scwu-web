@@ -283,24 +283,11 @@ const openArena = async (page: Page) => {
   // the demo's own art (a story's panels fill the top of the screen), so
   // only their leaving proves the direct exit. Demo-skip presses wait for
   // all of that.
-  const confirmDirect = async (send: () => Promise<void>, demo: boolean) => {
+  const confirmDirect = async (send: () => Promise<void>) => {
     expect(await lum('h', HEADER), 'boss header before confirm').toBeLessThan(
       160,
     );
     const deadline = Date.now() + 120_000;
-    if (!demo) {
-      await send();
-      while ((await pad.count()) <= 8 && Date.now() < deadline) {
-        const header = await lum('h', HEADER);
-        if ((await pad.count()) > 8) break;
-        expect(header, 'boss header while selector visible').toBeLessThan(160);
-        await page.waitForTimeout(150);
-      }
-      await expect
-        .poll(() => pad.count(), { timeout: 30_000 })
-        .toBeGreaterThan(8);
-      return;
-    }
     let demoLoaded = false;
     const onResponse = (res: { url(): string; ok(): boolean }) => {
       if (res.url().includes('demo-3.bin') && res.ok()) demoLoaded = true;
@@ -882,7 +869,7 @@ test('bosses: STORY MODE keeps the boss’s own story at native seats', async ({
   // band never lit before skipToBattle sends its first demo-skip press —
   // a buggy route step would still be up with its band lit, and those
   // presses would confirm its default route into the same duel.
-  await confirmDirect(() => press('Enter'), true);
+  await confirmDirect(() => press('Enter'));
   await skipToBattle();
 
   // Her own story opens on YO at native 480 — the boss route would seat
@@ -979,7 +966,7 @@ test('bosses: SHIN-Z routes to B.R. ANOTHER, DoraEmon his own story', async ({
   // proven gone before the demo-skip presses — and his own story opens
   // on GIANT at native 550 over DoraEmon's native 600, timed, where a
   // boss B.R. stage would seat doubles and read Unlimited.
-  await confirmDirect(() => press('Enter'), true);
+  await confirmDirect(() => press('Enter'));
   await skipToBattle();
   await expect(player).toHaveAttribute('aria-valuemax', '600');
   await expect(opponent).toHaveAttribute('aria-valuemax', '550', {
