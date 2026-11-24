@@ -260,13 +260,18 @@ const openArena = async (page: Page) => {
         async () => {
           const s = await sample(rects);
           if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
-          return Math.abs(s.h.lum - h0);
+          // The flip's other proof (HPA-1251): a generated route leaves
+          // for its battle in place — no demo — and the arena under the
+          // header band can read as bright as the sign it replaced, so
+          // the battle's own pad (more than the screens' eight controls,
+          // which a story demo keeps) says the selector left then.
+          return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
         },
         {
           timeout: 15_000,
         },
       )
-      .toBeGreaterThan(25);
+      .toBe(true);
     return frames;
   };
   // A boss's confirm starts the story or generated route itself, so the
