@@ -18,7 +18,7 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STAGES } from './game/characters';
 import { bytesOf, parsePack } from './game/packs';
-import { exporterSha, itWithArt } from './game/testing';
+import { exporterSha, itWithArt, shuwaArt } from './game/testing';
 import manifest from './game/generated/assets-version.json';
 
 const python = (expression: string) =>
@@ -109,8 +109,10 @@ describe('exporter fingerprint', () => {
         'art/hud/en-900.png',
         'art/hud/en-1000.png',
         'art/dora/name.png',
+        ...shuwaArt(),
         'src/App.svelte',
         'src/Menu.svelte',
+        'src/instructions/fighters.ts',
         'src/instructions/Instructions.svelte',
         'src/instructions/moves.ts',
         'src/instructions/page.ts',

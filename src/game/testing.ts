@@ -2,7 +2,7 @@
 // source action; these name the ones the tests drive, and the objects they
 // spawn (the axe, DST's missiles).
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { it } from 'vitest';
 import type { ObjectKey } from './animations';
 import { CHARACTERS } from './characters';
@@ -17,9 +17,24 @@ import type { Effect, Fighter, Input } from './match';
 // when CI is set.
 export const itWithArt = it.skipIf(!!process.env.CI);
 
+// SHUWA's committed files (art/shuwa/game, dotfiles aside), sorted by path,
+// as export_assets.py's authored_art() lists them after AUTHORED_ART.
+export const shuwaArt = () =>
+  readdirSync(new URL('../../art/shuwa/game', import.meta.url), {
+    recursive: true,
+    encoding: 'utf8',
+  })
+    .map((name) => `art/shuwa/game/${name}`)
+    .filter(
+      (name) =>
+        !name.split('/').pop()!.startsWith('.') &&
+        statSync(new URL(`../../${name}`, import.meta.url)).isFile(),
+    )
+    .sort();
+
 // export_assets.py's exporter() fingerprint, which build.sh's script_sha and
-// CI's fetch-generated.sh must reproduce: the script bytes, then AUTHORED_ART
-// (the committed art it reads) in the same order.
+// CI's fetch-generated.sh must reproduce: the script bytes, then
+// authored_art() (the committed art it reads) in the same order.
 export const exporterSha = () => {
   const hash = createHash('sha256');
   for (const name of [
@@ -29,6 +44,7 @@ export const exporterSha = () => {
     'art/hud/en-900.png',
     'art/hud/en-1000.png',
     'art/dora/name.png',
+    ...shuwaArt(),
   ])
     hash.update(readFileSync(new URL(`../../${name}`, import.meta.url)));
   return hash.digest('hex');

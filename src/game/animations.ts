@@ -959,6 +959,7 @@ const TWIN_ANIMATIONS = {
   dora: twinAnimations('dora'),
   rario: twinAnimations('rario'),
   training: twinAnimations('training'),
+  shuwa: twinAnimations('shuwa'),
 };
 // ANMC P's guards jump to their EX forms while variable 0 is 100 (op 0x1f,
 // PCs 1970, 2015, ...): the same records showing his other costume.

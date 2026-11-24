@@ -915,6 +915,8 @@ describe('KO Down life checks', () => {
       ],
       rario: [[66, 27]],
       training: [[0, 113]],
+      // SHUWA's is Ryuko's (export_authored).
+      shuwa: [[60, 145]],
     };
     for (const who of Object.keys(CHARACTERS) as Who[]) {
       const { events } = script(twin(who, 62), who);
@@ -936,7 +938,7 @@ describe('KO Down life checks', () => {
       ).toEqual(who === 'training' ? [] : expected[who].map(([t]) => t));
       for (const e of roundOver)
         expect(e).toMatchObject({
-          value: who === 'ryuko' ? 99 : 100,
+          value: who === 'ryuko' || who === 'shuwa' ? 99 : 100,
           action: twin(who, 62),
         });
       // Each target is the fighter's own exported action: its get-up

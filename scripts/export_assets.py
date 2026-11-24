@@ -4366,6 +4366,177 @@ def export_fighter(ryuko, ryuko_responses, key, source, neutral, twins, differ, 
     return len(images)
 
 
+# SHUWA (HPA-1304), the authored fighter: no original file, so his data is
+# RYUKO's export with his own drawings, effects and stats (art/shuwa/game,
+# whose README.md is the contract).
+SHUWA = ROOT / "art/shuwa/game"
+# The scripts his drawings were placed against first (art/shuwa/tools/
+# donor_data.py's RYUKO): a donor image's reference placement is its first
+# frame in these, then in her other scripts, then in her clips.
+SHUWA_FIRST = ["178", "179", "180", "181", "182", "185", "186", "187", "188", "189", "191", "194", "196", "197", "200",
+               "202"]
+
+
+def script_key(action, offset=0):
+    return f"{action}+{offset}" if offset else str(action)
+
+
+def script_edges(script):
+    """The actions a flattened script enters, as flatten_queue follows them: (key, spawned). A spawn makes an object;
+    a jump, branch, call, handler or busy action stays with the script's owner."""
+    out = [(script_key(script["next"], script.get("offset", 0)), False)] if script["end"] == "jump" else []
+    for e in script["events"]:
+        if e["op"] == "spawn":
+            out += [(script_key(e["action"], e["offset"]), True)] * bool(e["action"])
+            out += [(script_key(e["busy"], e["busyOffset"]), False)] * bool(e["busy"])
+        elif e["op"] in ("handler", "random", "input", "test", "command") and e["action"]:
+            out.append((script_key(e["action"], e["offset"]), False))
+        elif e["op"] == "call":
+            out.append((str(e["action"]), False))
+        elif e["op"] in ("stock", "life") and e["target"]:
+            out.append((script_key(e["target"], e["offset"]), False))
+    return out
+
+
+def fighter_scripts(scripts, roots):
+    """The exported scripts the fighter's own timeline plays from the roots: every edge but a spawn."""
+    seen, todo = set(), [str(root) for root in roots]
+    while todo:
+        key = todo.pop()
+        if key in scripts and key not in seen:
+            seen.add(key)
+            todo += [target for target, spawned in script_edges(scripts[key]) if not spawned]
+    return seen
+
+
+def drop_frames(script, images):
+    """The script without the frames that show these images, and the events in their ticks; later ticks move up."""
+    cut, spans, frames = 0, [], []
+    for f in script["frames"]:
+        if f["image"] in images:
+            spans.append((f["t"], f["t"] + f["duration"]))
+            cut += f["duration"]
+        else:
+            frames.append(dict(f, t=f["t"] - cut))
+
+    def moved(t):
+        return t - sum(end - start for start, end in spans if end <= t)
+
+    events = [dict(e, t=moved(e["t"])) for e in script["events"] if not any(start <= e["t"] < end for start, end in spans)]
+    if not frames or script["loop"] >= 0:
+        sys.exit("SHUWA's drop leaves a script without frames or cuts a loop; refusing to export.")
+    return dict(script, frames=frames, events=events)
+
+
+def png_size(content):
+    return struct.unpack(">II", content[16:24])
+
+
+def export_authored(ryuko, roots):
+    """SHUWA's shuwa.json and his images under public/assets/shuwa/: RYUKO's export (`ryuko`, as main() writes it)
+    with spec.json's stats, command table, drawings, effects, blanks and drops. `roots` are the actions her own
+    timeline plays besides her moves (main()'s queue without the moves and hit effects)."""
+    spec = json.loads((SHUWA / "spec.json").read_text(encoding="utf8"))
+    anchors = json.loads((SHUWA / "anchors.json").read_text(encoding="utf8"))
+    data = json.loads(json.dumps(ryuko))
+    scripts, clips = data["scripts"], data["clips"]
+    # The command table: kept entries keep their numbers, the rest take entry 21's inert shape.
+    entries = data["commands"]["entries"]
+    commands = spec["commands"]
+    for n in range(1, len(entries) + 1):
+        if n not in commands["keep"]:
+            entries[n - 1] = dict(ryuko["commands"]["entries"][20])
+        entries[n - 1].update(name=commands["names"].get(str(n), entries[n - 1]["name"]),
+                              steps=commands["steps"].get(str(n), entries[n - 1]["steps"]))
+    moves = {e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]} | {174}
+    if missing := sorted(m for m in moves if str(m) not in scripts):
+        sys.exit(f"SHUWA's moves {missing} are not RYUKO's scripts; refusing to export.")
+    own = fighter_scripts(scripts, [*roots, *moves])
+    for action, images in spec["drop"].items():
+        for key in fighter_scripts(scripts, [action]):
+            scripts[key] = drop_frames(scripts[key], set(images))
+    # Each donor image's reference placement (README "Placing a drawing"), from her unchanged export.
+    refs = {}
+    for s in [ryuko["scripts"][k] for k in SHUWA_FIRST] + list(ryuko["scripts"].values()) + list(ryuko["clips"].values()):
+        for f in s["frames"] if isinstance(s, dict) else s:
+            refs.setdefault(f["image"], (f["dx"], f["dy"]))
+    for h in ryuko["held"]:
+        refs.setdefault(h["image"], (h["dx"], h["dy"]))
+    idle = [bytearray(r) for r in data["idle"]["records"]]
+    for r in idle:
+        if r[0] == 0x0c:
+            refs.setdefault(u16(r, 3) & 8191, (s16(r, 5), s16(r, 7)))
+    drawings = {int(m): d for m, d in spec["images"].items()}
+    swaps = {}
+    for key, images in spec["scriptImages"].items():
+        for k in fighter_scripts(scripts, [key]):
+            swaps.setdefault(k, {}).update({int(m): d for m, d in images.items()})
+    for (m, d) in {(m, d) for images in swaps.values() for m, d in images.items()}:
+        drawings[10000 + m] = d
+
+    def place(f, donor, image):
+        (ax, ay), (w, h) = anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"]
+        rx, ry = refs[donor]
+        f.update(dx=w // 2 - ax + f["dx"] - rx, dy=h - ay + f["dy"] - ry, width=w, height=h)
+
+    for key, s in scripts.items():
+        for f in s["frames"]:
+            donor = f["image"]
+            if donor in swaps.get(key, {}):
+                f.update(image=10000 + donor, packed_image=10000 + donor)
+            if f["image"] in drawings:
+                place(f, donor, f["image"])
+    for f in [f for frames in clips.values() for f in frames] + data["held"]:
+        if f["image"] in drawings:
+            place(f, f["image"], f["image"])
+    for r in idle:
+        if r[0] == 0x0c and (u16(r, 3) & 8191) in drawings:
+            f = dict(image=u16(r, 3) & 8191, dx=s16(r, 5), dy=s16(r, 7))
+            place(f, f["image"], f["image"])
+            struct.pack_into("<hh", r, 5, f["dx"], f["dy"])
+    data["idle"]["records"] = [list(r) for r in idle]
+    # His files: the drawings, his effects (the donor image's size, so her offsets and boxes stay true), the blanks
+    # and the HUD face.
+    sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
+    files = {}
+    for image, d in drawings.items():
+        files[image] = (SHUWA / f"drawings/{d}.png").read_bytes()
+        if png_size(files[image]) != tuple(anchors[d]["size"]):
+            sys.exit(f"SHUWA's drawing {d} is not the size anchors.json gives; refusing to export.")
+    for image in spec["fx"]:
+        files[image] = (SHUWA / f"fx/{image}.png").read_bytes()
+        if png_size(files[image]) != sizes[image]:
+            sys.exit(f"SHUWA's fx/{image}.png is not RYUKO's image {image}'s size; refusing to export.")
+    for image in spec["blank"]:
+        w, h = sizes[image]
+        files[image] = rgba_png(w, h, bytes(w * h * 4))
+    for image in spec["ui"]["hudFaceImages"]:
+        files[image] = (SHUWA / spec["ui"]["hudFace"]).read_bytes()
+    # Every image his own timeline, clips, held poses and idle program show is his (images 0 and 8191 are the
+    # source's blank displays). The black clip is the super darkening's panel (image 294), an object of hers.
+    shown = {f["image"] for k in own for f in scripts[k]["frames"]}
+    shown |= {f["image"] for name, frames in clips.items() if name != "black" for f in frames}
+    shown |= {h["image"] for h in data["held"]}
+    shown |= {u16(r, 3) & 8191 for r in idle if r[0] == 0x0c}
+    if unmapped := sorted(shown - set(files) - {0, 8191}):
+        sys.exit(f"SHUWA shows RYUKO's images {unmapped}, which spec.json does not map; refusing to export.")
+    (PUBLIC / "shuwa").mkdir(exist_ok=True)
+    for image, content in files.items():
+        write_if_changed(PUBLIC / f"shuwa/{image}.png", content)
+    # The Menu's face tile (src/instructions/fighters.ts OWN_TILES).
+    write_if_changed(PUBLIC / "shuwa/9000.png", (SHUWA / spec["ui"]["faceTile"]).read_bytes())
+    own_images = [dict(index=i, width=png_size(c)[0], height=png_size(c)[1], filename=f"shuwa/{i}.png", own=True)
+                  for i, c in files.items()]
+    data["images"] = sorted([i for i in ryuko["images"] if i["index"] not in files] + own_images, key=lambda i: i["index"])
+    # He has no seat on the select sheet, so no select programs and no story (an empty scenario).
+    data.update(spec["stats"], select=dict(ryuko["select"], actions={}), scenario=[], resultScripts={}, aliases={}, counters={},
+                neutralTests={}, twins={str(r): r for r, _ in ZOMA_TWINS.values()})
+    write_json(GENERATED / "shuwa.json", data)
+    write_if_changed(GENERATED / "shuwa.d.json.ts",
+                     b"declare const data: import('../characters').FighterData;\nexport default data;\n")
+    return len(files)
+
+
 def main():
     source = RESEARCH / "extracted/01 RYUKO.PLAYER"
     if not source.exists():
@@ -4457,6 +4628,8 @@ def main():
                               *sorted({tables["responses"][i] for i in OWN_TIMELINES}),
                               # 開始時, which a VS round plays from the start.
                               tables["start"], *tables["jumps"], *tables["walks"], tables["fall"]]]
+    # What her own timeline plays besides her moves, from which SHUWA's shown images follow (export_authored).
+    roots = [i for i, _ in queue if i not in moves and i not in tables["response_effects"]]
     # The object her HUD face spawns (70 + 26, PC 708), which the match makes in the Vs. modes.
     queue.append(tuple(tables["faceHelper"]))
     queue.append((tables["charge"], 0))
@@ -4467,9 +4640,11 @@ def main():
     select = select_program(p, tables["selectFace"], image_ids)
     images = export_images(c, "ryuko", image_ids)
     idle = p.action(1)
-    write_json(GENERATED / "assets.json", dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
-        **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]])))
+    ryuko = dict(source_sha256=digest, images=images, sounds=sounds, clips=clips,
+        **tables, scripts=scripts, select=select, palettes=export_palettes(c, image_ids), neutral={i: name for name, i in neutral.items()}, levels=levels, idle=dict(start=idle.start, end=idle.end, records=[list(r) for r in p.records[:idle.end]]))
+    write_json(GENERATED / "assets.json", ryuko)
     counts = {key: export_fighter(p, tables["responses"], key, **fighter) for key, fighter in FIGHTERS.items()}
+    counts["shuwa"] = export_authored(ryuko, roots)
     demo_name = export_ui()
     export_text()
     for key, (name, sha256) in DEMOS.items():
@@ -4487,7 +4662,7 @@ def main():
     timeline = json.loads((RESEARCH / "ryuko-idle/timeline.json").read_text(encoding="utf8"))
     write_json(FIXTURES / "handoff-timeline.json", timeline)
     export_packs()
-    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon, {counts['rario']} RARIO and {counts['training']} TRAINING images, "
+    print(f"Exported {len(images)} Ryuko, {counts['zoma']} Zoma, {counts['kiki']} Kiki, {counts['chung']} Chung, {counts['amiro']} Amiro, {counts['anmc']} ANMC P, {counts['giant']} Giant, {counts['suneo']} G Suneo, {counts['yo']} Yo, {counts['sin']} SIN, {counts['lizard']} LIZARD, {counts['kay']} KAY, {counts['dido']} DIDO, {counts['sakuya']} SAKUYA, {counts['alex']} ALEX, {counts['sou']} SOU, {counts['hiso']} HISO, {counts['erus']} ERUS, {counts['feng']} OS FENG, {counts['sean']} SEAN, {counts['gon']} GON, {counts['kate']} KATE, {counts['remu']} REMU, {counts['rear']} REAR, {counts['gigi']} GIGI, {counts['sww']} SWW, {counts['ogi']} OGI, {counts['ziro']} ZIRO, {counts['masa']} MASA, {counts['times']} 3-TIMES, {counts['zenka']} ZENKA, {counts['zmega']} Z-MEGA, {counts['alpha']} ALPHA, {counts['shinz']} SHIN-Z, {counts['zaku']} ZAKU, {counts['pachelo']} PAC-HELO, {counts['golf']} GOLF, {counts['asura']} ASURA, {counts['ttro']} TTRO, {counts['astroman']} ASTROMAN, {counts['yinan']} YINAN, {counts['aya']} AYA, {counts['dora']} DoraEmon, {counts['rario']} RARIO, {counts['training']} TRAINING and {counts['shuwa']} SHUWA images, "
           f"{len(STAGES)} stages, "
           f"idle programs, and {len(cases)} oracle traces.")
 
@@ -4951,20 +5126,27 @@ def export_demo(key, name, sha256, out):
 
 
 # The committed art the export reads: HPA-971's authored EN stock digits for
-# 700–1000, then Dora's nameplate. One order, hashed by inputs() and exporter()
-# and concatenated in the same order by build.sh's script_sha and CI's
-# fetch-generated.sh (the Cloudflare builds' fingerprint).
+# 700–1000, then Dora's nameplate, then every file of SHUWA's (art/shuwa/game,
+# dotfiles aside) sorted by path. One order, hashed by inputs() and exporter()
+# and concatenated in the same order by build.sh's script_sha, CI's
+# fetch-generated.sh and testing.ts's exporterSha (the Cloudflare builds'
+# fingerprint).
 AUTHORED_ART = ("art/hud/en-700.png", "art/hud/en-800.png", "art/hud/en-900.png",
                 "art/hud/en-1000.png", "art/dora/name.png")
 
 
+def authored_art():
+    return [*AUTHORED_ART, *sorted(path.relative_to(ROOT).as_posix() for path in (ROOT / "art/shuwa/game").rglob("*")
+                                   if path.is_file() and not path.name.startswith("."))]
+
+
 def dom_art():
-    """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon and
-    Menu.svelte's cheat digits and stage thumbnails, the Instructions sources' select and gauge art,
+    """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon,
+    Menu.svelte's cheat digits and stage thumbnails, fighters.ts's own face tiles, the Instructions sources' select and gauge art,
     moves.ts's guide art and nameplates, and the shared page.ts backdrop the profile page reuses. The
     literal paths are the one source, so this scans the same text; the regex takes whole nested paths
     (a stage thumbnail is stages/<stage>/<image>.png)."""
-    sources = [ROOT / "src/App.svelte", ROOT / "src/Menu.svelte",
+    sources = [ROOT / "src/App.svelte", ROOT / "src/Menu.svelte", ROOT / "src/instructions/fighters.ts",
                *sorted((ROOT / "src/instructions").glob("*.svelte")),
                ROOT / "src/instructions/moves.ts", ROOT / "src/instructions/page.ts",
                *sorted((ROOT / "src/profile").glob("*.svelte")), *sorted((ROOT / "src/profile").glob("*.ts"))]
@@ -5018,7 +5200,7 @@ def export_packs():
                    **files(t2["sounds"], "t2-sound")}
     sign_images = {}
     out = {}
-    for who in ["ryuko", *FIGHTERS]:
+    for who in ["ryuko", *FIGHTERS, "shuwa"]:
         data = load("assets.json" if who == "ryuko" else f"{who}.json")
         records = [bytes(r) for actions in data["select"]["actions"].values() for r in actions]
         shown = {u16(r, 3) & 8191 for r in records if r[0] == 0x0c}
@@ -5053,10 +5235,10 @@ def export_packs():
 
 
 def inputs():
-    """What the export reads: this script, the committed art (AUTHORED_ART), the handoff's files by
+    """What the export reads: this script, the committed art (authored_art()), the handoff's files by
     name, size and time, and the DOM's art paths."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
-    for name in AUTHORED_ART:
+    for name in authored_art():
         digest.update((ROOT / name).read_bytes())
     for path in sorted(RESEARCH.rglob("*")):
         if path.is_file():
@@ -5069,9 +5251,9 @@ def inputs():
 
 def exporter():
     """This script's fingerprint: the part of inputs() a git checkout can reproduce —
-    the script itself and the committed art it reads (AUTHORED_ART, in order)."""
+    the script itself and the committed art it reads (authored_art(), in order)."""
     digest = hashlib.sha256(Path(__file__).read_bytes())
-    for name in AUTHORED_ART:
+    for name in authored_art():
         digest.update((ROOT / name).read_bytes())
     return digest.hexdigest()
 

@@ -10,11 +10,12 @@ node "$(dirname "$0")/check-google-client-id.mjs"
 
 script_sha() {
   # The exporter fingerprint: script bytes, then the committed art it reads
-  # (export_assets.py's AUTHORED_ART, in its order).
+  # (export_assets.py's authored_art(), in its order: AUTHORED_ART, then
+  # art/shuwa/game's files but dotfiles, sorted by path).
   if command -v sha256sum >/dev/null 2>&1; then
-    cat scripts/export_assets.py art/hud/en-700.png art/hud/en-800.png art/hud/en-900.png art/hud/en-1000.png art/dora/name.png | sha256sum
+    cat scripts/export_assets.py art/hud/en-700.png art/hud/en-800.png art/hud/en-900.png art/hud/en-1000.png art/dora/name.png $(find art/shuwa/game -type f ! -name '.*' | LC_ALL=C sort) | sha256sum
   else
-    cat scripts/export_assets.py art/hud/en-700.png art/hud/en-800.png art/hud/en-900.png art/hud/en-1000.png art/dora/name.png | shasum -a 256
+    cat scripts/export_assets.py art/hud/en-700.png art/hud/en-800.png art/hud/en-900.png art/hud/en-1000.png art/dora/name.png $(find art/shuwa/game -type f ! -name '.*' | LC_ALL=C sort) | shasum -a 256
   fi | awk '{print $1}'
 }
 

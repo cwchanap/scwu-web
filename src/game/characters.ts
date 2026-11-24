@@ -16,7 +16,9 @@
 // ASURA's (38 ASURA.PLAYER), TTRO's (39 TTRO.PLAYER), ASTROMAN's (40
 // ASTROMAN.PLAYER), YINAN's (41 YINAN.PLAYER), AYA's (42 AYA.PLAYER),
 // DoraEmon's (46 B6.PLAYER), RARIO's (47 RARIO.PLAYER) and TRAINING's (48
-// TRAINING.PLAYER); and each stage's objects, images and track.
+// TRAINING.PLAYER); SHUWA's, an authored fighter with no file of his own
+// (RYUKO's export with his drawings, export_authored); and each stage's
+// objects, images and track.
 import ryuko from './generated/assets.json';
 import zoma from './generated/zoma.json';
 import kiki from './generated/kiki.json';
@@ -62,6 +64,7 @@ import aya from './generated/aya.json';
 import dora from './generated/dora.json';
 import rario from './generated/rario.json';
 import training from './generated/training.json';
+import shuwa from './generated/shuwa.json';
 import stages from './generated/stages.json';
 
 export type Who =
@@ -109,7 +112,8 @@ export type Who =
   | 'aya'
   | 'dora'
   | 'rario'
-  | 'training';
+  | 'training'
+  | 'shuwa';
 export const CHARACTERS = {
   ryuko,
   zoma,
@@ -156,6 +160,7 @@ export const CHARACTERS = {
   dora,
   rario,
   training,
+  shuwa,
 };
 // Each other fighter's export: Ryuko's keys, and the twins pairing its victim
 // actions with hers (export_fighter). The export declares it for each file
@@ -263,6 +268,7 @@ const twins = Object.fromEntries(
       'dora',
       'rario',
       'training',
+      'shuwa',
     ] as const
   ).map((who) => {
     const own = new Map(
@@ -349,6 +355,12 @@ export const SUPER_GATES: Partial<Record<Who, Record<string, SuperGate>>> = {
     '265': { below: true, value: 153 },
     '254+9': { below: false, value: 150 },
     '286': { below: false, value: 153 },
+  },
+  // SHUWA's SPECIUM RAY is her G BEAM (export_authored).
+  shuwa: {
+    '263': { below: true, value: 153 },
+    '264': { below: true, value: 153 },
+    '265': { below: true, value: 153 },
   },
   // Shin Spark (279) turns into BOMB at 147 or more (Zoma's supers).
   zoma: { '279': { below: false, value: 147 } },
