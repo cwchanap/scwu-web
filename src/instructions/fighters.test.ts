@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS } from '../game/characters';
 import type { Who } from '../game/characters';
 import { itWithArt } from '../game/testing';
-import { NAMEPLATES, ROSTER } from './fighters';
+import { NAMEPLATES, OWN_TILES, ROSTER } from './fighters';
 import { GRID, GUIDES_DATA, FACES, SHARED, STOCKS, XS, YS } from './moves';
 
 const here = new URL('.', import.meta.url).pathname;
@@ -32,8 +32,11 @@ const domNamed = () =>
   );
 
 describe('instructions page', () => {
-  it('orders the grid over every fighter, GATE LOCK cells null', () => {
-    expect(GRID.filter((id) => id !== null)).toEqual(Object.keys(CHARACTERS));
+  it('orders the grid over every seated fighter, GATE LOCK cells null', () => {
+    // A fighter with his own tile (SHUWA) has no seat on the sheet yet.
+    expect(GRID.filter((id) => id !== null)).toEqual(
+      Object.keys(CHARACTERS).filter((id) => !(id in OWN_TILES)),
+    );
   });
 
   it('tiles the roster inside the 206 x 417 face sheet', () => {
@@ -120,7 +123,8 @@ describe('instructions page', () => {
   it("uses each fighter's in-game name lettering as the header plate", () => {
     // The *name action the Vs. intro shows: a looping, facing-independent
     // script whose 100-tick first frame is a banner no taller than 40 px.
-    // ASTROMAN's VS NAME is a portrait and TRAINING has no banner;
+    // ASTROMAN's VS NAME is a portrait, TRAINING has no banner and SHUWA
+    // has no lettering yet (his name shows as plain text);
     // DoraEmon uses authored lettering.
     type Script = {
       loop: number;
@@ -152,7 +156,7 @@ describe('instructions page', () => {
     };
     for (const entry of ROSTER) {
       const plate = GUIDES_DATA[entry.id].nameplate;
-      if (['astroman', 'training'].includes(entry.id)) {
+      if (['astroman', 'training', 'shuwa'].includes(entry.id)) {
         expect(plate, entry.id).toBe('');
       } else if (entry.id === 'dora') {
         expect(plate).toBe('dora/247.png');

@@ -66,7 +66,7 @@
     summonables,
     summonStep,
     SUMMON_COLUMNS,
-    tileOf,
+    tileStyle,
     toggleSide,
     type MenuIdentity,
   } from './menu';
@@ -463,7 +463,7 @@
             >
               <i
                 class="tile"
-                style="--x: {tileOf(entry.id)?.x}; --y: {tileOf(entry.id)?.y}"
+                style={tileStyle(entry.id, ASSET_BASE)}
               ></i>
               {#if entry.plate}
                 <img
@@ -601,8 +601,7 @@
                     >
                       <i
                         class="tile"
-                        style="--x: {tileOf(fighter)?.x}; --y: {tileOf(fighter)
-                          ?.y}"
+                        style={tileStyle(fighter, ASSET_BASE)}
                       ></i>
                     </button>
                     <strong class="pickname">{nameOf(fighter)}</strong>
@@ -636,9 +635,7 @@
                     >
                       <i
                         class="tile"
-                        style="--x: {tileOf(opponent)?.x}; --y: {tileOf(
-                          opponent,
-                        )?.y}"
+                        style={tileStyle(opponent, ASSET_BASE)}
                       ></i>
                     </button>
                     <strong class="pickname">{nameOf(opponent)}</strong>
@@ -1085,7 +1082,7 @@
     transform: scale(1.25);
     transform-origin: center;
     background: var(--face-sheet) calc(var(--x) * -1px) calc(var(--y) * -1px) /
-      206px 417px no-repeat;
+      var(--sheet-size, 206px 417px) no-repeat;
     image-rendering: pixelated;
   }
   .tilebtn {
