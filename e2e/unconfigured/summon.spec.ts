@@ -108,7 +108,7 @@ test('summons an enemy and a partner, then the fight resumes', async ({
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
   const tiles = dialog.getByRole('option');
-  await expect(tiles).toHaveCount(44);
+  await expect(tiles).toHaveCount(45);
 
   // The summon view opens on the enemy side with the cursor on Ryuko
   // and focus on her tile, so an immediate Enter would confirm her —
@@ -438,7 +438,7 @@ test.describe('at a phone size', () => {
     await page.keyboard.press('Control+Backquote');
     await expect(dialog).toBeVisible();
     const tiles = dialog.getByRole('option');
-    await expect(tiles).toHaveCount(44);
+    await expect(tiles).toHaveCount(45);
     // A tap on a tile picks and confirms it: Zoma loads his pack and joins
     // the enemy side (the view's default).
     await tiles.nth(1).tap();
