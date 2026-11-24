@@ -4469,8 +4469,6 @@ def export_authored(ryuko, roots):
     for s in [ryuko["scripts"][k] for k in SHUWA_FIRST] + list(ryuko["scripts"].values()) + list(ryuko["clips"].values()):
         for f in s["frames"] if isinstance(s, dict) else s:
             refs.setdefault(f["image"], (f["dx"], f["dy"]))
-    for h in ryuko["held"]:
-        refs.setdefault(h["image"], (h["dx"], h["dy"]))
     idle = [bytearray(r) for r in data["idle"]["records"]]
     for r in idle:
         if r[0] == 0x0c:
@@ -4495,9 +4493,18 @@ def export_authored(ryuko, roots):
                 f.update(image=10000 + donor, packed_image=10000 + donor)
             if f["image"] in drawings:
                 place(f, donor, f["image"])
-    for f in [f for frames in clips.values() for f in frames] + data["held"]:
+    for f in [f for frames in clips.values() for f in frames]:
         if f["image"] in drawings:
             place(f, f["image"], f["image"])
+    # Held poses (op 0x07) draw from the image's corner (heldPlacement), so they keep her corner offsets, moved by
+    # the drawing's anchor against the donor's: her reference point, (w//2 - rx, h - ry), where she shows the image
+    # in her own frames, else the image's bottom centre.
+    sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
+    for f in data["held"]:
+        if (image := f["image"]) in drawings:
+            (ax, ay), (w, h) = anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"]
+            (wd, hd), (rx, ry) = sizes[image], refs.get(image, (0, 0))
+            f.update(dx=f["dx"] + wd // 2 - rx - ax, dy=f["dy"] + hd - ry - ay, width=w, height=h)
     for r in idle:
         if r[0] == 0x0c and (u16(r, 3) & 8191) in drawings:
             f = dict(image=u16(r, 3) & 8191, dx=s16(r, 5), dy=s16(r, 7))
@@ -4506,7 +4513,6 @@ def export_authored(ryuko, roots):
     data["idle"]["records"] = [list(r) for r in idle]
     # His files: the drawings, his effects (the donor image's size, so her offsets and boxes stay true), the blanks
     # and the HUD face.
-    sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
     files = {}
     for image, d in drawings.items():
         files[image] = (SHUWA / f"drawings/{d}.png").read_bytes()
