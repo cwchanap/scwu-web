@@ -255,40 +255,45 @@ const openArena = async (page: Page) => {
       ? [{ ally: s0.ally.blue, tall: s0.tall.blue }]
       : [];
     // The route's own packs are the confirm's earliest proof (HPA-1251):
-    // a confirmed route starts loading its stage and fighters — the
+    // a confirmed route starts loading its stage and fighters, while a
+    // dropped input queues nothing and still times the poll out. The
     // generated routes' first battle queues up to fourteen fighter packs
-    // over R2, which can outlast the pixel watch below before the arena
-    // ever draws — while a dropped input queues nothing and still times
-    // the poll out. A route whose players are all resident queues no
-    // pack either, but it begins at once, and the pixel proofs catch it.
-    let loading = false;
-    const onRequest = (req: { url(): string }) => {
-      if (req.url().includes('/packs/')) loading = true;
-    };
-    page.on('request', onRequest);
+    // over R2 — a load whose decode jams the page, so the pixel watch's
+    // own calls can stall past its window while the battle comes up; the
+    // request event reaches the test process with no page round-trip, so
+    // the race lets it win from inside a stalled sample. A route whose
+    // players are all resident queues no pack either, but it begins at
+    // once, and the pixel watch catches it on a next sample.
+    const loaded = page.waitForRequest((req) => req.url().includes('/packs/'), {
+      timeout: 15_000,
+    });
+    let settled = false;
     try {
       await send();
-      await expect
-        .poll(
-          async () => {
-            const s = await sample(rects);
-            if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
-            // The flip's other proof (HPA-1251): a generated route leaves
-            // for its battle in place — no demo — and the arena under the
-            // header band can read as bright as the sign it replaced, so
-            // the battle's own pad (more than the screens' eight controls,
-            // which a story demo keeps) says the selector left then.
-            return (
-              Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8 || loading
-            );
-          },
-          {
-            timeout: 15_000,
-          },
-        )
-        .toBe(true);
+      await Promise.race([
+        expect
+          .poll(
+            async () => {
+              if (settled) return true;
+              const s = await sample(rects);
+              if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
+              // The flip's other proof (HPA-1251): a generated route leaves
+              // for its battle in place — no demo — and the arena under the
+              // header band can read as bright as the sign it replaced, so
+              // the battle's own pad (more than the screens' eight controls,
+              // which a story demo keeps) says the selector left then.
+              return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
+            },
+            {
+              timeout: 15_000,
+            },
+          )
+          .toBe(true),
+        loaded,
+      ]);
+      settled = true;
     } finally {
-      page.off('request', onRequest);
+      loaded.catch(() => {});
     }
     return frames;
   };
