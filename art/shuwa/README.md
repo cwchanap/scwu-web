@@ -146,6 +146,16 @@ follows, the other scripts, the clips). A frame of his that shows drawing `d` in
 so his anchor lands where the donor's position point would, moved by whatever the script itself shifts that image. `(ax_d, ay_d)` and
 `(w_d, h_d)` come from `anchors.json`. The donor's body boxes (op 0x19) are untouched.
 
+Held poses (op 0x07's table, the export's `held`) draw from the image's top-left corner instead (`heldPlacement`: `left = x + dx`,
+mirrored by the holder's facing XOR `flip_x`, negated with `flip_y`). They keep the donor's corner offsets and move by the anchor:
+
+    dx = dx_f + (ax_m - ax_d)
+    dy = dy_f + (ay_m - ay_d)
+    width, height = w_d, h_d
+
+where `(ax_m, ay_m)` is the donor point his normal frames put the anchor on, `(w_m // 2 - dx_ref(m), h_m - dy_ref(m))`, or the donor
+image's bottom centre `(w_m // 2, h_m)` when the donor shows `m` only held. Held records never set `ref`.
+
 #### What the exporter checks
 
 - every action in `commands` (and Counter Hit, action 174) exists in the donor's scripts;
