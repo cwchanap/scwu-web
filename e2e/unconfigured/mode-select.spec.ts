@@ -254,24 +254,42 @@ const openArena = async (page: Page) => {
     const frames: { ally: number; tall: number }[] = ally
       ? [{ ally: s0.ally.blue, tall: s0.tall.blue }]
       : [];
-    await send();
-    await expect
-      .poll(
-        async () => {
-          const s = await sample(rects);
-          if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
-          // The flip's other proof (HPA-1251): a generated route leaves
-          // for its battle in place — no demo — and the arena under the
-          // header band can read as bright as the sign it replaced, so
-          // the battle's own pad (more than the screens' eight controls,
-          // which a story demo keeps) says the selector left then.
-          return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
-        },
-        {
-          timeout: 15_000,
-        },
-      )
-      .toBe(true);
+    // The route's own packs are the confirm's earliest proof (HPA-1251):
+    // a confirmed route starts loading its stage and fighters — the
+    // generated routes' first battle queues up to fourteen fighter packs
+    // over R2, which can outlast the pixel watch below before the arena
+    // ever draws — while a dropped input queues nothing and still times
+    // the poll out. A route whose players are all resident queues no
+    // pack either, but it begins at once, and the pixel proofs catch it.
+    let loading = false;
+    const onRequest = (req: { url(): string }) => {
+      if (req.url().includes('/packs/')) loading = true;
+    };
+    page.on('request', onRequest);
+    try {
+      await send();
+      await expect
+        .poll(
+          async () => {
+            const s = await sample(rects);
+            if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
+            // The flip's other proof (HPA-1251): a generated route leaves
+            // for its battle in place — no demo — and the arena under the
+            // header band can read as bright as the sign it replaced, so
+            // the battle's own pad (more than the screens' eight controls,
+            // which a story demo keeps) says the selector left then.
+            return (
+              Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8 || loading
+            );
+          },
+          {
+            timeout: 15_000,
+          },
+        )
+        .toBe(true);
+    } finally {
+      page.off('request', onRequest);
+    }
     return frames;
   };
   // A boss's confirm starts the story or generated route itself, so the
