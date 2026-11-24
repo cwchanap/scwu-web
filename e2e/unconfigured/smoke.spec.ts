@@ -251,7 +251,7 @@ test('arrow keys walk menu rows; summon Enter follows the highlight', async ({
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
   const tiles = dialog.getByRole('option');
-  await expect(tiles).toHaveCount(44);
+  await expect(tiles).toHaveCount(45);
   // Even with another button focused — the side switch — the first arrow
   // hands focus to the cursor's tile, so Enter confirms the highlight,
   // not the focused button.
@@ -292,7 +292,7 @@ test('arrow keys walk menu rows; summon Enter follows the highlight', async ({
     true,
   );
   for (let i = 0; i < 8; i++) await page.keyboard.press('ArrowDown');
-  const last = tiles.nth(43);
+  const last = tiles.nth(44);
   await expect(last).toHaveAttribute('aria-selected', 'true');
   expect(await last.evaluate((el) => document.activeElement === el)).toBe(true);
   await expect(last).toBeInViewport();
@@ -454,7 +454,7 @@ test('clamped summon navigation still hands focus to the highlight', async ({
   await page.keyboard.press('Control+Backquote');
   await expect(dialog).toBeVisible();
   const tiles = dialog.getByRole('option');
-  await expect(tiles).toHaveCount(44);
+  await expect(tiles).toHaveCount(45);
 
   // Boundary case (HPA-972 review round 2): the cursor rests on tile 0,
   // so ←/↑ are clamped — the cursor cannot move, but focus must still
