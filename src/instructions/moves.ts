@@ -92,6 +92,8 @@ export const FACES: Record<Who, string> = {
   astroman: 'astroman/220.png',
   yinan: 'yinan/132.png',
   aya: 'aya/132.png',
+  // No select portrait yet: his idle drawing stands in.
+  shuwa: 'shuwa/3.png',
   dora: 'dora/140.png',
   rario: 'rario/234.png',
   training: 'training/234.png',
@@ -5025,6 +5027,124 @@ export const GUIDES_DATA = {
             input: '<span class="motion">↓←↓→</span><kbd>G</kbd>',
             desc: 'For three stocks: a sword sweep into a holy blast.',
             cost: 3,
+          },
+        ],
+      },
+    ],
+  },
+  shuwa: {
+    art: FACES.shuwa,
+    nameplate: '',
+    role: 'New fighter with 480 life',
+    tag: 'A new fighter with 480 life, still on RYUKO’s timing and boxes: the same normals, chains and throw, with his own drawings, inputs and effects.',
+    ex: false,
+    sections: [
+      {
+        title: 'Movement & basics',
+        note: '',
+        cost: false,
+        rows: [
+          {
+            name: 'Walk / Crouch',
+            input:
+              '<kbd>A</kbd><kbd>D</kbd><span class="sep">/</span><kbd>S</kbd>',
+            desc: 'Arrow keys also move. Hold <kbd>S</kbd> or ↓ to crouch.',
+            cost: 0,
+          },
+          {
+            name: 'Guard',
+            input: 'hold away',
+            desc: 'Jumping attacks break a crouching guard.',
+            cost: 0,
+          },
+          {
+            name: 'Jump / Double Jump',
+            input: '<kbd>W</kbd><span class="sep">,</span><kbd>W</kbd> in air',
+            desc: 'In the air, release every direction then press jump again; steer with left or right.',
+            cost: 0,
+          },
+          {
+            name: 'Dash / Backdash',
+            input: '<kbd>⇧</kbd> or <span class="motion">→→</span>',
+            desc: 'Double-tap a direction, letting go in between. Hold away with <kbd>⇧</kbd> to backdash.',
+            cost: 0,
+          },
+          {
+            name: 'Punch chain',
+            input:
+              '<kbd>G</kbd><span class="sep">→</span><kbd>G</kbd><span class="sep">→</span><kbd>G</kbd>',
+            desc: 'Tap again when a standing punch hits or is blocked, up to three.',
+            cost: 0,
+          },
+          {
+            name: 'Kick chain',
+            input:
+              '<kbd>H</kbd><span class="sep">→</span><kbd>H</kbd><span class="sep">→</span><kbd>H</kbd>',
+            desc: 'Tap again when a standing kick hits or is blocked, up to three.',
+            cost: 0,
+          },
+          {
+            name: 'Hit Up <em>+ chase</em>',
+            input:
+              '<kbd>K</kbd><span class="sep">,</span> then <kbd>W</kbd> on hit',
+            desc: 'Upward kick. Press Jump near the end of the impact pause to chase into the air.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Specials',
+        note: 'No stock cost',
+        cost: false,
+        rows: [
+          {
+            name: 'RING',
+            input: '<span class="motion">↓←</span><kbd>G</kbd>',
+            desc: 'A spinning saw ring. One out at a time; pressing again while it flies only makes him stand.',
+            cost: 0,
+          },
+          {
+            name: 'Chuck',
+            input: '<kbd>J</kbd> close',
+            desc: 'Grab and throw even through guard.',
+            cost: 0,
+          },
+          {
+            name: 'SWING',
+            input: '<span class="motion">←↓→</span><kbd>H</kbd>',
+            desc: 'Command throw: spins the opponent overhead and hurls them skyward. Long recovery on a miss.',
+            cost: 0,
+          },
+        ],
+      },
+      {
+        title: 'Supers & system',
+        note: 'Power gauge: hits, blocking and taking damage fill it — up to three stocks. Without enough stock, a super only gains a little power.',
+        cost: true,
+        rows: [
+          {
+            name: 'SPECIUM RAY',
+            input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
+            desc: 'A beam across the arena, also in the air. At 30% health or less takes its stronger form.',
+            cost: 1,
+          },
+          {
+            name: 'ULTRA SWING',
+            input: '<span class="motion">→↓←→↓←</span><kbd>G</kbd>',
+            desc: 'Grabs at close range.',
+            cost: 1,
+          },
+          {
+            name: 'THREE MINUTES',
+            input: '<span class="motion">↓→↓→</span><kbd>H</kbd>',
+            desc: 'A sky-wide beam. Needs all three stocks.',
+            cost: 3,
+          },
+          {
+            name: 'Counter Hit',
+            input: '<kbd>K</kbd> while blocking',
+            desc: 'Spend a stock while guarding.',
+            cost: 1,
           },
         ],
       },

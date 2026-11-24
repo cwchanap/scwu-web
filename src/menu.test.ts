@@ -21,6 +21,7 @@ import {
   summonStep,
   summonables,
   tileOf,
+  tileStyle,
   toggleSide,
   type MenuIdentity,
 } from './menu';
@@ -308,11 +309,15 @@ describe('summon grid (HPA-972)', () => {
         (entry) => entry.id,
       ),
     );
-    expect(summonables.length).toBe(44);
+    expect(summonables.length).toBe(45);
   });
 
-  it('places each summonable fighter on its select-sheet tile', () => {
+  it('places each seated fighter on its select-sheet tile and shows SHUWA his own', () => {
+    expect(tileOf('shuwa')).toBeNull();
+    expect(tileStyle('shuwa', '/a/')).toContain('url(/a/shuwa/');
+    expect(tileStyle('ryuko', '/a/')).toBe('--x: 0; --y: 0');
     for (const entry of summonables) {
+      if (entry.id === 'shuwa') continue;
       const tile = tileOf(entry.id)!;
       const grid = GRID.indexOf(entry.id);
       expect(tile.x).toBe((grid % 8) * 26);
@@ -327,14 +332,14 @@ describe('summon grid (HPA-972)', () => {
     // Down a row and back up; the last row is partial.
     expect(summonStep(0, count, 's')).toBe(SUMMON_COLUMNS);
     expect(summonStep(SUMMON_COLUMNS, count, 'w')).toBe(0);
-    expect(summonStep(40, count, 's')).toBe(43);
-    expect(summonStep(43, count, 's')).toBe(43);
+    expect(summonStep(40, count, 's')).toBe(44);
+    expect(summonStep(44, count, 's')).toBe(44);
     expect(summonStep(0, count, 'w')).toBe(0);
     // Sideways never wraps between rows.
     expect(summonStep(0, count, 'a')).toBe(0);
     expect(summonStep(8, count, 'a')).toBe(8);
     expect(summonStep(7, count, 'd')).toBe(7);
-    expect(summonStep(43, count, 'd')).toBe(43);
+    expect(summonStep(44, count, 'd')).toBe(44);
     expect(summonStep(5, count, 'd')).toBe(6);
     // Arrow keys step the same cells; other keys change nothing.
     expect(summonStep(3, count, 'ArrowRight')).toBe(4);
@@ -350,8 +355,8 @@ describe('summon grid (HPA-972)', () => {
     // displayed row, not two.
     expect(summonStep(0, count, 's', 4)).toBe(4);
     expect(summonStep(4, count, 'w', 4)).toBe(0);
-    expect(summonStep(40, count, 's', 4)).toBe(43);
-    expect(summonStep(43, count, 's', 4)).toBe(43);
+    expect(summonStep(40, count, 's', 4)).toBe(44);
+    expect(summonStep(44, count, 's', 4)).toBe(44);
     expect(summonStep(0, count, 'w', 4)).toBe(0);
     // Sideways still never wraps between rows.
     expect(summonStep(0, count, 'a', 4)).toBe(0);
