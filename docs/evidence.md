@@ -235,6 +235,39 @@ Authored: the source has no mid-match summoning; every rule below is this projec
 - **DOM publication (authored).** The same four PNGs are copied verbatim to `public/assets/en/7.png` … `en/10.png` (export_ui), because a Phaser pack texture cannot feed an HTML `<img>`; the DOM (Menu.svelte) names them by literal path, alongside the source stock digits `ui/18.png` … `ui/23.png` (100–600; EMPTY at 17 is never shown, Max EN starts at 100) and one thumbnail per stage. `dom_art()` scans `src/Menu.svelte` too, with the regex widened to `(?:[a-z0-9]+/)+[0-9]+\.png` so whole nested paths survive: stage thumbnails are three segments (`stages/court/0.png`), and a stage's preview is its lowest-indexed frame — `stages/streetnight/4.png`, not 0 (every other stage starts at 0). The Menu's table literals and the manifest (`assets-version.json`'s `files`) are asserted equal by the tests.
 - **Exporter fingerprint (authored extension).** `AUTHORED_ART` centralizes the committed art the export reads (the four EN digits, then `art/dora/name.png`) in one order; `inputs()` and `exporter()` hash it, and `scripts/build.sh`'s `script_sha()` and `.github/scripts/fetch-generated.sh` concatenate the same files in the same order, replacing the old script-plus-name-PNG SHA. The Cloudflare `WORKERS_CI` builds compare that fingerprint with the downloaded `generated.tar.gz`'s `.exporter`, so the R2 bundle must be republished (`bun run upload:r2`) after any exporter change before those builds can pass.
 
+## Authored fighter SHUWA (HPA-1304, 2026-11-24)
+
+SHUWA has no source file. His data is RYUKO's export (`assets.json`, built in `main()`) changed by `art/shuwa/game/spec.json` in `export_authored` (the contract: `art/shuwa/README.md`, "The game's spec"). Everything not listed here is RYUKO's recovered data, unchanged: moves, boxes, responses, sounds, CPU table and timing. The engine runs him on the twin rules with identity twins, so RYUKO's victim actions are his.
+
+- **Stats (authored).** 480 life, three stocks, chip 20. `perStock`, `scale`, `decay`, `start` and `charge` stay RYUKO's.
+- **Command table (authored).**
+  - **Kept entries.** He keeps RYUKO's numbering, since the CPU table and the keys name entries by number. His entries are 1, 2, 4, 6, 7, 10–14 and 17–20. The rest take entry 21's inert shape (no actions, steps `[0x2000]`), so a CPU pick of one enters nothing and the touch pad shows only his keys.
+  - **Renamed entries.** 1 is ULTRA SWING (her CGA, 319), 2 THREE MINUTES (B G, 292), 4 SPECIUM RAY (G BEAM, 263/264), 6 RING (fire, 226) and 7 SWING (DST, 214/220).
+  - **Inputs.** RING ↓←G and ULTRA SWING →↓←→↓←G are the ticket's inputs, and they differ from RYUKO's data. Her fire is ↓→G (`0x3004, 0x3002, 0x2080`). Her CGA is →↓←→↓←H (ends `0x2010`). ULTRA SWING's steps are those of her MUSASHI (entry 3, which he lacks). The scan takes the first matching entry (`0x410060`), so the full ULTRA SWING input enters entry 1 although it ends in RING's ↓←G. SPECIUM RAY ↓→↓→G, THREE MINUTES ↓→↓→H and SWING ←↓→H keep her steps.
+  - **Costs (recovered).** Her own op `0x10`s give RING 0, SWING 0, SPECIUM RAY 1, ULTRA SWING 1 and THREE MINUTES 3 stocks.
+- **Drawings (authored).**
+  - **Mapping.** `images` maps 159 donor images to 77 drawings: every image his own timeline, clips (all but `black`), held poses and idle program show. `scriptImages` gives image 10 a second id, 10010, in 180, 226, 231, 331 and 332 (her walk step there is a wind-up), so the walks keep theirs.
+  - **Placement.** Each drawing sits by the README's placement rule: `dx = (w // 2 − ax) + (dx_f − dx_ref)`, `dy = (h − ay) + (dy_f − dy_ref)`. `ref` is the donor image's first placement in the scripts he was drawn against (`SHUWA_FIRST`), then her other scripts, clips, held poses and idle records. Boxes, flips and durations stay hers.
+  - **Effects and blanks.** `fx` redraws 308–319, 337–342 and 424–428 at the donor images' exact sizes. `blank` empties her emblem and giant robot (327–336) and her name plate (464).
+  - **Publication.** He shows them as his own images (`shuwa/<id>.png`, `own`, no palette swap).
+- **Objects (kept).** Hit sparks, dust, the super flash and the super darkening's panel (the `black` clip, image 294) stay RYUKO's objects. His pack (`fighter-shuwa`) therefore also carries the images of hers his drawings do not replace: her objects, and the poses of the moves he lacks, which nothing of his reaches.
+- **SWING (authored).**
+  - **What is cut.** `drop` `{214: [235–238]}` removes the missile volley's frames, with their events, from every script DST's timeline reaches. 215 goes from 368 ticks to 283 (65 frames to 59), 216 from 183 to 98 and 222 from 533 to 448.
+  - **Damage.** The toss (215's op `0x14`, response 31, at age 185) still deals its 10. Her missiles' 22 are gone (her DST deals 32).
+  - **Measured timing.** SWING enters 214 at tick 2 and 215 at 7, tosses at 192 and is back in idle at 290: 288 ticks. Her DST tosses at 192 too, her missiles strike at 294, and she is idle at 388. So he recovers 98 ticks after the toss against her 196. The cut takes 85 timeline ticks; the missiles' contact stop takes the other 13 (her 215 runs 381 match ticks for 368).
+  - **At 153 life or less.** SWING plays her Evil DST (221 into 222) with the same cut: 10 damage, back in idle at 455 against her 553.
+- **No EX mode (authored).** Her intros (30–34, 36) jump to Chage Character (37) through an op `0x16` while down is held. 37 sets variable 0 to 10, which is her EX mode. `cutInputs` `[37]` removes those input checks from his scripts, and the export refuses if his timeline still reaches 37. `EX_MODE` has no entry for him.
+- **Low-life forms (recovered).** Her op `0x11`s compare life with 153 absolute, so for his 480 life they trigger at about 32%. At or below that, SPECIUM RAY plays G BEAM EVIL (278 on the ground, 280 in the air) for 120. `SUPER_GATES` carries the same G BEAM gates for the cheats' Low HP line.
+- **Engine tables (authored, following RYUKO's).**
+  - **Following RYUKO's.** `BOUNCE_DOWN` (HISA Down lands into 147), the KO round-over value 99, HISA Down's −500 knock-back, `BACK_DASH` 14, and her CPU table and controls.
+  - **His keys.** `KEYS` keeps the RYUKO keys whose entries he has.
+  - **Left empty.** No HUD name plate (`NAMES` null), no story scenario (he is no story fighter), no select programs, result scripts, aliases, counters or neutral tests.
+- **Fingerprint and publication (authored).**
+  - **Fingerprint.** `authored_art()` appends `art/shuwa/game`'s files (dotfiles aside, sorted) to `AUTHORED_ART`, and `build.sh` and `fetch-generated.sh` concatenate the same files.
+  - **DOM art.** `dom_art()` also scans `src/instructions/fighters.ts`, for his face tile (`shuwa/9000.png`) and guide portrait (`shuwa/3.png`).
+  - **Upload.** As with any exporter change, `bun run upload:r2` must run before the Cloudflare builds and CI pass.
+  - **No game files under `art/`.** A test compares every `art/` PNG with `public/assets`; only the exporter's own copies match.
+
 ## Strict battle-scoped no-revive (HPA-1251, 2026-11-22)
 
 Authored: the source's own gates stay (HPA-973's `koRecovery`/`koDownGetUp` `!br` checks and HPA-858's seat rules untouched); the rules below close the remaining B.R. routes into them. Non-B.R. behavior is byte-identical.
