@@ -461,8 +461,11 @@ export function createHud(
     scene.add
       .text(x * scale, 35 * scale, '', {
         fontFamily: 'monospace',
-        fontSize: '10px',
+        fontSize: '15px',
+        fontStyle: 'italic bold',
         color: '#ffd24a',
+        stroke: '#7a2d00',
+        strokeThickness: 3,
       })
       .setScrollFactor(0)
       .setDepth(screenDepth(0x16))
@@ -494,8 +497,9 @@ export function createHud(
       const bar = healthCrop(f.hp, index === 1, f.maxHp);
       life[index].setCrop(bar.x, 0, bar.width, 14).setVisible(bar.width > 0);
       // Authored (HPA-1251): the cheat line rides the same fighter the
-      // strip already shows — no bar, no line.
-      if (!cheated || bar.width === 0) {
+      // strip already shows — a dead fighter hides it, while a living one
+      // whose bar rounds to 0 wide (2 of 510) keeps line, highlight and cut.
+      if (!cheated || f.hp <= 0) {
         lines[index].setVisible(false);
         glows[index].setVisible(false);
         cuts[index].setVisible(false);
