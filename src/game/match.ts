@@ -6134,12 +6134,17 @@ export class Match {
       // A loss that empties life, a chip's too (0x40e7c0), queues the lose
       // action instead (0x40e84b), so the reaction's records never run: no
       // op 0x15 power, no op 0x1a stops. The last box to reach the victim
-      // sets its reaction, so DST's two missiles stop it once. A KO'd
+      // sets its reaction, so DST's two missiles stop it once — outside a
+      // B.R. route (authored, HPA-1251): there a KO'd fighter's KO stands,
+      // and a later box whose loss the cut takes to nothing must not queue
+      // a reaction over the pending KO and raise a 0-HP zombie. A KO'd
       // victim KOs again, scoring again, but a box without damage takes
       // nothing and so doesn't (0x40f689, 0x40f747).
       if (loss && target.hp === 0) this.knockOut(target);
-      else if (timeline) target.pending = { key: timeline };
-      else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
+      else if (!(this.br && target.hp === 0)) {
+        if (timeline) target.pending = { key: timeline };
+        else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
+      }
       target.reaction = blocked
         ? target.reaction | 0xc
         : (target.reaction & ~4) | 8;
