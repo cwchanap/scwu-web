@@ -61,6 +61,25 @@ How a drawing becomes a sprite:
 - Glows, rings, walls of light and beams are soft-light layers drawn in code (`tools/fx.py`, `tools/b4.py`),
   never part of the fighter drawings.
 
+## The game's drawings
+
+`build.sh` ends with `tools/game_art.py`, which cuts the drawings the game uses into `game/` (committed, so the exporter
+can read them without the raw drawings or the game's files):
+
+- `game/drawings/<name>.png`: one cropped 8-bit palette PNG per drawing, all on one palette (colour 0 is clear), cut the
+  same way as the preview sprites (same head match and scale). `game/anchors.json` gives each one's anchor, the pixel the
+  game puts on the fighter's position: the donor's position point as it lands on the drawing (the guide's point for
+  x on a guided pose, his feet plus the donor's feet-to-position offset for y).
+- `game/fx/<donor image>.png`: his effects (saw ring, beam, muzzle bloom, the two wide beams of THREE MINUTES), drawn in
+  code by `tools/game_fx.py` at the size of the donor image each one replaces.
+- `game/ui/`: the Menu's 24 x 60 face tile and the HUD's 70 x 21 face, cut from `refs/base.png`.
+- `game/spec.json`: his stats, command table, which drawing stands in for each donor image, the images he shows as
+  nothing, and the frames SWING drops. The exporter (`export_authored` in `scripts/export_assets.py`) builds
+  `generated/shuwa.json` and the `fighter-shuwa` pack from it and the donor's own export.
+
+Nothing here is cut from the game: the anchors are numbers about his drawings, and the donor's offsets only decided them.
+Run `bun run format` after, since `game/*.json` follow the repo's prettier layout.
+
 `tools/lineup.py` puts SHUWA's sprites beside the donor's at the same scale, for checking a pose's size and reach.
 `tools/posref.py` makes one pose guide from a donor sprite (`python3 -I tools/posref.py <sprites> ryuko 34 base 1024x1536`);
 draw.sh runs it for every guide it needs.
