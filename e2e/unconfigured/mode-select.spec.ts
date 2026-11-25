@@ -336,13 +336,14 @@ const openArena = async (page: Page) => {
       page.off('response', onResponse);
     }
   };
-  // The tail of the ally capture: from after the route step's flip
-  // through skipToBattle. Page screenshots are serialized behind the
-  // route's pack decode and can miss the opening outright under runner
-  // load, so the watch instead listens to the compositor's CDP screencast
-  // and decodes its frames after the fact. The ring keeps the last five
-  // seconds: the pad flip can trail the first rendered frame, but the
-  // selector is long gone by then and the opening still stays in memory.
+  // The tail of the ally capture: from before the confirming tap through
+  // skipToBattle and the opening window. Page screenshots are serialized
+  // behind the route's pack decode and can miss the opening outright under
+  // runner load, so the watch instead listens to the compositor's CDP
+  // screencast and decodes its frames after the fact. Before the battle pad
+  // flips, the ring keeps the last 15 seconds (sampled at every other frame)
+  // so even a multi-second pad-detection lag keeps the opening; once the flip
+  // is marked, eviction pauses through the post-flip hold.
   const watchAlly = async () => {
     const frames: { t: number; ally: number; tall: number }[] = [];
     const shots: {
@@ -351,6 +352,7 @@ const openArena = async (page: Page) => {
       width: number;
       height: number;
     }[] = [];
+    let frozen = false;
     // Each frame carries its ms from the watch's start, so a failure dump
     // reads the capture's own timeline against the flip the body marks:
     // an opening the watch never reached shows as a gap, not a missing
@@ -365,7 +367,8 @@ const openArena = async (page: Page) => {
         width: frame.metadata.deviceWidth,
         height: frame.metadata.deviceHeight,
       });
-      while (shots.length && t - shots[0]!.t > 5_000) shots.shift();
+      if (!frozen)
+        while (shots.length && t - shots[0]!.t > 15_000) shots.shift();
       void cdp
         .send('Page.screencastFrameAck', { sessionId: frame.sessionId })
         .catch(() => {});
@@ -375,12 +378,15 @@ const openArena = async (page: Page) => {
       quality: 80,
       maxWidth: 800,
       maxHeight: 450,
-      everyNthFrame: 1,
+      everyNthFrame: 2,
       sendLastFrame: true,
     });
     return {
       frames,
-      now: () => Date.now() - t0,
+      markFlip: () => {
+        frozen = true;
+        return Date.now() - t0;
+      },
       stop: async () => {
         await cdp.send('Page.stopScreencast').catch(() => {});
         await cdp.detach().catch(() => {});
@@ -688,24 +694,24 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   // confirms it like a button. The keyboard confirm of a remembered
   // regular LONG stays in the next test. The twelve-enemy brawl on
   // Sakura Street: SWW first (460), untimed — Ryuko's 510 bar beside it.
-  // The ally's own initial trace: the screencast watch starts as the
-  // confirm lands and keeps the opening however long the pack load and
-  // pad flip take. Every pre-battle frame fails the signature (the
-  // selector's own left art is blue, so its tall band reads high), and
-  // so do the fight's later frames once the first hostile — blue too,
-  // and tall — reaches the ally's lane: a missing ally can't fake the
-  // probe, and neither can a sample that arrives after him. No combat
-  // loop, no production API, no ally bar read (his donated slot carries
-  // none).
-  await confirmRoute(() => tap(720, 400));
+  // The ally's own initial trace: the screencast watch starts before the
+  // confirming tap (with settle 0 so there is no blind gap) and keeps
+  // the opening however long the pack load and pad flip take. Every
+  // pre-battle frame fails the signature (the selector's own left art
+  // is blue, so its tall band reads high), and so do the fight's later
+  // frames once the first hostile — blue too, and tall — reaches the
+  // ally's lane: a missing ally can't fake the probe, and neither can a
+  // sample that arrives after him. No combat loop, no production API, no
+  // ally bar read (his donated slot carries none).
   const tail = await watchAlly();
   let flip: number;
   try {
+    await confirmRoute(() => tap(720, 400, 0));
     await skipToBattle();
     // skipToBattle returns at the pad flip — the fight's first rendered
     // frame — but the only proving frames are its opening, before the
-    // first hostile finishes rising: hold the watch over them.
-    flip = tail.now();
+    // first hostile finishes rising: pause eviction and hold over them.
+    flip = tail.markFlip();
     await page.waitForTimeout(2_000);
   } finally {
     await tail.stop();

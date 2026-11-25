@@ -433,26 +433,46 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     ]);
   });
 
-  it('keeps Random lose shut after a B.R. KO', () => {
-    const br = Match.story(
-      'ziro',
-      brLongStory('ziro')[0] as Battle,
-      1,
-      undefined,
-      undefined,
-      true,
-    );
-    const [ziro] = br.fighters;
-    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
-    while (br.roundTicks <= br.fightTick) br.step();
-    ziro.hp = 0;
-    (br as unknown as { knockOut(f: Fighter): void }).knockOut(ziro);
-    let stood = false;
-    for (let t = 0; t < 700; t++) {
-      br.step();
-      stood ||= ziro.branch === 75 || ziro.action === 'idle';
+  it('keeps Random lose shut after a B.R. KO while preserving the voice roll and RNG', () => {
+    const run = (seed: number, brFlag: boolean) => {
+      const m = Match.story(
+        'ziro',
+        brLongStory('ziro')[0] as Battle,
+        seed,
+        undefined,
+        undefined,
+        brFlag,
+      );
+      const [ziro] = m.fighters;
+      for (const [i, vm] of m.cpus.entries()) if (i) vm!.input = () => ({});
+      while (m.roundTicks <= m.fightTick) m.step();
+      ziro.hp = 0;
+      (m as unknown as { knockOut(f: Fighter): void }).knockOut(ziro);
+      const cued: number[] = [];
+      let stood = false;
+      let rngAfterRolls = -1;
+      for (let t = 0; t < 700; t++) {
+        m.step();
+        for (const { owner, index } of m.sounds)
+          if (owner === 0 && (index === 12 || index === 29)) cued.push(index);
+        if (rngAfterRolls < 0 && ziro.branch === 73)
+          rngAfterRolls = m.cpu.random();
+        stood ||= ziro.branch === 75 || ziro.action === 'idle';
+      }
+      return { ziro, cued, stood, rngAfterRolls };
+    };
+    const pairs = [0, 1, 200].map((seed) => ({
+      br: run(seed, true),
+      native: run(seed, false),
+    }));
+    for (const { br, native } of pairs) {
+      expect([br.ziro.hp, br.ziro.downed, br.stood]).toEqual([0, true, false]);
+      expect(br.cued).toEqual(native.cued);
+      if (!native.stood) expect(br.rngAfterRolls).toBe(native.rngAfterRolls);
     }
-    expect([ziro.hp, ziro.downed, stood]).toEqual([0, true, false]);
+    expect(pairs.some((p) => p.br.cued[0] === 12)).toBe(true);
+    expect(pairs.some((p) => p.br.cued[0] === 29)).toBe(true);
+    expect(pairs.some((p) => p.native.stood)).toBe(true);
   });
 
   it('wins after demo act, looping image 142 (PC 766), and draws looping Randon op rp (32, PC 948)', () => {
