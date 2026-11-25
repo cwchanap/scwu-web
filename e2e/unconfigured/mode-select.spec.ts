@@ -256,7 +256,8 @@ const openArena = async (page: Page) => {
       : [];
     // The route's own packs are the confirm's earliest proof (HPA-1251):
     // a confirmed route starts loading its stage and fighters, while a
-    // dropped input queues nothing and still times the poll out. The
+    // dropped input queues neither and still times the poll out. Boot and
+    // demo packs are not route proof and do not count. The
     // generated routes' first battle queues up to fourteen fighter packs
     // over R2 — a load whose decode jams the page, so the pixel watch's
     // own calls can stall past its window while the battle comes up; the
@@ -265,9 +266,12 @@ const openArena = async (page: Page) => {
     // players are all resident queues no pack either, but it begins at
     // once, and the pixel watch catches it on a next sample.
     const loaded = page
-      .waitForRequest((req) => req.url().includes('/packs/'), {
-        timeout: 15_000,
-      })
+      .waitForRequest(
+        (req) => /\/packs\/(fighter|stage)-[^/]+\.bin/.test(req.url()),
+        {
+          timeout: 15_000,
+        },
+      )
       // A route whose players are all resident fires no request: its
       // timeout must not out-race the pixel watch — only a seen pack cuts
       // it short, so a rejection stays pending.
