@@ -1216,6 +1216,81 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
+  it('keeps a nonlethal GON MISS on its B.R. launch (control)', () => {
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+    )!;
+    victim.hp = victim.maxHp;
+    pose(br, victim, 'gonMiss', animationDuration('gonMiss', victim.who) - 1);
+    br.step();
+    expect(victim).toMatchObject({
+      action: 'launchAway',
+      hp: victim.maxHp - 40,
+    });
+  });
+
+  it('settles a lethal GON MISS as the B.R. KO (authored, HPA-1251)', () => {
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+    )!;
+    victim.hp = 1;
+    pose(br, victim, 'gonMiss', animationDuration('gonMiss', victim.who) - 1);
+    expect(() => br.step()).not.toThrow();
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(victim.pending).toMatchObject({ action: 'down' });
+    for (let t = 0; t < 600; t++) br.step();
+    expect(playing(victim)).toBe('koLand');
+  });
+
+  it('keeps a clash handler from replacing a B.R. KO queued earlier that tick (authored, HPA-1251)', () => {
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const [ryuko] = br.fighters;
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+    )!;
+    victim.x = ryuko.x;
+    knockOut(br, victim);
+    victim.onClash = 167;
+    ryuko.box = { x: 0, y: 0, w: 100, h: 100, damage: 1, kind: 0 };
+    victim.box = { x: 0, y: 0, w: 100, h: 100, damage: 0, kind: 0 };
+    (br as unknown as { clashBoxes(): void }).clashBoxes();
+    expect(victim.pending).toMatchObject({ action: 'down' });
+    expect(victim.onClash).toBe(0);
+    expect(victim.box).toBeNull();
+    for (let t = 0; t < 600; t++) br.step();
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(playing(victim)).toBe('koLand');
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',

@@ -3537,6 +3537,10 @@ export class Match {
       addPower(f, event.selfPower);
       if (striker) addPower(striker, event.otherPower);
     }
+    if (this.koProtected(f)) {
+      this.knockOut(f);
+      return true;
+    }
     this.queue(f, 'launchAway', 13, 13);
     this.enterPending(f);
     if (f.hp === 0) this.knockOut(f);
@@ -4878,7 +4882,10 @@ export class Match {
             for (const o of [a, b]) {
               if (!o.onClash) continue;
               if ('clip' in o) [o.pending, o.onClash] = [o.onClash, undefined];
-              else [o.pending, o.onClash] = [{ key: o.onClash }, 0];
+              else {
+                this.queueKey(o, o.onClash);
+                o.onClash = 0;
+              }
               strip(a, b);
             }
           }
