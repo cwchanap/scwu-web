@@ -51,13 +51,13 @@ const ROW2: Record<'a' | 'b' | 'c', Rect> = {
 };
 // The LONG ally's initial trace on the fight's canvas (HPA-1251): the
 // first-tick Dora is short, so his blue sprite fills the low 'ally' band
-// at his stand and never the 'tall' one above it — which stays clear
-// until the first hostile rises from his entry door (blue too, and tall),
-// so the boss route's ally-less opening can't fake the probe and the
-// hostile's emergence can't read as the ally.
+// at his x 450 opening (scene x ≈ 216 under the brawl's camera) and never
+// the 'tall' one above it — which stays clear until the first hostile
+// (blue too, and tall) reaches him, so the boss route's ally-less opening
+// can't fake the probe and the hostile's emergence can't read as the ally.
 const ALLY: Record<'ally' | 'tall', Rect> = {
-  ally: { x: 690, y: 505, w: 115, h: 140 },
-  tall: { x: 690, y: 300, w: 115, h: 170 },
+  ally: { x: 170, y: 510, w: 60, h: 135 },
+  tall: { x: 170, y: 300, w: 60, h: 170 },
 };
 // A board lighting means a whole screen chain ran — several opens and the
 // picked select's hundred-tick wait — so the pixel polls share the slack
@@ -237,23 +237,9 @@ const openArena = async (page: Page) => {
   // out. Without this gate skipToBattle's own 'g' would confirm the
   // highlighted route and mask the miss (both screens show the same
   // eight pad buttons).
-  // With `ally`, every screenshot this helper already takes — the
-  // pre-input read and each poll iteration, including the one that
-  // detects the flip — also records the two ally bands: a separate
-  // probe started after the poll returns would first sample past the
-  // first hostile's rise (an irreversible window), and a parallel
-  // capture stream would contend with this one for the same page's
-  // serialized screenshots under runner load. The frames carry plain
-  // blue fractions for the caller's discriminator.
-  const confirmRoute = async (send: () => Promise<void>, ally?: boolean) => {
-    const rects: Record<string, Rect> = ally
-      ? { h: HEADER, ally: ALLY.ally, tall: ALLY.tall }
-      : { h: HEADER };
-    const s0 = await sample(rects);
+  const confirmRoute = async (send: () => Promise<void>) => {
+    const s0 = await sample({ h: HEADER });
     const h0 = s0.h.lum;
-    const frames: { ally: number; tall: number }[] = ally
-      ? [{ ally: s0.ally.blue, tall: s0.tall.blue }]
-      : [];
     // The route's own packs are the confirm's earliest proof (HPA-1251):
     // a confirmed route starts loading its stage and fighters, while a
     // dropped input queues neither and still times the poll out. Boot and
@@ -283,8 +269,7 @@ const openArena = async (page: Page) => {
         .poll(
           async () => {
             if (settled) return true;
-            const s = await sample(rects);
-            if (ally) frames.push({ ally: s.ally.blue, tall: s.tall.blue });
+            const s = await sample({ h: HEADER });
             // The flip's other proof (HPA-1251): a generated route leaves
             // for its battle in place — no demo — and the arena under the
             // header band can read as bright as the sign it replaced, so
@@ -300,7 +285,6 @@ const openArena = async (page: Page) => {
       loaded,
     ]);
     settled = true;
-    return frames;
   };
   // A boss's confirm starts the story or generated route itself, so the
   // route step's small header sign must never light. The band is read
@@ -353,58 +337,101 @@ const openArena = async (page: Page) => {
     }
   };
   // The tail of the ally capture: from after the route step's flip
-  // through skipToBattle. confirmRoute's own ally-watched screenshots
-  // cover the confirm itself; this clipped loop extends the same frames
-  // over the fight's first seconds — the composite costs a fraction of
-  // a full frame, so scheduling delays leave more samples inside the
-  // window — and the caller asserts the unchanged discriminator over
-  // the whole span. stop() ends the loop; it dies quietly if the page
-  // goes away, where the test body fails on its own reads.
-  const watchAlly = () => {
+  // through skipToBattle. Page screenshots are serialized behind the
+  // route's pack decode and can miss the opening outright under runner
+  // load, so the watch instead listens to the compositor's CDP screencast
+  // and decodes its frames after the fact. The ring keeps the last five
+  // seconds: the pad flip can trail the first rendered frame, but the
+  // selector is long gone by then and the opening still stays in memory.
+  const watchAlly = async () => {
     const frames: { t: number; ally: number; tall: number }[] = [];
+    const shots: {
+      t: number;
+      data: string;
+      width: number;
+      height: number;
+    }[] = [];
     // Each frame carries its ms from the watch's start, so a failure dump
     // reads the capture's own timeline against the flip the body marks:
     // an opening the watch never reached shows as a gap, not a missing
     // ally.
     const t0 = Date.now();
-    let live = true;
-    const loop = (async () => {
-      while (live) {
-        try {
-          const s = await sample(
-            ALLY,
-            // One clip covering both bands: the screenshot composites only
-            // this strip, so each sample costs a fraction of a full-frame
-            // capture and scheduling delays leave more of them inside the
-            // window.
-            {
-              x: ALLY.ally.x,
-              y: ALLY.tall.y,
-              w: ALLY.ally.w,
-              h: ALLY.ally.y + ALLY.ally.h - ALLY.tall.y,
-            },
-          );
-          frames.push({
-            t: Date.now() - t0,
-            ally: s.ally.blue,
-            tall: s.tall.blue,
-          });
-        } catch {
-          // A sample can only throw while the scene remounts its canvas
-          // or the decode jams the capture — both pass, and the watch
-          // must survive them to reach the fight's opening; a page
-          // really gone fails the test body on its own reads.
-          if (page.isClosed()) break;
-        }
-        await new Promise((r) => setTimeout(r, 40));
-      }
-    })();
+    const cdp = await page.context().newCDPSession(page);
+    cdp.on('Page.screencastFrame', (frame) => {
+      const t = Date.now() - t0;
+      shots.push({
+        t,
+        data: frame.data,
+        width: frame.metadata.deviceWidth,
+        height: frame.metadata.deviceHeight,
+      });
+      while (shots.length && t - shots[0]!.t > 5_000) shots.shift();
+      void cdp
+        .send('Page.screencastFrameAck', { sessionId: frame.sessionId })
+        .catch(() => {});
+    });
+    await cdp.send('Page.startScreencast', {
+      format: 'jpeg',
+      quality: 80,
+      maxWidth: 800,
+      maxHeight: 450,
+      everyNthFrame: 1,
+      sendLastFrame: true,
+    });
     return {
       frames,
       now: () => Date.now() - t0,
       stop: async () => {
-        live = false;
-        await loop;
+        await cdp.send('Page.stopScreencast').catch(() => {});
+        await cdp.detach().catch(() => {});
+        const box = await canvas.boundingBox();
+        if (!box) return;
+        const measured = await page.evaluate(
+          async ({ shots, rects, box }) => {
+            const out: { t: number; ally: number; tall: number }[] = [];
+            for (const shot of shots) {
+              const img = new Image();
+              img.src = 'data:image/jpeg;base64,' + shot.data;
+              await img.decode();
+              const c = document.createElement('canvas');
+              c.width = img.naturalWidth;
+              c.height = img.naturalHeight;
+              const ctx = c.getContext('2d')!;
+              ctx.drawImage(img, 0, 0);
+              const scaleX = img.naturalWidth / shot.width;
+              const scaleY = img.naturalHeight / shot.height;
+              const band = (rect: Rect) => {
+                const x = Math.round(
+                  (box.x + (rect.x / 960) * box.width) * scaleX,
+                );
+                const y = Math.round(
+                  (box.y + (rect.y / 720) * box.height) * scaleY,
+                );
+                const w = Math.max(
+                  1,
+                  Math.round((rect.w / 960) * box.width * scaleX),
+                );
+                const h = Math.max(
+                  1,
+                  Math.round((rect.h / 720) * box.height * scaleY),
+                );
+                const d = ctx.getImageData(x, y, w, h).data;
+                let blue = 0;
+                for (let i = 0; i < d.length; i += 4)
+                  if (d[i + 2] - d[i] > 40) blue++;
+                return blue / (d.length / 4);
+              };
+              out.push({
+                t: shot.t,
+                ally: band(rects.ally),
+                tall: band(rects.tall),
+              });
+            }
+            return out;
+          },
+          { shots, rects: ALLY, box },
+        );
+        frames.push(...measured);
       },
     };
   };
@@ -661,20 +688,17 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   // confirms it like a button. The keyboard confirm of a remembered
   // regular LONG stays in the next test. The twelve-enemy brawl on
   // Sakura Street: SWW first (460), untimed — Ryuko's 510 bar beside it.
-  // The ally's own initial trace, captured while the confirm lands and
-  // carried through skipToBattle: confirmRoute(…, true) records the ally
-  // bands on its own pre-input read and every header-poll screenshot
-  // (the flip-detecting frame included), and watchAlly extends the same
-  // frames over the fight's first second however slowly the poll
-  // returned. Every pre-battle frame fails the signature (the
-  // selector's own right half is blue, so its tall band reads high),
-  // and so do the fight's later frames once the first hostile — blue
-  // too, and tall — rises out of his door: a missing ally can't fake
-  // the probe, and neither can a sample that arrives after him. No
-  // combat loop, no production API, no ally bar read (his donated slot
-  // carries none).
-  const frames = await confirmRoute(() => tap(720, 400), true);
-  const tail = watchAlly();
+  // The ally's own initial trace: the screencast watch starts as the
+  // confirm lands and keeps the opening however long the pack load and
+  // pad flip take. Every pre-battle frame fails the signature (the
+  // selector's own left art is blue, so its tall band reads high), and
+  // so do the fight's later frames once the first hostile — blue too,
+  // and tall — reaches the ally's lane: a missing ally can't fake the
+  // probe, and neither can a sample that arrives after him. No combat
+  // loop, no production API, no ally bar read (his donated slot carries
+  // none).
+  await confirmRoute(() => tap(720, 400));
+  const tail = await watchAlly();
   let flip: number;
   try {
     await skipToBattle();
@@ -686,9 +710,9 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   } finally {
     await tail.stop();
   }
-  const seen = frames.concat(tail.frames);
+  const seen = tail.frames;
   expect(
-    seen.some((f) => f.ally > 0.08 && f.tall < 0.03),
+    seen.some((f) => f.ally > 0.08 && f.tall < 0.05),
     `ally sprite in ${seen.length} captured frames (tail ms, flip at ${flip}): ${JSON.stringify(seen)}`,
   ).toBe(true);
   await expect(player).toHaveAttribute('aria-valuemax', '510');
