@@ -1163,6 +1163,59 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
+  it('keeps a wall handler from replacing a B.R. KO queued earlier that tick (authored, HPA-1251)', () => {
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+    )!;
+    // Op 0x15 empties life inside the victim's step, before the same step's
+    // motion pass settles its script into the wall.
+    victim.hp = 1;
+    const internals = br as unknown as {
+      runEvent(
+        f: Fighter,
+        self: number,
+        event: {
+          op: 'power';
+          selfLife: number;
+          selfPower: number;
+          otherLife: number;
+          otherPower: number;
+          t: number;
+        },
+      ): void;
+      settle(f: Fighter, walled?: boolean): void;
+    };
+    internals.runEvent(victim, br.fighters.indexOf(victim), {
+      op: 'power',
+      selfLife: -1,
+      selfPower: 0,
+      otherLife: 0,
+      otherPower: 0,
+      t: 0,
+    });
+    expect(victim.pending).toMatchObject({ action: 'down' });
+    Object.assign(victim, {
+      action: 'script',
+      branch: RYUKO.punch,
+      onWall: 95,
+    });
+    internals.settle(victim, true);
+    expect(victim.pending).toMatchObject({ action: 'down' });
+    for (let t = 0; t < 600; t++) br.step();
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(playing(victim)).toBe('koLand');
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',
