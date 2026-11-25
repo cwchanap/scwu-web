@@ -296,6 +296,7 @@ export const brLongStory = (who: Who): readonly Step[] => {
     : {
         ...roles.slots[0]!,
         player: ROSTER.indexOf('dora'),
+        x: 450,
         flags: roles.slots[0]!.flags | 0x200,
       };
   const battle = assemble(roles, roles, seats(row), true, 9, ally);
