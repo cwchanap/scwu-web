@@ -1292,6 +1292,49 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
+  it('rejects Musashi’s apply/hold records on an entered B.R. KO (authored, HPA-1251)', () => {
+    const br = Match.story(
+      'ryuko',
+      brLongStory('ryuko')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    const [ryuko] = br.fighters;
+    const victim = br.fighters.find(
+      (f, i) => i > 0 && f.present && (f.enemies & 1) !== 0,
+    )!;
+    victim.caught = ryuko;
+    ryuko.caught = victim;
+    knockOut(br, victim);
+    for (let t = 0; t < 600; t++) br.step();
+    expect(playing(victim)).toBe('koLand');
+    expect(ryuko.caught).toBe(victim);
+    ryuko.x = 1000;
+    ryuko.y = 0;
+    ryuko.facing = 1;
+    victim.x = 1200;
+    victim.y = 0;
+    victim.facing = -1;
+    victim.hitStop = 0;
+    const z = victim.z;
+    enter(br, ryuko, RYUKO.musashiHit);
+    for (let t = 0; t < 8; t++) br.step();
+    (br as unknown as { pause(f: Fighter, ticks: number): void }).pause(
+      victim,
+      13,
+    );
+    for (let t = 0; t < 20; t++) br.step();
+    expect(victim.held).toBeNull();
+    expect(victim.z).toBe(z);
+    expect([victim.x, victim.y]).toEqual([1200, 0]);
+    expect([victim.hp, victim.downed]).toEqual([0, true]);
+    expect(playing(victim)).toBe('koLand');
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',
