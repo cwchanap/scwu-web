@@ -570,4 +570,29 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
     }
     expect([boss.hp, boss.downed, idle, rose]).toEqual([0, true, false, false]);
   });
+
+  it('keeps a B.R. KO queued through Mega Beam’s apply a tick later', () => {
+    const br = Match.story(
+      'alpha',
+      brLongStory('alpha')[0] as Battle,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
+    const [alpha, victim] = br.fighters;
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    victim.x = alpha.x + 90;
+    victim.y = alpha.y;
+    victim.hp = 1;
+    alpha.caught = victim;
+    enter(br, alpha, 332, 142, 8);
+    let tossed = false;
+    for (let t = 0; t < 80; t++) {
+      br.step();
+      tossed ||= victim.action === 'dstToss';
+    }
+    expect([victim.hp, victim.downed, tossed]).toEqual([0, true, false]);
+  });
 });

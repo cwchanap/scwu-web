@@ -7,6 +7,8 @@ import { faceImage } from './hud';
 import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro } from './testing';
+import { brLongStory } from './br-another';
+import type { Battle } from './story';
 
 // ZIRO as player 1, `gap` from a standing opponent as player 2.
 function ziroPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -429,6 +431,28 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
       },
       burst(29, '70+16'),
     ]);
+  });
+
+  it('keeps Random lose shut after a B.R. KO', () => {
+    const br = Match.story(
+      'ziro',
+      brLongStory('ziro')[0] as Battle,
+      1,
+      undefined,
+      undefined,
+      true,
+    );
+    const [ziro] = br.fighters;
+    for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+    while (br.roundTicks <= br.fightTick) br.step();
+    ziro.hp = 0;
+    (br as unknown as { knockOut(f: Fighter): void }).knockOut(ziro);
+    let stood = false;
+    for (let t = 0; t < 700; t++) {
+      br.step();
+      stood ||= ziro.branch === 75 || ziro.action === 'idle';
+    }
+    expect([ziro.hp, ziro.downed, stood]).toEqual([0, true, false]);
   });
 
   it('wins after demo act, looping image 142 (PC 766), and draws looping Randon op rp (32, PC 948)', () => {

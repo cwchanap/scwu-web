@@ -3274,6 +3274,16 @@ export class Match {
         continue;
       }
       if (event.op !== 'random' && event.op !== 'test') continue;
+      // Authored (HPA-1251): a B.R. KO down takes no random branch — ZIRO's
+      // can reach Random lose, which leaves him standing — and falls through
+      // to the ordinary ko DOWN2/DOWN3 timeline instead.
+      if (
+        event.op === 'random' &&
+        this.br &&
+        f.action === 'koLand' &&
+        f.hp === 0
+      )
+        continue;
       // A drawn branch takes a test out of a call, returning into it; the
       // result's own clip draws its EX stands (exStands).
       if (
@@ -4088,7 +4098,7 @@ export class Match {
         // the victim's stop (0x413147).
         other.hitStop = 0;
         if (timeline) {
-          other.pending = { key: timeline };
+          this.queueKey(other, timeline);
           break;
         }
         this.queue(
@@ -4508,7 +4518,7 @@ export class Match {
     const wall = launchMotion[f.action]?.wall;
     if (walled && wall) this.queue(f, wall);
     else if (walled && f.action === 'script' && f.onWall)
-      f.pending = { key: f.onWall };
+      this.queueKey(f, f.onWall);
     const by = f.striker ? f.struckBy : null;
     const reeling = f.striker === 'body' && ((by?.reaction ?? 0) & 12) === 8;
     if (f.hp > 0 && f.reaction & 8 && by && !reeling) by.transfer += f.stopped;
@@ -5053,7 +5063,17 @@ export class Match {
   }
 
   // The victim's next action (+0x38), the last write winning: a contact's
-  // reaction, op 0x14's, or the lose action (0x40e84b).
+  // reaction, op 0x14's, or the lose action (0x40e84b). Authored (HPA-1251):
+  // on a B.R. route a fighter at 0 has already lost; only the KO action may
+  // queue for it, whichever contact, wall or op write arrives later.
+  private koProtected(target: Fighter) {
+    return this.br && target.hp === 0;
+  }
+
+  private queueKey(target: Fighter, key: ObjectKey) {
+    if (!this.koProtected(target)) target.pending = { key };
+  }
+
   private queue(
     target: Fighter,
     action: Action,
@@ -5062,6 +5082,8 @@ export class Match {
     power = 0,
     own?: number,
   ) {
+    if (this.koProtected(target) && action !== 'down' && action !== 'koAgain')
+      return;
     target.pending = { action, stop, attackerStop, power, own };
   }
 
@@ -6142,7 +6164,7 @@ export class Match {
       // nothing and so doesn't (0x40f689, 0x40f747).
       if (loss && target.hp === 0) this.knockOut(target);
       else if (!(this.br && target.hp === 0)) {
-        if (timeline) target.pending = { key: timeline };
+        if (timeline) this.queueKey(target, timeline);
         else this.queue(target, reaction!, hitStop, attackerStop, bonus, own);
       }
       target.reaction = blocked
@@ -6197,7 +6219,7 @@ export class Match {
           ('clip' in c.source || this.fighters.indexOf(c.f) > i),
       );
       if (!later && !(this.br && striker.hp === 0))
-        striker.pending = { key: striker.onHit };
+        this.queueKey(striker, striker.onHit);
     }
     // 0x40fce9: overlapping op 0x19 boxes of kind bit 0 push both fighters
     // apart by a quarter of the overlap (<< 14 in 16.16), boxes walked from
@@ -6261,7 +6283,7 @@ export class Match {
           (landed.some((c) => c.target === met) &&
             !landed.some((c) => c.f === met)))
       )
-        f.pending = { key: handler };
+        this.queueKey(f, handler);
     }
     for (const [striker] of objectHits) {
       striker.connected = true;
