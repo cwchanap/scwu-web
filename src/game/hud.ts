@@ -468,7 +468,7 @@ export function createHud(
         strokeThickness: 3,
       })
       .setScrollFactor(0)
-      .setDepth(screenDepth(0x16))
+      .setDepth(screenDepth(0x1a))
       .setVisible(false),
   );
 

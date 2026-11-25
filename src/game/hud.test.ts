@@ -19,6 +19,7 @@ import {
   ROUND_END_TICKS,
   healthCrop,
   stockTexture,
+  screenDepth,
 } from './hud';
 import { Match } from './match';
 import { scenarioOf } from './story';
@@ -38,6 +39,7 @@ const hudScene = () => {
       y: 0,
       visible: true,
       crop: { x: 0, width: 0 },
+      depth: 0,
       setTexture(texture: string) {
         this.texture = texture;
         return this;
@@ -66,7 +68,10 @@ const hudScene = () => {
       setScrollFactor: () => s,
       setOrigin: () => s,
       setScale: () => s,
-      setDepth: () => s,
+      setDepth(depth: number) {
+        this.depth = depth;
+        return s;
+      },
       setAlpha: () => s,
       setBlendMode: () => s,
       setFlipX: () => s,
@@ -110,6 +115,18 @@ const hudScene = () => {
     cuts: () => [texts[1], texts[2]],
   };
 };
+
+it('draws the Damage cut labels over the face strips and names', () => {
+  const hud = hudScene();
+  const update = createHud(hud.as, (key) => key);
+  const match = new Match('cpu', true);
+  match.useCheats({ ...DEFAULT_CHEATS, enabled: true });
+  update(match);
+  expect(hud.cuts().map((cut) => cut.depth)).toEqual([
+    screenDepth(0x1a),
+    screenDepth(0x1a),
+  ]);
+});
 
 it('shows the CHEAT tag only for a battle whose effective cheats are on', () => {
   const hud = hudScene();
