@@ -377,7 +377,11 @@ const openArena = async (page: Page) => {
           );
           frames.push({ ally: s.ally.blue, tall: s.tall.blue });
         } catch {
-          break; // page gone — the test body fails on its own reads
+          // A sample can only throw while the scene remounts its canvas
+          // or the decode jams the capture — both pass, and the watch
+          // must survive them to reach the fight's opening; a page
+          // really gone fails the test body on its own reads.
+          if (page.isClosed()) break;
         }
         await new Promise((r) => setTimeout(r, 40));
       }
@@ -659,6 +663,10 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   const tail = watchAlly();
   try {
     await skipToBattle();
+    // skipToBattle returns at the pad flip — the fight's first rendered
+    // frame — but the only proving frames are its opening, before the
+    // first hostile finishes rising: hold the watch over them.
+    await page.waitForTimeout(2_000);
   } finally {
     await tail.stop();
   }
