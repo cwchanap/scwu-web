@@ -1285,6 +1285,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     (br as unknown as { clashBoxes(): void }).clashBoxes();
     expect(victim.pending).toMatchObject({ action: 'down' });
     expect(victim.onClash).toBe(0);
+    expect(ryuko.box).toBeNull();
     expect(victim.box).toBeNull();
     for (let t = 0; t < 600; t++) br.step();
     expect([victim.hp, victim.downed]).toEqual([0, true]);
