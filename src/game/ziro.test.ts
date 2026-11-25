@@ -450,16 +450,13 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
       (m as unknown as { knockOut(f: Fighter): void }).knockOut(ziro);
       const cued: number[] = [];
       let stood = false;
-      let rngAfterRolls = -1;
       for (let t = 0; t < 700; t++) {
         m.step();
         for (const { owner, index } of m.sounds)
           if (owner === 0 && (index === 12 || index === 29)) cued.push(index);
-        if (rngAfterRolls < 0 && ziro.branch === 73)
-          rngAfterRolls = m.cpu.random();
         stood ||= ziro.branch === 75 || ziro.action === 'idle';
       }
-      return { ziro, cued, stood, rngAfterRolls };
+      return { ziro, cued, stood, rngSeed: m.cpu.seed };
     };
     const pairs = [0, 1, 200].map((seed) => ({
       br: run(seed, true),
@@ -468,7 +465,7 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     for (const { br, native } of pairs) {
       expect([br.ziro.hp, br.ziro.downed, br.stood]).toEqual([0, true, false]);
       expect(br.cued).toEqual(native.cued);
-      if (!native.stood) expect(br.rngAfterRolls).toBe(native.rngAfterRolls);
+      expect(br.rngSeed).toBe(native.rngSeed);
     }
     expect(pairs.some((p) => p.br.cued[0] === 12)).toBe(true);
     expect(pairs.some((p) => p.br.cued[0] === 29)).toBe(true);
