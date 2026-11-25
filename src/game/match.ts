@@ -3274,16 +3274,6 @@ export class Match {
         continue;
       }
       if (event.op !== 'random' && event.op !== 'test') continue;
-      // Authored (HPA-1251): a B.R. KO down takes no random branch — ZIRO's
-      // can reach Random lose, which leaves him standing — and falls through
-      // to the ordinary ko DOWN2/DOWN3 timeline instead.
-      if (
-        event.op === 'random' &&
-        this.br &&
-        f.action === 'koLand' &&
-        f.hp === 0
-      )
-        continue;
       // A drawn branch takes a test out of a call, returning into it; the
       // result's own clip draws its EX stands (exStands).
       if (
@@ -3292,6 +3282,19 @@ export class Match {
           : event.called ||
             (event.resume && key !== f.branch) ||
             !this.passes(f, f, event)
+      )
+        continue;
+      // Authored (HPA-1251): a B.R. KO down keeps its voice roll within
+      // KO_DOWN, but takes no random branch out of it — ZIRO's can reach
+      // Random lose (75), which leaves him standing — and falls through to
+      // the ordinary ko DOWN2/DOWN3 timeline instead (with the roll drawn so
+      // the shared RNG sequence stays aligned).
+      if (
+        event.op === 'random' &&
+        this.br &&
+        f.action === 'koLand' &&
+        f.hp === 0 &&
+        event.action !== twin(f.who, KO_DOWN)
       )
         continue;
       if (event.op === 'test' && event.resume)
