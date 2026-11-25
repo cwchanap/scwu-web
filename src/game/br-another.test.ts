@@ -1120,6 +1120,10 @@ describe('B.R. LONG route', () => {
       expect((ally.flags >> 1) & 3, who).toBe(0);
       expect(ally.watch, who).toBe(0);
       expect(ally.enemies, who).toBe((((1 << 14) - 1) & ~1 & ~(1 << 13)) >>> 0);
+      // The left opening faces right toward the 1P and never overlaps the
+      // first enemy's right-side slot.
+      expect(ally.x, who).toBe(450);
+      expect(ally.x, who).not.toBe(battle.slots[0]!.x);
     }
   });
 
