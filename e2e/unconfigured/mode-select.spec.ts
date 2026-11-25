@@ -357,7 +357,12 @@ const openArena = async (page: Page) => {
   // the whole span. stop() ends the loop; it dies quietly if the page
   // goes away, where the test body fails on its own reads.
   const watchAlly = () => {
-    const frames: { ally: number; tall: number }[] = [];
+    const frames: { t: number; ally: number; tall: number }[] = [];
+    // Each frame carries its ms from the watch's start, so a failure dump
+    // reads the capture's own timeline against the flip the body marks:
+    // an opening the watch never reached shows as a gap, not a missing
+    // ally.
+    const t0 = Date.now();
     let live = true;
     const loop = (async () => {
       while (live) {
@@ -375,7 +380,11 @@ const openArena = async (page: Page) => {
               h: ALLY.ally.y + ALLY.ally.h - ALLY.tall.y,
             },
           );
-          frames.push({ ally: s.ally.blue, tall: s.tall.blue });
+          frames.push({
+            t: Date.now() - t0,
+            ally: s.ally.blue,
+            tall: s.tall.blue,
+          });
         } catch {
           // A sample can only throw while the scene remounts its canvas
           // or the decode jams the capture — both pass, and the watch
@@ -388,6 +397,7 @@ const openArena = async (page: Page) => {
     })();
     return {
       frames,
+      now: () => Date.now() - t0,
       stop: async () => {
         live = false;
         await loop;
@@ -661,11 +671,13 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   // carries none).
   const frames = await confirmRoute(() => tap(720, 400), true);
   const tail = watchAlly();
+  let flip: number;
   try {
     await skipToBattle();
     // skipToBattle returns at the pad flip — the fight's first rendered
     // frame — but the only proving frames are its opening, before the
     // first hostile finishes rising: hold the watch over them.
+    flip = tail.now();
     await page.waitForTimeout(2_000);
   } finally {
     await tail.stop();
@@ -673,7 +685,7 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   const seen = frames.concat(tail.frames);
   expect(
     seen.some((f) => f.ally > 0.08 && f.tall < 0.03),
-    `ally sprite in ${seen.length} captured frames: ${JSON.stringify(seen)}`,
+    `ally sprite in ${seen.length} captured frames (tail ms, flip at ${flip}): ${JSON.stringify(seen)}`,
   ).toBe(true);
   await expect(player).toHaveAttribute('aria-valuemax', '510');
   await expect(opponent).toHaveAttribute('aria-valuemax', '460', {
