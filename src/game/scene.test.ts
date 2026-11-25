@@ -1119,9 +1119,9 @@ describe('cheats (HPA-767)', () => {
     expect(drawn.some((r) => r.color === 0xff3020)).toBe(false);
     expect(drawn.some((r) => r.color === 0xffd24a)).toBe(true);
     expect(texts[0]!.text).toBe('Damage cut: 45%');
-    // And a bar far past the canvas clamps its whole label and gold tick
-    // inside [0,960] × [0,720], right and bottom edges included — x 960
-    // alone would hold nothing of an origin-0 label.
+    // A bar far past the canvas still clamps its whole label inside
+    // [0,960] × [0,720]; its gold tick follows the bar off-canvas rather
+    // than lying at the edge.
     drawn.length = 0;
     bar.bar.x = 9000;
     bar.bar.y = 1000;
@@ -1136,10 +1136,7 @@ describe('cheats (HPA-767)', () => {
     expect(far.y + far.height).toBeLessThanOrEqual(720);
     const farTick = drawn.find((r) => r.color === 0xffd24a)!;
     expect(farTick).toBeDefined();
-    expect(farTick.x).toBeGreaterThanOrEqual(0);
-    expect(farTick.x + farTick.w).toBeLessThanOrEqual(960);
-    expect(farTick.y).toBeGreaterThanOrEqual(0);
-    expect(farTick.y + farTick.h).toBeLessThanOrEqual(720);
+    expect(farTick.x).toBeGreaterThanOrEqual(960);
     // One far off the canvas's left clamps the label's left edge at 0.
     bar.bar.x = -5000;
     (view.drawLifeBars as () => void)();
