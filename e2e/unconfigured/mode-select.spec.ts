@@ -49,16 +49,17 @@ const ROW2: Record<'a' | 'b' | 'c', Rect> = {
   b: { x: 620, y: 240, w: 80, h: 40 },
   c: { x: 440, y: 240, w: 80, h: 40 },
 };
-// The LONG ally's initial trace on the fight's canvas (HPA-1251): the
-// first-tick Dora is short, so his blue sprite fills the low 'ally' band
-// at his x 450 opening (scene x ≈ 216 under the brawl's camera) and never
-// the 'tall' one above it — which stays clear until the first hostile
-// (blue too, and tall) reaches him, so the boss route's ally-less opening
-// can't fake the probe and the hostile's emergence can't read as the ally.
-const ALLY: Record<'ally' | 'tall', Rect> = {
-  ally: { x: 170, y: 510, w: 60, h: 135 },
-  tall: { x: 170, y: 300, w: 60, h: 170 },
-};
+// The LONG partner's trace on the fight's canvas: his story life bar
+// (Match.lifeBars — the seat's 0x1 flag, owner 26 Nov 2026), a pure-green
+// strip under his feet that no hostile draws (the Enemy HP bars option is
+// off) and no selector or demo screen shows. At the opening he stands on
+// the floor, so the strip rides the row at scene y ≈ 637–650; the band
+// spans the whole width, since the intro's camera moves it sideways. The
+// boss route seats no partner, so its band stays clear.
+const BAR: Rect = { x: 0, y: 625, w: 960, h: 40 };
+// The share of the band's pixels the full bar covers is ≈ 0.023; a capture
+// counts as showing it above a quarter of that.
+const BAR_SEEN = 0.005;
 // A board lighting means a whole screen chain ran — several opens and the
 // picked select's hundred-tick wait — so the pixel polls share the slack
 // the route check already gives confirmRoute, not the five-second default.
@@ -270,11 +271,11 @@ const openArena = async (page: Page) => {
           async () => {
             if (settled) return true;
             const s = await sample({ h: HEADER });
-            // The flip's other proof (HPA-1251): a generated route leaves
-            // for its battle in place — no demo — and the arena under the
-            // header band can read as bright as the sign it replaced, so
-            // the battle's own pad (more than the screens' eight controls,
-            // which a story demo keeps) says the selector left then.
+            // The flip's other proof (HPA-1251): should the screen that
+            // replaces the selector — a route's opening demo, or the arena
+            // once it loads — read as bright under the header band as the
+            // sign did, the battle's own pad (more than the screens' eight
+            // controls, which a story demo keeps) says the selector left.
             return Math.abs(s.h.lum - h0) > 25 || (await pad.count()) > 8;
           },
           {
@@ -286,15 +287,11 @@ const openArena = async (page: Page) => {
     ]);
     settled = true;
   };
-  // A boss's confirm starts the story or generated route itself, so the
-  // route step's small header sign must never light. The band is read
-  // dark before the confirm and then sampled with no blind gap after it.
-  // A route has no demo: the pad stops being the eight select controls
-  // only when the battle renders, and the pad re-check after each sample
-  // drops one that landed mid-transition — the band is never read once
-  // the arena's pad shows. A story keeps the eight controls through its
-  // demo, so the mode boards are the selector's trace instead: while they
-  // draw the band must stay dark — a buggy route step lights the band and
+  // A boss's STORY confirm starts her story itself, so the route step's
+  // small header sign must never light. The band is read dark before the
+  // confirm and then sampled with no blind gap after it. A story keeps the
+  // eight controls through its demo, so the mode boards are the selector's
+  // trace instead: while they draw the band must stay dark — a buggy route step lights the band and
   // holds its own boards lit over the left one's spot, so it fails the
   // check without reaching the exit. Once the boards leave the band reads
   // the demo's own art (a story's panels fill the top of the screen), so
@@ -336,16 +333,17 @@ const openArena = async (page: Page) => {
       page.off('response', onResponse);
     }
   };
-  // The tail of the ally capture: from before the confirming tap through
-  // skipToBattle and the opening window. Page screenshots are serialized
-  // behind the route's pack decode and can miss the opening outright under
-  // runner load, so the watch instead listens to the compositor's CDP
-  // screencast and decodes its frames after the fact. Before the battle pad
-  // flips, the ring keeps the last 15 seconds (sampled at every other frame)
-  // so even a multi-second pad-detection lag keeps the opening; once the flip
-  // is marked, eviction pauses through the post-flip hold.
+  // The tail of the partner capture: from before the confirm through the
+  // route's opening demo, skipToBattle and the opening window. Page
+  // screenshots are serialized behind the route's pack decode and can miss
+  // the opening outright under runner load, so the watch instead listens
+  // to the compositor's CDP screencast and decodes its frames after the
+  // fact. Before the battle pad flips, the ring keeps the last 15 seconds
+  // (sampled at every other frame) so even a multi-second pad-detection lag
+  // keeps the opening; once the flip is marked, eviction pauses through the
+  // post-flip hold.
   const watchAlly = async () => {
-    const frames: { t: number; ally: number; tall: number }[] = [];
+    const frames: { t: number; bar: number }[] = [];
     const shots: {
       t: number;
       data: string;
@@ -393,8 +391,8 @@ const openArena = async (page: Page) => {
         const box = await canvas.boundingBox();
         if (!box) return;
         const measured = await page.evaluate(
-          async ({ shots, rects, box }) => {
-            const out: { t: number; ally: number; tall: number }[] = [];
+          async ({ shots, rect, box }) => {
+            const out: { t: number; bar: number }[] = [];
             for (const shot of shots) {
               const img = new Image();
               img.src = 'data:image/jpeg;base64,' + shot.data;
@@ -421,21 +419,18 @@ const openArena = async (page: Page) => {
                   1,
                   Math.round((rect.h / 720) * box.height * scaleY),
                 );
+                // The bar's pure green (0x00ff00), with JPEG slack.
                 const d = ctx.getImageData(x, y, w, h).data;
-                let blue = 0;
+                let green = 0;
                 for (let i = 0; i < d.length; i += 4)
-                  if (d[i + 2] - d[i] > 40) blue++;
-                return blue / (d.length / 4);
+                  if (d[i + 1] > 180 && d[i] < 90 && d[i + 2] < 90) green++;
+                return green / (d.length / 4);
               };
-              out.push({
-                t: shot.t,
-                ally: band(rects.ally),
-                tall: band(rects.tall),
-              });
+              out.push({ t: shot.t, bar: band(rect) });
             }
             return out;
           },
-          { shots, rects: ALLY, box },
+          { shots, rect: BAR, box },
         );
         frames.push(...measured);
       },
@@ -636,10 +631,10 @@ test('mode select: two-step routes by keyboard, Enter, Escape and taps', async (
 // ANOTHER and the blank LONG board. The keyboard walk lights each board
 // under its arrow and a tap on LONG's drawn box starts the twelve-enemy
 // brawl — the touch route start on the third sign (the remembered tap
-// then starts ANOTHER). The brawl's first-tick Dora ally draws no bar
-// (his donated slot carries no life-bar flag) — his sprite is the ally's
-// visible trace, probed at the fight's first second; the DOM meters hold
-// the initial fighter and first enemy.
+// then starts ANOTHER). LONG opens on its HERE COMES NEW CHALLENGER demo
+// (24); the brawl's first-tick Z-MEGA partner draws his story life bar,
+// probed at the fight's first seconds; the DOM meters hold the initial
+// fighter and first enemy.
 test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to ANOTHER', async ({
   page,
 }) => {
@@ -694,23 +689,19 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   // confirms it like a button. The keyboard confirm of a remembered
   // regular LONG stays in the next test. The twelve-enemy brawl on
   // Sakura Street: SWW first (460), untimed — Ryuko's 510 bar beside it.
-  // The ally's own initial trace: the screencast watch starts before the
-  // confirming tap (with settle 0 so there is no blind gap) and keeps
-  // the opening however long the pack load and pad flip take. Every
-  // pre-battle frame fails the signature (the selector's own left art
-  // is blue, so its tall band reads high), and so do the fight's later
-  // frames once the first hostile — blue too, and tall — reaches the
-  // ally's lane: a missing ally can't fake the probe, and neither can a
-  // sample that arrives after him. No combat loop, no production API, no
-  // ally bar read (his donated slot carries none).
+  // The partner's own initial trace: the screencast watch starts before
+  // the confirming tap (with settle 0 so there is no blind gap) and keeps
+  // the demo and the opening however long the pack load and pad flip
+  // take. Only the partner's life bar paints the band's pure green, so a
+  // missing partner can't fake the probe. No combat loop, no production
+  // API.
   const tail = await watchAlly();
   let flip: number;
   try {
     await confirmRoute(() => tap(720, 400, 0));
     await skipToBattle();
     // skipToBattle returns at the pad flip — the fight's first rendered
-    // frame — but the only proving frames are its opening, before the
-    // first hostile finishes rising: pause eviction and hold over them.
+    // frame: pause eviction and hold over its opening.
     flip = tail.markFlip();
     await page.waitForTimeout(2_000);
   } finally {
@@ -718,8 +709,8 @@ test('regular B.R.: three signs walk to a tapped LONG, then a remembered tap to 
   }
   const seen = tail.frames;
   expect(
-    seen.some((f) => f.ally > 0.08 && f.tall < 0.05),
-    `ally sprite in ${seen.length} captured frames (tail ms, flip at ${flip}): ${JSON.stringify(seen)}`,
+    seen.some((f) => f.t >= flip && f.bar > BAR_SEEN),
+    `partner bar in ${seen.length} captured frames (tail ms, flip at ${flip}): ${JSON.stringify(seen)}`,
   ).toBe(true);
   await expect(player).toHaveAttribute('aria-valuemax', '510');
   await expect(opponent).toHaveAttribute('aria-valuemax', '460', {
@@ -774,6 +765,7 @@ test('regular→boss: the remembered LONG lands on the boss route step', async (
     confirmRoute,
     skipToBattle,
     backToModeSelect,
+    watchAlly,
   } = await openArena(page);
 
   // Ryuko's B.R. route step: right, right to LONG, Enter starts it —
@@ -834,9 +826,24 @@ test('regular→boss: the remembered LONG lands on the boss route step', async (
   // the spot the arrow sits over — confirms it: the boss step's touch
   // route start (the keyboard confirms on this step take ANOTHER in the
   // bosses' own tests). ZENKA's LONG brawl — no ally, twelve tough
-  // enemies, ERUS first at twice his native 450 — 900 — untimed.
-  await confirmRoute(() => tap(660, 400));
-  await skipToBattle();
+  // enemies, ERUS first at twice his native 450 — 900 — untimed. The
+  // partner probe of the previous test, watched the same way over her
+  // opening, finds no bar: a boss seats no partner.
+  const tail = await watchAlly();
+  let flip: number;
+  try {
+    await confirmRoute(() => tap(660, 400, 0));
+    await skipToBattle();
+    flip = tail.markFlip();
+    await page.waitForTimeout(2_000);
+  } finally {
+    await tail.stop();
+  }
+  const opening = tail.frames.filter((f) => f.t >= flip);
+  expect(
+    opening.length > 0 && opening.every((f) => f.bar <= BAR_SEEN),
+    `no partner bar in ${opening.length} opening frames (tail ms, flip at ${flip}): ${JSON.stringify(tail.frames)}`,
+  ).toBe(true);
   await expect(player).toHaveAttribute('aria-valuemax', '480');
   await expect(opponent).toHaveAttribute('aria-valuemax', '900', {
     timeout: 30_000,
