@@ -1,65 +1,81 @@
 # HPA-1148 — B.R. ANOTHER stage 3 partners and boss finale extensions
 
-**Status:** design only; implement and verify on this same draft PR.  
-**Linear:** [HPA-1148](https://linear.app/cwchanap/issue/HPA-1148/br-another-stage-3-extras-z-mega-and-rario-partners-boss-runs-add)  
-**Baseline:** main at `7f43f3d853a241589a4c97506cf14890bb7d10fa` (2026-11-26; HPA-1251/#28 and HPA-1304/#30 merged).  
-**Integration prerequisite:** [#31](https://github.com/cwchanap/scwu-web/pull/31) is open at `a098d1705741adde7008e3b7119da7c9e34745d1`. It modifies the same builder/tests/docs, introduces `bossBrAnotherStages`, restores boss ANOTHER demos, and fixes LONG's partner and HP bar. Rebase this docs branch onto main after #31 lands, review its actual merged behavior, then implement. Do not copy its changes into this PR or revert them. If it changes before landing, reconcile the plan with the merged result.
+**Status:** design only; implement and verify on this same draft PR.
+**Linear:** [HPA-1148](https://linear.app/cwchanap/issue/HPA-1148/br-another-stage-3-extras-z-mega-and-rario-partners-boss-runs-add).
+**Baseline:** main at `c59771913b680e7008980fa2c51e7ff2350221ed` (2026-11-26; HPA-1251/#28, HPA-1304/#30 and [#31](https://github.com/cwchanap/scwu-web/pull/31) merged).
+**Review:** [2026-11-26 design review (F1–F7)](https://github.com/cwchanap/scwu-web/pull/32#pullrequestreview-6078425665). [follow-up review (findings 1–4)](https://github.com/cwchanap/scwu-web/pull/32#pullrequestreview-6078839572). #31's loading demos, LONG partner/bar fix, and existing helpers are the baseline, not pending work.
 
 ## 1. Goals and scope
 
-Extend only the final battle of the existing regular and boss B.R. ANOTHER routes. Keep the approved HPA-1035 §7 regular boss sequences and arenas; keep boss HPA-858's seeded first two stages and original first three final-stage enemies. Keep the existing route selection, demos (including #31), Continue, endings, stage headers, recovery, native KO bonuses and B.R.-wide no-revive rule. No new art, sound, exporter work, screens, routes, backend, or engine rewrite. B.R. ZERO, LONG, STORY, practice and versus are unchanged.
+Extend only the final battle of regular and boss B.R. ANOTHER. Preserve HPA-1035 §7's approved regular boss order/arenas, HPA-858's seeded boss stages 1–2 and first three finale enemies, route selection, demos, Continue, endings, native battle headers and B.R. no-revive. No new screens, art, sound, asset export, backend, modes, or simulation/rendering architecture. B.R. ZERO, LONG, STORY, practice and versus retain their behavior.
 
 ### Regular fighters
 
-- Four hostile bosses remain in their current approved order; the last of those sets the arena. Each still enters on its predecessor's native desperation threshold.
-- Z-MEGA and RARIO are CPU allies present from the start, with normal HP/EN, ally facing and existing per-fighter green life bars; the usual finale partner still enters at the player's native desperation mark unless that fighter is one of the immediate partners.
-- Build a stable unique roster by fighter identity: exclude 1P; if the donated usual partner is already Z-MEGA/RARIO, replace its waiting role with the immediate role, never add a second copy. Existing data already pairs Z-MEGA with RARIO and vice versa. All allied slots are mutually friendly (including 1P); every hostile fights every ally and every other hostile. Defeating allies is not a victory requirement.
-- All four hostiles must be down for a win (including not-yet-arrived hostiles); 1P KO still loses under the existing brawl rule. No changed scoring/tie/time rules.
+- Four hostile bosses retain their approved order; the last sets the arena. Each reinforcement still watches its predecessor's native desperation threshold.
+- Z-MEGA and RARIO are CPU allies from the start, with normal HP/EN, ally facing and existing green life bars. The usual partner still enters at 1P's native desperation mark, except when already one of the immediate partners.
+- Exclude 1P from the immediate list and deduplicate the usual ally by Who. Keep the four enemy slots at indices 1–4. All allies including 1P are friendly to one another; each enemy fights every ally and every other enemy.
+- All four hostiles (including waiting ones) must fall to win; 1P KO still loses. Ally survival is not a win condition. No new time, scoring or draw rules.
 
-| Player | Start allies | Waiting ally | Total native seats (incl. 1P and all four enemies) |
+| Player | Immediate allies | Delayed ally | Total native seats (incl. 1P) |
 | --- | --- | --- | --- |
-| Typical regular (e.g. RYUKO) | Z-MEGA, RARIO | Usual partner (ZOMA for RYUKO) | 8 |
-| Z-MEGA | RARIO | None (same usual partner) | 6 |
-| RARIO | Z-MEGA | None (same usual partner) | 6 |
+| Other 32 regulars | Z-MEGA, RARIO | Usual partner | 8 |
+| Z-MEGA | RARIO | None | 6 |
+| RARIO | Z-MEGA | None | 6 |
 
-**Ticket arithmetic discrepancy:** the prose says seven for Z-MEGA/RARIO, but its explicit one-partner/no-duplicate rule and the existing reciprocal usual-partner data give 1 + 4 + 1 = 6 seats. Follow the explicit roster and dedup rules, not the stated seven; do not invent a third fighter. Likewise, “eight on stage” describes seated roster capacity, not simultaneous presence: reinforcements continue waiting. If any other source usual partner overlaps an immediate one, the same deduplication rule applies. This is an explicit implementation interpretation, not a new owner approval.
+**Ticket arithmetic:** the explicit reciprocal-only/no-duplicate rule gives 1 + 4 + 1 = 6, not the stated seven. The review reports inspecting all 34 generated finales: the reciprocal usual partners are the only overlaps, consistent with the existing reciprocal test assertions. Verify with the real generated data during the roster test. Counts refer to seats, not simultaneous entrants.
 
 ### Boss fighters
 
-The existing seeded order (from the baseline's independent test expectations) and fixed suffix:
-
 | Player | Existing first three (unchanged) | Fourth | Fifth | Sixth | Arena ID |
-| --- | --- | --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- |
 | ZENKA | DoraEmon, SHIN-Z, ALPHA | ASTROMAN | TTRO | ZENKA | 14 |
 | ALPHA | DoraEmon, ZENKA, SHIN-Z | TTRO | ASTROMAN | ALPHA | 15 |
 | SHIN-Z | ALPHA, ZENKA, DoraEmon | TTRO | ASTROMAN | SHIN-Z | 18 |
 | DoraEmon | ZENKA, SHIN-Z, ALPHA | ASTROMAN | TTRO | DoraEmon | 14 |
 
-Use the explicit fixed table, not another shuffle call. Arena selection still looks at the third enemy before appending the suffix. Seven seats, no allies, symmetric free-for-all hostility (mirror is hostile even though its Who equals 1P's), native strength including ASTROMAN/TTRO/mirror. The first enemy preserves its existing entry role; all five following enemies wait on the preceding enemy's native mark. The old third/final enemy becomes a middle role and the sixth receives the final slot's scorer/points, so the authored KO-bonus structure remains coherent. All six hostiles count for victory, not just the original three. No duplicate palette among all seven seats once entered, including a visibly different mirror. DoraEmon's late mirror uses existing opening/intro and BR EN gating.
+Use the fixed suffix from Linear, no additional RNG call. The original third enemy still chooses the arena. Seven seats, no allies, all hostile (including the mirror, whose Who equals 1P). All six enemies are native strength. The first enemy keeps its entry role; each following enemy watches its predecessor's native mark. The former third/final role becomes a middle role; the final mirror gets the last-slot scorer/points as assigned by assemble. Win only after six KOs, lose on 1P KO. Existing palette assignment gives the mirror a distinct color among seven entered natives.
+
+### Requirement readings
+
+The ticket contains a “Readings to confirm with the owner” section. The plan follows its written scope: additional immediate partners (not replacements except deduplication), reciprocal-only for Z-MEGA/RARIO, fixed ASTROMAN/TTRO order, hostile mirror, original arena, native strength, no revive, ANOTHER only. The design review agrees with these readings and six-seat correction; no separate explicit owner confirmation of every reading was found. Record any correction/confirmation in this spec before changing those expectations; do not invent an approval or treat human sign-off as a test/acceptance criterion. The fixed spawn coordinates below are proposed implementation details, not owner-provided values.
 
 ## 2. Minimal design
 
-### Route construction: `src/game/br-another.ts`
+All production changes belong in `src/game/br-another.ts`.
 
-Retain the current pure builder and its source-donor architecture. Change `assemble(roles, header, players, paired, stage, ally?: Slot)` to accept an ally list (default empty); update existing stage-1/2 and LONG callers to pass zero/one slot without behavioral changes. Keep enemies at seat indices 1..N, append allies afterwards (usual delayed ally first when retained, then immediate extras in Z-MEGA/RARIO order). Compute masks by seat, not Who:
-- `enemyBits = ((1 << (N + 1)) - 1) & ~1`
-- all bits = `(1 << (1 + N + allies.length)) - 1`
-- each enemy excludes self and, for paired stages only, its pair mate; all other seated fighters are hostile.
-- each ally's enemies = enemyBits; no friendly/self bits. 1P already excludes every ally by flag in Match.storyFighters.
-Keep roles, header, watch indices, thresholds, enemy positions and scoring donation unchanged for existing one-/zero-ally callers. Never mutate the generated scenarios or return shared donor slot objects.
+### Shared battle assembly
 
-Construct a small stage-3-only ally helper using the existing `allyOf(finale)` and a real ally-role donor: `sourceStep('rario', 49).slots[6]` for Z-MEGA and `sourceStep('zmega', 49).slots[6]` for RARIO (verified reciprocal partner expectations in br-another.test.ts; assert these identities against generated source data before changing code). If the usual ally matches an immediate partner, retain its donor fields. Use immediate entry bits 1–2 = 0, explicitly retain/set ally bit 0x200 and bar bit 0x1 (the missing-bit bug fixed in #31), neutralize watch/below/delay/random for immediate partners, retain native ally CPU/reward fields, and do not set tough. Do not blindly clone an enemy role's scorer/bonus flags. Keep the delayed usual partner's flags and native watch/threshold; choose distinct authored starting x coordinates for the immediate allies near the 1P, away from the first enemy and within the existing boss arenas, using existing coordinate conventions (slot x is multiplied by 1.5 in Match). Verify visually before settling the values; no new collision/camera system.
+Change `assemble(roles, header, players, paired, stage, ally?: Slot)` to `assemble(..., allies: readonly Slot[] = [])`. Pass singleton/empty lists from current stage-1/2 and LONG callers. Enemy indices remain 1..N; append allies afterwards. Calculate the all-seat mask as `(1 << (1 + n + allies.length)) - 1`; each enemy excludes self and, for paired stages only, its mate. Each ally gets `((1 << (n + 1)) - 1) & ~1` (only enemy seats). Preserve existing donors, watch, below, x, bonuses, headers, and no source mutation.
 
-For bosses append the three extra Who values after the existing seeded draw and call assemble with no allies and `bossArena(originalBosses.at(-1)!)`. Keep the stage-1/2 tough marking and seed consumption exactly as before. Use existing `bossBrAnotherStages` after #31 merges, leaving the story wrapper's demo 4/5/7 sequence and retry behavior intact.
+### One immediate-ally recipe shared with LONG (#31)
 
-### Simulation and rendering: reuse, do not redesign
+Extract the already shipped recipe, parameterized by the existing donor and partner:
 
-- `Match.seat`, `storyFighters`, `arrive`, `brawlEnemies`/ `storyResult`, `lifeBars`, `reseatWithoutAlly` already support arbitrary native slots, masks, partner flags, bar visibility and queued enemies. With at most eight native seats and existing LONG's higher capacity there is no need for seat reuse, wider masks or a new engine abstraction. Test actual simulation behavior, including allies KO'ing hostiles and enemies killing each other, and that all queued hostiles remain required.
-- `reseatWithoutAlly` already nulls every 0x200 slot, preserving seat indices; test that all added and delayed allies disappear with the existing BR No partner cheat, with hostile arrival and victory unchanged. Confirm Partner HP snapshot covers both new allies and existing Low HP effects remain correct; no cheat expansion.
-- `takeSeat`/`takePalette` use carried story-held palettes, so test after prior stages and Continue as well as fresh Match. Check uniqueness only for entered natives, then all after final reinforcement (no summons for that assertion). No global palette allocator change absent a demonstrated regression.
-- `TrainingScene.whenReady` loads packs for every `match.fighters` entry, including waiting fighters; existing render pool grows with fighter count and `drawLifeBars` uses Match.lifeBars. Verify the newly required packs, mirrors, opening sprites, bar visibility, and no loading errors; make a narrowly scoped fix only if acceptance shows a regression. Existing known #31 edge clipping is not a global HUD redesign.
-- HPA-1251's shared BR no-revive protection applies to the four affected new fighter types and their roles; assert through real KO/revival actions rather than add character-specific guards. Preserve non-BR revive.
+```ts
+const onStageAlly = (base: Slot, partner: Who, x: number): Slot => ({
+  ...base,
+  player: ROSTER.indexOf(partner),
+  x,
+  flags: (base.flags | 0x201) & ~0x6,
+});
+```
 
-## 3. Verification and non-goals
+The entry bits 1–2 become 0, the ally bit 0x200 and life-bar bit 0x1 are set. No cross-fighter donor lookup or neutralizing watch/below/delay/random: the entry-0 path does not use them, and we preserve all other donor fields, including any scorer/award differences between LONG and ANOTHER. LONG calls `onStageAlly(roles.slots[0]!, brLongPartner(who), 450)`, preserving its existing result; stage 3 calls it with `finale.slots[6]!`. The review reports the 34 source finale ally slots have the same role fields aside from player/below/x; use the fighter's own source ally rather than duplicate a foreign template. Stage 3 builds the immediate list from Z-MEGA and RARIO excluding who (the special cases are the same reciprocal pairing as `brLongPartner`). Retain the usual `allyOf(finale)` only if its Who is not already immediate; append delayed ally first when retained, then the immediate ones in Z-MEGA/RARIO order. No new behavior for LONG.
 
-Use current source and existing Story/Match test helpers; update assertions that assume only one final-stage ally or three boss enemies instead of deleting coverage. Preserve reference evidence distinguishing authored changes from recovered behavior. See the companion implementation plan for exhaustive roster checks, deterministic Match/Story tests, real MCP browser journeys and screenshots. No UI mockup is attached to this ticket; compare screenshots of existing and changed native arena/HUD presentation at matching scale with checks for added fighter sprites, readable bars, mirror colors, and no regressions in route screens. No human sign-off criterion. No tests have been executed at design time; the generated game assets and runtime are not present in this connector session.
+Use fixed starting slot coordinates: Z-MEGA x=450, RARIO x=350 (source scale; Match multiplies by 1.5), also when only one is present. Leave the delayed ally at its donor x. Verify the ordinary opening screenshot for sprite/HP-bar readability; adjust the two constants only if a concrete overlap is found and update tests accordingly. No arena-bounds calculation.
+
+### Boss suffix
+
+Define `export type Boss = (typeof BOSSES)[number]` in `br-another.ts` and `BOSS_STAGE3_SUFFIX: Record<Boss, readonly [Who, Who]>` using the Linear order above. Tighten both `bossBrAnotherStages(who: Boss)` and `bossBrAnotherStory(who: Boss)`; the Story map already iterates BOSSES and the callers use boss literals or the boss tuple. Update the two loosely typed `battlesOf` helpers in `br-another.test.ts` and `team.test.ts` to take Boss. Index the table directly with `who`; no runtime guard, cast or fallback for a non-boss. Keep `bossBrAnotherStages`'s seeded draws and arena selection on the original three. Append the suffix and own roster seat, letting assemble apply existing first/middle/final role and arrival rules. Keep tough only on stages 1–2. Leave the #31 story wrapper (demo 4/5/7 and Continue retry) untouched.
+
+### Reuse existing engine paths
+
+`Match.storyFighters` derives 1P hostility from every ally flag, `arrive` handles queued seats, `brawlEnemies`/`storyResult` already count all native hostiles, and `reseatWithoutAlly` nulls all 0x200 slots without renumbering. Existing generic cheat snapshot applies partner HP and B.R. no-revive. `TrainingScene.whenReady` loads unique fighter packs for all seated fighters, including waiting ones; the mirror reuses its pack. `lifeBars` and `drawLifeBars` already show each flagged living, visible ally; existing palette and late-Dora intro/EN gates remain. No new Match, scene, HUD, pack, palette or cheat code planned. A failure of the actual ticket checks warrants the smallest targeted fix, not speculative changes.
+
+Regular stage 3 has eight natives at most; `MAX_FIGHTERS = 10` therefore permits two additional cheat summons at full native roster. With only eight palettes, unique colors cannot be guaranteed when summons take the total beyond eight (already supported bounded fallback). No cap/allocator change. Native palette checks exclude summons.
+
+## 3. Verification
+
+Extend the existing all-roster tests in `br-another.test.ts` and stage-3 simulation suite in `team.test.ts`. Add one multi-ally No partner case to the existing `cheat-rules.test.ts` suite and one parameterized no-revive case in `match.test.ts`'s "strict B.R. no-revive roles and routes" suite. The four new fighter types use ordinary KO_DOWN recovery gates, not self-healing KO branches (reviewed recovery ages: Z-MEGA/TTRO 60, RARIO 66, ASTROMAN 130; verify generated data at implementation). The no-revive test must actually deliver post-KO life gains and prove a non-B.R. control gets up through its native gate, while B.R. suppresses the gain/recovery. Observe the recovery gate age after landing rather than relying on the existing 120-total-tick loop. The existing `downed` bit records whether a fighter has ever fallen for brawl completion; it need not clear on a successful non-B.R. recovery. Verify action/branch transition, not `downed === false`, for the control. Update affected existing assertions, including DoraEmon/ALPHA; isolate the late Dora intro test from the new present allies by moving all other present fighters out of the way.
+
+Run full validation and existing Playwright suite; do not add a lengthy CI stage-3 playthrough. Two MCP-driven browser journeys (RYUKO opening including delayed partner and ZENKA mirror) provide screenshot evidence of native HUD/bar and sprite presentation. For RYUKO turn the master Cheats switch off in stage 2 before the stage-3 battle snapshot, so the screenshots show native bars rather than cheat labels/markers; ZENKA may keep cheats on to reach the mirror. Deterministic tests prove exact roster, timing, win/loss and retry. No ticket UI mockup; screenshot visual check is required, not a new UI design or human sign-off. See companion plan. No tests executed at design time.
