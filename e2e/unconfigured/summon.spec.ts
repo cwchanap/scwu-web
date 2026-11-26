@@ -136,6 +136,15 @@ test('summons an enemy and a partner, then the fight resumes', async ({
     { timeout: 30_000 },
   );
 
+  // And a second enemy, SHUWA (HPA-1304): the authored fighter's pack
+  // comes from the same store as the source roster's.
+  await dialog.getByRole('button', { name: 'Enemy' }).click();
+  await dialog.getByRole('option', { name: 'SHUWA', exact: true }).click();
+  await expect(dialog.locator('.note')).toContainText(
+    'SHUWA joined the fight.',
+    { timeout: 30_000 },
+  );
+
   // Esc closes; the modal pause lifts with it, focus returns to the
   // arena and the fight plays on — a held direction walks.
   await page.keyboard.press('Escape');
