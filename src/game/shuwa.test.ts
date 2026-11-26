@@ -313,6 +313,30 @@ describe('SHUWA (authored, donor RYUKO)', () => {
     expect(his).toMatchObject({ stock, foreign: [] });
   });
 
+  // REMU's GOLD HAND dove about 536 px on a diagonal, past the opponent;
+  // spec.json's patches make it a rise and a straight stamp about 250 px
+  // ahead, its box at the sole, for 100 (export_authored graft patch).
+  it('stamps with GIANT STEP ahead of him for 100, never past RYUKO', () => {
+    for (const side of [0, 1])
+      for (const [gap, damage] of [
+        [120, 100],
+        [250, 100],
+        [360, 100],
+        [480, 0],
+      ] as const) {
+        const { f, other, step } = duel('shuwa', side, gap);
+        const start = f.x;
+        let passed = false;
+        for (let t = 0; t < 300; t++) {
+          step({ musashi: t === 2 });
+          passed ||= (other.x - f.x) * f.facing < 0;
+        }
+        expect([LIFE - other.hp, f.stock, passed]).toEqual([damage, 2, false]);
+        // A miss lands him about 250 px ahead.
+        if (!damage) expect((f.x - start) * f.facing).toBeGreaterThan(200);
+      }
+  });
+
   it("rises with SHUWATCH from a jump too (DoraEmon's Sky Rise 280)", () => {
     const { path } = run('shuwa', (t) => ({ jump: t === 0, drill: t === 20 }), {
       ticks: 200,
@@ -486,6 +510,20 @@ describe("SHUWA's lamp (HPA-1305)", () => {
       entered: [13229],
       lamps: [0],
     });
+  });
+
+  // Both spawn their shot into RYUKO's axe slot (6, busy 225): with one
+  // out, a second press of either only makes him stand, for nothing.
+  it('keeps one RING or SPECIUM out at a time; a blocked press is free', () => {
+    const specium = motion('d f f+P');
+    const { f, step } = duel('shuwa', 0, 900);
+    const path = new Set<unknown>();
+    for (let t = 0; t < 120; t++) {
+      step({ ...specium(t), axe: t === 50 });
+      path.add(playing(f));
+    }
+    expect([...path]).toEqual(['idle', 'crouchEnter', 231, 225]);
+    expect(f.variables[LAMP]).toBe(10);
   });
 
   it('gives a charge back for a landed Chuck, never past full', () => {
