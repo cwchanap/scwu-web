@@ -7,8 +7,7 @@ import { faceImage } from './hud';
 import { exMode, fighterPose, Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro } from './testing';
-import { brLongStory } from './br-another';
-import type { Battle } from './story';
+import { brLongBattle } from './br-another';
 
 // ZIRO as player 1, `gap` from a standing opponent as player 2.
 function ziroPlayer(gap = 90, opponent: Who = 'ryuko', seed = 3) {
@@ -437,7 +436,7 @@ describe('ZIRO (28 ZIRO.PLAYER)', () => {
     const run = (seed: number, brFlag: boolean) => {
       const m = Match.story(
         'ziro',
-        brLongStory('ziro')[0] as Battle,
+        brLongBattle('ziro'),
         seed,
         undefined,
         undefined,

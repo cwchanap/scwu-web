@@ -5,8 +5,7 @@ import { faceImage, FIGHT_TICK } from './hud';
 import { Match } from './match';
 import type { Fighter, Input } from './match';
 import { brIntro, enter, named } from './testing';
-import { brAnotherStages, brLongStory } from './br-another';
-import type { Battle } from './story';
+import { brAnotherStages, brLongBattle } from './br-another';
 
 // ALPHA as player 1, `gap` from a standing Ryuko as player 2.
 function alphaPlayer(gap = 90) {
@@ -505,7 +504,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
 
     const br = Match.story(
       'alpha',
-      brLongStory('alpha')[0] as Battle,
+      brLongBattle('alpha'),
       0,
       undefined,
       undefined,
@@ -539,7 +538,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
   it('runs none of the excluded KO Boss tests in his B.R. lose prefix', () => {
     const br = Match.story(
       'alpha',
-      brLongStory('alpha')[0] as Battle,
+      brLongBattle('alpha'),
       0,
       undefined,
       undefined,
@@ -574,7 +573,7 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
   it('keeps a B.R. KO queued through Mega Beam’s apply a tick later', () => {
     const br = Match.story(
       'alpha',
-      brLongStory('alpha')[0] as Battle,
+      brLongBattle('alpha'),
       0,
       undefined,
       undefined,

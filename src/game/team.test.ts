@@ -1606,20 +1606,28 @@ describe('boss B.R. ANOTHER', () => {
   const battlesOf = (who: Who) =>
     bossBrAnotherStory(who).filter((s): s is Battle => s.type === 1);
 
-  it('runs Story over exactly three battles then the title, and a continue replays the very battle it lost', () => {
+  it('runs Story over a loading screen before each of three battles then the title, and a continue replays the very battle it lost', () => {
     for (const who of BOSSES) {
       const story = new Story(who, 'boss-br');
       const stages: number[] = [];
+      const demos: number[] = [];
       for (
         let next = story.next();
-        next.kind === 'battle';
+        next.kind !== 'title';
         next = story.next()
       ) {
+        if (next.kind === 'demo') {
+          demos.push(next.demo);
+          continue;
+        }
+        if (next.kind !== 'battle') throw new Error(next.kind);
         expect(next.battle.flags & 1, who).toBe(1);
         stages.push(next.battle.stage);
       }
+      expect(demos, who).toEqual([4, 5, 7]);
       expect(stages, who).toEqual([9, 3, battlesOf(who)[2]!.stage]);
       const loser = new Story(who, 'boss-br');
+      expect(loser.next(), who).toEqual({ kind: 'demo', demo: 4 });
       const lost = loser.next();
       if (lost.kind !== 'battle') throw new Error(lost.kind);
       const again = loser.retry();
