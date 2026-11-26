@@ -66,14 +66,25 @@ test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
   await page.screenshot({ path: test.info().outputPath('shuwa-menu.png') });
 
   // A punch from neutral: once he stands idle, G takes him into a move.
-  // A jab is short and the DOM reports per frame, so a missed sample
-  // presses again rather than failing.
+  // The jab lasts about 280 ms, less than a loaded runner's round trip
+  // from the press to a DOM read, so the page itself records a report
+  // that left idle rather than a poll that may only arrive after it. A
+  // press the game drops is pressed again rather than failing.
   await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
   await expect(health).toContainText('Action: idle', { timeout: 20_000 });
+  const moved = await health.evaluateHandle((el) => {
+    const seen = { yes: false };
+    new MutationObserver(() => {
+      seen.yes ||= !el.textContent?.includes('Action: idle');
+    }).observe(el, { subtree: true, childList: true, characterData: true });
+    return seen;
+  });
   await expect(async () => {
     await page.keyboard.press('g');
-    await expect(health).not.toContainText('Action: idle', { timeout: 500 });
+    await expect
+      .poll(() => moved.evaluate((s) => s.yes), { timeout: 1_000 })
+      .toBe(true);
   }).toPass({ timeout: 10_000 });
   await page.screenshot({ path: test.info().outputPath('shuwa-practice.png') });
 
