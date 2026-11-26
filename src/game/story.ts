@@ -160,22 +160,11 @@ export const validateLineupCoverage = (
     );
 };
 
-const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
-  (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
-    isModeSelectBattle((CHARACTERS[who].scenario as readonly Step[])[0])
-      ? [[who, brAnotherStory(who)]]
-      : [],
-  ),
-);
-
-const BOSS_BR_STORIES = new Map<Who, readonly Step[]>(
-  BOSSES.map((who) => [who, bossBrAnotherStory(who)]),
-);
-
-// Authored (HPA-1251): load-time roster coverage — after BR_ANOTHER_STORIES
-// (opensOnModeSelect reads it), before BR_LONG_STORIES quietly skips a row.
+// Authored (HPA-1251): load-time roster coverage — before BR_ANOTHER_STORIES
+// throws per-row or BR_LONG_STORIES quietly skips a row, reading the raw
+// scenario so opensOnModeSelect does not touch BR_ANOTHER_STORIES early.
 const MODE_SELECT_FIGHTERS = (Object.keys(CHARACTERS) as Who[]).filter((who) =>
-  opensOnModeSelect(who),
+  isModeSelectBattle((CHARACTERS[who].scenario as readonly Step[])[0]),
 );
 validateLineupCoverage(
   'B.R. ANOTHER',
@@ -187,6 +176,14 @@ validateLineupCoverage('B.R. LONG', new Set(Object.keys(BR_LONG_LINEUPS)), [
   ...(BOSSES as readonly Who[]),
 ]);
 
+const BR_ANOTHER_STORIES = new Map<Who, readonly Step[]>(
+  MODE_SELECT_FIGHTERS.map((who) => [who, brAnotherStory(who)]),
+);
+
+const BOSS_BR_STORIES = new Map<Who, readonly Step[]>(
+  BOSSES.map((who) => [who, bossBrAnotherStory(who)]),
+);
+
 const BR_LONG_STORIES = new Map<Who, readonly Step[]>(
   (Object.keys(CHARACTERS) as Who[]).flatMap((who) =>
     BR_LONG_LINEUPS[who] ? [[who, brLongStory(who)] as const] : [],
@@ -197,8 +194,9 @@ export class Story {
   // The step counter (0x424f28), which the title sets to −1 (0x408263).
   step = -1;
   // Authored (HPA-858): the route this run is on — the picked sign route,
-  // or the bosses' generated B.R. ANOTHER ('boss-br') — which marks the
-  // battles it starts B.R.; null on an ordinary story.
+  // the bosses' generated B.R. ANOTHER ('boss-br'), or B.R. LONG
+  // ('br-long', HPA-1251) — which marks the battles it starts B.R.; null
+  // on an ordinary story.
   route: Route | null;
 
   constructor(
