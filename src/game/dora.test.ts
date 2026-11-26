@@ -24,7 +24,7 @@ import {
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, fighterPose, firstStrike, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
-import { CharacterSelect, StoryDemo } from './select';
+import { CharacterSelect, ROSTER, StoryDemo } from './select';
 import type { Demo } from './select';
 import { StandingVM } from './standing';
 import { Story, scenarioOf } from './story';
@@ -1888,19 +1888,21 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     expect(kept).toMatchObject({ hp: lifeOf('dora'), stock: 1 });
   });
 
-  it('keeps the global-0 KO path (77) from reloading the B.R. LONG CPU ally too', () => {
-    // Authored (HPA-1251): the B.R. restriction now covers every DoraEmon
-    // seat, so the generated B.R. LONG's CPU ally — his 77 entry reached the
-    // same way, global 0 held at 10 — loses both KO RELOAD entries with the
-    // player's and stays down at 0 life, his stocks unspent.
-    const match = Match.story(
-      'ryuko',
-      brLongBattle('ryuko'),
-      0,
-      undefined,
-      undefined,
-      true,
-    );
+  it('keeps the global-0 KO path (77) from reloading a first-tick B.R. CPU ally too', () => {
+    // Authored (HPA-1251): the B.R. restriction covers every DoraEmon seat,
+    // so a CPU DoraEmon ally on a B.R. route — B.R. LONG's first-tick
+    // partner seat reseated with him (the route itself seats Z-MEGA since
+    // 26 Nov 2026), his 77 entry reached the same way, global 0 held at 10
+    // — loses both KO RELOAD entries with the player's and stays down at 0
+    // life, his stocks unspent.
+    const long = brLongBattle('ryuko');
+    const battle = {
+      ...long,
+      slots: long.slots.map((slot, i) =>
+        i === 12 ? { ...slot!, player: ROSTER.indexOf('dora') } : slot,
+      ),
+    };
+    const match = Match.story('ryuko', battle, 0, undefined, undefined, true);
     const dora = match.fighters[13];
     expect(dora.who).toBe('dora');
     driveCpus(match, 13, {});

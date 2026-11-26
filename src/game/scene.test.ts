@@ -2438,7 +2438,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     };
   };
 
-  it('carries a keyboard LONG pick through its loading screen into a B.R. match with its Dora ally', async () => {
+  it('carries a keyboard LONG pick through its loading screen into a B.R. match with its Z-MEGA ally', async () => {
     const { scene, view, artIn, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
@@ -2459,18 +2459,18 @@ describe('mode select (HPA-1251 LONG route)', () => {
     expect(view.storyLost).toBe(0);
     await passRouteDemo(view, completes, finishLoad, 24);
     // The route's battle is on: Sakura Street, marked B.R., with the 1P,
-    // its twelve enemies and the first-tick Dora ally (14 seats).
+    // its twelve enemies and the first-tick Z-MEGA ally (14 seats).
     expect(view.select).toBeNull();
     expect(scene.match.br).toBe(true);
     expect(scene.match.battle).toEqual(brLongBattle('ryuko'));
     expect(scene.match.stage).toBe('sakura');
     expect(scene.match.fighters).toHaveLength(14);
-    const dora = scene.match.fighters.at(-1)!;
-    expect(dora.who).toBe('dora');
-    expect(dora.present).toBe(true);
-    // Once the fight is on, Dora draws the partner's life bar.
+    const partner = scene.match.fighters.at(-1)!;
+    expect(partner.who).toBe('zmega');
+    expect(partner.present).toBe(true);
+    // Once the fight is on, Z-MEGA draws the partner's life bar.
     while (scene.match.roundTicks <= scene.match.fightTick) scene.match.step();
-    expect(scene.match.lifeBars).toEqual([dora]);
+    expect(scene.match.lifeBars).toEqual([partner]);
   });
 
   it('a lost LONG battle runs the scene’s Continue into an identical retry, the route kept', async () => {
@@ -2501,7 +2501,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     expect(view.select).toBeNull();
     expect(second.battle).toEqual(brLongBattle('ryuko'));
     expect(second.fighters).toHaveLength(14);
-    expect(second.fighters.at(-1)?.who).toBe('dora');
+    expect(second.fighters.at(-1)?.who).toBe('zmega');
     expect(story.route).toBe('br-long');
   });
 
@@ -2520,7 +2520,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     await passRouteDemo(view, completes, finishLoad, 24);
     expect(scene.match.br).toBe(true);
     expect(scene.match.fighters).toHaveLength(13);
-    expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
+    expect(scene.match.fighters.map((f) => f.who)).not.toContain('zmega');
   });
 
   it('a boss’s LONG pick starts the generated route a fresh Story owns', async () => {
@@ -2541,7 +2541,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     expect(scene.match.battle).toEqual(brLongBattle('shinz'));
     // No ally: thirteen native seats, the twelve tough hostiles.
     expect(scene.match.fighters).toHaveLength(13);
-    expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
+    expect(scene.match.fighters.map((f) => f.who)).not.toContain('zmega');
     for (const f of scene.match.fighters.slice(1))
       expect(f, f.who).toMatchObject({ maxStock: 5 });
   });
