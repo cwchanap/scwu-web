@@ -4481,10 +4481,17 @@ def export_authored(ryuko, roots):
     for (m, d) in {(m, d) for images in swaps.values() for m, d in images.items()}:
         drawings[10000 + m] = d
 
+    sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
+
     def place(f, donor, image):
+        # An unflipped frame puts his anchor where her reference point (w_d // 2 - rx, h_d - ry from the image's
+        # corner) stands. A frame the game draws flipped mirrors the image about its own centre, and the point on
+        # it, so each flipped axis re-solves the same landing for the mirrored anchor and mirrored reference.
         (ax, ay), (w, h) = anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"]
-        rx, ry = refs[donor]
-        f.update(dx=w // 2 - ax + f["dx"] - rx, dy=h - ay + f["dy"] - ry, width=w, height=h)
+        (wd, hd), (rx, ry) = sizes[donor], refs[donor]
+        dx = f["dx"] + rx + ax + wd % 2 - (w - w // 2) if f.get("flip_x") else w // 2 - ax + f["dx"] - rx
+        dy = f["dy"] + ry + ay - hd if f.get("flip_y") else h - ay + f["dy"] - ry
+        f.update(dx=dx, dy=dy, width=w, height=h)
 
     for key, s in scripts.items():
         for f in s["frames"]:
@@ -4499,7 +4506,6 @@ def export_authored(ryuko, roots):
     # Held poses (op 0x07) draw from the image's corner (heldPlacement), so they keep her corner offsets, moved by
     # the drawing's anchor against the donor's: her reference point, (w//2 - rx, h - ry), where she shows the image
     # in her own frames, else the image's bottom centre.
-    sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
     for f in data["held"]:
         if (image := f["image"]) in drawings:
             (ax, ay), (w, h) = anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"]
