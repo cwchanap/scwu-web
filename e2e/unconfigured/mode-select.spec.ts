@@ -291,12 +291,12 @@ const openArena = async (page: Page) => {
   // small header sign must never light. The band is read dark before the
   // confirm and then sampled with no blind gap after it. A story keeps the
   // eight controls through its demo, so the mode boards are the selector's
-  // trace instead: while they draw the band must stay dark — a buggy route step lights the band and
-  // holds its own boards lit over the left one's spot, so it fails the
-  // check without reaching the exit. Once the boards leave the band reads
-  // the demo's own art (a story's panels fill the top of the screen), so
-  // only their leaving proves the direct exit. Demo-skip presses wait for
-  // all of that.
+  // trace instead: while they draw the band must stay dark — a buggy route
+  // step lights the band and holds its own boards lit over the left one's
+  // spot, so it fails the check without reaching the exit. Once the boards
+  // leave the band reads the demo's own art (a story's panels fill the top
+  // of the screen), so only their leaving proves the direct exit. Demo-skip
+  // presses wait for all of that.
   const confirmDirect = async (send: () => Promise<void>) => {
     expect(await lum('h', HEADER), 'boss header before confirm').toBeLessThan(
       160,
