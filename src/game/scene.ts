@@ -409,9 +409,9 @@ export class TrainingScene extends Phaser.Scene {
       this.pressed.set('punch', (this.pressed.get('punch') ?? 0) + 1);
     }
     // Esc over a confirmed pick cancels the start it began (HPA-765;
-    // HPA-858 lets a boss confirm on stage 0 too) and steps back to the
-    // mode signs. On the route step it goes back to the mode pick, and
-    // on the mode step to the story select, which remembers its cell
+    // HPA-858 lets a boss's STORY confirm on stage 0 too) and steps back
+    // to the mode signs. On the route step it goes back to the mode pick,
+    // and on the mode step to the story select, which remembers its cell
     // (authored, HPA-765).
     if (!e.repeat && e.code === 'Escape' && this.select instanceof ModeSelect) {
       e.preventDefault();
@@ -863,7 +863,7 @@ export class TrainingScene extends Phaser.Scene {
   }
   // A player's images and sounds its select screens don't show, as one pack;
   // the select screens' own are in the boot pack, which preload loads, and
-  // the mode select's six Chii boards are in `mode-select`.
+  // the mode select's seven Chii boards are in `mode-select`.
   private loadPlayer(who: Who) {
     const { images, sounds } = CHARACTERS[who];
     const select = selectAssets[who];
