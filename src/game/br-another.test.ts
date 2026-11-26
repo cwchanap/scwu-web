@@ -7,7 +7,12 @@ import type { Fighter } from './match';
 import { BOSSES, ROSTER } from './select';
 import { opensOnModeSelect, validateLineupCoverage } from './story';
 import type { Battle, Slot, Step } from './story';
-import { brAnotherStages, brLongStory, bossBrAnotherStory } from './br-another';
+import {
+  BR_LONG_DEMO,
+  brAnotherStages,
+  brLongStory,
+  bossBrAnotherStory,
+} from './br-another';
 import type { BrAnotherStages } from './br-another';
 import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
 import type { LineupPair } from './br-lineups';
@@ -811,14 +816,21 @@ describe('boss B.R. ANOTHER route', () => {
     expect(BOSSES.map((who) => ROSTER.indexOf(who))).toEqual([30, 32, 33, 45]);
   });
 
-  it('is three battles and the end step, no demos, every stage permitting Continue', () => {
+  it('plays ANOTHER’s loading screens before its three battles, then ends, every stage permitting Continue', () => {
     for (const who of BOSSES) {
       const steps = bossBrAnotherStory(who);
-      expect(steps, who).toHaveLength(4);
+      expect(steps, who).toHaveLength(7);
       expect(
         steps.map((s) => s.type),
         who,
-      ).toEqual([1, 1, 1, 4]);
+      ).toEqual([2, 1, 2, 1, 2, 1, 4]);
+      // The same screens as everyone's ANOTHER: the BR ANOTHER roll call,
+      // SEEDED PLAYERS before the extra pairs, NEXT CHALLENGER before the
+      // bosses.
+      expect(
+        steps.flatMap((s) => (s.type === 2 ? [s.demo] : [])),
+        who,
+      ).toEqual([4, 5, 7]);
       for (const battle of battlesOf(who))
         expect(battle.flags & 1, who).toBe(1);
     }
@@ -1044,8 +1056,8 @@ describe('B.R. LONG route', () => {
     expect(
       steps.map((s) => s.type),
       who,
-    ).toEqual([1, 4]);
-    return steps[0] as Battle;
+    ).toEqual([2, 1, 4]);
+    return steps[1] as Battle;
   };
   const toFight = (match: Match) => {
     while (match.roundTicks <= match.fightTick) match.step();
@@ -1103,6 +1115,33 @@ describe('B.R. LONG route', () => {
       'aya',
       'yinan',
     ]);
+  });
+
+  it('opens on the HERE COMES A NEW CHALLENGER screen for all 38 rows', () => {
+    expect(BR_LONG_DEMO).toBe(24);
+    for (const [who] of rows)
+      expect(brLongStory(who)[0], who).toEqual({ type: 2, demo: 24 });
+  });
+
+  it('gives the DoraEmon ally the partner life bar from the first tick', () => {
+    for (const [who] of rows) {
+      if (isBoss(who)) continue;
+      const battle = longBattle(who);
+      // Bit 0 (+0xdf0d) is the story partner's bar flag (Match.lifeBars).
+      expect(battle.slots.at(-1)!.flags & 1, who).toBe(1);
+      // The enemies keep the opener's bar-less roles.
+      for (const slot of battle.slots.slice(0, 12))
+        expect(slot!.flags & 1, who).toBe(0);
+    }
+    const match = Match.story('ryuko', longBattle('ryuko'));
+    const dora = match.fighters.at(-1)!;
+    expect(dora.who).toBe('dora');
+    toFight(match);
+    expect(match.lifeBars).toEqual([dora]);
+    // A boss plays alone: no partner, no bar.
+    const boss = Match.story('zenka', longBattle('zenka'));
+    toFight(boss);
+    expect(boss.lifeBars).toEqual([]);
   });
 
   it('adds DoraEmon as the ordinary player’s first-tick ally and gives a boss no ally', () => {

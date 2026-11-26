@@ -183,15 +183,15 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
   return { stage1, stage2, stage3 };
 };
 
-// Authored (HPA-858): the four bosses' B.R. ANOTHER route — three pure
-// battles and the end step, no demos and no ally. Ryuko's source steps
-// donate the roles and header: 63 for stage 1, 65 for stages 2 and 3; both
-// flags' bit 0 keeps Continue. One seed stream from the boss's ROSTER seat
-// draws stage 1's three of the twelve regular pairs, stage 2's three of the
-// four extra pairs (one seeded omission) and the three other bosses in
-// order; the last boss's arena hosts stage 3. Stages 1–2 mark all six enemy
-// slots tough (Slot.tough; match.ts applies the stats).
-export const bossBrAnotherStory = (who: Who): readonly Step[] => {
+// Authored (HPA-858): the four bosses' B.R. ANOTHER stages — three pure
+// battles with no ally. Ryuko's source steps donate the roles and header:
+// 63 for stage 1, 65 for stages 2 and 3; both flags' bit 0 keeps Continue.
+// One seed stream from the boss's ROSTER seat draws stage 1's three of the
+// twelve regular pairs, stage 2's three of the four extra pairs (one seeded
+// omission) and the three other bosses in order; the last boss's arena
+// hosts stage 3. Stages 1–2 mark all six enemy slots tough (Slot.tough;
+// match.ts applies the stats).
+export const bossBrAnotherStages = (who: Who): BrAnotherStages => {
   const shuffle = seededShuffle(ROSTER.indexOf(who));
   const opener = sourceStep('ryuko', 63);
   const finale = sourceStep('ryuko', 65);
@@ -221,7 +221,25 @@ export const bossBrAnotherStory = (who: Who): readonly Step[] => {
   );
   for (const battle of [stage1, stage2])
     for (const slot of battle.slots) slot!.tough = true;
-  return [stage1, stage2, stage3, { type: 4 }];
+  return { stage1, stage2, stage3 };
+};
+
+// Authored (owner, 26 Nov 2026): the bosses' route plays the same loading
+// screens as everyone's B.R. ANOTHER — demo 4 (the BR ANOTHER roll call)
+// before stage 1, demo 5 (SEEDED PLAYERS) before stage 2 and demo 7 (NEXT
+// CHALLENGER) before stage 3 — then the end step. A continue's retry
+// reruns the battle, not the demo before it.
+export const bossBrAnotherStory = (who: Who): readonly Step[] => {
+  const { stage1, stage2, stage3 } = bossBrAnotherStages(who);
+  return [
+    { type: 2, demo: 4 },
+    stage1,
+    { type: 2, demo: 5 },
+    stage2,
+    { type: 2, demo: 7 },
+    stage3,
+    { type: 4 },
+  ];
 };
 
 // Authored (HPA-1035 §5): the ANOTHER route now runs stage-1 intro → stage 1
@@ -276,17 +294,19 @@ export const brAnotherStory = (who: Who): readonly Step[] => {
   return steps;
 };
 
-// Authored (HPA-1035 §3, §8): the one-battle B.R. LONG route — the six
+// Authored (HPA-1035 §3, §8): the one-battle B.R. LONG brawl — the six
 // approved ordered pairs (twelve enemies) on Sakura Street with the header
-// and roles of ryuko's own stage-9 opener (63), followed by the end step; no
-// demos and no Chii sign. An ordinary player adds DoraEmon as the sole
-// partner, rebuilt from the opener's immediate-entry first slot with the
-// ally flag (0x200) so he is on stage from the first tick; a boss player has
-// no ally and all twelve hostile seats marked tough (Slot.tough; match.ts
-// applies the stats). Pacing stays native: the first enemy is present at the
-// start and each next enters once its predecessor falls below its own
-// desperation mark (assemble's watch/below, read through match.ts lifeMark).
-export const brLongStory = (who: Who): readonly Step[] => {
+// and roles of ryuko's own stage-9 opener (63). An ordinary player adds
+// DoraEmon as the sole partner, rebuilt from the opener's immediate-entry
+// first slot with the ally flag (0x200) so he is on stage from the first
+// tick, and the life-bar bit (0x1, +0xdf0d) every native partner slot
+// carries, so he draws his bar like any partner (owner, 26 Nov 2026); a
+// boss player has no ally and all twelve hostile seats marked tough
+// (Slot.tough; match.ts applies the stats). Pacing stays native: the first
+// enemy is present at the start and each next enters once its predecessor
+// falls below its own desperation mark (assemble's watch/below, read
+// through match.ts lifeMark).
+export const brLongBattle = (who: Who): Battle => {
   const row = BR_LONG_LINEUPS[who];
   if (!row) throw new Error(`${who} has no approved B.R. LONG row`);
   const roles = sourceStep('ryuko', 63);
@@ -297,9 +317,20 @@ export const brLongStory = (who: Who): readonly Step[] => {
         ...roles.slots[0]!,
         player: ROSTER.indexOf('dora'),
         x: 450,
-        flags: roles.slots[0]!.flags | 0x200,
+        flags: roles.slots[0]!.flags | 0x201,
       };
   const battle = assemble(roles, roles, seats(row), true, 9, ally);
   if (boss) for (const slot of battle.slots) slot!.tough = true;
-  return [battle, { type: 4 }];
+  return battle;
 };
+
+// Authored (owner, 26 Nov 2026): B.R. LONG opens on demo 24 (Challenge
+// BR, the DANGER!! HERE COMES A NEW CHALLENGER screen) for every player,
+// bosses included, then its one battle and the end step; no Chii sign. A
+// continue's retry reruns the battle, not the demo.
+export const BR_LONG_DEMO = 24;
+export const brLongStory = (who: Who): readonly Step[] => [
+  { type: 2, demo: BR_LONG_DEMO },
+  brLongBattle(who),
+  { type: 4 },
+];
