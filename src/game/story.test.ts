@@ -14,7 +14,11 @@ import {
   TAKES,
 } from './story';
 import type { Battle, Next, SignRoute, Step } from './story';
-import { bossBrAnotherStory, brAnotherStages } from './br-another';
+import {
+  bossBrAnotherStages,
+  brAnotherStages,
+  brLongBattle,
+} from './br-another';
 import { BR_LONG_LINEUPS } from './br-lineups';
 
 const at = (story: Story) => story.step;
@@ -197,12 +201,21 @@ describe('story runner', () => {
     // The generated B.R. LONG route marks B.R. like the rest (HPA-1251).
     const long = new Story('ryuko', 'br-long');
     expect([long.route, long.br]).toEqual(['br-long', true]);
-    // The bosses' generated B.R. ANOTHER route caches its steps by route (HPA-858).
+    // It opens on HERE COMES A NEW CHALLENGER, then its one battle.
+    expect(long.next()).toEqual({ kind: 'demo', demo: 24 });
+    expect(long.next()).toEqual({
+      kind: 'battle',
+      battle: brLongBattle('ryuko'),
+    });
+    expect(long.next()).toEqual({ kind: 'title' });
+    // The bosses' generated B.R. ANOTHER route caches its steps by route
+    // (HPA-858), its first battle behind ANOTHER's opening screen.
     const boss = new Story('shinz', 'boss-br');
     expect([boss.route, boss.br]).toEqual(['boss-br', true]);
+    expect(boss.next()).toEqual({ kind: 'demo', demo: 4 });
     expect(boss.next()).toEqual({
       kind: 'battle',
-      battle: bossBrAnotherStory('shinz')[0],
+      battle: bossBrAnotherStages('shinz').stage1,
     });
   });
 

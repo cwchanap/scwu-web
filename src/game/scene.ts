@@ -645,8 +645,8 @@ export class TrainingScene extends Phaser.Scene {
     // enters as if the 1P struck its Chii sign — the skipped battle's life
     // left for its jumps — while the generated routes ('boss-br', HPA-858;
     // 'br-long', HPA-1251) are a fresh Story's own run, whose first step
-    // is a plain battle with no Chii-sign jumps to feed. STORY starts
-    // plain.
+    // is its opening loading screen (a demo) with no Chii-sign jumps to
+    // feed. STORY starts plain.
     if (select instanceof ModeSelect) {
       const { who, done } = select;
       const cheated = this.runCheated;

@@ -16,7 +16,11 @@ import {
   pushboxes,
   script,
 } from './animations';
-import { bossBrAnotherStory, brAnotherStages, brLongStory } from './br-another';
+import {
+  bossBrAnotherStory,
+  brAnotherStages,
+  brLongBattle,
+} from './br-another';
 import { faceImage, gaugeCrop } from './hud';
 import { addPower, fighterPose, firstStrike, Match } from './match';
 import type { Effect, Fighter, Input } from './match';
@@ -1891,7 +1895,7 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     // player's and stays down at 0 life, his stocks unspent.
     const match = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,

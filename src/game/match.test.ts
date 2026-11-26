@@ -20,7 +20,11 @@ import type { CpuEntry } from './cpu';
 import { FIGHT_TICK, ROUND_END_TICKS, roundEndTick } from './hud';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
-import { brAnotherStages, brLongStory, bossBrAnotherStory } from './br-another';
+import {
+  brAnotherStages,
+  brLongBattle,
+  bossBrAnotherStages,
+} from './br-another';
 import { scenarioOf } from './story';
 import type { Battle, Slot } from './story';
 import {
@@ -1087,7 +1091,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     // seat among them so her DST missiles fly as her objects.
     const br = Match.story(
       'zenka',
-      brLongStory('zenka')[0] as Battle,
+      brLongBattle('zenka'),
       0,
       undefined,
       undefined,
@@ -1129,7 +1133,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     // leave the pending KO alone too.
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1168,7 +1172,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('keeps a wall handler from replacing a B.R. KO queued earlier that tick (authored, HPA-1251)', () => {
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1221,7 +1225,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('keeps a nonlethal GON MISS on its B.R. launch (control)', () => {
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1244,7 +1248,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('settles a lethal GON MISS as the B.R. KO (authored, HPA-1251)', () => {
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1267,7 +1271,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('keeps a clash handler from replacing a B.R. KO queued earlier that tick (authored, HPA-1251)', () => {
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1297,7 +1301,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('rejects Musashi’s apply/hold records on an entered B.R. KO (authored, HPA-1251)', () => {
     const br = Match.story(
       'ryuko',
-      brLongStory('ryuko')[0] as Battle,
+      brLongBattle('ryuko'),
       0,
       undefined,
       undefined,
@@ -1351,7 +1355,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     ] as const) {
       const br = Match.story(
         'ryuko',
-        brLongStory('ryuko')[0] as Battle,
+        brLongBattle('ryuko'),
         0,
         undefined,
         undefined,
@@ -1390,7 +1394,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',
-      brLongStory('zenka')[0] as Battle,
+      brLongBattle('zenka'),
       0,
       undefined,
       undefined,
@@ -1537,19 +1541,19 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
     {
       name: 'boss B.R. ANOTHER',
       who: 'zenka' as Who,
-      battle: () => bossBrAnotherStory('zenka')[0] as Battle,
+      battle: () => bossBrAnotherStages('zenka').stage1,
       ally: 'summon',
     },
     {
       name: 'ordinary B.R. LONG',
       who: 'masa' as Who,
-      battle: () => brLongStory('masa')[0] as Battle,
+      battle: () => brLongBattle('masa'),
       ally: 'native',
     },
     {
       name: 'boss B.R. LONG',
       who: 'zenka' as Who,
-      battle: () => brLongStory('zenka')[0] as Battle,
+      battle: () => brLongBattle('zenka'),
       ally: 'none',
     },
   ] as const;

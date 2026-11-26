@@ -25,7 +25,11 @@ import {
 import type { Demo } from './select';
 import { scenarioOf, Story, TAKES } from './story';
 import type { Battle } from './story';
-import { bossBrAnotherStory, brAnotherStages, brLongStory } from './br-another';
+import {
+  bossBrAnotherStages,
+  brAnotherStages,
+  brLongBattle,
+} from './br-another';
 import type { GameStatus } from './scene';
 import { PackFile } from './packLoader';
 import { itWithArt } from './testing';
@@ -194,6 +198,24 @@ const boot = () => {
       for (const done of completes.splice(0)) done();
     },
   };
+};
+
+// A generated B.R. route's opening loading screen (a story demo): its
+// pack load lands, the demo shows with the given index, and once it ends
+// the scene runs the story on to the route's battle.
+const passRouteDemo = async (
+  view: { select: unknown; [key: string]: unknown },
+  completes: unknown[],
+  finishLoad: () => void,
+  index: number,
+) => {
+  await vi.waitFor(() => expect(completes).toHaveLength(1));
+  finishLoad();
+  const demo = view.select as StoryDemo;
+  expect(demo).toBeInstanceOf(StoryDemo);
+  expect(demo.index).toBe(index);
+  demo.done = true;
+  stepSelect(view);
 };
 
 // The Escape and R keydowns, and one screen step through the scene's
@@ -2232,8 +2254,8 @@ describe('mode select (HPA-858 bosses)', () => {
     }
   });
 
-  it('B.R. starts a boss on the generated route a new Story owns, marked B.R.', () => {
-    const { scene, view, artIn, statuses } = boot();
+  it('B.R. starts a boss on the generated route a new Story owns, marked B.R.', async () => {
+    const { scene, view, artIn, statuses, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true; // the sign pack and stage are resident
@@ -2243,17 +2265,19 @@ describe('mode select (HPA-858 bosses)', () => {
     const story = view.story as Story;
     expect(story.route).toBe('boss-br');
     expect(story.br).toBe(true);
-    // The generated route's own first battle starts directly: no
-    // routeLife take (the generated path has no Chii-sign jumps) and no
-    // ordinary story runner call.
+    // The generated route starts on its own first step: no routeLife take
+    // (the generated path has no Chii-sign jumps) — ANOTHER's stage-1
+    // loading screen, demo 4, as every fighter's ANOTHER opens.
     expect(story.step).toBe(0);
     expect(view.storyLife).toBe(0);
     expect(view.storyLost).toBe(0);
+    await passRouteDemo(view, completes, finishLoad, 4);
     // The battle is on, marked B.R., on Sakura Street with the 1P and its
     // six enemies.
+    expect(story.step).toBe(1);
     expect(view.select).toBeNull();
     expect(scene.match.br).toBe(true);
-    expect(scene.match.battle).toEqual(bossBrAnotherStory('shinz')[0]);
+    expect(scene.match.battle).toEqual(bossBrAnotherStages('shinz').stage1);
     expect(scene.match.stage).toBe('sakura');
     expect(scene.match.fighters[0].who).toBe('shinz');
     expect(scene.match.fighters).toHaveLength(7);
@@ -2328,8 +2352,7 @@ describe('mode select (HPA-858 bosses)', () => {
     const mode = openBossPick(view, 'shinz');
     mode.done = 'boss-br';
     stepSelect(view);
-    // The generated battle's stage and fighters load while the selector
-    // stays up.
+    // The route's opening demo loads while the selector stays up.
     expect(view.loading).toBe(true);
     expect(view.select).toBe(mode);
     esc(view);
@@ -2415,8 +2438,8 @@ describe('mode select (HPA-1251 LONG route)', () => {
     };
   };
 
-  it('carries a keyboard LONG pick through Story into a B.R. match with its Dora ally', () => {
-    const { scene, view, artIn } = boot();
+  it('carries a keyboard LONG pick through its loading screen into a B.R. match with its Dora ally', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true; // the sign pack and stage are resident
@@ -2429,19 +2452,25 @@ describe('mode select (HPA-1251 LONG route)', () => {
     expect(story.who).toBe('ryuko');
     expect(story.route).toBe('br-long');
     expect(story.br).toBe(true);
-    // It starts straight in — no routeLife take, no Chii-sign jumps.
+    // It starts on its own first step — no routeLife take, no Chii-sign
+    // jumps: the HERE COMES A NEW CHALLENGER screen, demo 24.
     expect(story.step).toBe(0);
     expect(view.storyLife).toBe(0);
     expect(view.storyLost).toBe(0);
-    // The route's first battle is on: Sakura Street, marked B.R., with
-    // the 1P, its twelve enemies and the first-tick Dora ally (14 seats).
+    await passRouteDemo(view, completes, finishLoad, 24);
+    // The route's battle is on: Sakura Street, marked B.R., with the 1P,
+    // its twelve enemies and the first-tick Dora ally (14 seats).
     expect(view.select).toBeNull();
     expect(scene.match.br).toBe(true);
-    expect(scene.match.battle).toEqual(brLongStory('ryuko')[0]);
+    expect(scene.match.battle).toEqual(brLongBattle('ryuko'));
     expect(scene.match.stage).toBe('sakura');
     expect(scene.match.fighters).toHaveLength(14);
-    expect(scene.match.fighters.at(-1)?.who).toBe('dora');
-    expect(scene.match.fighters.at(-1)?.present).toBe(true);
+    const dora = scene.match.fighters.at(-1)!;
+    expect(dora.who).toBe('dora');
+    expect(dora.present).toBe(true);
+    // Once the fight is on, Dora draws the partner's life bar.
+    while (scene.match.roundTicks <= scene.match.fightTick) scene.match.step();
+    expect(scene.match.lifeBars).toEqual([dora]);
   });
 
   it('a lost LONG battle runs the scene’s Continue into an identical retry, the route kept', async () => {
@@ -2454,6 +2483,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     stepSelect(view);
     const story = view.story as Story;
     expect(story.route).toBe('br-long');
+    await passRouteDemo(view, completes, finishLoad, 24);
     const first = scene.match;
     // The 1P falls: the battle's Continue flag (bit 0) opens the screen.
     first.fighters[0]!.hp = 0;
@@ -2462,19 +2492,21 @@ describe('mode select (HPA-1251 LONG route)', () => {
     await vi.waitFor(() => expect(completes).toHaveLength(1));
     finishLoad();
     expect(view.select).toBeInstanceOf(Continue);
-    // YES replays the same battle through the runner, still on the route.
+    // YES replays the same battle through the runner, still on the route
+    // — not its loading screen.
     stepSelect(view); // the arm tick
     (view.stepSelect as (input: object) => void)({ kick: true });
     const second = scene.match;
     expect(second).not.toBe(first);
-    expect(second.battle).toEqual(brLongStory('ryuko')[0]);
+    expect(view.select).toBeNull();
+    expect(second.battle).toEqual(brLongBattle('ryuko'));
     expect(second.fighters).toHaveLength(14);
     expect(second.fighters.at(-1)?.who).toBe('dora');
     expect(story.route).toBe('br-long');
   });
 
-  it('the HPA-972 no-partner cheat drops the ally from the LONG match', () => {
-    const { scene, view, artIn } = boot();
+  it('the HPA-972 no-partner cheat drops the ally from the LONG match', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true;
@@ -2485,13 +2517,14 @@ describe('mode select (HPA-1251 LONG route)', () => {
     const story = view.story as Story;
     expect(story.route).toBe('br-long');
     expect(story.br).toBe(true);
+    await passRouteDemo(view, completes, finishLoad, 24);
     expect(scene.match.br).toBe(true);
     expect(scene.match.fighters).toHaveLength(13);
     expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
   });
 
-  it('a boss’s LONG pick starts the generated route a fresh Story owns', () => {
-    const { scene, view, artIn } = boot();
+  it('a boss’s LONG pick starts the generated route a fresh Story owns', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true;
@@ -2502,8 +2535,10 @@ describe('mode select (HPA-1251 LONG route)', () => {
     const story = view.story as Story;
     expect(story.route).toBe('br-long');
     expect(story.br).toBe(true);
+    // A boss's LONG opens on the same loading screen.
+    await passRouteDemo(view, completes, finishLoad, 24);
     expect(scene.match.br).toBe(true);
-    expect(scene.match.battle).toEqual(brLongStory('shinz')[0]);
+    expect(scene.match.battle).toEqual(brLongBattle('shinz'));
     // No ally: thirteen native seats, the twelve tough hostiles.
     expect(scene.match.fighters).toHaveLength(13);
     expect(scene.match.fighters.map((f) => f.who)).not.toContain('dora');
@@ -2511,8 +2546,8 @@ describe('mode select (HPA-1251 LONG route)', () => {
       expect(f, f.who).toMatchObject({ maxStock: 5 });
   });
 
-  it('a tap on the blank LONG board starts the route (touch)', () => {
-    const { scene, view, artIn } = boot();
+  it('a tap on the blank LONG board starts the route (touch)', async () => {
+    const { scene, view, artIn, completes, finishLoad } = boot();
     artIn();
     const textures = view.textures as { exists: (key: string) => boolean };
     textures.exists = () => true;
@@ -2532,6 +2567,7 @@ describe('mode select (HPA-1251 LONG route)', () => {
     const story = view.story as Story;
     expect(story.route).toBe('br-long');
     expect(story.br).toBe(true);
+    await passRouteDemo(view, completes, finishLoad, 24);
     expect(scene.match.br).toBe(true);
   });
 
