@@ -4059,8 +4059,10 @@ export class Match {
           !(self.caught && 'clip' in self.caught) &&
           other &&
           this.koProtected(other)
-        )
+        ) {
+          this.clearBoxes(self);
           break;
+        }
         this.seize(self, event.flags);
         if (self.caught && 'clip' in self.caught) {
           this.placeHeld(self, self.caught, event);
@@ -4095,8 +4097,10 @@ export class Match {
           !(self.caught && 'clip' in self.caught) &&
           other &&
           this.koProtected(other)
-        )
+        ) {
+          this.clearBoxes(self);
           break;
+        }
         this.seize(self, event.flags);
         if (self.caught && 'clip' in self.caught) {
           this.placeHeld(self, self.caught, event);
@@ -4400,13 +4404,19 @@ export class Match {
     return true;
   }
 
+  // Ops 0x07 and 0x14 clear the holder's boxes and bodies (0x40e550) as an
+  // action change does, until op 0x19 sets them again.
+  private clearBoxes(f: Fighter) {
+    Object.assign(f, { box: null, boxes: [] });
+  }
+
   // Ops 0x07 and 0x14 on whatever +0xdef9 holds, before either acts.
   private seize(self: Fighter, flags: number) {
     if (!self.caught) return;
     const front = flags & 1 ? 1 : -1;
     self.z = FIGHTER_Z + front;
     self.caught.z = FIGHTER_Z - front;
-    Object.assign(self, { box: null, boxes: [] });
+    this.clearBoxes(self);
   }
 
   // Ops 0x07 (0x412e93) and 0x14 (0x413057) reach the player this one's
