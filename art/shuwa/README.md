@@ -146,6 +146,14 @@ follows, the other scripts, the clips). A frame of his that shows drawing `d` in
 so his anchor lands where the donor's position point would, moved by whatever the script itself shifts that image. `(ax_d, ay_d)` and
 `(w_d, h_d)` come from `anchors.json`. The donor's body boxes (op 0x19) are untouched.
 
+A frame the game draws flipped (`flip_x`, `flip_y`) mirrors the image about its own centre, and the point on it, so the landing is
+solved again for the flipped axis, with `(w_m, h_m)` the donor image's size and `rx = dx_ref(m)`, `ry = dy_ref(m)`:
+
+    flip_x:  dx = dx_f + rx + ax_d + (w_m % 2) - (w_d - w_d // 2)
+    flip_y:  dy = dy_f + ry + ay_d - h_m
+
+Either facing then puts his anchor on the same point of the donor image (the exporter test checks it through `placement()` for both).
+
 Held poses (op 0x07's table, the export's `held`) draw from the image's top-left corner instead (`heldPlacement`: `left = x + dx`,
 mirrored by the holder's facing XOR `flip_x`, negated with `flip_y`). They keep the donor's corner offsets and move by the anchor:
 

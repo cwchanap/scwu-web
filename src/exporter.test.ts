@@ -20,7 +20,11 @@ import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { STAGES } from './game/characters';
 import { bytesOf, parsePack } from './game/packs';
-import { heldPlacement, type Frame as Placed } from './game/standing';
+import {
+  heldPlacement,
+  placement,
+  type Frame as Placed,
+} from './game/standing';
 import { exporterSha, itWithArt, shuwaArt } from './game/testing';
 import manifest from './game/generated/assets-version.json';
 
@@ -410,7 +414,10 @@ describe("SHUWA's authored export", () => {
     // Op 0x07's held poses draw from the image's corner (heldPlacement), the
     // rest from its bottom centre (placement). A drawing's anchor stands for
     // the point of her image that his normal frames put it on, or, for an
-    // image she only shows held, its bottom centre.
+    // image she only shows held, its bottom centre. A frame the game draws
+    // flipped mirrors the image and that point, so each normal frame must
+    // land his anchor on the same point of her image whatever its flips and
+    // whichever way the fighter faces.
     const size = new Map(
       ryuko.images.map((i) => [i.index, [i.width, i.height] as const]),
     );
@@ -425,6 +432,12 @@ describe("SHUWA's authored export", () => {
         shuwa.scripts[k]?.frames ?? [],
       ]),
     ];
+    const at = (
+      { left, top, flip_x, flip_y }: ReturnType<typeof heldPlacement>,
+      [w, h]: readonly [number, number],
+      [ax, ay]: readonly [number, number],
+    ) => [flip_x ? left + w - ax : left + ax, flip_y ? top + h - ay : top + ay];
+    let flipped = 0;
     for (const [hers, his] of pairs)
       if (hers.length === his.length)
         hers.forEach((f, i) => {
@@ -435,23 +448,32 @@ describe("SHUWA's authored export", () => {
             size: [w, h],
           } = drawing(her.image);
           const [wd, hd] = size.get(her.image)!;
-          // placement: his anchor and this point of hers land together.
+          // The point of her image, from its corner, his anchor lands on
+          // with the fighter facing right.
+          const [px, py] = at(
+            placement(him, w, h, 0, 0, false),
+            [w, h],
+            anchor,
+          );
+          const hers0 = placement(her, wd, hd, 0, 0, false);
           const point: [number, number] = [
-            him.dx -
-              Math.floor(w / 2) +
-              anchor[0] -
-              her.dx +
-              Math.floor(wd / 2),
-            him.dy - h + anchor[1] - her.dy + hd,
+            hers0.flip_x ? hers0.left + wd - px : px - hers0.left,
+            hers0.flip_y ? hers0.top + hd - py : py - hers0.top,
           ];
           expect(donor.get(her.image) ?? point, `${her.image}`).toEqual(point);
           donor.set(her.image, point);
+          for (const facingLeft of [false, true])
+            expect(
+              at(placement(him, w, h, 100, 50, facingLeft), [w, h], anchor),
+              `${her.image} ${facingLeft}`,
+            ).toEqual(
+              at(placement(her, wd, hd, 100, 50, facingLeft), [wd, hd], point),
+            );
+          if (her.flip_x || her.flip_y) flipped++;
         });
-    const at = (
-      { left, top, flip_x, flip_y }: ReturnType<typeof heldPlacement>,
-      [w, h]: readonly [number, number],
-      [ax, ay]: readonly [number, number],
-    ) => [flip_x ? left + w - ax : left + ax, flip_y ? top + h - ay : top + ay];
+    // Her kept animations do show images flipped (Chuck's spin, launched
+    // fighters), so the loop above reaches the mirrored cases.
+    expect(flipped).toBeGreaterThan(0);
     const held = ryuko.held.filter((f) => drawing(f.image));
     expect(held).toHaveLength(13);
     expect(held.map((f) => f.image).filter((i) => !donor.has(i))).toEqual([
