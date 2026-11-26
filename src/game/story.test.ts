@@ -15,6 +15,7 @@ import {
 } from './story';
 import type { Battle, Next, SignRoute, Step } from './story';
 import {
+  BR_LONG_DEMO,
   bossBrAnotherStages,
   brAnotherStages,
   brLongBattle,
@@ -1468,13 +1469,16 @@ describe('B.R. LONG route', () => {
     );
   });
 
-  it('marks the route B.R. and walks every row: its battle, then the end', () => {
+  it('marks the route B.R. and walks every row: its demo, its battle, then the end', () => {
     expect(rows).toHaveLength(38);
     for (const who of rows) {
       const story = new Story(who, 'br-long');
       expect([story.route, story.br], who).toEqual(['br-long', true]);
-      const next = story.next();
+      // HERE COMES A NEW CHALLENGER opens every row, bosses included.
+      expect(story.next(), who).toEqual({ kind: 'demo', demo: BR_LONG_DEMO });
       expect(at(story), who).toBe(0);
+      const next = story.next();
+      expect(at(story), who).toBe(1);
       expect(next.kind, who).toBe('battle');
       if (next.kind !== 'battle') continue;
       // Sakura Street, bit 0 keeping the Continue screen on a player KO.

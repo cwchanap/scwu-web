@@ -1248,7 +1248,7 @@ describe('B.R. LONG route', () => {
     expect([...combos.values()].filter((n) => n === 2)).toHaveLength(36);
   });
 
-  it('seats 14 native fighters for an ordinary player and 13 for a boss, Dora present from the first tick', () => {
+  it('seats 14 native fighters for an ordinary player and 13 for a boss, Z-MEGA present from the first tick', () => {
     const ordinary = Match.story(
       'ryuko',
       longBattle('ryuko'),
@@ -1271,9 +1271,9 @@ describe('B.R. LONG route', () => {
       'masa',
       'dido',
       'sakuya',
-      'dora',
+      'zmega',
     ]);
-    // The 1P, the first enemy and Dora are in; the other eleven wait.
+    // The 1P, the first enemy and Z-MEGA are in; the other eleven wait.
     expect(ordinary.fighters.map((f) => f.present)).toEqual([
       true,
       true,
@@ -1322,7 +1322,7 @@ describe('B.R. LONG route', () => {
     expect(second.present).toBe(true);
   });
 
-  it('keeps HPA-972’s no-partner cheat removing Dora without corrupting the waits', () => {
+  it('keeps HPA-972’s no-partner cheat removing Z-MEGA without corrupting the waits', () => {
     const match = Match.story(
       'ryuko',
       longBattle('ryuko'),
@@ -1332,7 +1332,7 @@ describe('B.R. LONG route', () => {
       true,
     );
     match.useCheats({ ...DEFAULT_CHEATS, enabled: true, brNoPartner: true });
-    expect(match.fighters.map((f) => f.who)).not.toContain('dora');
+    expect(match.fighters.map((f) => f.who)).not.toContain('zmega');
     expect(match.fighters).toHaveLength(13);
     const waits = (match as unknown as { waits: (Slot | null)[] }).waits;
     expect(waits).toHaveLength(13);
