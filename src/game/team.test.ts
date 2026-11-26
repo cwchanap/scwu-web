@@ -1620,7 +1620,6 @@ describe('boss B.R. ANOTHER', () => {
           demos.push(next.demo);
           continue;
         }
-        if (next.kind !== 'battle') throw new Error(next.kind);
         expect(next.battle.flags & 1, who).toBe(1);
         stages.push(next.battle.stage);
       }
