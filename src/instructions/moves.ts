@@ -5106,7 +5106,7 @@ export const GUIDES_DATA = {
           {
             name: 'RING',
             input: '<span class="motion">↓←</span><kbd>G</kbd>',
-            desc: 'A spinning saw ring for one lamp charge. One out at a time; pressing again while it flies only makes him stand.',
+            desc: 'A spinning saw ring for one lamp charge. One RING or SPECIUM out at a time; pressing either while one flies only makes him stand, for free.',
             cost: 0,
           },
           {
