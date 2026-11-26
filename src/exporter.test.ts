@@ -437,6 +437,20 @@ describe("SHUWA's authored export", () => {
       [w, h]: readonly [number, number],
       [ax, ay]: readonly [number, number],
     ) => [flip_x ? left + w - ax : left + ax, flip_y ? top + h - ay : top + ay];
+    // Her own frames name the point, not his export: the image's bottom
+    // centre less the offset a frame gives it (the exporter takes the first).
+    // A drawing his frames place consistently but off that point fails.
+    const refs = new Map<number, string[]>();
+    for (const [hers] of pairs)
+      for (const f of hers) {
+        const { image, dx, dy } = placed(f);
+        const dims = size.get(image);
+        if (!dims || !drawing(image)) continue;
+        refs.set(image, [
+          ...(refs.get(image) ?? []),
+          `${Math.floor(dims[0] / 2) - dx},${dims[1] - dy}`,
+        ]);
+      }
     let flipped = 0;
     for (const [hers, his] of pairs)
       if (hers.length === his.length)
@@ -461,6 +475,9 @@ describe("SHUWA's authored export", () => {
             hers0.flip_y ? hers0.top + hd - py : py - hers0.top,
           ];
           expect(donor.get(her.image) ?? point, `${her.image}`).toEqual(point);
+          expect(refs.get(her.image), `${her.image} ref`).toContain(
+            point.join(),
+          );
           donor.set(her.image, point);
           for (const facingLeft of [false, true])
             expect(
