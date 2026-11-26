@@ -19,4 +19,4 @@ python3 -I tools/b3.py out/raw refs out/b2 out/b3 out/data/donors.json out/data/
 python3 -I tools/b4.py out/b3 out/b4 out/raw
 python3 -I tools/build_page.py out/b4 "$A" out/shuwa-animations.html
 # The game's drawings, effects and anchors (committed in game/; the exporter reads them): same raw drawings, no clips.
-python3 -I tools/game_art.py out/raw refs round7 out/data/ryuko.json "$A" game
+python3 -I tools/game_art.py out/raw refs round7 out/data "$A" game

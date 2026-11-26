@@ -4434,23 +4434,159 @@ def png_size(content):
     return struct.unpack(">II", content[16:24])
 
 
+def placed(f, anchor, size, donor_size, ref):
+    """Frame f showing a drawing (`anchor`, `size` from anchors.json) in place of a donor image of `donor_size` whose
+    reference placement is `ref` (art/shuwa/README.md, "Placing a drawing"). An unflipped frame puts his anchor where
+    the donor's reference point (w_d // 2 - rx, h_d - ry from the image's corner) stands. A frame the game draws flipped
+    mirrors the image about its own centre, and the point on it, so each flipped axis re-solves the same landing for the
+    mirrored anchor and mirrored reference."""
+    (ax, ay), (w, h), (wd, hd), (rx, ry) = anchor, size, donor_size, ref
+    dx = f["dx"] + rx + ax + wd % 2 - (w - w // 2) if f.get("flip_x") else w // 2 - ax + f["dx"] - rx
+    dy = f["dy"] + ry + ay - hd if f.get("flip_y") else h - ay + f["dy"] - ry
+    f.update(dx=dx, dy=dy, width=w, height=h)
+
+
+def scale_life(script, life, donor_life):
+    """Op 0x11's thresholds (native HP of the fighter's own bar) moved from the donor's life to his: RYUKO's 153 of
+    510 (30%) is his 144 of 480. The sentinels 0 and 1 stay."""
+    for e in script["events"]:
+        if e["op"] == "life" and e["value"] > 1:
+            e["value"] = e["value"] * life // donor_life
+
+
+def graft(g, life, anchors, host_keys):
+    """One move grafted from another fighter (spec.json `grafts`, art/shuwa/README.md, "Grafts"): the donor's scripts
+    from its roots, renumbered into his tables (actions, images and sounds at `base` + the donor's number), with its
+    patches, cut jumps, host actions and variables applied, its drawings placed against the donor's own images, and its
+    levels and CPU entries. Returns (scripts, drawings {image: drawing}, donor images, sounds, levels, cpu)."""
+    donor = json.loads((GENERATED / f"{g['donor']}.json").read_text(encoding="utf8"))
+    base, roots = g["base"], [str(r) for r in g["actions"]]
+    host = {int(a): b for a, b in g.get("host", {}).items()}
+    cut = set(g.get("cut", []))
+    variables = {int(a): b for a, b in g.get("variables", {}).items()}
+    images = {int(m): d for m, d in g["images"].items()}
+    src = json.loads(json.dumps(donor["scripts"]))
+    for p in g.get("patch", []):
+        events = src[p["script"]]["events"]
+        match = {k: v for k, v in p.items() if k not in ("script", "set", "drop")}
+        hits = [i for i, e in enumerate(events) if all(e.get(k) == v for k, v in match.items())]
+        if not hits:
+            sys.exit(f"SHUWA's {g['move']} patch {p} matches no event of {g['donor']}'s script; refusing to export.")
+        for i in hits:
+            events[i] = None if p.get("drop") else dict(events[i], **p["set"])
+        src[p["script"]]["events"] = [e for e in events if e]
+
+    def action(a):
+        return host.get(a, base + a) if a else 0
+
+    def cut_away(e):
+        return any(e.get(k) in cut for k in ("action", "busy", "target") if e.get(k))
+
+    for s in src.values():
+        s["events"] = [e for e in s["events"] if not cut_away(e)]
+    keys, todo = [], list(roots)
+    while todo:
+        key = todo.pop(0)
+        if key in keys:
+            continue
+        if key not in src:
+            sys.exit(f"SHUWA's {g['move']} reaches {g['donor']}'s {key}, which is not exported; refusing to export.")
+        keys.append(key)
+        for target, _ in script_edges(src[key]):
+            a, _, o = target.partition("+")
+            if int(a) not in host:
+                todo.append(target)
+            elif script_key(host[int(a)], int(o or 0)) not in host_keys:
+                sys.exit(f"SHUWA's {g['move']} host action for {g['donor']}'s {target} is not his; refusing to export.")
+    # The donor's reference placements: first in the grafted scripts, then its other scripts, then its clips.
+    refs = {}
+    for s in [donor["scripts"][k] for k in keys] + list(donor["scripts"].values()) + list(donor["clips"].values()):
+        for f in s["frames"] if isinstance(s, dict) else s:
+            refs.setdefault(f["image"], (f["dx"], f["dy"]))
+    sizes = {i["index"]: i for i in donor["images"]}
+    out, drawings, shown, sounds = {}, {}, {}, {}
+    for key in keys:
+        s = src[key]
+        a, _, o = key.partition("+")
+        if s["end"] == "jump":
+            s["next"] = action(s["next"])
+        for e in s["events"]:
+            for k in ("action", "busy", "target"):
+                if e.get(k):
+                    e[k] = action(e[k])
+            if e["op"] in ("variable", "add") and e["index"] in variables:
+                e["index"] = variables[e["index"]]
+            if e["op"] == "test" and 0x40 <= e["selector"] < 0x80 and e["selector"] & 0x3F in variables:
+                e["selector"] = 0x40 | variables[e["selector"] & 0x3F]
+            if e["op"] == "sound":
+                sounds[base + e["index"]] = e["index"]
+                e["index"] += base
+            if e["op"] == "hold":
+                sys.exit(f"SHUWA's {g['move']} holds a pose from {g['donor']}'s table; refusing to export.")
+        scale_life(s, life, donor["life"])
+        for f in s["frames"]:
+            m = f["image"]
+            if m in (0, 8191):
+                continue
+            f.update(image=base + m, packed_image=base + m)
+            if m in images:
+                d = images[m]
+                placed(f, anchors[d]["anchor"], anchors[d]["size"], (sizes[m]["width"], sizes[m]["height"]), refs[m])
+                drawings[base + m] = d
+            else:
+                shown[base + m] = dict(sizes[m], index=base + m, own=True)
+        out[script_key(action(int(a)), int(o or 0))] = s
+    levels = {str(action(int(r))): g.get("level", donor["levels"].get(r)) for r in roots}
+    if None in levels.values():
+        sys.exit(f"SHUWA's {g['move']} roots {roots} need a level; refusing to export.")
+    entry = {int(a): b for a, b in g.get("cpu", {}).items()}
+    cpu = [dict(c, steps=[dict(t, command=entry.get(t["command"], 0)) for t in c["steps"]]) for c in donor["cpu"]
+           if any(t["command"] in entry for t in c["steps"]) and all(not t["command"] or t["command"] in entry for t in c["steps"])]
+    by_index = {x["index"]: x for x in donor["sounds"]}
+    sounds = [dict(by_index[n], index=i) for i, n in sorted(sounds.items())]
+    return out, drawings, shown, sounds, levels, cpu
+
+
 def export_authored(ryuko, roots):
     """SHUWA's shuwa.json and his images under public/assets/shuwa/: RYUKO's export (`ryuko`, as main() writes it)
-    with spec.json's stats, command table, drawings, effects, blanks, drops and cut input checks. `roots` are the actions her own
-    timeline plays besides her moves (main()'s queue without the moves and hit effects)."""
+    with spec.json's stats, command table, drawings, effects, blanks, drops and cut input checks, the moves grafted from
+    other fighters and his lamp. `roots` are the actions her own timeline plays besides her moves (main()'s queue without
+    the moves and hit effects)."""
     spec = json.loads((SHUWA / "spec.json").read_text(encoding="utf8"))
     anchors = json.loads((SHUWA / "anchors.json").read_text(encoding="utf8"))
     data = json.loads(json.dumps(ryuko))
     scripts, clips = data["scripts"], data["clips"]
-    # The command table: kept entries keep their numbers, the rest take entry 21's inert shape.
+    life = spec["stats"]["life"]
+    for s in scripts.values():
+        scale_life(s, life, ryuko["life"])
+    # The moves grafted from other fighters, added to her scripts before the command table names them.
+    grafted, grafted_keys, graft_images, graft_cpu = {}, set(), {}, []
+    for g in spec["grafts"]:
+        # A host action is one of her scripts or one of the engine's own states (her landing, 9, is a clip).
+        moved, drawn, shown, sounds, levels, cpu = graft(g, life, anchors, set(scripts) | set(data["neutral"]))
+        if clash := sorted(set(moved) & set(scripts)) + sorted({x["index"] for x in sounds} & {x["index"] for x in data["sounds"]}):
+            sys.exit(f"SHUWA's {g['move']} numbers {clash} are taken; refusing to export.")
+        scripts.update(moved)
+        grafted_keys.update(moved)
+        grafted.update(drawn)
+        graft_images.update(shown)
+        data["sounds"] += sounds
+        data["levels"].update(levels)
+        graft_cpu += cpu
+    # The command table: kept entries keep their numbers, new ones take theirs from spec.json, the rest take entry
+    # 21's inert shape.
     entries = data["commands"]["entries"]
     commands = spec["commands"]
     for n in range(1, len(entries) + 1):
         if n not in commands["keep"]:
-            entries[n - 1] = dict(ryuko["commands"]["entries"][20])
+            entries[n - 1] = dict(ryuko["commands"]["entries"][20], **commands["new"].get(str(n), {}))
         entries[n - 1].update(name=commands["names"].get(str(n), entries[n - 1]["name"]),
                               steps=commands["steps"].get(str(n), entries[n - 1]["steps"]))
     moves = {e[k] for e in entries for k in ("air", "near", "far", "crouch") if e[k]} | {174}
+    # His CPU: RYUKO's table without the entries for the commands whose numbers he gives new moves, then the new
+    # moves' own entries (spec.json's and the grafted fighters').
+    new = {int(n) for n in commands["new"]}
+    data["cpu"] = [c for c in data["cpu"] if not any(t["command"] in new for t in c["steps"])] + spec["cpu"] + graft_cpu
     if missing := sorted(m for m in moves if str(m) not in scripts):
         sys.exit(f"SHUWA's moves {missing} are not RYUKO's scripts; refusing to export.")
     # The input checks (op 0x16) that jump to actions he lacks: her intro's down-held jump to Chage Character (37),
@@ -4474,6 +4610,8 @@ def export_authored(ryuko, roots):
         if r[0] == 0x0c:
             refs.setdefault(u16(r, 3) & 8191, (s16(r, 5), s16(r, 7)))
     drawings = {int(m): d for m, d in spec["images"].items()}
+    if clash := sorted(set(grafted) & set(drawings)):
+        sys.exit(f"SHUWA's grafted images {clash} are numbers of hers; refusing to export.")
     swaps = {}
     for key, images in spec["scriptImages"].items():
         for k in fighter_scripts(scripts, [key]):
@@ -4484,16 +4622,11 @@ def export_authored(ryuko, roots):
     sizes = {i["index"]: (i["width"], i["height"]) for i in ryuko["images"]}
 
     def place(f, donor, image):
-        # An unflipped frame puts his anchor where her reference point (w_d // 2 - rx, h_d - ry from the image's
-        # corner) stands. A frame the game draws flipped mirrors the image about its own centre, and the point on
-        # it, so each flipped axis re-solves the same landing for the mirrored anchor and mirrored reference.
-        (ax, ay), (w, h) = anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"]
-        (wd, hd), (rx, ry) = sizes[donor], refs[donor]
-        dx = f["dx"] + rx + ax + wd % 2 - (w - w // 2) if f.get("flip_x") else w // 2 - ax + f["dx"] - rx
-        dy = f["dy"] + ry + ay - hd if f.get("flip_y") else h - ay + f["dy"] - ry
-        f.update(dx=dx, dy=dy, width=w, height=h)
+        placed(f, anchors[drawings[image]]["anchor"], anchors[drawings[image]]["size"], sizes[donor], refs[donor])
 
     for key, s in scripts.items():
+        if key in grafted_keys:  # placed against their own donors (graft)
+            continue
         for f in s["frames"]:
             donor = f["image"]
             if donor in swaps.get(key, {}):
@@ -4533,13 +4666,15 @@ def export_authored(ryuko, roots):
         files[image] = rgba_png(w, h, bytes(w * h * 4))
     for image in spec["ui"]["hudFaceImages"]:
         files[image] = (SHUWA / spec["ui"]["hudFace"]).read_bytes()
+    for image, d in grafted.items():
+        files[image] = (SHUWA / f"drawings/{d}.png").read_bytes()
     # Every image his own timeline, clips, held poses and idle program show is his (images 0 and 8191 are the
     # source's blank displays). The black clip is the super darkening's panel (image 294), an object of hers.
     shown = {f["image"] for k in own for f in scripts[k]["frames"]}
     shown |= {f["image"] for name, frames in clips.items() if name != "black" for f in frames}
     shown |= {h["image"] for h in data["held"]}
     shown |= {u16(r, 3) & 8191 for r in idle if r[0] == 0x0c}
-    if unmapped := sorted(shown - set(files) - {0, 8191}):
+    if unmapped := sorted(shown - set(files) - set(graft_images) - {0, 8191}):
         sys.exit(f"SHUWA shows RYUKO's images {unmapped}, which spec.json does not map; refusing to export.")
     (PUBLIC / "shuwa").mkdir(exist_ok=True)
     for image, content in files.items():
@@ -4548,7 +4683,31 @@ def export_authored(ryuko, roots):
     write_if_changed(PUBLIC / "shuwa/9000.png", (SHUWA / spec["ui"]["faceTile"]).read_bytes())
     own_images = [dict(index=i, width=png_size(c)[0], height=png_size(c)[1], filename=f"shuwa/{i}.png", own=True)
                   for i, c in files.items()]
-    data["images"] = sorted([i for i in ryuko["images"] if i["index"] not in files] + own_images, key=lambda i: i["index"])
+    data["images"] = sorted([i for i in ryuko["images"] if i["index"] not in files] + own_images + list(graft_images.values()),
+                            key=lambda i: i["index"])
+    # The lamp (HPA-1305): each shot spends a charge as it leaves, a press with none left plays RECHARGE instead,
+    # and a landed Chuck gives one back. Charges count up in steps of `step` in his variable `variable` (ZOMA's bomb
+    # counter, whose reload he grafts, counts the same way), so full is 0 and empty is step * charges; the match
+    # resets variables each round. Below the low-life line the match lets shots spend nothing (match.ts `lampLow`).
+    lamp = spec["lamp"]
+    var, step, empty = lamp["variable"], lamp["step"], lamp["step"] * lamp["charges"]
+
+    def insert(key, event):  # first in its tick, so no jump of that tick skips it (the Chuck's 197 tests at 0)
+        events = scripts[key]["events"]
+        at = next((i for i, e in enumerate(events) if e["t"] >= event["t"]), len(events))
+        scripts[key]["events"] = events[:at] + [event] + events[at:]
+
+    for key, t in lamp["shots"].items():
+        scripts[key]["events"].insert(0, dict(op="test", selector=0x40 | var, compare=1, value=empty, action=lamp["empty"],
+                                              offset=0, t=0))
+        insert(key, dict(op="add", index=var, value=step, t=t))
+    for key, t in lamp["refund"].items():
+        insert(key, dict(op="add", index=var, value=-step, t=t))
+    # His drawings carry the lamp on his chest; at low life scene.ts blinks its blues (`colors`) red on them.
+    data["lamp"] = dict(variable=var, step=step, charges=lamp["charges"],
+                        colors=[[int(a, 16), int(b, 16)] for a, b in lamp["colors"].items()],
+                        images=sorted(set(drawings) | set(grafted)))
+    data["levels"].update(spec["levels"])
     # He has no seat on the select sheet, so no select programs and no story (an empty scenario).
     data.update(spec["stats"], select=dict(ryuko["select"], actions={}), scenario=[], resultScripts={}, aliases={}, counters={},
                 neutralTests={}, twins={str(r): r for r, _ in ZOMA_TWINS.values()})

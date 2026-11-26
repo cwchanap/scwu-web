@@ -38,6 +38,7 @@ import {
   superGateOf,
   twinOf,
   lifeOf,
+  lampOf,
   neutralTestsOf,
   perStockOf,
   responseEffectsOf,
@@ -2922,6 +2923,19 @@ export class Match {
     return this.lineScaledMark(f, lifeOf(f.who), 100);
   }
 
+  // Authored (HPA-1305): SHUWA's lamp is low on the low-life line, where
+  // SPECIUM RAY turns to its stronger form: shots spend nothing and an empty
+  // lamp never forces RECHARGE.
+  lampLow(f: Fighter): boolean {
+    return !!lampOf(f.who) && f.hp <= this.lifeLineMark(f);
+  }
+
+  // Whether a low lamp shows red this tick (scene.ts): it blinks, 25 ticks
+  // (250 ms) red then 25 blue.
+  lampRed(f: Fighter): boolean {
+    return this.lampLow(f) && Math.floor(this.ticks / 25) % 2 === 0;
+  }
+
   // Authored (HPA-972): `value` native HP scaled by the Low HP line over
   // the native share it replaces (`lineOver`: 100 for the percent line, 30
   // for a 30% gate). The percent keeps full precision through the
@@ -3809,6 +3823,17 @@ export class Match {
     return true;
   }
 
+  // Authored (HPA-1305): at low life SHUWA's empty lamp (his shots' first
+  // test, export_authored) no longer turns a shot into RECHARGE.
+  private lampHolds(
+    self: Fighter,
+    { selector }: Extract<SourceEvent, { op: 'test' }>,
+  ) {
+    // A stage's or the HUD's objects run with no player.
+    const lamp = self && lampOf(self.who);
+    return !!lamp && selector === (0x40 | lamp.variable) && this.lampLow(self);
+  }
+
   // Op 0x1f's checks (0x4137a4) of the actor's own variables (below selector
   // 0x40), player variables (0x40 up), globals (0x80 up) and global 6 (the
   // freeze), which `pre` sets or adds to first (0x4138df): == (1), > (2) or
@@ -4018,6 +4043,7 @@ export class Match {
         if (event.resume && !('clip' in actor)) break;
         if (
           ('clip' in actor || actor.action === 'script') &&
+          !this.lampHolds(self, event) &&
           this.passes(self, actor, event)
         ) {
           if (event.resume && 'clip' in actor)
@@ -4205,10 +4231,25 @@ export class Match {
       case 'variable':
         self.variables[event.index] = event.value;
         break;
-      case 'add':
-        self.variables[event.index] =
-          (self.variables[event.index] ?? 0) + event.value;
+      case 'add': {
+        const lamp = lampOf(self.who);
+        if (lamp?.variable !== event.index) {
+          self.variables[event.index] =
+            (self.variables[event.index] ?? 0) + event.value;
+          break;
+        }
+        // Authored (HPA-1305): the lamp stays between full (0) and empty,
+        // and a shot at low life spends nothing.
+        if (event.value > 0 && this.lampLow(self)) break;
+        self.variables[event.index] = Math.max(
+          0,
+          Math.min(
+            lamp.step * lamp.charges,
+            (self.variables[event.index] ?? 0) + event.value,
+          ),
+        );
         break;
+      }
       case 'local':
         this.setLocal(actor, event.index, event);
         break;

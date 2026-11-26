@@ -5036,7 +5036,7 @@ export const GUIDES_DATA = {
     art: FACES.shuwa,
     nameplate: '',
     role: 'New fighter with 480 life',
-    tag: 'A new fighter with 480 life, still on RYUKO’s timing and boxes: the same normals, chains and throw, with his own drawings, inputs and effects.',
+    tag: 'A new fighter with 480 life, still on RYUKO’s timing and boxes for his normals, chains and throw, with moves borrowed from DoraEmon, ALEX, ZOMA and REMU. His chest lamp holds three shots.',
     ex: false,
     sections: [
       {
@@ -5098,21 +5098,51 @@ export const GUIDES_DATA = {
         cost: false,
         rows: [
           {
+            name: 'Chest lamp',
+            input: '3 charges',
+            desc: 'RING and SPECIUM each spend a charge; with none left the press plays RECHARGE instead. A landed Chuck gives one back, and every round starts full. At 30% life or less the lamp blinks red: shots spend nothing and SPECIUM RAY hits harder.',
+            cost: 0,
+          },
+          {
             name: 'RING',
             input: '<span class="motion">↓←</span><kbd>G</kbd>',
-            desc: 'A spinning saw ring. One out at a time; pressing again while it flies only makes him stand.',
+            desc: 'A spinning saw ring for one lamp charge. One out at a time; pressing again while it flies only makes him stand.',
+            cost: 0,
+          },
+          {
+            name: 'SPECIUM',
+            input: '<span class="motion">↓→</span><kbd>G</kbd>',
+            desc: 'A crossed-arm energy shot for one lamp charge.',
+            cost: 0,
+          },
+          {
+            name: 'RECHARGE',
+            input: '<span class="motion">↓↓</span><kbd>G</kbd> or <kbd>E</kbd>',
+            desc: 'Refills the lamp. He is open while he does.',
+            cost: 0,
+          },
+          {
+            name: 'SHUWATCH',
+            input: '<span class="motion">→↓↘</span><kbd>G</kbd>',
+            desc: 'A rising punch that carries him up and forward, also in the air.',
+            cost: 0,
+          },
+          {
+            name: 'BARRIER',
+            input: '<span class="motion">↓→</span><kbd>H</kbd> or <kbd>F</kbd>',
+            desc: 'A wall of light at his palms. A projectile that meets it flies back at the thrower.',
             cost: 0,
           },
           {
             name: 'Chuck',
             input: '<kbd>J</kbd> close',
-            desc: 'Grab and throw even through guard.',
+            desc: 'Grab and throw even through guard. Landing it gives the lamp a charge back.',
             cost: 0,
           },
           {
             name: 'SWING',
             input: '<span class="motion">←↓→</span><kbd>H</kbd>',
-            desc: 'Command throw: spins the opponent overhead and hurls them skyward. Long recovery on a miss. At about a third of his life or less it plays a longer form.',
+            desc: 'Command throw: spins the opponent overhead and hurls them skyward. Long recovery on a miss. At 30% life or less it plays a longer form.',
             cost: 0,
           },
         ],
@@ -5125,7 +5155,13 @@ export const GUIDES_DATA = {
           {
             name: 'SPECIUM RAY',
             input: '<span class="motion">↓→↓→</span><kbd>G</kbd>',
-            desc: 'A beam across the arena, also in the air. At about a third of his life or less takes its stronger form.',
+            desc: 'A beam across the arena, also in the air. At 30% life or less takes its stronger form.',
+            cost: 1,
+          },
+          {
+            name: 'GIANT STEP',
+            input: '<span class="motion">↓←↓←</span><kbd>H</kbd>',
+            desc: 'He leaps off the screen and a giant foot stamps the spot ahead, slamming the opponent down.',
             cost: 1,
           },
           {

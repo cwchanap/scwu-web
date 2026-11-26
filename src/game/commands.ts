@@ -880,11 +880,22 @@ export const KEYS: Record<Who, [Control, number][]> = {
     ['drill', 6],
     ['dash', 4],
   ],
-  // SHUWA's: Ryuko's keys for the entries he has (spec.json's keep).
-  shuwa: RYUKO_KEYS.filter(([, entry]) => {
-    const { air, near, far, crouch } = shuwa.commands.entries[entry - 1];
-    return air || near || far || crouch;
-  }),
+  // SHUWA's (HPA-1305): Ryuko's keys where his moves keep her numbers —
+  // SPECIUM RAY (4), GIANT STEP (3), ULTRA SWING (1), THREE MINUTES (2),
+  // SHUWATCH (8), SWING (7), RING (6) — with BARRIER (15) on her IORI key (F)
+  // and RECHARGE (16) on her EX key (E). SPECIUM (9) has no key.
+  shuwa: [
+    ['getterBeam', 4],
+    ['musashi', 3],
+    ['changeAttack', 1],
+    ['megaBeam', 2],
+    ['drill', 8],
+    ['iori', 15],
+    ['dst', 7],
+    ['axe', 6],
+    ['ex', 16],
+    ['dash', 13],
+  ],
 };
 export const BACK_DASH: Record<Who, number> = {
   ryuko: 14,

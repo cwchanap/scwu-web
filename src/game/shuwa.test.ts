@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CHARACTERS, lifeOf } from './characters';
+import { CHARACTERS, lampOf, lifeOf } from './characters';
 import type { Who } from './characters';
 import { entriesOf, KEYS } from './commands';
 import { exMode, fighterPose, LIFE, Match } from './match';
@@ -75,6 +75,8 @@ function motion(text: string, side = 0) {
     d: { crouch: true },
     f: forward,
     b: back,
+    df: { crouch: true, ...forward },
+    n: {},
   };
   const tokens = text.split(' ');
   return (t: number): Input => {
@@ -99,15 +101,16 @@ describe('SHUWA (authored, donor RYUKO)', () => {
     expect(names.slice(0, 9)).toEqual([
       'ULTRA SWING',
       'THREE MINUTES',
-      '--------',
+      'GIANT STEP',
       'SPECIUM RAY',
       '--------',
       'RING',
       'SWING',
-      '--------',
-      '--------',
+      'SHUWATCH',
+      'SPECIUM',
     ]);
-    for (const entry of [3, 5, 8, 9, 15, 22])
+    expect(names.slice(14, 16)).toEqual(['BARRIER', 'RECHARGE']);
+    for (const entry of [5, 22])
       expect(entriesOf('shuwa')[entry - 1]).toMatchObject({
         air: 0,
         near: 0,
@@ -115,14 +118,19 @@ describe('SHUWA (authored, donor RYUKO)', () => {
         crouch: 0,
         steps: [0x2000],
       });
-    // Only his keys: no MUSASHI, hidden super, Drill, IORI, CPU IORI or EX.
-    expect(KEYS.shuwa.map(([control]) => control)).toEqual([
-      'getterBeam',
-      'changeAttack',
-      'megaBeam',
-      'dst',
-      'axe',
-      'dash',
+    // His keys: Ryuko's where his moves keep her numbers, BARRIER on F (her
+    // IORI key) and RECHARGE on E (her EX key).
+    expect(KEYS.shuwa).toEqual([
+      ['getterBeam', 4],
+      ['musashi', 3],
+      ['changeAttack', 1],
+      ['megaBeam', 2],
+      ['drill', 8],
+      ['iori', 15],
+      ['dst', 7],
+      ['axe', 6],
+      ['ex', 16],
+      ['dash', 13],
     ]);
   });
 
@@ -240,22 +248,22 @@ describe('SHUWA (authored, donor RYUKO)', () => {
     expect(swing.damage).toBeLessThan(dst.damage);
   });
 
-  // Her low-life forms, which his scripts keep (op 0x11 at 153 life, PCs of
-  // 264 and 214): 153 of his 480 is 32%.
+  // Her low-life forms, which his scripts keep (op 0x11, PCs of 264 and
+  // 214), their mark moved from her 153 of 510 to his 144 of 480: 30%.
   it.each([
     ['getterBeam', 'SPECIUM RAY', 'G BEAM EVIL', 200, 264, [278], 120],
     ['dst', 'SWING', 'Evil DST', 130, 214, [221, 222], 10],
   ] as const)(
-    '%s turns %s into her %s at 153 life or less, his drawings throughout',
+    '%s turns %s into her %s at 144 life or less, his drawings throughout',
     (key, _name, _form, gap, normal, path, damage) => {
       const input = (t: number) => ({ [key]: t === 2 });
-      const low = run('shuwa', input, { gap, hp: 153 });
+      const low = run('shuwa', input, { gap, hp: 144 });
       expect(low.path.slice(1).map(([, action]) => action)).toEqual([
         ...path,
         'idle',
       ]);
       expect(low).toMatchObject({ damage, foreign: [] });
-      expect(firstMove(run('shuwa', input, { gap, hp: 154 }).path)).toBe(
+      expect(firstMove(run('shuwa', input, { gap, hp: 145 }).path)).toBe(
         normal,
       );
     },
@@ -270,6 +278,14 @@ describe('SHUWA (authored, donor RYUKO)', () => {
     ['d f d f f+P', 'SPECIUM RAY', 200, 264],
     ['d f d f f+K', 'THREE MINUTES', 200, 292],
     ['b d f f+K', 'SWING', 130, 214],
+    // HPA-1305's: SPECIUM is her EX Fire (231), the others grafted
+    // (export_authored graft: DoraEmon's 278, ALEX's 261, ZOMA's 229, REMU's
+    // 347 at 11000, 12000, 13000 and 14000 on).
+    ['d f f+P', 'SPECIUM', 200, 231],
+    ['f d df df+P', 'SHUWATCH', 200, 11278],
+    ['d f f+K', 'BARRIER', 200, 12261],
+    ['d n d d+P', 'RECHARGE', 200, 13229],
+    ['d b d b b+K', 'GIANT STEP', 250, 14347],
   ] as const)('enters %s as %s', (text, _name, gap, action) => {
     for (const side of [0, 1]) {
       const { path } = run('shuwa', motion(text, side), {
@@ -279,6 +295,53 @@ describe('SHUWA (authored, donor RYUKO)', () => {
       });
       expect(firstMove(path)).toBe(action);
     }
+  });
+
+  // His keys for the new moves: DRILL's for SHUWATCH, MUSASHI's for GIANT
+  // STEP (a stock), IORI's (F) for BARRIER and EX's (E) for RECHARGE.
+  it.each([
+    ['drill', 'SHUWATCH', 11278, 3],
+    ['musashi', 'GIANT STEP', 14347, 2],
+    ['iori', 'BARRIER', 12261, 3],
+    ['ex', 'RECHARGE', 13229, 3],
+  ] as const)('enters %s as %s', (key, _name, action, stock) => {
+    const his = run('shuwa', (t) => ({ [key]: t === 2 }), {
+      gap: 250,
+      ticks: 300,
+    });
+    expect(firstMove(his.path)).toBe(action);
+    expect(his).toMatchObject({ stock, foreign: [] });
+  });
+
+  it("rises with SHUWATCH from a jump too (DoraEmon's Sky Rise 280)", () => {
+    const { path } = run('shuwa', (t) => ({ jump: t === 0, drill: t === 20 }), {
+      ticks: 200,
+    });
+    expect(path.map(([, action]) => action)).toEqual([
+      'takeoff',
+      'jump',
+      11280,
+      'land',
+      'turn',
+      'idle',
+    ]);
+  });
+
+  it("sends RYUKO's RING back with BARRIER (ALEX's REFLACT 261)", () => {
+    // Her axe (227) thrown from 300 away meets the wall at tick 25: he turns
+    // it (12267) into his own shot (12269), which knocks her down.
+    const { match, f, other } = duel('shuwa', 0, 300);
+    const path = new Set<unknown>();
+    const shots = new Set<unknown>();
+    for (let t = 0; t < 300; t++) {
+      match.step({ iori: t === 2 }, { axe: t === 0 });
+      path.add(playing(f));
+      for (const e of objects(match, 12269, 0)) shots.add(e.clip);
+    }
+    expect([...path]).toEqual(['idle', 12261, 12267]);
+    expect(shots.size).toBeGreaterThan(0);
+    expect(f.hp).toBe(480);
+    expect(other.hp).toBeLessThan(LIFE);
   });
 
   // Her intros' op 0x16s jump to Chage Character (37) while down is held,
@@ -330,6 +393,8 @@ describe('SHUWA (authored, donor RYUKO)', () => {
   });
 
   it('plays Vs. CPU rounds from his CPU table, never a move he lacks', () => {
+    // RYUKO's moves his new entries replaced: MUSASHI (GIANT STEP), DRILL
+    // (SHUWATCH), IORI and CPU IORI (BARRIER) and EX (RECHARGE).
     const lacks = [
       RYUKO.musashi,
       RYUKO.blackRush,
@@ -355,8 +420,137 @@ describe('SHUWA (authored, donor RYUKO)', () => {
         RYUKO.axeThrow,
         RYUKO.changeAttack,
         RYUKO.hitUp,
+        // HPA-1305's SPECIUM, SHUWATCH, BARRIER and GIANT STEP.
+        RYUKO.exFire,
+        11278,
+        12261,
+        14347,
       ]),
     );
     expect(lacks.filter((action) => moves.has(action))).toEqual([]);
+  });
+});
+
+// HPA-1305: his chest lamp is variable 10 (spec.json lamp), 0 full and 30
+// empty: SPECIUM (231) and RING (226) each add a charge's 10 on firing, an
+// empty lamp's shot plays RECHARGE (ZOMA's reload, 13229) instead, which
+// sets it back to 0, and a landed Chuck (197) gives one back. At his 30%
+// line (144 of 480) shots are free and never recharge.
+describe("SHUWA's lamp (HPA-1305)", () => {
+  const LAMP = 10;
+  // Presses `input` at each tick of `at` from `lamp`, `hp` life: the first
+  // timeline each press entered and the lamp once it played out.
+  function presses(
+    at: number[],
+    input: Input,
+    { lamp = 0, hp = 0, gap = 300 } = {},
+  ) {
+    const { f, step } = duel('shuwa', 0, gap);
+    if (hp) f.hp = hp;
+    f.variables[LAMP] = lamp;
+    const entered: unknown[] = [];
+    const lamps: number[] = [];
+    for (let t = 0; t <= at.at(-1)! + 95; t++) {
+      if (at.includes(t - 1)) entered.push(playing(f));
+      if (at.includes(t - 95)) lamps.push(f.variables[LAMP] ?? 0);
+      step(at.includes(t) ? input : {});
+    }
+    return { entered, lamps };
+  }
+  const ring = { axe: true };
+
+  it('spends a charge per RING; the fourth press plays RECHARGE, a refill', () => {
+    expect(presses([2, 100, 200, 300, 400], ring)).toEqual({
+      entered: [226, 226, 226, 13229, 226],
+      lamps: [10, 20, 30, 0, 10],
+    });
+  });
+
+  it('spends one on SPECIUM too, and its fourth press recharges', () => {
+    const specium = motion('d f f+P');
+    const { f, step } = duel('shuwa', 0, 300);
+    const entered: unknown[] = [];
+    for (let press = 0; press < 4; press++) {
+      for (let t = 0; t < 120; t++) {
+        step(specium(t));
+        if (t === 7) entered.push(playing(f));
+      }
+      if (press < 3) expect(f.variables[LAMP]).toBe(10 * (press + 1));
+    }
+    expect(entered).toEqual([231, 231, 231, 13229]);
+    expect(f.variables[LAMP]).toBe(0);
+  });
+
+  it('recharges from E or ↓↓G at any time, open while he does', () => {
+    expect(presses([2], { ex: true }, { lamp: 10 })).toEqual({
+      entered: [13229],
+      lamps: [0],
+    });
+  });
+
+  it('gives a charge back for a landed Chuck, never past full', () => {
+    for (const [lamp, after] of [
+      [20, 10],
+      [0, 0],
+    ]) {
+      const { f, other, step } = duel('shuwa', 0, 80);
+      f.variables[LAMP] = lamp;
+      for (let t = 0; t < 250; t++) step({ throw: t === 0 });
+      expect([f.variables[LAMP], LIFE - other.hp]).toEqual([after, 30]);
+    }
+  });
+
+  it('shoots free at 30% life or less: no charge spent, no RECHARGE', () => {
+    expect(presses([2, 100, 200, 300], ring, { hp: 144 })).toEqual({
+      entered: [226, 226, 226, 226],
+      lamps: [0, 0, 0, 0],
+    });
+    // An empty lamp at the line still shoots; one life above it recharges.
+    expect(presses([2], ring, { hp: 144, lamp: 30 }).entered).toEqual([226]);
+    expect(presses([2], ring, { hp: 145, lamp: 30 }).entered).toEqual([13229]);
+  });
+
+  it('blinks red at 30% life or less, on his drawings only', () => {
+    const { match, f } = duel('shuwa');
+    const lamp = lampOf('shuwa');
+    expect(lamp).toMatchObject({
+      variable: LAMP,
+      step: 10,
+      charges: 3,
+      colors: [
+        [0x68c8f8, 0xf88088],
+        [0x1870d8, 0xe82028],
+        [0x102868, 0xa81018],
+      ],
+    });
+    // His drawings and the grafted moves', not RYUKO's effects he shows.
+    expect(lamp!.images).toEqual(
+      expect.arrayContaining([1, 467, 11293, 12235, 13117]),
+    );
+    expect(lamp!.images).not.toContain(308);
+    f.hp = 145;
+    expect([match.lampLow(f), match.lampRed(f)]).toEqual([false, false]);
+    f.hp = 144;
+    const red: boolean[] = [];
+    for (let t = 0; t < 100; t++) {
+      red.push(match.lampRed(f));
+      match.step();
+    }
+    expect(match.lampLow(f)).toBe(true);
+    // 25 ticks (250 ms) red, then 25 blue.
+    expect(red.filter(Boolean)).toHaveLength(50);
+    expect(red.slice(1).filter((on, t) => on !== red[t])).toHaveLength(3);
+    expect(lampOf('ryuko')).toBeUndefined();
+  });
+
+  it('starts every round full', () => {
+    const match = new Match('cpu', true, 1, ['shuwa', 'ryuko']);
+    while (match.roundTicks <= match.fightTick) match.step();
+    match.fighters[0].variables[LAMP] = 30;
+    match.fighters[1].hp = 0;
+    for (let t = 0; t < 5000 && match.round === 1; t++) match.step();
+    // Each round seats new fighters (nextRound), their variables empty.
+    expect(match.round).toBe(2);
+    expect(match.fighters[0]).toMatchObject({ who: 'shuwa', variables: {} });
   });
 });

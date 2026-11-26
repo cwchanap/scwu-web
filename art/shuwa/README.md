@@ -74,7 +74,7 @@ can read them without the raw drawings or the game's files):
   code by `tools/game_fx.py` at the size of the donor image each one replaces.
 - `game/ui/`: the Menu's 24 x 60 face tile and the HUD's 70 x 21 face, cut from `refs/base.png`.
 - `game/spec.json`: his stats, command table, which drawing stands in for each donor image, the images he shows as
-  nothing, and the frames SWING drops. The exporter (`export_authored` in `scripts/export_assets.py`) builds
+  nothing, the frames SWING drops, his chest lamp and the moves grafted from other fighters. The exporter (`export_authored` in `scripts/export_assets.py`) builds
   `generated/shuwa.json` and the `fighter-shuwa` pack from it and the donor's own export.
 
 Nothing here is cut from the game: the anchors are numbers about his drawings, and the donor's offsets only decided them.
@@ -114,6 +114,10 @@ cut from the game.
   (the steps are the donor's raw words: `commands.ts` documents the bits). `near` stays the donor's.
   RING and ULTRA SWING take the ticket's inputs: the donor's axe entry is down, forward, P and her CGA ends in K, his are down, back, G and
   forward, down, back, forward, down, back, G (G is the P button, H the K button).
+  `new` fills entries he does not keep: `{entry: fields}` over the inert entry (its `name` from `names`), with `window`, the `near`,
+  `far`, `air` and `crouch` actions and the `steps`. His are 3 GIANT STEP, 8 SHUWATCH, 9 SPECIUM, 15 BARRIER and 16 RECHARGE; their
+  actions are the donor's (231, her EX Fire) or a graft's (11278, 12261, 13229, 14347, below). The shortcut keys of those entries
+  (`commands.ts` `KEYS.shuwa`) are the donor's keys for the same numbers, BARRIER on F (her IORI) and RECHARGE on E (her EX).
 - `images`: donor image id -> drawing name. Every image a fighter-owned script, clip, held or idle record shows must be here (or in
   `blank`, `fx`, or `scriptImages`). Objects' images (hit sparks, dust, the super flash) are not listed and stay the donor's.
   An image he shows is exported as his own: `filename shuwa/<id>.png` (the drawing's bytes), the drawing's width and height,
@@ -130,8 +134,47 @@ cut from the game.
   The scripts must still end and the throw must still deal its damage.
 - `cutInputs`: donor actions his input checks may not jump to. The exporter removes every op 0x16 (`input` event) of his scripts
   that jumps to one, and refuses if his own timeline still reaches one. Her intros (30 to 34, 36) jump to Chage Character (37)
-  while down is held, which sets variable 0 to 10, her EX mode; he has none, so 37 is cut.
+  while down is held, which sets variable 0 to 10, her EX mode; he has none, so 37 is cut. Her EX Fire (231, his SPECIUM)
+  fires again while down is held (its check at age 18 into 237 and 238); one lamp charge is one shot, so both are cut.
 - `ui`: the Menu and HUD stand-ins. `hudFaceImages` take `ui/hud-face.png` (their own width and height).
+- `levels`: `{action: level}` over the donor's (the header byte a cancel window tests). The donor's 231 has none, since she enters it
+  only in EX mode; SPECIUM gives it RING's 31.
+- `cpu`: CPU entries (the export's `cpu` shape) added to the donor's table, after the donor's entries for the commands `new` fills are
+  dropped. The grafts add their donors' entries too (`grafts[].cpu`).
+- `lamp`: his chest lamp, kept in player variable `variable` (10, which RYUKO never uses): 0 is full, each shot adds `step`, and
+  `charges` shots empty it. The exporter puts, first in each `shots` script (`{action: age}`), a test that jumps to `empty`
+  (RECHARGE) when the lamp is at `step × charges`, and an add of `step` at the age the shot fires. Each `refund` script gets an add of
+  `-step` (a landed Chuck), first in its tick, so no jump of that tick skips it. The engine keeps the lamp between full and empty and,
+  at his low-life line (`lifeLineMark`), passes the test and skips the adds, so shots are free. `colors` (`{from: to}`, hex RGB) are
+  the lamp's blues and the reds they blink to; the export lists his own drawings (not the donor's effects) as `lamp.images`, the
+  images the scene recolours.
+- `grafts`: moves taken from other fighters, each `{move, donor, base, actions, ...}` (see "Grafts" below).
+
+The donor's op 0x11 life thresholds (native HP of the fighter's own bar) are scaled from the donor's life to his
+(`scale_life`): RYUKO's 153 of 510 is his 144 of 480, both 30%.
+
+#### Grafts
+
+A graft copies one move from another fighter's export (`src/game/generated/<donor>.json`) into his. From its `actions` (the move's
+roots), the exporter follows every script the move reaches (its next script, jumps, calls, handlers and the objects it spawns, as
+`script_edges` lists them) and renumbers each by
+`base` + the donor's number, together with the images, sound indexes and variables they use, so nothing clashes with RYUKO's tables
+(DoraEmon 11000, ALEX 12000, ZOMA 13000, REMU 14000).
+
+- `host`: `{donor action: his action}`. The walk stops there and jumps go to his own script instead (a landing, the super flash,
+  dust). The target must be one of his scripts or engine states.
+- `cut`: donor actions the move may not reach; events that jump to or spawn one are removed (ALEX's REFLACT's follow-up 274).
+- `variables`: `{donor variable: his}` for the move's own counters (ALEX's variable 2 is his 11; ZOMA's ammo, variable 0, is his
+  lamp, 10).
+- `images`: `{donor image: drawing}`, placed as above against the donor's own image and reference placement. Every other image the
+  move shows (its effects and objects) stays the donor's picture, exported as `own` under the donor's filename.
+- `level`: the roots' cancel level, else the donor's.
+- `cpu`: `{donor command: his}`. The donor's CPU entries whose commands are all listed are added with his numbers.
+- `patch`: `[{script, op, ...match, set | drop}]`. Each changes (`set`) or removes (`drop`) the donor events of `script` that match
+  every other field (`t`, `slot`, `action`, ...); a patch that matches nothing stops the export. GIANT STEP's patches spend one stock
+  (REMU spends three), spawn his foot, make the dive a straight stamp down about 250 px ahead and set its box at the sole, for 100.
+
+Grafted scripts may not use op 0x07's held poses (the exporter refuses them), and their life thresholds are scaled like his own.
 
 #### Placing a drawing
 
@@ -168,6 +211,7 @@ image's bottom centre `(w_m // 2, h_m)` when the donor shows `m` only held. Held
 
 - every action in `commands` (and Counter Hit, action 174) exists in the donor's scripts;
 - nothing of his reaches a `cutInputs` action once its checks are cut;
+- every graft patch matches an event, every `host` target is his, no graft action or image clashes with his or another graft's;
 - every fighter-shown image of every script those actions reach maps to a drawing, is blanked or kept (list the exceptions);
 - every `images`/`scriptImages` drawing and every `fx` file exists and has an anchor; each `fx` file has the donor image's size;
 - nothing under `art/` is a file of the game (the test compares hashes with `public/assets`).

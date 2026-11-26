@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ASSET_BASE as BASE } from './assetBase';
-import { CHARACTERS, lifeOf, STAGES } from './characters';
+import { CHARACTERS, lampOf, lifeOf, STAGES } from './characters';
 import type { Container, Stage, Who } from './characters';
 import { DEFAULT_CHEATS } from './cheats';
 import type { CheatOptions } from './cheats';
@@ -1407,8 +1407,14 @@ export class TrainingScene extends Phaser.Scene {
 
   // A player's objects draw with its palette (0x40ccf2), but for images with
   // their own; each recoloured image is drawn once and cached.
-  private recolored(image: number, who: Container, palette: number) {
+  private recolored(
+    image: number,
+    who: Container,
+    palette: number,
+    lamp = false,
+  ) {
     const key = `${who === 'kgt' ? 'ui' : who}-${image}`;
+    if (lamp) return this.lampLit(key, image, who as Who);
     if (!palette || !(who in CHARACTERS)) return key;
     const recolored = `${key}@${palette}`;
     if (this.textures.exists(recolored)) return recolored;
@@ -1441,13 +1447,46 @@ export class TrainingScene extends Phaser.Scene {
     return recolored;
   }
 
+  // Authored (HPA-1305): SHUWA's lamp lit red, his drawing with each of the
+  // lamp's blues swapped for its red (`${key}@lamp`).
+  private lampLit(key: string, image: number, who: Who) {
+    const lamp = lampOf(who);
+    if (!lamp?.images.includes(image)) return key;
+    const lit = `${key}@lamp`;
+    if (this.textures.exists(lit)) return lit;
+    const colors = new Map(lamp.colors);
+    const source = this.textures.get(key).getSourceImage() as HTMLImageElement;
+    const canvas = this.textures.createCanvas(
+      lit,
+      source.width,
+      source.height,
+    )!;
+    canvas.context.drawImage(source, 0, 0);
+    const pixels = canvas.getData(0, 0, source.width, source.height);
+    const { data } = pixels;
+    for (let i = 0; i < data.length; i += 4) {
+      const color = colors.get(
+        (data[i] << 16) | (data[i + 1] << 8) | data[i + 2],
+      );
+      if (!data[i + 3] || color === undefined) continue;
+      [data[i], data[i + 1], data[i + 2]] = [
+        color >> 16,
+        (color >> 8) & 255,
+        color & 255,
+      ];
+    }
+    canvas.putData(pixels, 0, 0).refresh();
+    return lit;
+  }
+
   private texture(
     image: number,
     color: Color,
     who: Container,
     palette: number,
+    lamp = false,
   ) {
-    return this.tint(this.recolored(image, who, palette), color);
+    return this.tint(this.recolored(image, who, palette, lamp), color);
   }
 
   // 0x404e2d draws each bar after every object, in source pixels from the
@@ -1602,11 +1641,12 @@ export class TrainingScene extends Phaser.Scene {
     color: Color,
     who: Container,
     palette = 0,
+    lamp = false,
   ) {
     if (isBlank(pose, who)) return sprite.setVisible(false);
     return sprite
       .setVisible(true)
-      .setTexture(this.texture(pose.image, color, who, palette))
+      .setTexture(this.texture(pose.image, color, who, palette, lamp))
       .setBlendMode(
         color.mode === 2 ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL,
       )
@@ -1783,7 +1823,16 @@ export class TrainingScene extends Phaser.Scene {
           (GROUND + f.y) / ART_SCALE,
           (pose.held ? holder : f).facing === -1,
         );
-        this.paint(sprite, pose, this.faded(f, i), f.who, this.palettes[i])
+        // SHUWA's lamp blinks red at low life.
+        const lamp = this.match.lampRed(f);
+        this.paint(
+          sprite,
+          pose,
+          this.faded(f, i),
+          f.who,
+          this.palettes[i],
+          lamp,
+        )
           .setDepth(depthOf(f.z, i))
           .setPosition(p.left * ART_SCALE, p.top * ART_SCALE)
           .setFlip(p.flip_x, p.flip_y);
