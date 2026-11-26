@@ -258,7 +258,7 @@ SHUWA has no source file. His data is RYUKO's export (`assets.json`, built in `m
   - **Measured timing.** SWING enters 214 at tick 2 and 215 at 7, tosses at 192 and is back in idle at 290: 288 ticks. Her DST tosses at 192 too, her missiles strike at 294, and she is idle at 388. So he recovers 98 ticks after the toss against her 196. The cut takes 85 timeline ticks; the missiles' contact stop takes the other 13 (her 215 runs 381 match ticks for 368).
   - **At 153 life or less.** SWING plays her Evil DST (221 into 222) with the same cut: 10 damage, back in idle at 455 against her 553.
 - **No EX mode (authored).** Her intros (30–34, 36) jump to Chage Character (37) through an op `0x16` while down is held. 37 sets variable 0 to 10, which is her EX mode. `cutInputs` `[37]` removes those input checks from his scripts, and the export refuses if his timeline still reaches 37. `EX_MODE` has no entry for him.
-- **Low-life forms (recovered).** Her op `0x11`s compare life with 153 absolute, so for his 480 life they trigger at about 32%. At or below that, SPECIUM RAY plays G BEAM EVIL (278 on the ground, 280 in the air) for 120. `SUPER_GATES` carries the same G BEAM gates for the cheats' Low HP line.
+- **Low-life forms (recovered, line scaled by HPA-1305).** Her op `0x11`s compare life with 153 absolute (30% of her 510). Since HPA-1305 the export scales them to his life (`scale_life`: 144 of 480, also 30%). At or below that, SPECIUM RAY plays G BEAM EVIL (278 on the ground, 280 in the air) for 120. `SUPER_GATES` carries the same G BEAM gates at 144 for the cheats' Low HP line.
 - **Engine tables (authored, following RYUKO's).**
   - **Following RYUKO's.** `BOUNCE_DOWN` (HISA Down lands into 147), the KO round-over value 99, HISA Down's −500 knock-back, `BACK_DASH` 14, and her CPU table and controls.
   - **His keys.** `KEYS` keeps the RYUKO keys whose entries he has.
@@ -268,6 +268,26 @@ SHUWA has no source file. His data is RYUKO's export (`assets.json`, built in `m
   - **DOM art.** `dom_art()` also scans `src/instructions/fighters.ts`, for his face tile (`shuwa/9000.png`) and guide portrait (`shuwa/3.png`).
   - **Upload.** As with any exporter change, `bun run upload:r2` must run before the Cloudflare builds and CI pass.
   - **No game files under `art/`.** A test compares every `art/` PNG with `public/assets`; only the exporter's own copies match.
+
+## SHUWA's lamp and grafted moves (HPA-1305, 2026-11-26)
+
+Authored throughout: SHUWA has no source file. Each new move is a donor fighter's recovered move, copied by the exporter (`graft` in `scripts/export_assets.py`; the contract is `art/shuwa/README.md`, "Grafts"). Its timing, boxes, responses, effects and sounds stay the donor's unless a patch below says otherwise. The engine runs them as his own scripts.
+
+- **Grafts.**
+  - **SHUWATCH** (entry 8, →↓↘G, 40-tick window): DoraEmon's Sky Rise, 278 on the ground and 280 in the air, renumbered to 11278/11280. Its landing (Dora's 270) goes to his landing (9). His drawings replace Dora's 293, 321, 328 and 125; the sparkle (404) stays Dora's picture. Dora's CPU entries for her command 13 come with it, as ALEX's for 16 and REMU's for 1 do below.
+  - **BARRIER** (entry 15, ↓→H or F): ALEX's REFLACT 261 as 12261. A shot that meets the wall plays 12267 and turns into his own shot 12269. ALEX's follow-up 274 is cut, and his variable 2 becomes 11. The red wall and the reflected shot stay ALEX's pictures. Measured: a RING thrown from 300 px at tick 0 meets a wall raised at tick 2 at tick 25 and knocks RYUKO down; a wall raised at tick 10 is not up yet.
+  - **RECHARGE** (entry 16, ↓↓G or E): ZOMA's reload 229 as 13229, level 31. ZOMA's ammo variable 0 becomes his lamp variable 10, so the reload's own reset empties the counter.
+  - **GIANT STEP** (entry 3, ↓←↓←H, 1 stock): REMU's GOLD HAND 347 as 14347. Its no-stock fallback (REMU's 302) goes to RYUKO's 251, and its flash and dust objects (407, 413) to RYUKO's 371 and 396. Patched: one stock instead of REMU's three, his foot (`giant-foot`) spawned above him, a forward drift while rising (vx 800 at age 30), REMU's handler at slot 2 dropped, a straight dive down (vx 0, vy 2000 at age 85), and the sole's box (x 0, y −30, half-size 70 × 30, kind 4) for 100 with responses 77 (launch down) and 25–27 (heavy block). REMU's diagonal dive carried him about 536 px, past the opponent; the stamp lands about 250 px ahead and hits from 60 to 360 px away.
+  - **Sounds.** The grafted scripts keep their donors' sounds, at `base` + the donor's index. Some are voices, to be replaced by HPA-1307.
+- **SPECIUM** (entry 9, ↓→G): RYUKO's EX Fire 231, which she plays only in EX mode, so it has no level of its own; `levels` gives it RING's 31. Its down-held repeat (the check at age 18 into 237 and 238) is cut (`cutInputs`).
+- **Command table.** `commands.new` fills the five entries over the inert shape. The CPU table drops RYUKO's entries for commands 3, 8, 9, 15 and 16 (the moves he lacks), then adds a SPECIUM entry (probability 20 at 400–700 px) and the donors' entries for the grafted commands. `KEYS.shuwa` is RYUKO's keys for the same numbers, BARRIER on F (her IORI) and RECHARGE on E (her EX).
+- **The lamp.**
+  - **Data.** Player variable 10 (RYUKO uses 0–3, 5, 6, 8, 9, 12, 14 and 15). 0 is full; each shot adds 10, and 30 is empty.
+  - **Exporter.** It puts a test first in RING (226) and SPECIUM (231): at 30, jump to RECHARGE (13229). It adds 10 at their firing ages, 16 and 18. The Chuck's 197 gets an add of −10 at age 0, first in its tick so its age-0 test cannot skip it.
+  - **Engine.** `match.ts`'s add keeps the lamp between 0 and 30. At or below `lifeLineMark` (144), `lampHolds` passes the empty test and positive adds are skipped, so shots are free. Variables reset with each round's new fighters.
+  - **Blink.** `lampRed` is on for 25 ticks and off for 25 while low. The scene then draws his drawings (`lamp.images`, not the donor effects) with the lamp's three blues (68c8f8, 1870d8, 102868) swapped for reds (f88088, e82028, a81018). Those blues appear only in the chest lamp.
+  - **HUD.** None, per the ticket.
+- **Drawings.** New drawings for the grafted moves (`sw-293`, `sw-321`, `sw-125`, `b-235`, `b-236`, `rc-117`, `rc-261`–`rc-263` and `giant-foot`) come from the HPA-1304 art. `game_art.py` places a donor pose against that donor's own frames, scaled by idle height to RYUKO's (`donor_offset`). `sw-328` moved by 1 px because the median now includes the new poses.
 
 ## Strict battle-scoped no-revive (HPA-1251, 2026-11-22)
 

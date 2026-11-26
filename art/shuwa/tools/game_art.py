@@ -1,9 +1,10 @@
 """SHUWA's game drawings: one shared-palette PNG per drawing and its anchor (art/shuwa/game/).
 
-usage: python3 -I tools/game_art.py RAW_DIR REFS_DIR ROUND7_DIR DONOR_JSON ASSETS_DIR OUT_DIR
+usage: python3 -I tools/game_art.py RAW_DIR REFS_DIR ROUND7_DIR DATA_DIR ASSETS_DIR OUT_DIR
 RAW_DIR holds every drawing (draw.sh output, with the hand-drawn and fixed ones laid over the first pass), REFS_DIR the
-key drawings, ROUND7_DIR the committed round 7 build (idle, walk and the powered key sprites), DONOR_JSON out/data/ryuko.json
-(tools/donor_data.py: RYUKO's frame offsets) and ASSETS_DIR the game's exported sprites (the donor's feet are read from them).
+key drawings, ROUND7_DIR the committed round 7 build (idle, walk and the powered key sprites), DATA_DIR out/data
+(tools/donor_data.py: each donor's frame offsets and idle size) and ASSETS_DIR the game's exported sprites (the donors'
+feet are read from them).
 Writes OUT_DIR/drawings/<name>.png, OUT_DIR/anchors.json, OUT_DIR/fx/<donor image>.png (his effects, drawn in code at
 the size of the donor image they replace) and OUT_DIR/ui/ (the Menu's face tile and the HUD face, cut from his key drawing).
 
@@ -15,6 +16,9 @@ the donor's own position point lands on the drawing.
   (the key drawing's place on a 1024x1536 canvas) and the same y.
 - The donor image a drawing stands in for sets that offset (SOURCE below); the exporter then moves every use of the
   drawing by how far the donor's script shifts that image (spec.json lists which drawing stands in for each donor image).
+- A special drawn for another donor's move (b3_poses: DoraEmon's SHUWATCH, ALEX's BARRIER) takes that donor's offset
+  and guide point, scaled from its idle height to RYUKO's as b3.py does; RECHARGE's free poses (ZOMA sits in a tank)
+  take none, so their anchor is their feet. GIANT STEP's foot is cut 330 px tall (as b4.py does) and anchored on its sole.
 Drawings share one palette (index 0 is transparent): the cast's two-tone ramps leave 31 opaque colours in all.
 """
 import json
@@ -32,8 +36,10 @@ from b3_poses import POSES as B3  # noqa: E402
 from v4 import BASE_ACTION, Ref, feet, load, pixel  # noqa: E402
 
 HERE = Path(__file__).parent.parent
-# Drawings the game uses (batch 4's GIANT STEP, SHUWATCH, BARRIER and RECHARGE are not in his training moves).
-SKIP = {"giant-foot", "b-235", "b-236", "rc-117", "rc-261", "rc-262", "rc-263", "sw-293", "sw-321", "sw-125"}
+# GIANT STEP's foot: cut to this height in game px, anchored on its sole.
+FOOT = ("giant-foot", 330)
+# Donor folders under ASSETS_DIR and their out/data names (b3_poses names RYUKO "ryuko").
+FOLDER = {"ryuko": "ryuko", "dora": "dora", "alex": "alex", "zoma": "zoma"}
 # Round 7 key sprites kept as they are (the powered stances); anchor = feet.
 ROUND7_KEYS = ["p-charge", "p-fire", "p-fistup"]
 # Donor image a drawing is placed for, when it is not the number after the dash in its name.
@@ -103,17 +109,24 @@ def crop_opaque(spr, w, h, x0, y0):
     return out
 
 
-def main(raw, refs_dir, round7, donor_json, assets, out):
-    raw, refs_dir, round7, assets, out = map(Path, (raw, refs_dir, round7, assets, out))
-    R = json.loads(Path(donor_json).read_text())["frames"]
+def main(raw, refs_dir, round7, data, assets, out):
+    raw, refs_dir, round7, data, assets, out = map(Path, (raw, refs_dir, round7, data, assets, out))
+    frames = {d: json.loads((data / f"{d}.json").read_text())["frames"] for d in FOLDER}
+    R = frames["ryuko"]
+    idle = {("ryuko" if d == "assets" else d): v["idle"][2] for d, v in json.loads((data / "donors.json").read_text()).items()}
     rows = poses()
 
-    def ryuko_offset(n, vertical_only):
-        """The donor's position point minus its feet, in image n (sprite px; the same scale as SHUWA's)."""
-        dx, dy, w, h = R[str(n)]
-        im = np.asarray(Image.open(assets / "ryuko" / f"{n}.png").convert("RGBA"))
+    def donor_offset(donor, n, vertical_only):
+        """The donor's position point minus its feet, in its image n, in SHUWA sprite px (other donors are scaled from
+        their idle height to RYUKO's, as b3.py does)."""
+        dx, dy, w, h = frames[donor][str(n)]
+        im = np.asarray(Image.open(assets / FOLDER[donor] / f"{n}.png").convert("RGBA"))
         fx, fy = feet(im)
-        return (0 if vertical_only else (w // 2 - dx) - fx), (h - dy) - fy
+        k = 1.0 if donor == "ryuko" else idle["ryuko"] / idle[donor]
+        return (0 if vertical_only else round(((w // 2 - dx) - fx) * k)), round(((h - dy) - fy) * k)
+
+    def ryuko_offset(n, vertical_only):
+        return donor_offset("ryuko", n, vertical_only)
 
     refs = {}
     for form, h in (("base", 208.0), ("hero", 205.0)):
@@ -123,7 +136,7 @@ def main(raw, refs_dir, round7, donor_json, assets, out):
 
     found = {}
     for name, row in rows.items():
-        if name in SKIP or not (raw / f"{name}.png").exists() or row["batch"] == "b4":
+        if not (raw / f"{name}.png").exists() or row["batch"] == "b4":
             continue
         a, bg = load(raw, name)
         (f, _, _), score = refs[row["form"]][0].find(a, np.arange(0.75, 1.26, 0.01))
@@ -145,15 +158,22 @@ def main(raw, refs_dir, round7, donor_json, assets, out):
         spr, (x0, _) = pixel(a, bg, s0 / use)
         n = source(name, row)
         guided = row["guide"] != "-"
+        # b3's specials for other donors; sw-328 stood in for RYUKO's flight first (THREE MINUTES) and keeps her offset
+        donor = B3[name][0] if name in B3 and name != "sw-328" else "ryuko"
         fx_, fy_ = feet(spr)
-        ox, oy = ryuko_offset(n, vertical_only=not guided)
+        ox, oy = (0, 0) if donor == "zoma" else donor_offset(donor, n, vertical_only=not guided)
         ax, ay = int(fx_ + ox), int(fy_ + oy)
         if guided:
-            ax = (posref.point(R[str(n)], form, size)[0] - x0) * s0 / use
+            k = 1.0 if donor == "ryuko" else idle["ryuko"] / idle[donor]
+            ax = (posref.point(frames[donor][str(n)], form, size, posref.SCALE[form] * k)[0] - x0) * s0 / use
         elif (form, size) in posref.POINT and size == "1024x1536":
             ax = (posref.POINT[form, size][0] - x0) * s0 / use
         sprites[name] = spr
         anchors[name] = [round(float(ax)), int(ay)]
+
+    a, bg = load(raw, FOOT[0])
+    sprites[FOOT[0]], _ = pixel(a, bg, FOOT[1] / a.shape[0])  # the leg fills the canvas height
+    anchors[FOOT[0]] = [int(v) for v in feet(sprites[FOOT[0]])]
 
     # Round 7: idle and walk keep the canvases and anchors the preview page built, the powered stances their feet.
     meta = json.loads((round7 / "frames.json").read_text())

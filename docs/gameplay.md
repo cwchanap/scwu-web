@@ -104,12 +104,19 @@ Press J or the Throw touch button to grab an opponent, including one holding bac
 
 ## SHUWA
 
-SHUWA is an authored fighter: he has no original file. He plays Ryuko's moves on her timing with his own drawings, 480 life and three stocks. He joins from the Menu's fighter lists and the summon grid; he has no seat on the select sheet and no story. He has Ryuko's chains, jumps and dashes, Hit Up and its chase, Chuck and COUNTER HIT. His five specials and supers take Ryuko's motions, read toward the opponent, or their keys:
+SHUWA is an authored fighter: he has no original file. He plays Ryuko's moves on her timing with his own drawings, 480 life and three stocks, and five moves borrowed from other fighters. He joins from the Menu's fighter lists and the summon grid; he has no seat on the select sheet and no story. He has Ryuko's chains, jumps and dashes, Hit Up and its chase, Chuck and COUNTER HIT. His specials and supers take these motions, read toward the opponent; BARRIER and RECHARGE also have keys:
 
-- **RING**, ↓← G: Ryuko's axe throw (30), free.
+- **RING**, ↓← G: Ryuko's axe throw (30), for a lamp charge.
+- **SPECIUM**, ↓→ G: her EX Fire, a crossed-arm shot, for a lamp charge. It fires once per press.
+- **RECHARGE**, ↓↓ G or E: ZOMA's reload. It refills the lamp, and he can be hit while he does.
+- **SHUWATCH**, →↓↘ G, also in the air: DoraEmon's Sky Rise, a rising punch that carries him up and forward.
+- **BARRIER**, ↓→ H or F: ALEX's REFLACT. A wall of light at his palms; a shot that meets it flies back at the thrower. It takes about a fifth of a second to rise.
 - **SWING**, ←↓→ H: her Daisetsuzan Oroshi without the missile volley. The toss deals 10, and he is back 98 ticks (about a second) sooner.
 - **SPECIUM RAY**, ↓→↓→ G, also in the air: her G BEAM, 100 over 20 hits, for a stock.
 - **ULTRA SWING**, →↓←→↓← G: her CGA (100), for a stock. The full motion enters it though it ends in RING's ↓← G.
+- **GIANT STEP**, ↓←↓← H: REMU's GOLD HAND turned into a stamp. He rises, a giant foot comes down about 250 arena pixels ahead, and it deals 100 (blocked as a heavy hit), for one stock.
 - **THREE MINUTES**, ↓→↓→ H: her B G (240), for three stocks.
 
-At 153 life or less (about a third of his), SPECIUM RAY becomes G BEAM EVIL (120) and SWING her Evil DST, still without the volley. He has no Drill Punch, IORI, MUSASHI, hidden super or EX mode: holding down through his intro changes nothing. In Vs. CPU he plays Ryuko's CPU table, whose picks of the moves he lacks enter nothing.
+His chest lamp holds three shots. RING and SPECIUM each spend one as they fire; a press with none left plays RECHARGE instead. RECHARGE fills it again, and a landed Chuck gives one back. Every round starts full, and the HUD shows nothing for it: the lamp on his chest is the gauge.
+
+At 144 life or less (30% of his), the lamp blinks red, a quarter second red and a quarter second blue. Shots spend nothing and never turn into RECHARGE, SPECIUM RAY becomes G BEAM EVIL (120), and SWING becomes her Evil DST, still without the volley. He has no Drill Punch, IORI, hidden super or EX mode: holding down through his intro changes nothing. In Vs. CPU he plays Ryuko's CPU table without the entries his new moves replaced, plus the borrowed moves' own CPU entries and one for SPECIUM.

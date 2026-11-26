@@ -223,6 +223,10 @@
       rario: {
         iori: 'Tatumaki',
       },
+      shuwa: {
+        iori: 'Barrier',
+        ex: 'Recharge',
+      },
       training: {
         punch: 'Drain',
         kick: 'Refill',

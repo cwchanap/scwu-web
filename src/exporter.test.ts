@@ -273,6 +273,7 @@ const spec = json<{
   drop: Record<string, number[]>;
   cutInputs: number[];
   ui: { portrait: string; faceTile: string; hudFace: string };
+  grafts: { base: number; images: Record<string, string> }[];
 }>(`${ART}/spec.json`);
 const anchors = json<
   Record<string, { anchor: [number, number]; size: [number, number] }>
@@ -364,6 +365,10 @@ describe("SHUWA's authored export", () => {
       ...Object.values(spec.scriptImages).flatMap((images) =>
         Object.keys(images).map((image) => 10000 + Number(image)),
       ),
+      // A graft's drawings, at its base + the donor's image.
+      ...spec.grafts.flatMap(({ base, images }) =>
+        Object.keys(images).map((image) => base + Number(image)),
+      ),
     ]);
     expect([...shown].filter((image) => !mapped.has(image))).toEqual([]);
     const ownImages = new Set(
@@ -375,9 +380,11 @@ describe("SHUWA's authored export", () => {
       ),
     ).toEqual([]);
     // The moves he lacks are left out, and with her intro's input checks to
-    // them cut (cutInputs), so is Chage Character (37), her EX mode.
+    // them cut (cutInputs), so is Chage Character (37), her EX mode, and
+    // her EX Fire's repeat with down held (231's check at age 18 into 237
+    // and 238), so SPECIUM fires once per lamp charge.
     const cut = new Set(spec.cutInputs);
-    expect(cut).toEqual(new Set([37]));
+    expect(cut).toEqual(new Set([37, 237, 238]));
     expect([...own].filter((key) => cut.has(parseInt(key)))).toEqual([]);
     expect(
       Object.values(shuwa.scripts).flatMap(({ events }) =>
@@ -391,6 +398,7 @@ describe("SHUWA's authored export", () => {
     const drawings = new Set([
       ...Object.values(spec.images),
       ...Object.values(spec.scriptImages).flatMap(Object.values),
+      ...spec.grafts.flatMap(({ images }) => Object.values(images)),
       spec.ui.portrait,
     ]);
     for (const name of drawings) {

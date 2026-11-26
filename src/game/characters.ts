@@ -174,6 +174,18 @@ export type FighterData = typeof ryuko & {
   aliases: Record<string, number>;
   counters: Record<string, [number, number, number][]>;
   neutralTests: Record<string, GlobalTest[]>;
+  // Authored (HPA-1305): SHUWA's chest lamp (export_authored).
+  lamp?: Lamp;
+};
+// SHUWA's lamp: shots spend `step` from `variable` up to `step * charges`
+// (empty), RECHARGE sets it back to 0, and at low life his drawings in
+// `images` blink each `colors` pair's first colour as its second.
+export type Lamp = {
+  variable: number;
+  step: number;
+  charges: number;
+  colors: [number, number][];
+  images: number[];
 };
 // An op 0x1f test of a global.
 export type GlobalTest = {
@@ -296,6 +308,9 @@ export const countersOf = (
 ): Record<string, [number, number, number][]> =>
   (CHARACTERS[who] as { counters?: Record<string, [number, number, number][]> })
     .counters ?? {};
+// SHUWA's lamp (HPA-1305); no other fighter has one.
+export const lampOf = (who: Who): Lamp | undefined =>
+  (CHARACTERS[who] as { lamp?: Lamp } | undefined)?.lamp;
 // Each neutral action's tests of a global before its first display, which
 // entering it takes (export_fighter).
 export const neutralTestsOf = (
@@ -356,11 +371,12 @@ export const SUPER_GATES: Partial<Record<Who, Record<string, SuperGate>>> = {
     '254+9': { below: false, value: 150 },
     '286': { below: false, value: 153 },
   },
-  // SHUWA's SPECIUM RAY is her G BEAM (export_authored).
+  // SHUWA's SPECIUM RAY is her G BEAM, its mark moved to his 30% of 480
+  // (export_authored scale_life).
   shuwa: {
-    '263': { below: true, value: 153 },
-    '264': { below: true, value: 153 },
-    '265': { below: true, value: 153 },
+    '263': { below: true, value: 144 },
+    '264': { below: true, value: 144 },
+    '265': { below: true, value: 144 },
   },
   // Shin Spark (279) turns into BOMB at 147 or more (Zoma's supers).
   zoma: { '279': { below: false, value: 147 } },
