@@ -548,6 +548,7 @@ test('guide links SHUWA by his own face tile and opens his page', async ({
   await page.goto('/instructions.html');
   const link = page.getByRole('link', { name: 'SHUWA', exact: true });
   await expect(link.locator('img')).toBeVisible();
+  await expect(link.locator('img')).toHaveAttribute('src', /shuwa\/9000\.png$/);
   await expect
     .poll(() =>
       link
