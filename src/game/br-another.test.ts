@@ -10,6 +10,7 @@ import type { Battle, Slot, Step } from './story';
 import {
   BR_LONG_DEMO,
   brAnotherStages,
+  brLongPartner,
   brLongStory,
   bossBrAnotherStory,
 } from './br-another';
@@ -1123,7 +1124,7 @@ describe('B.R. LONG route', () => {
       expect(brLongStory(who)[0], who).toEqual({ type: 2, demo: 24 });
   });
 
-  it('gives the DoraEmon ally the partner life bar from the first tick', () => {
+  it('gives the Z-MEGA ally the partner life bar from the first tick', () => {
     for (const [who] of rows) {
       if (isBoss(who)) continue;
       const battle = longBattle(who);
@@ -1134,17 +1135,20 @@ describe('B.R. LONG route', () => {
         expect(slot!.flags & 1, who).toBe(0);
     }
     const match = Match.story('ryuko', longBattle('ryuko'));
-    const dora = match.fighters.at(-1)!;
-    expect(dora.who).toBe('dora');
+    const partner = match.fighters.at(-1)!;
+    expect(partner.who).toBe('zmega');
     toFight(match);
-    expect(match.lifeBars).toEqual([dora]);
+    expect(match.lifeBars).toEqual([partner]);
     // A boss plays alone: no partner, no bar.
     const boss = Match.story('zenka', longBattle('zenka'));
     toFight(boss);
     expect(boss.lifeBars).toEqual([]);
   });
 
-  it('adds DoraEmon as the ordinary player’s first-tick ally and gives a boss no ally', () => {
+  it('adds Z-MEGA as the ordinary player’s first-tick ally (RARIO for Z-MEGA) and gives a boss no ally', () => {
+    expect(brLongPartner('ryuko')).toBe('zmega');
+    expect(brLongPartner('rario')).toBe('zmega');
+    expect(brLongPartner('zmega')).toBe('rario');
     for (const [who] of rows) {
       const battle = longBattle(who);
       for (const slot of battle.slots)
@@ -1153,7 +1157,9 @@ describe('B.R. LONG route', () => {
         );
       if (isBoss(who)) continue;
       const ally = battle.slots.at(-1)!;
-      expect(ally.player, who).toBe(ROSTER.indexOf('dora'));
+      expect(ROSTER[ally.player], who).toBe(
+        who === 'zmega' ? 'rario' : 'zmega',
+      );
       expect(ally.flags & 0x200, who).toBe(0x200);
       // Entry bits 1–2 are 0: on stage from the first tick.
       expect((ally.flags >> 1) & 3, who).toBe(0);

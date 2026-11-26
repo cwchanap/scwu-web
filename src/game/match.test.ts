@@ -1145,7 +1145,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     while (br.roundTicks <= br.fightTick) br.step();
     const [ryuko] = br.fighters;
     const victim = br.fighters.find(
-      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+      (f, i) => i > 0 && f.who !== 'zmega' && f.shown,
     )!;
     victim.x =
       ryuko.x + firstStrike('ryuko', RYUKO.punch, victim.who).reach - 20;
@@ -1179,7 +1179,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
     while (br.roundTicks <= br.fightTick) br.step();
     const victim = br.fighters.find(
-      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+      (f, i) => i > 0 && f.who !== 'zmega' && f.shown,
     )!;
     // Op 0x15 empties life inside the victim's step, before the same step's
     // motion pass settles its script into the wall.
@@ -1232,7 +1232,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
     while (br.roundTicks <= br.fightTick) br.step();
     const victim = br.fighters.find(
-      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+      (f, i) => i > 0 && f.who !== 'zmega' && f.shown,
     )!;
     victim.hp = victim.maxHp;
     pose(br, victim, 'gonMiss', animationDuration('gonMiss', victim.who) - 1);
@@ -1255,7 +1255,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
     while (br.roundTicks <= br.fightTick) br.step();
     const victim = br.fighters.find(
-      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+      (f, i) => i > 0 && f.who !== 'zmega' && f.shown,
     )!;
     victim.hp = 1;
     pose(br, victim, 'gonMiss', animationDuration('gonMiss', victim.who) - 1);
@@ -1279,7 +1279,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     while (br.roundTicks <= br.fightTick) br.step();
     const [ryuko] = br.fighters;
     const victim = br.fighters.find(
-      (f, i) => i > 0 && f.who !== 'dora' && f.shown,
+      (f, i) => i > 0 && f.who !== 'zmega' && f.shown,
     )!;
     victim.x = ryuko.x;
     knockOut(br, victim);
@@ -1365,7 +1365,7 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
       const victim = br.fighters.find(
         (f, i) => i > 0 && f.present && (f.enemies & 1) !== 0,
       )!;
-      // Simulate DoraEmon KO'ing the first enemy before 1P has hit anyone:
+      // Simulate the Z-MEGA ally KO'ing the first enemy before 1P has hit anyone:
       // 1P's target still points to that KO'd enemy while caught is null.
       knockOut(br, victim);
       expect([ryuko.caught, ryuko.target, victim.hp], label).toEqual([
