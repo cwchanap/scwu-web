@@ -1322,7 +1322,11 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     victim.hitStop = 0;
     const z = victim.z;
     enter(br, ryuko, RYUKO.musashiHit);
+    const box = { x: -10000, y: -10000, w: 1, h: 1, damage: 0, kind: 0 };
+    ryuko.box = box;
+    ryuko.boxes = [box];
     for (let t = 0; t < 8; t++) br.step();
+    expect([ryuko.box, ryuko.boxes]).toEqual([null, []]);
     (br as unknown as { pause(f: Fighter, ticks: number): void }).pause(
       victim,
       13,
