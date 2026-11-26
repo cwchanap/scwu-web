@@ -1339,6 +1339,56 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
+  it('keeps an unholding fighter’s boxes on B.R. op 0x07/0x14 when its stale target is KO’d and refuses superHeld re-catch (authored, HPA-1251)', () => {
+    const events = script(RYUKO.dstHit, 'ryuko').events;
+    const apply = events.find((e) => e.op === 'apply')!;
+    const hold = events.find((e) => e.op === 'hold')!;
+    for (const [label, event, holdPose] of [
+      ['apply', apply, false],
+      ['apply-superHeld', apply, true],
+      ['hold', hold, false],
+      ['hold-superHeld', hold, true],
+    ] as const) {
+      const br = Match.story(
+        'ryuko',
+        brLongStory('ryuko')[0] as Battle,
+        0,
+        undefined,
+        undefined,
+        true,
+      );
+      for (const [i, vm] of br.cpus.entries()) if (i) vm!.input = () => ({});
+      while (br.roundTicks <= br.fightTick) br.step();
+      const [ryuko] = br.fighters;
+      const victim = br.fighters.find(
+        (f, i) => i > 0 && f.present && (f.enemies & 1) !== 0,
+      )!;
+      // Simulate DoraEmon KO'ing the first enemy before 1P has hit anyone:
+      // 1P's target still points to that KO'd enemy while caught is null.
+      knockOut(br, victim);
+      if (holdPose) pose(br, victim, 'superHeld', 0);
+      expect([ryuko.caught, ryuko.target, victim.hp], label).toEqual([
+        null,
+        victim,
+        0,
+      ]);
+      const box = { x: -10000, y: -10000, w: 1, h: 1, damage: 0, kind: 0 };
+      ryuko.box = box;
+      ryuko.boxes = [box];
+      (
+        br as unknown as {
+          runEvent(
+            actor: Fighter,
+            owner: number,
+            event: typeof apply | typeof hold,
+          ): boolean;
+        }
+      ).runEvent(ryuko, 0, event);
+      expect([ryuko.box, ryuko.boxes], label).toEqual([box, [box]]);
+      expect(victim.held, label).toBeNull();
+    }
+  });
+
   it('keeps the boss seat down on the generated boss B.R. LONG', () => {
     const br = Match.story(
       'zenka',

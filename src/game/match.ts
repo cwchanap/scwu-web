@@ -4060,7 +4060,7 @@ export class Match {
           other &&
           this.koProtected(other)
         ) {
-          this.clearBoxes(self);
+          if (self.caught) this.clearBoxes(self);
           break;
         }
         this.seize(self, event.flags);
@@ -4098,7 +4098,7 @@ export class Match {
           other &&
           this.koProtected(other)
         ) {
-          this.clearBoxes(self);
+          if (self.caught) this.clearBoxes(self);
           break;
         }
         this.seize(self, event.flags);
