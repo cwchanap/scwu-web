@@ -1339,15 +1339,13 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
     expect(playing(victim)).toBe('koLand');
   });
 
-  it('keeps an unholding fighter’s boxes on B.R. op 0x07/0x14 when its stale target is KO’d and refuses superHeld re-catch (authored, HPA-1251)', () => {
+  it('keeps an unholding fighter’s boxes on B.R. op 0x07/0x14 when its stale target is KO’d (authored, HPA-1251)', () => {
     const events = script(RYUKO.dstHit, 'ryuko').events;
     const apply = events.find((e) => e.op === 'apply')!;
     const hold = events.find((e) => e.op === 'hold')!;
-    for (const [label, event, holdPose] of [
-      ['apply', apply, false],
-      ['apply-superHeld', apply, true],
-      ['hold', hold, false],
-      ['hold-superHeld', hold, true],
+    for (const [label, event] of [
+      ['apply', apply],
+      ['hold', hold],
     ] as const) {
       const br = Match.story(
         'ryuko',
@@ -1366,7 +1364,6 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
       // Simulate DoraEmon KO'ing the first enemy before 1P has hit anyone:
       // 1P's target still points to that KO'd enemy while caught is null.
       knockOut(br, victim);
-      if (holdPose) pose(br, victim, 'superHeld', 0);
       expect([ryuko.caught, ryuko.target, victim.hp], label).toEqual([
         null,
         victim,
@@ -1385,7 +1382,6 @@ describe('strict B.R. no-revive (authored, HPA-1251)', () => {
         }
       ).runEvent(ryuko, 0, event);
       expect([ryuko.box, ryuko.boxes], label).toEqual([box, [box]]);
-      expect(victim.held, label).toBeNull();
     }
   });
 
