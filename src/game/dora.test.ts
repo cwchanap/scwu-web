@@ -2009,7 +2009,7 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
   });
 
   it('plays his whole Br. intro from a waiting seat in B.R., untouchable, before the CPU wakes', () => {
-    // kiki's stage-3 brawl seats DoraEmon last, watching ZENKA's seat:
+    // kiki's stage-3 brawl seats DoraEmon last, watching ALPHA's seat:
     // arrive → opening enters the authored Br. intro mid-fight, as a first
     // seat's does before the fight.
     const battle = brAnotherStages('kiki').stage3;

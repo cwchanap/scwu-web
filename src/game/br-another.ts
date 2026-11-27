@@ -173,7 +173,7 @@ const STAGE3_PARTNERS: readonly (readonly [Who, number])[] = [
 // from its actual predecessor, and a donated ally is rebuilt to watch the
 // 1P at the 1P's own desperation mark rather than keeping the donor's stale
 // threshold (sww's opener ships below 160). Stage 3 also seats Z-MEGA and
-// RARIO as immediate allies (HPA-1148, owner-approved): each built by the
+// RARIO as immediate allies (HPA-1148): each built by the
 // shared onStageAlly recipe from the fighter's own finale ally donor at its
 // fixed x, the player's own excluded; the usual delayed partner is kept
 // ahead of them unless it is already one of the immediates — the reciprocal
