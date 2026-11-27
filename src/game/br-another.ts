@@ -78,18 +78,29 @@ const sourceStep = (who: Who, index: number) =>
 const seats = (row: readonly (readonly Who[])[]) =>
   row.flat().map((who) => ROSTER.indexOf(who));
 
+// An ally on stage from the first tick: the donor's own fields but the
+// partner's seat and opening x, the ally flag (0x200) and the life-bar bit
+// (0x1, +0xdf0d) every native partner slot carries, and the entry bits
+// (0x6) cleared so no donor's delayed or timed entry survives.
+const onStageAlly = (base: Slot, partner: Who, x: number): Slot => ({
+  ...base,
+  player: ROSTER.indexOf(partner),
+  x,
+  flags: (base.flags | 0x201) & ~0x6,
+});
+
 const assemble = (
   roles: Battle,
   header: Battle,
   players: readonly number[],
   paired: boolean,
   stage: number,
-  ally?: Slot,
+  allies: readonly Slot[] = [],
 ): Battle => {
   const n = players.length;
-  // The hostility bits cover the actual seats: the 1P, the n players and,
-  // when the route donates one, the ally behind them.
-  const all = (1 << (n + (ally ? 2 : 1))) - 1;
+  // The hostility bits cover the actual seats: the 1P, the n players and
+  // the allies behind them.
+  const all = (1 << (n + 1 + allies.length)) - 1;
   const slots: Slot[] = players.map((player, i) => {
     const enemies =
       all & ~(1 << (i + 1)) & ~(paired ? 1 << (i % 2 === 0 ? i + 2 : i) : 0);
@@ -112,7 +123,11 @@ const assemble = (
       below: desperationOf(ROSTER[players[i - 1]!]!),
     };
   });
-  if (ally) slots.push({ ...ally, enemies: all & ~1 & ~(1 << (n + 1)) });
+  // The allies take the seats behind all the enemies — the enemy indices
+  // never shift — and fight exactly the enemy seats: friendly to the 1P
+  // and to each other.
+  const enemySeats = ((1 << (n + 1)) - 1) & ~1;
+  for (const ally of allies) slots.push({ ...ally, enemies: enemySeats });
   return {
     type: header.type,
     stage,
@@ -161,16 +176,11 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     seats(row.stage1),
     true,
     9,
-    allyOf(folded ? finale : opener),
+    [allyOf(folded ? finale : opener)],
   );
-  const stage2 = assemble(
-    finale,
-    finale,
-    seats(row.stage2),
-    true,
-    3,
+  const stage2 = assemble(finale, finale, seats(row.stage2), true, 3, [
     allyOf(finale),
-  );
+  ]);
   const bosses = seats([row.stage3]);
   const stage3 = assemble(
     finale,
@@ -178,7 +188,7 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     bosses,
     false,
     bossArena(bosses.at(-1)!),
-    allyOf(finale),
+    [allyOf(finale)],
   );
   return { stage1, stage2, stage3 };
 };
@@ -298,15 +308,14 @@ export const brAnotherStory = (who: Who): readonly Step[] => {
 // approved ordered pairs (twelve enemies) on Sakura Street with the header
 // and roles of ryuko's own stage-9 opener (63). An ordinary player adds
 // Z-MEGA as the sole partner (owner, 26 Nov 2026, replacing DoraEmon) —
-// RARIO for a Z-MEGA player, as HPA-1148 pairs the two — rebuilt from the
-// opener's immediate-entry first slot with the ally flag (0x200) so he is
-// on stage from the first tick, and the life-bar bit (0x1, +0xdf0d) every
-// native partner slot carries, so he draws his bar like any partner; a
-// boss player has no ally and all twelve hostile seats marked tough
-// (Slot.tough; match.ts applies the stats). Pacing stays native: the first
-// enemy is present at the start and each next enters once its predecessor
-// falls below its own desperation mark (assemble's watch/below, read
-// through match.ts lifeMark).
+// RARIO for a Z-MEGA player, as HPA-1148 pairs the two — onStageAlly's
+// immediate ally rebuilt from the opener's first slot, so he is on stage
+// from the first tick and draws his bar like any partner; a boss player
+// has no ally and all twelve hostile seats marked tough (Slot.tough;
+// match.ts applies the stats). Pacing stays native: the first enemy is
+// present at the start and each next enters once its predecessor falls
+// below its own desperation mark (assemble's watch/below, read through
+// match.ts lifeMark).
 export const brLongPartner = (who: Who): Who =>
   who === 'zmega' ? 'rario' : 'zmega';
 export const brLongBattle = (who: Who): Battle => {
@@ -314,15 +323,10 @@ export const brLongBattle = (who: Who): Battle => {
   if (!row) throw new Error(`${who} has no approved B.R. LONG row`);
   const roles = sourceStep('ryuko', 63);
   const boss = (BOSSES as readonly Who[]).includes(who);
-  const ally: Slot | undefined = boss
-    ? undefined
-    : {
-        ...roles.slots[0]!,
-        player: ROSTER.indexOf(brLongPartner(who)),
-        x: 450,
-        flags: roles.slots[0]!.flags | 0x201,
-      };
-  const battle = assemble(roles, roles, seats(row), true, 9, ally);
+  const allies = boss
+    ? []
+    : [onStageAlly(roles.slots[0]!, brLongPartner(who), 450)];
+  const battle = assemble(roles, roles, seats(row), true, 9, allies);
   if (boss) for (const slot of battle.slots) slot!.tough = true;
   return battle;
 };
