@@ -108,15 +108,47 @@ const pairKey = (players: readonly number[]) =>
 const leaderPosKey = (players: readonly number[], pos: number) =>
   `${Math.floor(players[0]! / 2)},${players[0]! % 2},${pos}`;
 
+// Team membership independent of the builder's mask arithmetic: a slot is
+// an ally when its flags carry bit 9 (0x200), the same bit Match reads.
+const isAllySlot = (slot: Slot | null) => !!(slot && slot.flags & 0x200);
+const enemySlotsOf = (battle: Battle) =>
+  battle.slots.filter((slot) => !isAllySlot(slot));
+const allySlotsOf = (battle: Battle) =>
+  battle.slots.filter((slot) => isAllySlot(slot));
+
+// Friendship over the original seat indices — seat 0 is the 1P, seat s the
+// slot at index s − 1. A seat joins the 1P's team when it is the 1P or a
+// 0x200-flagged ally; two seats are friendly when both are on that team or
+// both are enemies paired as mates (consecutive enemy seats).
+const onPlayerTeam = (battle: Battle, seat: number) =>
+  seat === 0 || isAllySlot(battle.slots[seat - 1]!);
+const friendlySeats = (
+  battle: Battle,
+  paired: boolean,
+  a: number,
+  b: number,
+) => {
+  if (a === b) return true;
+  const pa = onPlayerTeam(battle, a);
+  const pb = onPlayerTeam(battle, b);
+  if (pa !== pb) return false;
+  if (pa) return true;
+  return paired && Math.floor((a - 1) / 2) === Math.floor((b - 1) / 2);
+};
+
+// The hostility mask of the slot at index i, derived seat by seat from team
+// membership and pairing alone — never from the builder's own arithmetic.
 const enemyMask = (battle: Battle, i: number, paired: boolean) => {
-  const last = battle.slots.length - 1;
-  const all = (1 << (last + 2)) - 1;
-  if (i === last) return all & ~1 & ~(1 << (last + 1));
-  let mask = all & ~(1 << (i + 1));
-  if (paired) mask &= ~(1 << (i % 2 === 0 ? i + 2 : i));
+  let mask = 0;
+  for (let seat = 0; seat <= battle.slots.length; seat++)
+    if (!friendlySeats(battle, paired, i + 1, seat)) mask |= 1 << seat;
   return mask;
 };
 
+// Every slot equals its donor role slot with only the seat details
+// overridden, enemies and allies told apart by the 0x200 flag rather than
+// position: the enemies keep their original indices (0 first, the last the
+// chain's end) and the allies follow them.
 const expectRoles = (
   who: Who,
   battle: Battle,
@@ -124,21 +156,21 @@ const expectRoles = (
   paired: boolean,
 ) => {
   const ally = roles.slots[6]!;
-  const n = battle.slots.length - 1;
+  const enemies = enemySlotsOf(battle);
+  const allies = allySlotsOf(battle);
   battle.slots.forEach((slot, i) => {
-    const role =
-      i === n
-        ? ally
-        : i === 0
-          ? roles.slots[0]!
-          : i === n - 1
-            ? roles.slots[5]!
-            : roles.slots[1]!;
-    const { player, enemies, watch, below, x } = slot!;
+    const role = isAllySlot(slot)
+      ? ally
+      : i === 0
+        ? roles.slots[0]!
+        : i === enemies.length - 1
+          ? roles.slots[5]!
+          : roles.slots[1]!;
+    const { player, enemies: hostility, watch, below, x } = slot!;
     expect(slot, `${who} slot ${i}`).toEqual({
       ...role,
       player,
-      enemies,
+      enemies: hostility,
       watch,
       below,
       x,
@@ -147,26 +179,26 @@ const expectRoles = (
       enemyMask(battle, i, paired),
     );
   });
-  const players = battle.slots.map((s) => s!.player);
   expect(
     battle.slots.map((s) => s!.watch),
     who,
-  ).toEqual([0, ...Array.from({ length: n - 1 }, (_, i) => i + 1), 0]);
+  ).toEqual(battle.slots.map((s, i) => (isAllySlot(s) ? 0 : i)));
   expect(
     battle.slots.map((s) => s!.x),
     who,
   ).toEqual([
-    ...Array.from({ length: n - 1 }, (_, i) => (i % 2 === 0 ? 850 : 450)),
-    450,
-    ally.x,
+    ...enemies.map((_, i) =>
+      i === enemies.length - 1 ? 450 : i % 2 === 0 ? 850 : 450,
+    ),
+    ...allies.map(() => ally.x),
   ]);
   expect(
     battle.slots.map((s) => s!.below),
     who,
   ).toEqual([
     0,
-    ...players.slice(0, n - 1).map((p) => desperationOf(ROSTER[p]!)),
-    desperationOf(who),
+    ...enemies.slice(0, -1).map((s) => desperationOf(ROSTER[s!.player]!)),
+    ...allies.map(() => desperationOf(who)),
   ]);
 };
 
@@ -568,34 +600,22 @@ describe('BR Another approved lineups', () => {
       const { stage1, stage2, stage3 } = brAnotherStages(who);
       for (const battle of [stage1, stage2, stage3]) {
         if (!battle) continue;
-        const last = battle.slots.length - 1;
-        const limit = 1 << (last + 2);
+        const paired = battle !== stage3;
         for (const [i, a] of battle.slots.entries()) {
-          expect(a!.enemies, `${who} slot ${i}`).toBeLessThan(limit);
-          expect(a!.enemies & (1 << (i + 1)), `${who} self ${i}`).toBe(0);
-          expect(!!(a!.enemies & 1), `${who} vs 1P ${i}`).toBe(
-            !(a!.flags & 0x200),
+          // The whole mask, seat by seat from team membership: hostile to
+          // the 1P unless an ally, never to itself, friendly to its pair
+          // mate and to its team, hostile to every other seat.
+          expect(a!.enemies, `${who} slot ${i}`).toBe(
+            enemyMask(battle, i, paired),
           );
+          expect(a!.enemies & (1 << (i + 1)), `${who} self ${i}`).toBe(0);
+          expect(!!(a!.enemies & 1), `${who} vs 1P ${i}`).toBe(!isAllySlot(a));
           for (const [j, b] of battle.slots.entries())
             expect(
               !!(a!.enemies & (1 << (j + 1))),
               `${who} ${i + 1}->${j + 1}`,
             ).toBe(!!(b!.enemies & (1 << (i + 1))));
         }
-        for (let i = 0; i < last; i++)
-          for (let j = 0; j < last; j++) {
-            const paired =
-              battle !== stage3 &&
-              i !== j &&
-              Math.floor(i / 2) === Math.floor(j / 2);
-            expect(
-              !!(battle.slots[i]!.enemies & (1 << (j + 1))),
-              `${who} ${i + 1}->${j + 1}`,
-            ).toBe(i !== j && !paired);
-          }
-        expect(battle.slots[last]!.enemies, who).toBe(
-          (((1 << (last + 2)) - 1) & ~1 & ~(1 << (last + 1))) >>> 0,
-        );
       }
     }
   });
@@ -644,14 +664,13 @@ describe('BR Another approved lineups', () => {
       'yinan',
     ] as Who[])
       for (const battle of built(brAnotherStages(who))) {
-        const n = battle.slots.length - 1;
-        for (let i = 0; i < n - 1; i++) {
-          const slot = battle.slots[i]!;
-          expect((slot.flags >> 7) & 3, `${who} ${i}`).toBe(2);
-          expect([slot.life, slot.power], `${who} ${i}`).toEqual([50, 10]);
-          expect(slot.points, `${who} ${i}`).toBe(0);
+        const enemies = enemySlotsOf(battle);
+        for (const [i, slot] of enemies.slice(0, -1).entries()) {
+          expect((slot!.flags >> 7) & 3, `${who} ${i}`).toBe(2);
+          expect([slot!.life, slot!.power], `${who} ${i}`).toEqual([50, 10]);
+          expect(slot!.points, `${who} ${i}`).toBe(0);
         }
-        const last = battle.slots[n - 1]!;
+        const last = enemies.at(-1)!;
         expect((last.flags >> 7) & 3, who).toBe(0);
         expect(last.points, who).toBe(100);
         expect(last.scorer, who).toBe(1);
@@ -673,10 +692,10 @@ describe('BR Another approved lineups', () => {
     expect(masa.slots.map((s) => s?.below)).toEqual([0, 180, 240, 150, 135]);
     for (const who of ELIGIBLE)
       for (const battle of built(brAnotherStages(who))) {
-        const players = battle.slots.map((s) => s!.player);
-        for (let i = 1; i < battle.slots.length - 1; i++)
-          expect(battle.slots[i]!.below, `${who} ${i}`).toBe(
-            desperationOf(ROSTER[players[i - 1]!]!),
+        const enemies = enemySlotsOf(battle);
+        for (let i = 1; i < enemies.length; i++)
+          expect(enemies[i]!.below, `${who} ${i}`).toBe(
+            desperationOf(ROSTER[enemies[i - 1]!.player]!),
           );
       }
   });
@@ -691,16 +710,20 @@ describe('BR Another approved lineups', () => {
         finale.slots[6]!,
         finale.slots[6]!,
       ];
-      for (const [battle, donor] of built(brAnotherStages(who)).map(
-        (battle, i) => [battle, donors[i]!] as const,
-      )) {
+      const battles = built(brAnotherStages(who));
+      for (const [i, donor] of donors.entries()) {
+        const battle = battles[i]!;
         const ally = battle.slots.at(-1)!;
         expect(ally.player, who).toBe(donor.player);
         expect(ally.flags & 0x200, who).toBe(0x200);
         expect(ally.watch, who).toBe(0);
         expect(ally.below, who).toBe(desperationOf(who));
         expect(ally.x, who).toBe(donor.x);
-        expect(ally.enemies, who).toBe(((1 << battle.slots.length) - 1) & ~1);
+        // Hostile exactly to the enemy seats — never the 1P or itself —
+        // derived from team membership, not the builder's arithmetic.
+        expect(ally.enemies, who).toBe(
+          enemyMask(battle, battle.slots.length - 1, battle !== battles[2]),
+        );
       }
     }
     // The rebuilt slot binds the ally donor, not its stale thresholds: sww is
@@ -721,7 +744,9 @@ describe('BR Another approved lineups', () => {
       expect(ally.life).toBe(77);
       expect(ally.watch).toBe(0);
       expect(ally.below).toBe(desperationOf('sww'));
-      expect(ally.enemies).toBe(((1 << stage1.slots.length) - 1) & ~1);
+      expect(ally.enemies).toBe(
+        enemyMask(stage1, stage1.slots.length - 1, true),
+      );
       for (const battle of [stage2, stage3])
         expect(battle.slots.at(-1)!.player).toBe(original.player);
     } finally {
@@ -805,10 +830,9 @@ describe('boss B.R. ANOTHER route', () => {
         x,
         tough: tough || undefined,
       });
-      const all = (1 << (n + 1)) - 1;
-      let expected = all & ~(1 << (i + 1));
-      if (paired) expected &= ~(1 << (i % 2 === 0 ? i + 2 : i));
-      expect(slot!.enemies).toBe(expected);
+      // No ally seats here: hostile to every seat but itself and, in a
+      // paired battle, its mate — derived from team membership by seat.
+      expect(slot!.enemies).toBe(enemyMask(battle, i, paired));
     });
   };
 
@@ -1164,7 +1188,10 @@ describe('B.R. LONG route', () => {
       // Entry bits 1–2 are 0: on stage from the first tick.
       expect((ally.flags >> 1) & 3, who).toBe(0);
       expect(ally.watch, who).toBe(0);
-      expect(ally.enemies, who).toBe((((1 << 14) - 1) & ~1 & ~(1 << 13)) >>> 0);
+      // Hostile exactly to the twelve enemy seats — never the 1P or itself.
+      expect(ally.enemies, who).toBe(
+        enemyMask(battle, battle.slots.length - 1, true),
+      );
       // The left opening faces right toward the 1P and never overlaps the
       // first enemy's right-side slot.
       expect(ally.x, who).toBe(450);
@@ -1195,25 +1222,17 @@ describe('B.R. LONG route', () => {
   it('seats symmetric hostility: mates allied, the others hostile, the ally against all twelve', () => {
     for (const [who] of rows) {
       const battle = longBattle(who);
-      const last = battle.slots.length - 1;
-      const all = (1 << (last + 2)) - 1;
       for (const [i, a] of battle.slots.entries()) {
-        expect(a!.enemies, `${who} range ${i}`).toBeLessThanOrEqual(all);
+        // The whole mask from team membership by seat: mates friendly,
+        // the 1P and the ally one team, every other seat hostile.
+        expect(a!.enemies, `${who} slot ${i}`).toBe(enemyMask(battle, i, true));
         expect(a!.enemies & (1 << (i + 1)), `${who} self ${i}`).toBe(0);
-        expect(!!(a!.enemies & 1), `${who} vs 1P ${i}`).toBe(
-          !(a!.flags & 0x200),
-        );
+        expect(!!(a!.enemies & 1), `${who} vs 1P ${i}`).toBe(!isAllySlot(a));
         for (const [j, b] of battle.slots.entries())
           expect(
             !!(a!.enemies & (1 << (j + 1))),
             `${who} ${i + 1}->${j + 1}`,
           ).toBe(!!(b!.enemies & (1 << (i + 1))));
-        const mate = i % 2 === 0 ? i + 1 : i - 1;
-        for (let j = 0; j <= last; j++)
-          expect(
-            !!(a!.enemies & (1 << (j + 1))),
-            `${who} seat ${i + 1}->${j + 1}`,
-          ).toBe(j !== i && j !== mate);
       }
     }
   });
