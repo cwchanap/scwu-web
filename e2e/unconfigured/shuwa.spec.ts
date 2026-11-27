@@ -40,10 +40,17 @@ const stepTo = async (seat: Locator, step: Locator, name: string) => {
 // It counts the lamp's blues and their reds, and for each change between
 // lit and unlit compares the two frames around the lamp: when nothing else
 // in that window changed (the drawing held), only blues swapped for reds,
-// the swap is seen. Resolves after `frames` frames, or once `until` holds.
+// the swap is seen. Resolves after `frames` frames, or once `until` holds:
+// four flips (red and blue in turn, twice) and a clean swap.
 const BLUES = [0x68c8f8, 0x1870d8, 0x102868];
 const REDS = [0xf88088, 0xe82028, 0xa81018];
-type Lamp = { frames: number; blue: number; red: number; swapped: boolean };
+type Lamp = {
+  frames: number;
+  blue: number;
+  red: number;
+  flips: number;
+  swapped: boolean;
+};
 const watchLamp = (page: Page, frames: number, until?: 'blink') =>
   page.evaluate(
     ({ frames, until, BLUES, REDS }) =>
@@ -52,7 +59,13 @@ const watchLamp = (page: Page, frames: number, until?: 'blink') =>
         const copy = document.createElement('canvas');
         [copy.width, copy.height] = [game.width, game.height];
         const context = copy.getContext('2d', { willReadFrequently: true })!;
-        const seen: Lamp = { frames: 0, blue: 0, red: 0, swapped: false };
+        const seen: Lamp = {
+          frames: 0,
+          blue: 0,
+          red: 0,
+          flips: 0,
+          swapped: false,
+        };
         let last: { data: Uint8ClampedArray; lit: boolean } | undefined;
         const color = (d: Uint8ClampedArray, i: number) =>
           (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
@@ -82,6 +95,7 @@ const watchLamp = (page: Page, frames: number, until?: 'blink') =>
           if (red) seen.red++;
           const lit = red > 0;
           if (last && last.lit !== lit && blue + red) {
+            seen.flips++;
             let [swaps, others] = [0, 0];
             for (
               let y = Math.max(0, y0 - 24);
@@ -104,7 +118,7 @@ const watchLamp = (page: Page, frames: number, until?: 'blink') =>
             seen.swapped ||= swaps > 0 && others === 0;
           }
           last = { data, lit };
-          const blinked = seen.blue && seen.red && seen.swapped;
+          const blinked = seen.flips >= 4 && seen.swapped;
           if (seen.frames >= frames || (until === 'blink' && blinked))
             done(seen);
           else requestAnimationFrame(frame);
@@ -182,6 +196,9 @@ test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
   const low = await watchLamp(page, 600, 'blink');
   expect(low.blue, 'lamp blue between blinks').toBeGreaterThan(0);
   expect(low.red, 'lamp lit red').toBeGreaterThan(0);
+  expect(low.flips, 'red and blue in turn, twice over').toBeGreaterThanOrEqual(
+    4,
+  );
   expect(low.swapped, 'only the lamp changed colour').toBe(true);
   await page.screenshot({ path: test.info().outputPath('shuwa-lamp.png') });
   await menu.click();
