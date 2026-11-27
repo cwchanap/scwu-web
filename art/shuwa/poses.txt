@@ -1,6 +1,6 @@
 # One row per SHUWA drawing, read by draw.sh.
 # pose: prompts/<pose>.txt is its prompt, out/raw/<pose>.png its drawing.
-# batch: b1 body, b2 attacks, b3 specials, b4 supers.
+# batch: b1 body, b2 attacks, b3 specials, b4 supers, ui the select portrait and face tile (HPA-1306).
 # guide: out/posrefs/<guide>.png, the donor's sprite for the same pose, sent as image 2 (- draws from the prompt
 #   alone). draw.sh makes it from the game's sprites (tools/posref.py); it is never committed.
 # form: refs/<form>.png, SHUWA's key drawing sent as image 1 (base or hero).
@@ -83,3 +83,10 @@ rc-261       b3    -          hero 1024x1536
 rc-262       b3    -          hero 1024x1536
 rc-263       b3    -          hero 1024x1536
 giant-foot   b4    -          hero 1024x1536
+# ui: the select portrait and face tile variants (HPA-1306); tools/ui.py makes ui/ from them.
+portrait-a   ui    -          base 1024x1536
+portrait-b   ui    -          base 1024x1536
+portrait-c   ui    -          base 1024x1536
+face-a       ui    -          base 1024x1536
+face-b       ui    -          base 1024x1536
+face-c       ui    -          base 1024x1536

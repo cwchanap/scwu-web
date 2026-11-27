@@ -3,7 +3,7 @@
 # where poses.txt names one, the donor's sprite for the same pose as image 2. Those guides are cut from the game's
 # files (ASSETS, default public/assets, and GENERATED, default src/game/generated), so they are made here into
 # out/posrefs/ and never committed.
-#   bash art/shuwa/draw.sh b2            # a whole batch (b1 b2 b3 b4)
+#   bash art/shuwa/draw.sh b2            # a whole batch (b1 b2 b3 b4 ui)
 #   bash art/shuwa/draw.sh p1-33 k1-72   # single poses; batches and poses can be mixed
 # Needs OPENAI_API_KEY in the environment; the key is never printed. Writes out/raw/<pose>.png beside this script.
 # IMAGE_MODEL overrides the model (default gpt-image-2.6-sunburst).
