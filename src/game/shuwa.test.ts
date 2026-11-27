@@ -512,12 +512,23 @@ describe("SHUWA's lamp (HPA-1305)", () => {
     });
   });
 
-  // Both spawn their shot into RYUKO's axe slot (6, busy 225): with one
-  // out, a second press of either only makes him stand, for nothing.
+  it('can be hit out of RECHARGE before the refill', () => {
+    const { f, step } = duel('shuwa', 0, 80);
+    f.variables[LAMP] = 30;
+    const path: unknown[] = [];
+    for (let t = 0; t < 120; t++) {
+      step({ ex: t === 2 }, { punch: t === 20 });
+      if (path.at(-1) !== playing(f)) path.push(playing(f));
+    }
+    expect(path).toEqual(['idle', 13229, 'hit', 'idle']);
+    expect([lifeOf('shuwa') - f.hp, f.variables[LAMP]]).toEqual([10, 30]);
+  });
+
+  // Both spawn their shot into RYUKO's axe slot (6, busy 225). A press
+  // while one flies plays the stand and costs nothing, but a motion still
+  // in its 40-tick window fires once the shot is gone, as RYUKO's own fire
+  // does.
   it('keeps one RING or SPECIUM out at a time', () => {
-    // A press while a shot flies plays the stand (225) and costs nothing,
-    // but a motion still in its 40-tick window fires once the shot is gone,
-    // as RYUKO's own fire does.
     const specium = motion('d f f+P');
     const late = (t: number) => specium(t - 48);
     for (const [first, second, path, lamp] of [

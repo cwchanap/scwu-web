@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// SHUWA (HPA-1304), the one authored fighter: his pack, drawings and
+// SHUWA (HPA-1304, HPA-1305), the one authored fighter: his pack, drawings and
 // placement are exported apart from the source roster, so this journey
 // proves the production bundle seats and plays him through the Menu's own
 // controls — practice in 1P, then Vs. CPU in 2P. His rules are the Vitest
@@ -34,6 +34,85 @@ const stepTo = async (seat: Locator, step: Locator, name: string) => {
     await step.click();
   await expect(seat).toHaveText(name);
 };
+
+// SHUWA's chest lamp (HPA-1305) on the drawn canvas: the page copies each
+// frame as it renders, so the 250 ms blink can't fall between two polls.
+// It counts the lamp's blues and their reds, and for each change between
+// lit and unlit compares the two frames around the lamp: when nothing else
+// in that window changed (the drawing held), only blues swapped for reds,
+// the swap is seen. Resolves after `frames` frames, or once `until` holds.
+const BLUES = [0x68c8f8, 0x1870d8, 0x102868];
+const REDS = [0xf88088, 0xe82028, 0xa81018];
+type Lamp = { frames: number; blue: number; red: number; swapped: boolean };
+const watchLamp = (page: Page, frames: number, until?: 'blink') =>
+  page.evaluate(
+    ({ frames, until, BLUES, REDS }) =>
+      new Promise<Lamp>((done) => {
+        const game = document.querySelector('canvas')!;
+        const copy = document.createElement('canvas');
+        [copy.width, copy.height] = [game.width, game.height];
+        const context = copy.getContext('2d', { willReadFrequently: true })!;
+        const seen: Lamp = { frames: 0, blue: 0, red: 0, swapped: false };
+        let last: { data: Uint8ClampedArray; lit: boolean } | undefined;
+        const color = (d: Uint8ClampedArray, i: number) =>
+          (d[i] << 16) | (d[i + 1] << 8) | d[i + 2];
+        const frame = () => {
+          context.drawImage(game, 0, 0);
+          const { data } = context.getImageData(0, 0, copy.width, copy.height);
+          let [blue, red] = [0, 0];
+          let [x0, y0, x1, y1] = [copy.width, copy.height, 0, 0];
+          for (let i = 0; i < data.length; i += 4) {
+            const c = color(data, i);
+            if (BLUES.includes(c)) blue++;
+            else if (REDS.includes(c)) red++;
+            else continue;
+            const [x, y] = [
+              (i / 4) % copy.width,
+              Math.floor(i / 4 / copy.width),
+            ];
+            [x0, y0, x1, y1] = [
+              Math.min(x0, x),
+              Math.min(y0, y),
+              Math.max(x1, x),
+              Math.max(y1, y),
+            ];
+          }
+          seen.frames++;
+          if (blue) seen.blue++;
+          if (red) seen.red++;
+          const lit = red > 0;
+          if (last && last.lit !== lit && blue + red) {
+            let [swaps, others] = [0, 0];
+            for (
+              let y = Math.max(0, y0 - 24);
+              y <= Math.min(copy.height - 1, y1 + 24);
+              y++
+            )
+              for (
+                let x = Math.max(0, x0 - 24);
+                x <= Math.min(copy.width - 1, x1 + 24);
+                x++
+              ) {
+                const i = (y * copy.width + x) * 4;
+                const [was, now] = [color(last.data, i), color(data, i)];
+                if (was === now) continue;
+                const [blueOf, redOf] = lit ? [was, now] : [now, was];
+                const k = BLUES.indexOf(blueOf);
+                if (k >= 0 && REDS[k] === redOf) swaps++;
+                else others++;
+              }
+            seen.swapped ||= swaps > 0 && others === 0;
+          }
+          last = { data, lit };
+          const blinked = seen.blue && seen.red && seen.swapped;
+          if (seen.frames >= frames || (until === 'blink' && blinked))
+            done(seen);
+          else requestAnimationFrame(frame);
+        };
+        requestAnimationFrame(frame);
+      }),
+    { frames, until, BLUES, REDS },
+  );
 
 test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
   page,
@@ -88,9 +167,28 @@ test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
   }).toPass({ timeout: 10_000 });
   await page.screenshot({ path: test.info().outputPath('shuwa-practice.png') });
 
+  // The lamp: blue at full life in every frame. Under the low-life line
+  // (144 of 480) the practice Low health hold puts him at 143, and it
+  // blinks red, the drawing's lamp blues swapped for reds and nothing
+  // else around it changed.
+  await expect(health).toContainText('Action: idle', { timeout: 20_000 });
+  const full = await watchLamp(page, 20);
+  expect(full).toMatchObject({ blue: full.frames, red: 0 });
+  await menu.click();
+  await dialog.getByLabel('Low health').check();
+  await dialog.getByRole('button', { name: '◂ Back to game' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(player).toHaveText('143', { timeout: 10_000 });
+  const low = await watchLamp(page, 600, 'blink');
+  expect(low.blue, 'lamp blue between blinks').toBeGreaterThan(0);
+  expect(low.red, 'lamp lit red').toBeGreaterThan(0);
+  expect(low.swapped, 'only the lamp changed colour').toBe(true);
+  await page.screenshot({ path: test.info().outputPath('shuwa-lamp.png') });
+  await menu.click();
+  await dialog.getByLabel('Low health').uncheck();
+
   // Vs. CPU: Ryuko back in 1P, SHUWA the CPU in 2P. Life reads per seat,
   // so 510 then 480 shows the pair went the right way round.
-  await menu.click();
   await dialog.getByLabel('Opponent').selectOption('vsCpu');
   await stepTo(
     seats.nth(0),
