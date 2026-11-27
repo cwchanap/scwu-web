@@ -14,7 +14,7 @@ import {
   brLongStory,
   bossBrAnotherStory,
 } from './br-another';
-import type { BrAnotherStages } from './br-another';
+import type { Boss, BrAnotherStages } from './br-another';
 import { BR_ANOTHER_LINEUPS, BR_LONG_LINEUPS } from './br-lineups';
 import type { LineupPair } from './br-lineups';
 
@@ -932,7 +932,7 @@ describe('BR Another approved lineups', () => {
 });
 
 describe('boss B.R. ANOTHER route', () => {
-  const battlesOf = (who: Who): Battle[] =>
+  const battlesOf = (who: Boss): Battle[] =>
     bossBrAnotherStory(who).filter((step): step is Battle => step.type === 1);
 
   // Authored (HPA-858): each slot equals its donor role slot with only the
@@ -992,27 +992,38 @@ describe('boss B.R. ANOTHER route', () => {
     }
   });
 
-  it('builds 6, 6 and 3 hostile seats, no ally, and never the player’s own boss', () => {
+  it('builds 6, 6 and 6 hostile seats, no ally, the mirror the only own Who', () => {
     for (const who of BOSSES) {
       const [stage1, stage2, stage3] = battlesOf(who);
       expect(stage1.slots, who).toHaveLength(6);
       expect(stage2.slots, who).toHaveLength(6);
-      expect(stage3.slots, who).toHaveLength(3);
+      expect(stage3.slots, who).toHaveLength(6);
       const own = ROSTER.indexOf(who);
       for (const battle of [stage1, stage2, stage3])
         for (const slot of battle.slots) {
-          expect(slot!.player, who).not.toBe(own);
           expect(slot!.flags & 0x200, who).toBe(0);
           expect(slot!.enemies & 1, `${who} seat ${slot!.player}`).toBe(1);
         }
+      for (const battle of [stage1, stage2])
+        for (const slot of battle.slots)
+          expect(slot!.player, who).not.toBe(own);
       expect(
-        stage3.slots.map((s) => s!.player).sort((a, b) => a - b),
+        stage3.slots
+          .slice(0, 3)
+          .map((s) => s!.player)
+          .sort((a, b) => a - b),
         who,
       ).toEqual(BOSS_SEATS.filter((seat) => seat !== own));
+      expect(
+        stage3.slots.slice(0, -1).map((s) => s!.player),
+        who,
+      ).not.toContain(own);
+      expect(stage3.slots.at(-1)!.player, who).toBe(own);
+      expect(new Set(stage3.slots.map((s) => s!.player)).size, who).toBe(6);
     }
   });
 
-  it('draws stable, distinct seeded lineups on one stream from the boss’s roster seat', () => {
+  it('draws stable seeded lineups on one stream, then appends the fixed pair and mirror', () => {
     const drawn = Object.fromEntries(
       BOSSES.map((who) => {
         const [stage1, stage2, stage3] = battlesOf(who);
@@ -1031,25 +1042,25 @@ describe('boss B.R. ANOTHER route', () => {
       zenka: {
         stage1: [2, 3, 0, 1, 18, 19],
         stage2: [24, 25, 26, 27, 28, 29],
-        stage3: [45, 33, 32],
+        stage3: [45, 33, 32, 39, 38, 30],
         arena: 14,
       },
       alpha: {
         stage1: [8, 9, 10, 11, 4, 5],
         stage2: [24, 25, 28, 29, 26, 27],
-        stage3: [45, 30, 33],
+        stage3: [45, 30, 33, 38, 39, 32],
         arena: 15,
       },
       shinz: {
         stage1: [18, 19, 12, 13, 16, 17],
         stage2: [28, 29, 24, 25, 26, 27],
-        stage3: [32, 30, 45],
+        stage3: [32, 30, 45, 38, 39, 33],
         arena: 18,
       },
       dora: {
         stage1: [14, 15, 4, 5, 22, 23],
         stage2: [28, 29, 40, 41, 24, 25],
-        stage3: [30, 33, 32],
+        stage3: [30, 33, 32, 39, 38, 45],
         arena: 14,
       },
     });
@@ -1057,7 +1068,7 @@ describe('boss B.R. ANOTHER route', () => {
       expect(bossBrAnotherStory(who), who).toEqual(bossBrAnotherStory(who));
   });
 
-  it('keeps drawn pairs whole, omits exactly one extra pair, and stages on 9/3/the last boss’s arena', () => {
+  it('keeps drawn pairs whole, omits exactly one extra pair, and stages on 9/3/the original third boss’s arena', () => {
     for (const who of BOSSES) {
       const [stage1, stage2, stage3] = battlesOf(who);
       for (const [battle, pool] of [
@@ -1081,11 +1092,11 @@ describe('boss B.R. ANOTHER route', () => {
       expect(omitted, who).toHaveLength(1);
       expect(stage1.stage, who).toBe(9);
       expect(stage2.stage, who).toBe(3);
-      expect(stage3.stage, who).toBe(ARENAS.get(stage3.slots.at(-1)!.player));
+      expect(stage3.stage, who).toBe(ARENAS.get(stage3.slots[2]!.player));
     }
   });
 
-  it('runs symmetric hostility from the real seat count: mates allied on stages 1–2, every boss hostile on stage 3', () => {
+  it('runs symmetric hostility from the real seat count: mates allied on stages 1–2, every stage-3 seat hostile', () => {
     for (const who of BOSSES)
       for (const [i, battle] of battlesOf(who).entries()) {
         const paired = i < 2;
@@ -1131,7 +1142,7 @@ describe('boss B.R. ANOTHER route', () => {
       }
   });
 
-  it('donates ryuko’s source steps 63 and 65 for headers and roles, overriding only stage and seat details', () => {
+  it('donates ryuko’s source steps 63 and 65 for headers and roles, the final scorer on the sixth stage-3 enemy', () => {
     const opener = sourceStep('ryuko', 63);
     const finale = sourceStep('ryuko', 65);
     for (const who of BOSSES) {
@@ -1144,6 +1155,21 @@ describe('boss B.R. ANOTHER route', () => {
       expectDonorRoles(stage1, opener, true, true);
       expectDonorRoles(stage2, finale, true, true);
       expectDonorRoles(stage3, finale, false, false);
+      // The original third seeded boss is now a middle enemy; the mirror,
+      // not it, carries the donor finale slot's scorer and payout.
+      for (const [index, role] of [
+        [0, finale.slots[0]!],
+        [2, finale.slots[1]!],
+        [5, finale.slots[5]!],
+      ] as const) {
+        expect(stage3.slots[index], `${who} role ${index}`).toMatchObject({
+          flags: role.flags,
+          points: role.points,
+          life: role.life,
+          power: role.power,
+          scorer: role.scorer,
+        });
+      }
     }
   });
 

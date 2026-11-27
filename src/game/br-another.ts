@@ -5,6 +5,8 @@ import { BOSSES, ROSTER } from './select';
 import { rand } from './standing';
 import type { Battle, Slot, Step } from './story';
 
+export type Boss = (typeof BOSSES)[number];
+
 export interface BrAnotherStages {
   stage1: Battle;
   stage2: Battle;
@@ -34,16 +36,23 @@ const STAGE_TWO_PAIRS: readonly (readonly [number, number])[] = [
   [26, 27],
 ];
 const BOSS_SEATS: readonly number[] = BOSSES.map((who) => ROSTER.indexOf(who));
-const BOSS_ARENAS: Record<(typeof BOSSES)[number], number> = {
+const BOSS_ARENAS: Record<Boss, number> = {
   zenka: 12,
   alpha: 14,
   shinz: 15,
   dora: 18,
 };
+// Authored (HPA-1148): the fixed stage-3 suffix between the seeded bosses
+// and the player's mirror.
+const BOSS_STAGE3_SUFFIX: Record<Boss, readonly [Who, Who]> = {
+  zenka: ['astroman', 'ttro'],
+  alpha: ['ttro', 'astroman'],
+  shinz: ['ttro', 'astroman'],
+  dora: ['astroman', 'ttro'],
+};
 const bossArena = (seat: number): number => {
   const who = ROSTER[seat];
-  if (who && who in BOSS_ARENAS)
-    return BOSS_ARENAS[who as (typeof BOSSES)[number]];
+  if (who && who in BOSS_ARENAS) return BOSS_ARENAS[who as Boss];
   throw new Error(`No boss arena for seat ${seat}`);
 };
 
@@ -212,15 +221,17 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
   return { stage1, stage2, stage3 };
 };
 
-// Authored (HPA-858): the four bosses' B.R. ANOTHER stages — three pure
-// battles with no ally. Ryuko's source steps donate the roles and header:
-// 63 for stage 1, 65 for stages 2 and 3; both flags' bit 0 keeps Continue.
-// One seed stream from the boss's ROSTER seat draws stage 1's three of the
-// twelve regular pairs, stage 2's three of the four extra pairs (one seeded
-// omission) and the three other bosses in order; the last boss's arena
-// hosts stage 3. Stages 1–2 mark all six enemy slots tough (Slot.tough;
-// match.ts applies the stats).
-export const bossBrAnotherStages = (who: Who): BrAnotherStages => {
+// Authored (HPA-858, extended HPA-1148): the four bosses' B.R. ANOTHER
+// stages — three pure battles with no ally. Ryuko's source steps donate the
+// roles and header: 63 for stage 1, 65 for stages 2 and 3; both flags' bit 0
+// keeps Continue. One seed stream from the boss's ROSTER seat draws stage
+// 1's three of the twelve regular pairs, stage 2's three of the four extra
+// pairs (one seeded omission) and the original three other bosses in order.
+// The fixed ASTROMAN/TTRO pair and the player's mirror append without
+// another draw; the original third boss's arena hosts stage 3. Stages 1–2
+// mark all six enemy slots tough (Slot.tough; match.ts applies the stats),
+// while stage 3 stays native.
+export const bossBrAnotherStages = (who: Boss): BrAnotherStages => {
   const shuffle = seededShuffle(ROSTER.indexOf(who));
   const opener = sourceStep('ryuko', 63);
   const finale = sourceStep('ryuko', 65);
@@ -238,16 +249,15 @@ export const bossBrAnotherStages = (who: Who): BrAnotherStages => {
     true,
     3,
   );
-  const bosses = shuffle(
+  const seeded = shuffle(
     BOSS_SEATS.filter((seat) => seat !== ROSTER.indexOf(who)),
   );
-  const stage3 = assemble(
-    finale,
-    finale,
-    bosses,
-    false,
-    bossArena(bosses.at(-1)!),
-  );
+  const bosses = [
+    ...seeded,
+    ...BOSS_STAGE3_SUFFIX[who].map((partner) => ROSTER.indexOf(partner)),
+    ROSTER.indexOf(who),
+  ];
+  const stage3 = assemble(finale, finale, bosses, false, bossArena(seeded[2]!));
   for (const battle of [stage1, stage2])
     for (const slot of battle.slots) slot!.tough = true;
   return { stage1, stage2, stage3 };
@@ -258,7 +268,7 @@ export const bossBrAnotherStages = (who: Who): BrAnotherStages => {
 // before stage 1, demo 5 (SEEDED PLAYERS) before stage 2 and demo 7 (NEXT
 // CHALLENGER) before stage 3 — then the end step. A continue's retry
 // reruns the battle, not the demo before it.
-export const bossBrAnotherStory = (who: Who): readonly Step[] => {
+export const bossBrAnotherStory = (who: Boss): readonly Step[] => {
   const { stage1, stage2, stage3 } = bossBrAnotherStages(who);
   return [
     { type: 2, demo: 4 },
