@@ -1437,23 +1437,47 @@ describe('BR Another stages', () => {
   it('wins the stage-3 brawl only once every boss has fallen, however the allies fare or whoever strikes', () => {
     const match = Match.story('ryuko', brAnotherStages('ryuko').stage3);
     fight(match);
-    const [one] = match.fighters;
-    const [, first] = match.fighters;
+    const [one, boss1, boss2, boss3, boss4] = match.fighters;
     const zmega = match.fighters[6]!;
     const rario = match.fighters[7]!;
     expect([zmega.who, rario.who]).toEqual(['zmega', 'rario']);
     // An ally's fall is no part of the win: Z-MEGA goes down before any
     // boss and the brawl still only counts the four hostiles.
-    knockOut(match, zmega, first);
+    knockOut(match, zmega, boss1!);
     match.step();
     expect(match.winner).toBeNull();
-    for (const [i, boss] of match.fighters.slice(1, 5).entries()) {
+    // The first three bosses fall in chain order, each admission entering
+    // the next.
+    for (const boss of [boss1!, boss2!]) {
       expect(boss.present, boss.who).toBe(true);
-      // The final blow may be an ally's — RARIO fells the last boss.
-      knockOut(match, boss, i === 3 ? rario : one);
+      knockOut(match, boss, one!);
       match.step();
-      if (i < 3) expect(match.winner).toBeNull();
+      expect(match.winner).toBeNull();
     }
+    expect(boss3!.present, boss3!.who).toBe(true);
+    knockOut(match, boss3!, one!);
+    // The last boss is held in reserve: its watched predecessor's corpse
+    // reads full life, so nothing admits it while the window a premature
+    // result would need — picking, then the result, then the credit over
+    // three ticks, as the win below resolves — fully passes. Every
+    // entered hostile is down, so only the waiting fourth boss can be
+    // what keeps the brawl live.
+    boss3!.hp = boss3!.maxHp;
+    for (let t = 0; t < 5; t++) match.step();
+    expect([boss1!.downed, boss2!.downed, boss3!.downed]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+    expect(boss4!.present).toBe(false);
+    expect(match.winner).toBeNull();
+    expect(match.matchOver).toBe(false);
+    // Let the last boss in — the corpse's life reads empty again — and
+    // fell it; the final blow may be an ally's, RARIO's here.
+    boss3!.hp = 0;
+    match.step();
+    expect(boss4!.present, boss4!.who).toBe(true);
+    knockOut(match, boss4!, rario);
     for (let t = 0; t < 3; t++) match.step();
     expect(match.winner).toBe('player');
     expect(match).toMatchObject({ wins: [1, 0], lost: 0 });

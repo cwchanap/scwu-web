@@ -155,24 +155,38 @@ const allyByPartner = (battle: Battle, partner: number) => {
   return [index, battle.slots[index]!] as const;
 };
 
-// An ally on stage from the first tick carries entry bits 0, where a
-// delayed one keeps its donor's entry — the ticket's stage-3 immediates
-// are the only ones of the first kind.
-const immediateAlly = (slot: Slot) => ((slot.flags >> 1) & 3) === 0;
+// The ticket's stage-3 immediate partners with their fixed opening x, in
+// seating order — the only seats ever excused from the donor comparison.
+const STAGE3_IMMEDIATES: readonly (readonly [Who, number])[] = [
+  ['zmega', 450],
+  ['rario', 350],
+];
+const immediatesOf = (who: Who) =>
+  STAGE3_IMMEDIATES.filter(([partner]) => partner !== who);
 
 // Every slot equals its donor role slot with only the seat details
 // overridden, enemies and allies told apart by the 0x200 flag rather than
 // position: the enemies keep their original indices (0 first, the last the
-// chain's end) and the allies follow them.
+// chain's end) and the allies follow them. The immediate-ally exception is
+// scoped to the seats the caller expects to be immediate — stage 3's
+// Z-MEGA/RARIO — so stages 1–2 (and stage 3's delayed usual partner)
+// still require the donor role unchanged, flags included.
 const expectRoles = (
   who: Who,
   battle: Battle,
   roles: Battle,
   paired: boolean,
+  immediates: readonly (readonly [Who, number])[] = [],
 ) => {
   const ally = roles.slots[6]!;
   const enemies = enemySlotsOf(battle);
   const allies = allySlotsOf(battle);
+  // The fixed x of a seat expected to be an immediate partner, undefined
+  // for every seat the donor comparison covers in full.
+  const immediateXOf = (slot: Slot) =>
+    immediates.find(
+      ([partner]) => ROSTER.indexOf(partner) === slot.player,
+    )?.[1];
   battle.slots.forEach((slot, i) => {
     const role = isAllySlot(slot)
       ? ally
@@ -182,7 +196,7 @@ const expectRoles = (
           ? roles.slots[5]!
           : roles.slots[1]!;
     const { player, enemies: hostility, watch, below, x, flags } = slot!;
-    const immediate = isAllySlot(slot) && immediateAlly(slot!);
+    const immediate = isAllySlot(slot) && immediateXOf(slot!) !== undefined;
     expect(slot, `${who} slot ${i}`).toEqual({
       ...role,
       player,
@@ -213,13 +227,7 @@ const expectRoles = (
     ),
     // A delayed ally keeps its donor's x; the immediates the ticket's
     // fixed Z-MEGA 450 and RARIO 350.
-    ...allies.map((s) =>
-      immediateAlly(s!)
-        ? s!.player === ROSTER.indexOf('zmega')
-          ? 450
-          : 350
-        : ally.x,
-    ),
+    ...allies.map((s) => immediateXOf(s!) ?? ally.x),
   ]);
   expect(
     battle.slots.map((s) => s!.below),
@@ -229,7 +237,9 @@ const expectRoles = (
     ...enemies.slice(0, -1).map((s) => desperationOf(ROSTER[s!.player]!)),
     // A delayed ally watches the 1P's own mark; an immediate preserves its
     // donor's unused below.
-    ...allies.map((s) => (immediateAlly(s!) ? ally.below : desperationOf(who))),
+    ...allies.map((s) =>
+      immediateXOf(s!) !== undefined ? ally.below : desperationOf(who),
+    ),
   ]);
 };
 
@@ -246,12 +256,7 @@ const expectStage3Allies = (who: Who, stage3: Battle, finale: Battle) => {
   // bar bit over a delayed entry, watching seat 0.
   expect(donor.flags, `${who} donor flags`).toBe(0x305);
   expect(donor.watch, `${who} donor watch`).toBe(0);
-  const immediates = (
-    [
-      ['zmega', 450],
-      ['rario', 350],
-    ] as const
-  ).filter(([partner]) => partner !== who);
+  const immediates = immediatesOf(who);
   const retained = !immediates.some(
     ([partner]) => ROSTER.indexOf(partner) === donor.player,
   );
@@ -331,7 +336,7 @@ describe('BR Another approved lineups', () => {
       );
       for (const key of HEADER_KEYS)
         expect(stage3[key], `${who} stage3 ${key}`).toBe(finale[key]);
-      expectRoles(who, stage3, finale, false);
+      expectRoles(who, stage3, finale, false, immediatesOf(who));
       if (expectStage3Allies(who, stage3, finale).length === 1)
         sixSeat.push(who);
       expect(stage1.slots.at(-1)!.player, `${who} stage1 ally`).toBe(
@@ -736,7 +741,7 @@ describe('BR Another approved lineups', () => {
     for (const who of ELIGIBLE) {
       const { stage3 } = brAnotherStages(who);
       const finale = finaleOf(who);
-      expectRoles(who, stage3, finale, false);
+      expectRoles(who, stage3, finale, false, immediatesOf(who));
     }
     expect(
       (['times', 'ryuko', 'masa', 'kiki', 'zmega', 'rario'] as Who[]).map(
