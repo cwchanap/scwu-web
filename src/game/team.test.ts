@@ -1436,7 +1436,14 @@ describe('BR Another stages', () => {
   });
 
   it('wins the stage-3 brawl only once every boss has fallen, however the allies fare or whoever strikes', () => {
-    const match = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    const match = Match.story(
+      'ryuko',
+      brAnotherStages('ryuko').stage3,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
     fight(match);
     const [one, boss1, boss2, boss3, boss4] = match.fighters;
     const zmega = match.fighters[6]!;
@@ -1484,7 +1491,14 @@ describe('BR Another stages', () => {
     expect(match).toMatchObject({ wins: [1, 0], lost: 0 });
     expect(match.matchOver).toBe(true);
     // The 1P's fall loses even with every other ally still standing.
-    const loss = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    const loss = Match.story(
+      'ryuko',
+      brAnotherStages('ryuko').stage3,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
     fight(loss);
     knockOut(loss, loss.fighters[0]!, loss.fighters[1]!);
     for (let t = 0; t < 3; t++) loss.step();
@@ -1799,7 +1813,14 @@ describe('boss B.R. ANOTHER', () => {
         'office2',
       ],
     ] as const) {
-      const match = Match.story(who, battlesOf(who)[2]!);
+      const match = Match.story(
+        who,
+        battlesOf(who)[2]!,
+        0,
+        undefined,
+        undefined,
+        true,
+      );
       for (const vm of match.cpus) if (vm) vm.input = () => ({});
       expect(match.stage, who).toBe(stage);
       expect(match.fighters, who).toHaveLength(7);
@@ -1867,7 +1888,14 @@ describe('boss B.R. ANOTHER', () => {
       expect(match.winner, who).toBe('player');
       expect(match, `${who} won`).toMatchObject({ wins: [1, 0], lost: 0 });
     }
-    const loss = Match.story('zenka', battlesOf('zenka')[2]!);
+    const loss = Match.story(
+      'zenka',
+      battlesOf('zenka')[2]!,
+      0,
+      undefined,
+      undefined,
+      true,
+    );
     fight(loss);
     knockOut(loss, loss.fighters[0]!, loss.fighters[1]!);
     for (let t = 0; t < 3; t++) loss.step();
