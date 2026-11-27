@@ -449,6 +449,8 @@ describe('ALPHA (33 ALPHA.PLAYER)', () => {
       'alpha',
       'dora',
       'chung',
+      'zmega',
+      'rario',
     ]);
     for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
     while (match.roundTicks <= match.fightTick) match.step();

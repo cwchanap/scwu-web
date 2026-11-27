@@ -1941,11 +1941,11 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     expect(dora.who).toBe('dora');
     driveCpus(match, 4, {});
     while (match.roundTicks <= match.fightTick) match.step();
-    const [, alpha, shinz, zenka] = match.fighters;
+    const [, shinz, zenka, alpha] = match.fighters;
     for (const [watched, next] of [
-      [alpha, shinz],
       [shinz, zenka],
-      [zenka, dora],
+      [zenka, alpha],
+      [alpha, dora],
     ] as const) {
       watched.hp = desperationOf(watched.who) - 1;
       match.step();
@@ -2020,11 +2020,11 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     const ally = match.fighters[5];
     driveCpus(match, 4, {});
     while (match.roundTicks <= match.fightTick) match.step();
-    const [kiki, alpha, shinz, zenka] = match.fighters;
+    const [kiki, shinz, zenka, alpha] = match.fighters;
     for (const [watched, next] of [
-      [alpha, shinz],
       [shinz, zenka],
-      [zenka, dora],
+      [zenka, alpha],
+      [alpha, dora],
     ] as const) {
       watched.hp = desperationOf(watched.who) - 1;
       match.step();
@@ -2046,7 +2046,8 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     const x = dora.x;
     kiki.x = x - 90;
     kiki.facing = 1;
-    for (const f of [alpha, shinz, zenka]) f.x = x + 1500;
+    for (const f of match.fighters)
+      if (f !== kiki && f !== dora && f.present) f.x = x + 1500;
     const ages = [0, 149, 150, 177, 257, 266, 267, 276, 336];
     const poses = new Map<number, [number, number]>();
     const black = new Set<Effect>();

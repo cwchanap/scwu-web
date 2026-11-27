@@ -1525,6 +1525,241 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
     return next;
   };
 
+  // Admits a waiting fighter by lowering the watched seat's life through the
+  // battle's own arrive() check, never by writing the target's present bit.
+  // The chain advances one watch a step; immediate-entry fighters need none.
+  const admitThroughWatches = (match: Match, target: Fighter) => {
+    const { seats, slots } = seatsOf(match);
+    for (let t = 0; t < 250 && !target.present; t++) {
+      for (const [i, f] of match.fighters.entries()) {
+        const slot = slots[i];
+        if (!slot || f.present) continue;
+        const watched = match.fighters[seats.indexOf(slot.watch)];
+        if (watched?.present && watched.hp > 1) watched.hp = 1;
+      }
+      match.step();
+    }
+    expect(target.present).toBe(true);
+  };
+  // A waiting seat's arrival starts its opening at age −1. Let that real
+  // entrance finish before the scripted KO; the quiet CPUs cannot interfere.
+  const settleOpening = (match: Match, target: Fighter) => {
+    for (let t = 0; t < 500 && target.action !== 'idle'; t++) match.step();
+    expect(target.action).toBe('idle');
+  };
+  const bonusStrikerVictim = (
+    match: Match,
+    battle: Battle,
+    target: Fighter,
+  ) => {
+    const enemySlots = battle.slots.filter(
+      (slot): slot is Slot => Boolean(slot) && !(slot!.flags & 0x200),
+    );
+    const finalMirror = enemySlots.at(-1)!;
+    // The mirror is points-only; the stimulus must use an earlier bonus slot.
+    expect((finalMirror.flags >> 7) & 3).toBe(0);
+    expect(finalMirror.points).toBe(100);
+    const { slots } = seatsOf(match);
+    const index = match.fighters.findIndex((f, i) => {
+      if (i === 0 || f === target || !f.present || f.hp <= 0) return false;
+      if ((f.enemies & 1) === 0) return false;
+      const slot = slots[i];
+      return Boolean(
+        slot && slot !== finalMirror && ((slot.flags >> 7) & 3) === 2,
+      );
+    });
+    expect(index).toBeGreaterThan(0);
+    const victim = match.fighters[index]!;
+    const slot = slots[index]!;
+    expect((slot.flags >> 7) & 3).toBe(2);
+    expect(slot.life).toBeGreaterThan(0);
+    expect(slot.power).toBeGreaterThan(0);
+    return victim;
+  };
+
+  const recoveryCases = [
+    {
+      who: 'zmega',
+      player: 'ryuko',
+      battle: () => brAnotherStages('ryuko').stage3,
+      gate: 60,
+      recovery: { action: 'getUp', branch: null },
+    },
+    {
+      who: 'rario',
+      player: 'ryuko',
+      battle: () => brAnotherStages('ryuko').stage3,
+      gate: 66,
+      recovery: { action: 'script', branch: 27 },
+    },
+    {
+      who: 'astroman',
+      player: 'zenka',
+      battle: () => bossBrAnotherStages('zenka').stage3,
+      gate: 130,
+      recovery: { action: 'getUp', branch: null },
+    },
+    {
+      who: 'ttro',
+      player: 'zenka',
+      battle: () => bossBrAnotherStages('zenka').stage3,
+      gate: 60,
+      recovery: { action: 'getUp', branch: null },
+    },
+  ] as const;
+
+  it.each(recoveryCases)(
+    '$who takes the same post-KO gains only outside B.R. and recovers at its landed gate',
+    ({ who, player, battle: makeBattle, gate, recovery }) => {
+      const run = (br: boolean) => {
+        const battle = makeBattle();
+        const match = Match.story(player, battle, 0, undefined, undefined, br);
+        quiet(match);
+        toFight(match);
+        const target = match.fighters.find((f) => f.who === who)!;
+        // Z-MEGA and RARIO are immediate-entry allies on RYUKO's stage 3;
+        // ASTROMAN and TTRO genuinely wait their way through ZENKA's chain.
+        admitThroughWatches(match, target);
+        settleOpening(match, target);
+        // The manipulated watch seats stay alive, as do the 1P and every
+        // hostile the test does not knock out, so no result can start.
+        for (const f of match.fighters)
+          if (f.present && f.hp > 0) f.hp = f.maxHp;
+        expect(match.fighters[0]!.hp).toBeGreaterThan(0);
+        expect(target.present).toBe(true);
+        const payer = bonusStrikerVictim(match, battle, target);
+        target.power = 0;
+        target.stock = 0;
+        knock(match, target);
+        expect([target.hp, target.downed]).toEqual([0, true]);
+        scriptedGain(match, target, 100);
+        const selfHp = target.hp;
+        scriptedTransfer(match, payer, target, 100);
+        const transferHp = target.hp;
+        payer.caught = target;
+        knock(match, payer);
+        const awardHp = target.hp;
+        const awardPower = target.power;
+        expect(match.winner).toBeNull();
+
+        let landed = false;
+        let landedHp = 0;
+        let oldestLandedAge = -1;
+        let atGate: {
+          action: Fighter['action'];
+          age: number;
+          hp: number;
+          winner: string | null;
+          resultReady: boolean;
+        } | null = null;
+        let transition: {
+          beforeHp: number;
+          action: Fighter['action'];
+          branch: Fighter['branch'];
+          hp: number;
+          winner: string | null;
+          resultReady: boolean;
+        } | null = null;
+        // The launch and both KO holds can stop the victim after landing;
+        // the bound covers ASTROMAN's 130-tick gate after those holds.
+        for (let tick = 0; tick < 400; tick++) {
+          const before = {
+            action: target.action,
+            age: target.age,
+            hp: target.hp,
+          };
+          match.step();
+          if (!landed && target.action === 'koLand') {
+            landed = true;
+            landedHp = target.hp;
+          }
+          if (!landed) continue;
+          if (target.action === 'koLand')
+            oldestLandedAge = Math.max(oldestLandedAge, target.age);
+          if (br && !atGate && target.action === 'koLand' && target.age >= gate)
+            atGate = {
+              action: target.action,
+              age: target.age,
+              hp: target.hp,
+              winner: match.winner,
+              resultReady: match.resultReady,
+            };
+          if (
+            !br &&
+            before.action === 'koLand' &&
+            before.age === gate - 1 &&
+            target.action !== 'koLand'
+          ) {
+            transition = {
+              beforeHp: before.hp,
+              action: target.action,
+              branch: target.branch,
+              hp: target.hp,
+              winner: match.winner,
+              resultReady: match.resultReady,
+            };
+            break;
+          }
+        }
+        return {
+          selfHp,
+          transferHp,
+          awardHp,
+          awardPower,
+          landed,
+          landedHp,
+          oldestLandedAge,
+          atGate,
+          transition,
+          finalAction: target.action,
+          finalHp: target.hp,
+        };
+      };
+
+      const suppressed = run(true);
+      const control = run(false);
+      // Identical positive stimuli reach both victims: the B.R. guard blocks
+      // every life half, while the ordinary control really gains each one.
+      expect([
+        suppressed.selfHp,
+        suppressed.transferHp,
+        suppressed.awardHp,
+      ]).toEqual([0, 0, 0]);
+      expect([control.selfHp, control.transferHp, control.awardHp]).toEqual([
+        100, 200, 250,
+      ]);
+      // The award's EN half is not part of no-revive and lands in both runs.
+      expect([suppressed.awardPower, control.awardPower]).toEqual([10, 10]);
+      expect([suppressed.landed, control.landed]).toEqual([true, true]);
+      expect([suppressed.landedHp, control.landedHp]).toEqual([0, 250]);
+
+      expect(suppressed.atGate).toMatchObject({
+        action: 'koLand',
+        age: gate,
+        hp: 0,
+        winner: null,
+        resultReady: false,
+      });
+      expect(suppressed.oldestLandedAge).toBeGreaterThanOrEqual(gate);
+      expect([suppressed.finalAction, suppressed.finalHp]).toEqual([
+        'koLand',
+        0,
+      ]);
+
+      expect(control.transition).not.toBeNull();
+      const recovered = control.transition!;
+      // HP is positive before the age-gated check runs; the transition is
+      // the native action/branch, not merely a changed hit-point total.
+      expect(recovered.beforeHp).toBe(250);
+      expect(recovered.hp).toBe(250);
+      expect([recovered.action, recovered.branch]).toEqual([
+        recovery.action,
+        recovery.branch,
+      ]);
+      expect([recovered.winner, recovered.resultReady]).toEqual([null, false]);
+    },
+  );
+
   const routes = [
     {
       name: 'B.R. ZERO',
