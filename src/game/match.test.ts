@@ -1649,16 +1649,16 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
           action: Fighter['action'];
           age: number;
           hp: number;
+          picking: { winner: string | null } | null;
           winner: string | null;
-          resultReady: boolean;
         } | null = null;
         let transition: {
           beforeHp: number;
           action: Fighter['action'];
           branch: Fighter['branch'];
           hp: number;
+          picking: { winner: string | null } | null;
           winner: string | null;
-          resultReady: boolean;
         } | null = null;
         // The launch and both KO holds can stop the victim after landing;
         // the bound covers ASTROMAN's 130-tick gate after those holds.
@@ -1681,8 +1681,12 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
               action: target.action,
               age: target.age,
               hp: target.hp,
+              picking: (
+                match as unknown as {
+                  picking: { winner: string | null } | null;
+                }
+              ).picking,
               winner: match.winner,
-              resultReady: match.resultReady,
             };
           if (
             !br &&
@@ -1695,8 +1699,12 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
               action: target.action,
               branch: target.branch,
               hp: target.hp,
+              picking: (
+                match as unknown as {
+                  picking: { winner: string | null } | null;
+                }
+              ).picking,
               winner: match.winner,
-              resultReady: match.resultReady,
             };
             break;
           }
@@ -1737,8 +1745,8 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
         action: 'koLand',
         age: gate,
         hp: 0,
+        picking: null,
         winner: null,
-        resultReady: false,
       });
       expect(suppressed.oldestLandedAge).toBeGreaterThanOrEqual(gate);
       expect([suppressed.finalAction, suppressed.finalHp]).toEqual([
@@ -1756,7 +1764,7 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
         recovery.action,
         recovery.branch,
       ]);
-      expect([recovered.winner, recovered.resultReady]).toEqual([null, false]);
+      expect([recovered.picking, recovered.winner]).toEqual([null, null]);
     },
   );
 
