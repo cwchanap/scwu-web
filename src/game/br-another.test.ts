@@ -145,6 +145,16 @@ const enemyMask = (battle: Battle, i: number, paired: boolean) => {
   return mask;
 };
 
+// The 0x200-flagged ally seating the expected partner, with its original
+// slot index — selected by team and identity, never by position.
+const allyByPartner = (battle: Battle, partner: number) => {
+  const index = battle.slots.findIndex(
+    (slot) => isAllySlot(slot) && slot!.player === partner,
+  );
+  expect(index, `ally seating ${ROSTER[partner]}`).toBeGreaterThanOrEqual(0);
+  return [index, battle.slots[index]!] as const;
+};
+
 // Every slot equals its donor role slot with only the seat details
 // overridden, enemies and allies told apart by the 0x200 flag rather than
 // position: the enemies keep their original indices (0 first, the last the
@@ -713,16 +723,16 @@ describe('BR Another approved lineups', () => {
       const battles = built(brAnotherStages(who));
       for (const [i, donor] of donors.entries()) {
         const battle = battles[i]!;
-        const ally = battle.slots.at(-1)!;
-        expect(ally.player, who).toBe(donor.player);
-        expect(ally.flags & 0x200, who).toBe(0x200);
+        // The 0x200-flagged ally seating the donor's player — selected by
+        // team and identity, so its original index feeds the oracle.
+        const [allyAt, ally] = allyByPartner(battle, donor.player);
         expect(ally.watch, who).toBe(0);
         expect(ally.below, who).toBe(desperationOf(who));
         expect(ally.x, who).toBe(donor.x);
         // Hostile exactly to the enemy seats — never the 1P or itself —
         // derived from team membership, not the builder's arithmetic.
         expect(ally.enemies, who).toBe(
-          enemyMask(battle, battle.slots.length - 1, battle !== battles[2]),
+          enemyMask(battle, allyAt, battle !== battles[2]),
         );
       }
     }
@@ -739,14 +749,11 @@ describe('BR Another approved lineups', () => {
     };
     try {
       const { stage1, stage2, stage3 } = brAnotherStages('sww');
-      const ally = stage1.slots.at(-1)!;
-      expect(ally.player).toBe(ROSTER.indexOf('kay'));
+      const [allyAt, ally] = allyByPartner(stage1, ROSTER.indexOf('kay'));
       expect(ally.life).toBe(77);
       expect(ally.watch).toBe(0);
       expect(ally.below).toBe(desperationOf('sww'));
-      expect(ally.enemies).toBe(
-        enemyMask(stage1, stage1.slots.length - 1, true),
-      );
+      expect(ally.enemies).toBe(enemyMask(stage1, allyAt, true));
       for (const battle of [stage2, stage3])
         expect(battle.slots.at(-1)!.player).toBe(original.player);
     } finally {
@@ -1180,18 +1187,17 @@ describe('B.R. LONG route', () => {
           isBoss(who) ? true : undefined,
         );
       if (isBoss(who)) continue;
-      const ally = battle.slots.at(-1)!;
-      expect(ROSTER[ally.player], who).toBe(
-        who === 'zmega' ? 'rario' : 'zmega',
+      // The 0x200-flagged ally seating the expected partner — selected by
+      // team and identity, so its original index feeds the oracle.
+      const [allyAt, ally] = allyByPartner(
+        battle,
+        ROSTER.indexOf(who === 'zmega' ? 'rario' : 'zmega'),
       );
-      expect(ally.flags & 0x200, who).toBe(0x200);
       // Entry bits 1–2 are 0: on stage from the first tick.
       expect((ally.flags >> 1) & 3, who).toBe(0);
       expect(ally.watch, who).toBe(0);
       // Hostile exactly to the twelve enemy seats — never the 1P or itself.
-      expect(ally.enemies, who).toBe(
-        enemyMask(battle, battle.slots.length - 1, true),
-      );
+      expect(ally.enemies, who).toBe(enemyMask(battle, allyAt, true));
       // The left opening faces right toward the 1P and never overlaps the
       // first enemy's right-side slot.
       expect(ally.x, who).toBe(450);
