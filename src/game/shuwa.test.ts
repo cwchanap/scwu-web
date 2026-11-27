@@ -514,16 +514,26 @@ describe("SHUWA's lamp (HPA-1305)", () => {
 
   // Both spawn their shot into RYUKO's axe slot (6, busy 225): with one
   // out, a second press of either only makes him stand, for nothing.
-  it('keeps one RING or SPECIUM out at a time; a blocked press is free', () => {
+  it('keeps one RING or SPECIUM out at a time', () => {
+    // A press while a shot flies plays the stand (225) and costs nothing,
+    // but a motion still in its 40-tick window fires once the shot is gone,
+    // as RYUKO's own fire does.
     const specium = motion('d f f+P');
-    const { f, step } = duel('shuwa', 0, 900);
-    const path = new Set<unknown>();
-    for (let t = 0; t < 120; t++) {
-      step({ ...specium(t), axe: t === 50 });
-      path.add(playing(f));
+    const late = (t: number) => specium(t - 48);
+    for (const [first, second, path, lamp] of [
+      [specium, (t: number) => ({ axe: t === 50 }), [231, 225], 10],
+      [specium, late, [231, 225], 10],
+      [(t: number) => ({ axe: t === 2 }), late, [226, 225, 231], 20],
+    ] as const) {
+      const { f, step } = duel('shuwa', 0, 900);
+      const seen = new Set<unknown>();
+      for (let t = 0; t < 120; t++) {
+        step({ ...first(t), ...second(t) });
+        seen.add(playing(f));
+      }
+      expect([...seen].filter((a) => typeof a === 'number')).toEqual(path);
+      expect(f.variables[LAMP]).toBe(lamp);
     }
-    expect([...path]).toEqual(['idle', 'crouchEnter', 231, 225]);
-    expect(f.variables[LAMP]).toBe(10);
   });
 
   it('gives a charge back for a landed Chuck, never past full', () => {
