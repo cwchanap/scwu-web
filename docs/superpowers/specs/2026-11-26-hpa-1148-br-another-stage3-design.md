@@ -16,22 +16,22 @@ Extend only the final battle of regular and boss B.R. ANOTHER. Preserve HPA-1035
 - Exclude 1P from the immediate list and deduplicate the usual ally by Who. Keep the four enemy slots at indices 1–4. All allies including 1P are friendly to one another; each enemy fights every ally and every other enemy.
 - All four hostiles (including waiting ones) must fall to win; 1P KO still loses. Ally survival is not a win condition. No new time, scoring or draw rules.
 
-| Player | Immediate allies | Delayed ally | Total native seats (incl. 1P) |
-| --- | --- | --- | --- |
-| Other 32 regulars | Z-MEGA, RARIO | Usual partner | 8 |
-| Z-MEGA | RARIO | None | 6 |
-| RARIO | Z-MEGA | None | 6 |
+| Player            | Immediate allies | Delayed ally  | Total native seats (incl. 1P) |
+| ----------------- | ---------------- | ------------- | ----------------------------- |
+| Other 32 regulars | Z-MEGA, RARIO    | Usual partner | 8                             |
+| Z-MEGA            | RARIO            | None          | 6                             |
+| RARIO             | Z-MEGA           | None          | 6                             |
 
 **Ticket arithmetic:** the explicit reciprocal-only/no-duplicate rule gives 1 + 4 + 1 = 6, not the stated seven. The review reports inspecting all 34 generated finales: the reciprocal usual partners are the only overlaps, consistent with the existing reciprocal test assertions. Verify with the real generated data during the roster test. Counts refer to seats, not simultaneous entrants.
 
 ### Boss fighters
 
-| Player | Existing first three (unchanged) | Fourth | Fifth | Sixth | Arena ID |
-| --- | --- | --- | --- | --- | --- |
-| ZENKA | DoraEmon, SHIN-Z, ALPHA | ASTROMAN | TTRO | ZENKA | 14 |
-| ALPHA | DoraEmon, ZENKA, SHIN-Z | TTRO | ASTROMAN | ALPHA | 15 |
-| SHIN-Z | ALPHA, ZENKA, DoraEmon | TTRO | ASTROMAN | SHIN-Z | 18 |
-| DoraEmon | ZENKA, SHIN-Z, ALPHA | ASTROMAN | TTRO | DoraEmon | 14 |
+| Player   | Existing first three (unchanged) | Fourth   | Fifth    | Sixth    | Arena ID |
+| -------- | -------------------------------- | -------- | -------- | -------- | -------- |
+| ZENKA    | DoraEmon, SHIN-Z, ALPHA          | ASTROMAN | TTRO     | ZENKA    | 14       |
+| ALPHA    | DoraEmon, ZENKA, SHIN-Z          | TTRO     | ASTROMAN | ALPHA    | 15       |
+| SHIN-Z   | ALPHA, ZENKA, DoraEmon           | TTRO     | ASTROMAN | SHIN-Z   | 18       |
+| DoraEmon | ZENKA, SHIN-Z, ALPHA             | ASTROMAN | TTRO     | DoraEmon | 14       |
 
 Use the fixed suffix from Linear, no additional RNG call. The original third enemy still chooses the arena. Seven seats, no allies, all hostile (including the mirror, whose Who equals 1P). All six enemies are native strength. The first enemy keeps its entry role; each following enemy watches its predecessor's native mark. The former third/final role becomes a middle role; the final mirror gets the last-slot scorer/points as assigned by assemble. Win only after six KOs, lose on 1P KO. Existing palette assignment gives the mirror a distinct color among seven entered natives.
 

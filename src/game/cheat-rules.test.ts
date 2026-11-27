@@ -9,6 +9,7 @@ import { script } from './animations';
 import type { ObjectKey } from './animations';
 import {
   CHARACTERS,
+  desperationOf,
   lifeOf,
   stocksOf,
   superGateOf,
@@ -904,6 +905,73 @@ describe('B.R. No partner (HPA-972)', () => {
       0,
     );
     expect(seatsOf(match)).toEqual(nativeSeats.filter((s) => s !== dropped[0]));
+  });
+
+  it('drops every stage-3 ally without moving the four enemies’ seats or watch chain', () => {
+    const battle = brAnotherStages('ryuko').stage3;
+    expect(battle.slots.filter((slot) => slot!.flags & 0x200)).toHaveLength(3);
+    const native = Match.story('ryuko', battle, 0, undefined, undefined, true);
+    expect(native.fighters.map((f) => f.who)).toEqual([
+      'ryuko',
+      'shinz',
+      'alpha',
+      'dora',
+      'zenka',
+      'zoma',
+      'zmega',
+      'rario',
+    ]);
+    const match = Match.story('ryuko', battle, 0, undefined, undefined, true);
+    match.useCheats(cheats({ enabled: true, brNoPartner: true }));
+    for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+    // The waiting ZOMA and both immediate partners are the three dropped
+    // ally seats; only the 1P and the four bosses remain.
+    expect(match.fighters.map((f) => f.who)).toEqual([
+      'ryuko',
+      'shinz',
+      'alpha',
+      'dora',
+      'zenka',
+    ]);
+    const internals = (m: Match) =>
+      m as unknown as { seats: number[]; slots: (Slot | null)[] };
+    const nativeSeats = internals(native).seats;
+    const seats = internals(match).seats;
+    const dropped = nativeSeats.filter((s) => !seats.includes(s));
+    expect(dropped).toEqual([5, 6, 7]);
+    for (const seat of dropped)
+      expect(native.fighters[nativeSeats.indexOf(seat)].enemies & 1).toBe(0);
+    expect(seats).toEqual(nativeSeats.filter((s) => !dropped.includes(s)));
+    // The enemy seat numbers and watch indices are the native battle's own:
+    // seat 2 watches 1, seat 3 watches 2 and seat 4 watches 3.
+    expect(seats.slice(1)).toEqual([1, 2, 3, 4]);
+    expect(
+      internals(match)
+        .slots.slice(1)
+        .map((slot) => slot!.watch),
+    ).toEqual([0, 1, 2, 3]);
+    toFight(match);
+    expect(match.fighters.map((f) => f.present)).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    for (const [watched, next] of [
+      [match.fighters[1]!, match.fighters[2]!],
+      [match.fighters[2]!, match.fighters[3]!],
+      [match.fighters[3]!, match.fighters[4]!],
+    ] as const) {
+      watched.hp = desperationOf(watched.who);
+      match.step();
+      expect(next.present, `${next.who} at the mark`).toBe(false);
+      watched.hp = desperationOf(watched.who) - 1;
+      match.step();
+      expect(next.present, `${next.who} below the mark`).toBe(true);
+      watched.hp = watched.maxHp;
+    }
+    expect(match.fighters).toHaveLength(5);
   });
 
   it('leaves no duplicated pre-fight objects', () => {
