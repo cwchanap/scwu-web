@@ -11,6 +11,9 @@ bash art/shuwa/draw.sh b2            # a whole batch: b1 body, b2 attacks, b3 sp
 bash art/shuwa/draw.sh p1-33 k1-72   # or single poses
 ```
 
+The `ui` batch draws his select portrait and face close-ups instead; `ui/README.md` covers those and the rest of
+his select and HUD art.
+
 Each pose is one image edit: SHUWA's key drawing (`refs/base.png`, or `refs/hero.png` for the powered form) as
 image 1, and, where the pose has one, the donor fighter's sprite for the same move as a pose and size guide.
 `poses.txt` lists every pose with its batch, guide, form and canvas; `prompts/<pose>.txt` is its prompt.

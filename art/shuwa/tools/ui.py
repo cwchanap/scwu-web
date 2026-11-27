@@ -8,7 +8,7 @@
 - schemes: the seven alternate colour schemes: ui/palettes.json (each current colour to its colour in all eight)
   and each scheme's recoloured key drawings, ui/schemes/{base,giant}-<n>.png.
 - variants: each drawn portrait and face cleaned up to the cast's pixel style (crisp.py), into out/ui/ (not committed)
-  with a preview sheet; FRAMES holds each face drawing's tile and HUD framing.
+  FRAMES holds each face drawing's tile and HUD framing.
 """
 import json
 import sys
@@ -146,14 +146,17 @@ def name():
 
 # --- Portrait, face tile and HUD face ---------------------------------------------------------------------------
 # Each drawing goes through crisp.py like his sprites. The portrait is scaled to the cast's height; a face drawing
-# is scaled twice: so his face (hat brim to chin) fills the 60 px tile, and so both eyes span the 70 px HUD strip.
+# is scaled twice: so his face fills the 60 px tile, and a quarter larger for the 70 px HUD strip across his eyes.
+# His sprites' ramps, less the silver's third tone: at these sizes it is the grey's light tone again (136 against
+# 144), and the two speckle his gloves and boots.
+PIECE_RAMPS = {**crisp.RAMPS, "silver": ([(232, 232, 240), (184, 184, 200)], (64, 64, 88))}
 PORTRAIT_H = 450
 TILE, HUD = (24, 60), (70, 21)
 TILE_BG = (40, 88, 152)  # the drawings' background, snapped to the cast's multiples of 8
-# Per face drawing: brim-to-chin height in the tile, the tile's left edge as a share of the face's width (0 = the
-# face's left edge), the eye line's share of the tile's height, and the HUD's eye-to-eye span. Set by eye per
-# drawing; a drawing not listed takes DEFAULT.
-DEFAULT = dict(face=56, left=0.42, eyes=0.5, span=40)
+# Per face drawing: the skin's height in the tile (brow to neck), the tile's centre as a share of the face's
+# width (0 = the face's left edge), the eye line's share of the tile's height, and the HUD's scale against the
+# tile's (the cast's HUD eyes are about 12 px tall). Set by eye per drawing; a drawing not listed takes DEFAULT.
+DEFAULT = dict(face=50, left=0.42, eyes=0.5, hud=1.25)
 FRAMES = {}
 
 
@@ -162,7 +165,7 @@ def raw(name):
 
 
 def skin_and_eyes(rgba):
-    """Bounding box of the skin (his face under the brim) and the centres of the two largest navy blobs."""
+    """Bounding box of the skin (his face under the brim, down to the neck) and the centres of his two irises."""
     rgb, a = rgba[..., :3].astype(int), rgba[..., 3] > 0
     tones = crisp.RAMPS["skin"][0]
     skin = a & np.any([np.all(rgb == t, -1) for t in tones], 0)
@@ -185,11 +188,12 @@ def face_pieces(name):
     f = {**DEFAULT, **FRAMES.get(name, {})}
     rgb = raw(name)
     # A first pass at a fixed scale finds the face, then each piece is drawn at its own scale.
-    probe, _, _ = crisp.sprite(rgb, BG, height=240)
+    probe, _, _ = crisp.sprite(rgb, BG, height=240, ramps=PIECE_RAMPS)
     (x0, y0, x1, y1), eyes = skin_and_eyes(probe)
     pieces = {}
-    for piece, scale in (("tile", f["face"] / (y1 - y0)), ("hud", f["span"] / max(1, eyes[-1][1] - eyes[0][1]))):
-        spr, _, _ = crisp.sprite(rgb, BG, height=round(probe.shape[0] * scale))
+    tile = f["face"] / (y1 - y0)
+    for piece, scale in (("tile", tile), ("hud", tile * f["hud"])):
+        spr, _, _ = crisp.sprite(rgb, BG, height=round(probe.shape[0] * scale), ramps=PIECE_RAMPS)
         k = spr.shape[0] / probe.shape[0]
         if piece == "tile":
             w, h = TILE
@@ -200,7 +204,7 @@ def face_pieces(name):
         else:
             w, h = HUD
             left = round(sum(e[1] for e in eyes) / 2 * k - w / 2)
-            top = round(sum(e[0] for e in eyes) / 2 * k - h * 0.55)
+            top = round(sum(e[0] for e in eyes) / 2 * k - h * 0.6)
             canvas = Image.fromarray(spr, "RGBA")
         pieces[piece] = canvas.crop((left, top, left + w, top + h))
     return pieces
@@ -209,7 +213,7 @@ def face_pieces(name):
 def variants():
     (OUT / "ui").mkdir(parents=True, exist_ok=True)
     for f in sorted((OUT / "raw").glob("portrait-*.png")):
-        spr, _, _ = crisp.sprite(raw(f.stem), BG, height=PORTRAIT_H)
+        spr, _, _ = crisp.sprite(raw(f.stem), BG, height=PORTRAIT_H, ramps=PIECE_RAMPS)
         Image.fromarray(spr, "RGBA").save(OUT / f"ui/{f.stem}.png")
         print(f"out/ui/{f.stem}.png", spr.shape[1::-1])
     for f in sorted((OUT / "raw").glob("face-*.png")):
