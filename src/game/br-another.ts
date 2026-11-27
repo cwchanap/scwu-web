@@ -144,6 +144,13 @@ const assemble = (
   };
 };
 
+// Authored (HPA-1148): stage 3's immediate partners and their fixed
+// opening x, in the order they seat behind the bosses.
+const STAGE3_PARTNERS: readonly (readonly [Who, number])[] = [
+  ['zmega', 450],
+  ['rario', 350],
+];
+
 // Authored (HPA-1035 §7, owner-approved 16 Nov 2026): every fighter's three
 // ANOTHER stages come from the approved lineup table. Stage 1 seats three of
 // the twelve regular pairs; the roles, header and ally come from the
@@ -156,7 +163,12 @@ const assemble = (
 // finale's roles, header and ally. assemble derives each seat's watch/below
 // from its actual predecessor, and a donated ally is rebuilt to watch the
 // 1P at the 1P's own desperation mark rather than keeping the donor's stale
-// threshold (sww's opener ships below 160).
+// threshold (sww's opener ships below 160). Stage 3 also seats Z-MEGA and
+// RARIO as immediate allies (HPA-1148, owner-approved): each built by the
+// shared onStageAlly recipe from the fighter's own finale ally donor at its
+// fixed x, the player's own excluded; the usual delayed partner is kept
+// ahead of them unless it is already one of the immediates — the reciprocal
+// Z-MEGA/RARIO cases, the only overlaps the generated donors ship.
 export const brAnotherStages = (who: Who): BrAnotherStages => {
   const row = BR_ANOTHER_LINEUPS[who];
   if (!row) throw new Error(`${who} has no approved B.R. ANOTHER row`);
@@ -182,13 +194,20 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
     allyOf(finale),
   ]);
   const bosses = seats([row.stage3]);
+  const donor = finale.slots[6]!;
+  const immediates = STAGE3_PARTNERS.filter(([partner]) => partner !== who);
+  const allies: Slot[] = [];
+  if (!immediates.some(([partner]) => ROSTER.indexOf(partner) === donor.player))
+    allies.push(allyOf(finale));
+  for (const [partner, x] of immediates)
+    allies.push(onStageAlly(donor, partner, x));
   const stage3 = assemble(
     finale,
     finale,
     bosses,
     false,
     bossArena(bosses.at(-1)!),
-    [allyOf(finale)],
+    allies,
   );
   return { stage1, stage2, stage3 };
 };
