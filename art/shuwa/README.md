@@ -135,7 +135,7 @@ cut from the game.
 - `cutInputs`: donor actions his input checks may not jump to. The exporter removes every op 0x16 (`input` event) of his scripts
   that jumps to one, and refuses if his own timeline still reaches one. Her intros (30 to 34, 36) jump to Chage Character (37)
   while down is held, which sets variable 0 to 10, her EX mode; he has none, so 37 is cut. Her EX Fire (231, his SPECIUM)
-  fires again while down is held (its check at age 18 into 237 and 238); one lamp charge is one shot, so both are cut.
+  enters its forward-held charge (its check at age 18 into 237 and 238); one lamp charge is one shot, so both are cut.
 - `ui`: the Menu and HUD stand-ins. `hudFaceImages` take `ui/hud-face.png` (their own width and height).
 - `levels`: `{action: level}` over the donor's (the header byte a cancel window tests). The donor's 231 has none, since she enters it
   only in EX mode; SPECIUM gives it RING's 31.
