@@ -12,6 +12,7 @@ import { scenarioOf, Story } from './story';
 import { enter, playing, RYUKO, strike } from './testing';
 import type { Battle, Slot } from './story';
 import { bossBrAnotherStory, brAnotherStages } from './br-another';
+import type { Boss } from './br-another';
 
 // A third player borrowed from another match: a story battle seats up to
 // eight.
@@ -1695,7 +1696,7 @@ describe('BR Another stages', () => {
 });
 
 describe('boss B.R. ANOTHER', () => {
-  const battlesOf = (who: Who) =>
+  const battlesOf = (who: Boss) =>
     bossBrAnotherStory(who).filter((s): s is Battle => s.type === 1);
 
   it('runs Story over a loading screen before each of three battles then the title, and a continue replays the very battle it lost', () => {
@@ -1775,41 +1776,102 @@ describe('boss B.R. ANOTHER', () => {
     }
   });
 
-  it('seats the three other bosses in seeded order on the last boss’s arena and wins the brawl', () => {
+  it('seats the fixed pair and mirror after the seeded bosses, every entry native and hostile, and wins only after the sixth', () => {
     for (const [who, names, stage] of [
-      ['zenka', ['dora', 'shinz', 'alpha'], 'office2'],
-      ['alpha', ['dora', 'zenka', 'shinz'], 'brboss'],
-      ['shinz', ['alpha', 'zenka', 'dora'], 'streetnight'],
-      ['dora', ['zenka', 'shinz', 'alpha'], 'office2'],
+      [
+        'zenka',
+        ['dora', 'shinz', 'alpha', 'astroman', 'ttro', 'zenka'],
+        'office2',
+      ],
+      [
+        'alpha',
+        ['dora', 'zenka', 'shinz', 'ttro', 'astroman', 'alpha'],
+        'brboss',
+      ],
+      [
+        'shinz',
+        ['alpha', 'zenka', 'dora', 'ttro', 'astroman', 'shinz'],
+        'streetnight',
+      ],
+      [
+        'dora',
+        ['zenka', 'shinz', 'alpha', 'astroman', 'ttro', 'dora'],
+        'office2',
+      ],
     ] as const) {
       const match = Match.story(who, battlesOf(who)[2]!);
+      for (const vm of match.cpus) if (vm) vm.input = () => ({});
       expect(match.stage, who).toBe(stage);
-      expect(match.fighters, who).toHaveLength(4);
+      expect(match.fighters, who).toHaveLength(7);
       expect(match.fighters[0]!.who, who).toBe(who);
       expect(
         match.fighters.slice(1).map((f) => f.who),
         who,
       ).toEqual([...names]);
-      const all = (1 << 4) - 1;
+      expect(match.fighters[6]!.who, `${who} mirror`).toBe(who);
+      const all = (1 << 7) - 1;
       expect(
         match.fighters.map((f) => f.enemies),
         who,
       ).toEqual(
         match.fighters.map((_, k) => (k === 0 ? all & ~1 : all & ~(1 << k))),
       );
+      for (const f of match.fighters)
+        expect(f, `${who} ${f.who} native`).toMatchObject({
+          hp: lifeOf(f.who),
+          maxHp: lifeOf(f.who),
+          maxStock: stocksOf(f.who),
+          enGainMultiplier: 1,
+        });
       fight(match);
       expect(
         match.fighters.map((f) => f.present),
         who,
-      ).toEqual([true, true, false, false]);
-      const [one] = match.fighters;
-      for (const boss of match.fighters.slice(1)) {
+      ).toEqual([true, true, false, false, false, false, false]);
+      for (let k = 2; k <= 6; k++) {
+        const watched = match.fighters[k - 1]!;
+        const next = match.fighters[k]!;
+        const mark = desperationOf(watched.who);
+        expect(next.present, `${who} ${next.who} waits`).toBe(false);
+        watched.hp = mark;
+        match.step();
+        expect(next.present, `${who} ${next.who} at the mark`).toBe(false);
+        watched.hp = mark - 1;
+        match.step();
+        expect(next.present, `${who} ${next.who} below the mark`).toBe(true);
+      }
+      expect(
+        match.fighters.every((f) => f.present),
+        `${who} all seven entered`,
+      ).toBe(true);
+      expect(match.palettes, who).toHaveLength(7);
+      expect(new Set(match.palettes).size, `${who} unique palettes`).toBe(7);
+      expect(match.palettes[6], `${who} mirror palette`).not.toBe(
+        match.palettes[0],
+      );
+      const [one, ...enemies] = match.fighters;
+      for (const boss of enemies.slice(0, 3)) {
         knockOut(match, boss, one);
         match.step();
       }
       for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, `${who} after the third`).toBeNull();
+      for (const boss of enemies.slice(3, 5)) {
+        knockOut(match, boss, one);
+        match.step();
+      }
+      for (let t = 0; t < 3; t++) match.step();
+      expect(match.winner, `${who} after the fifth`).toBeNull();
+      knockOut(match, enemies[5]!, one);
+      for (let t = 0; t < 3; t++) match.step();
       expect(match.winner, who).toBe('player');
+      expect(match, `${who} won`).toMatchObject({ wins: [1, 0], lost: 0 });
     }
+    const loss = Match.story('zenka', battlesOf('zenka')[2]!);
+    fight(loss);
+    knockOut(loss, loss.fighters[0]!, loss.fighters[1]!);
+    for (let t = 0; t < 3; t++) loss.step();
+    expect(loss).toMatchObject({ winner: 'opponent', wins: [0, 1], lost: 1 });
   });
 
   it('toughens every stage-1/2 enemy seat at construction, waiting ones included, the player native', () => {
