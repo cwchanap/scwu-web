@@ -155,6 +155,11 @@ const allyByPartner = (battle: Battle, partner: number) => {
   return [index, battle.slots[index]!] as const;
 };
 
+// An ally on stage from the first tick carries entry bits 0, where a
+// delayed one keeps its donor's entry — the ticket's stage-3 immediates
+// are the only ones of the first kind.
+const immediateAlly = (slot: Slot) => ((slot.flags >> 1) & 3) === 0;
+
 // Every slot equals its donor role slot with only the seat details
 // overridden, enemies and allies told apart by the 0x200 flag rather than
 // position: the enemies keep their original indices (0 first, the last the
@@ -176,7 +181,8 @@ const expectRoles = (
         : i === enemies.length - 1
           ? roles.slots[5]!
           : roles.slots[1]!;
-    const { player, enemies: hostility, watch, below, x } = slot!;
+    const { player, enemies: hostility, watch, below, x, flags } = slot!;
+    const immediate = isAllySlot(slot) && immediateAlly(slot!);
     expect(slot, `${who} slot ${i}`).toEqual({
       ...role,
       player,
@@ -184,7 +190,12 @@ const expectRoles = (
       watch,
       below,
       x,
+      // An immediate ally's flags are the shared recipe's, not the donor's.
+      ...(immediate ? { flags } : {}),
     });
+    // Every generated donor carries 0x305, so the recipe's are exactly
+    // 0x301: the ally bit, the life-bar bit, entry bits cleared.
+    if (immediate) expect(flags, `${who} slot ${i}`).toBe(0x301);
     expect(slot!.enemies, `${who} slot ${i}`).toBe(
       enemyMask(battle, i, paired),
     );
@@ -200,7 +211,15 @@ const expectRoles = (
     ...enemies.map((_, i) =>
       i === enemies.length - 1 ? 450 : i % 2 === 0 ? 850 : 450,
     ),
-    ...allies.map(() => ally.x),
+    // A delayed ally keeps its donor's x; the immediates the ticket's
+    // fixed Z-MEGA 450 and RARIO 350.
+    ...allies.map((s) =>
+      immediateAlly(s!)
+        ? s!.player === ROSTER.indexOf('zmega')
+          ? 450
+          : 350
+        : ally.x,
+    ),
   ]);
   expect(
     battle.slots.map((s) => s!.below),
@@ -208,8 +227,65 @@ const expectRoles = (
   ).toEqual([
     0,
     ...enemies.slice(0, -1).map((s) => desperationOf(ROSTER[s!.player]!)),
-    ...allies.map(() => desperationOf(who)),
+    // A delayed ally watches the 1P's own mark; an immediate preserves its
+    // donor's unused below.
+    ...allies.map((s) => (immediateAlly(s!) ? ally.below : desperationOf(who))),
   ]);
+};
+
+// The ticket's stage-3 ally layout: the usual partner delayed first when
+// it is not already one of the immediates, then Z-MEGA and RARIO on stage
+// from the first tick in that order, the player's own excluded — eight
+// native seats with the 1P for the 32 regulars, six for the reciprocal
+// Z-MEGA/RARIO, whose usual partner is the other immediate. Returns the
+// expected ally layout as [partner, x] pairs for the caller's own pins.
+const expectStage3Allies = (who: Who, stage3: Battle, finale: Battle) => {
+  const self = ROSTER.indexOf(who);
+  const donor = finale.slots[6]!;
+  // The generated donor facts the recipe relies on: the ally bit and the
+  // bar bit over a delayed entry, watching seat 0.
+  expect(donor.flags, `${who} donor flags`).toBe(0x305);
+  expect(donor.watch, `${who} donor watch`).toBe(0);
+  const immediates = (
+    [
+      ['zmega', 450],
+      ['rario', 350],
+    ] as const
+  ).filter(([partner]) => partner !== who);
+  const retained = !immediates.some(
+    ([partner]) => ROSTER.indexOf(partner) === donor.player,
+  );
+  const expected: (readonly [Who, number])[] = [];
+  if (retained) expected.push([ROSTER[donor.player]!, donor.x]);
+  for (const [partner, x] of immediates) expected.push([partner, x]);
+  const seats = stage3.slots.map((s) => s!.player);
+  expect(seats, `${who} no self`).not.toContain(self);
+  expect(new Set(seats).size, `${who} no duplicate`).toBe(seats.length);
+  // Four enemies, then the allies: 1 + 4 + 3 = 8 seats for the 32
+  // regulars, 1 + 4 + 1 = 6 for the reciprocal two.
+  expect(stage3.slots, who).toHaveLength(4 + expected.length);
+  const allies = stage3.slots.slice(4);
+  expect(
+    allies.map((s) => [ROSTER[s!.player], s!.x]),
+    who,
+  ).toEqual(expected.map(([partner, x]) => [partner, x]));
+  allies.forEach((slot, i) => {
+    if (i === 0 && retained) {
+      // The delayed usual partner: its donor's flags and delayed entry,
+      // rebuilt to watch the 1P at the 1P's own mark.
+      expect(slot!.flags, `${who} delayed flags`).toBe(donor.flags);
+      expect((slot!.flags >> 1) & 3, `${who} delayed entry`).toBe(2);
+      expect(slot!.watch, `${who} delayed watch`).toBe(0);
+      expect(slot!.below, `${who} delayed below`).toBe(desperationOf(who));
+      return;
+    }
+    // An immediate partner: entry bits 0, the recipe's 0x301 and its bar.
+    expect(slot!.flags, `${who} immediate flags`).toBe(0x301);
+    expect(slot!.flags & 1, `${who} immediate bar`).toBe(1);
+    expect(slot!.watch, `${who} immediate watch`).toBe(donor.watch);
+    expect(slot!.below, `${who} immediate below`).toBe(donor.below);
+  });
+  return expected;
 };
 
 describe('BR Another approved lineups', () => {
@@ -223,6 +299,7 @@ describe('BR Another approved lineups', () => {
   // the last boss's arena — with the family's own role/header donors.
   it('constructs each approved §7 row for all 34 fighters', () => {
     expect(ELIGIBLE).toHaveLength(34);
+    const sixSeat: Who[] = [];
     for (const who of ELIGIBLE) {
       const row = BR_ANOTHER_LINEUPS[who];
       if (!row) throw new Error(`${who} has no approved row`);
@@ -255,14 +332,19 @@ describe('BR Another approved lineups', () => {
       for (const key of HEADER_KEYS)
         expect(stage3[key], `${who} stage3 ${key}`).toBe(finale[key]);
       expectRoles(who, stage3, finale, false);
+      if (expectStage3Allies(who, stage3, finale).length === 1)
+        sixSeat.push(who);
       expect(stage1.slots.at(-1)!.player, `${who} stage1 ally`).toBe(
         (folded ? finale : opener).slots[6]!.player,
       );
-      for (const battle of [stage2, stage3])
-        expect(battle.slots.at(-1)!.player, `${who} ally`).toBe(
-          finale.slots[6]!.player,
-        );
+      expect(stage2.slots.at(-1)!.player, `${who} stage2 ally`).toBe(
+        finale.slots[6]!.player,
+      );
     }
+    // Eight seats (32 regulars) or six (the reciprocal Z-MEGA/RARIO) —
+    // the generated data overlaps no other usual partner with the
+    // immediates.
+    expect([...sixSeat].sort()).toEqual(['rario', 'zmega']);
   });
 
   // Independent of the typed table: RYUKO's rows straight from the ticket.
@@ -274,7 +356,9 @@ describe('BR Another approved lineups', () => {
     expect(stage2.slots.map((s) => s!.player)).toEqual([
       26, 27, 24, 25, 40, 41, 1,
     ]);
-    expect(stage3.slots.map((s) => s!.player)).toEqual([33, 32, 45, 30, 1]);
+    expect(stage3.slots.map((s) => s!.player)).toEqual([
+      33, 32, 45, 30, 1, 31, 46,
+    ]);
     expect(stage3.stage).toBe(ARENAS.get(30));
     expect(stage1.stage).toBe(9);
     expect(stage2.stage).toBe(3);
@@ -634,7 +718,11 @@ describe('BR Another approved lineups', () => {
     const landed = new Map<number, Who[]>();
     for (const who of ELIGIBLE) {
       const { stage3 } = brAnotherStages(who);
-      expect(stage3.slots, who).toHaveLength(5);
+      // Four enemies, the delayed usual partner and the two immediates —
+      // or the one immediate the reciprocal cases keep.
+      expect(stage3.slots, who).toHaveLength(
+        who === 'zmega' || who === 'rario' ? 5 : 7,
+      );
       const bosses = stage3.slots.slice(0, 4).map((s) => s!.player);
       expect(
         [...bosses].sort((a, b) => a - b),
@@ -651,15 +739,19 @@ describe('BR Another approved lineups', () => {
       expectRoles(who, stage3, finale, false);
     }
     expect(
-      (['times', 'ryuko', 'masa', 'kiki'] as Who[]).map((who) => {
-        const { stage3 } = brAnotherStages(who);
-        return [who, stage3.stage, stage3.slots.map((s) => s?.player)];
-      }),
+      (['times', 'ryuko', 'masa', 'kiki', 'zmega', 'rario'] as Who[]).map(
+        (who) => {
+          const { stage3 } = brAnotherStages(who);
+          return [who, stage3.stage, stage3.slots.map((s) => s?.player)];
+        },
+      ),
     ).toEqual([
-      ['times', 12, [32, 33, 45, 30, 28]],
-      ['ryuko', 12, [33, 32, 45, 30, 1]],
-      ['masa', 12, [45, 33, 32, 30, 29]],
-      ['kiki', 18, [33, 30, 32, 45, 3]],
+      ['times', 12, [32, 33, 45, 30, 28, 31, 46]],
+      ['ryuko', 12, [33, 32, 45, 30, 1, 31, 46]],
+      ['masa', 12, [45, 33, 32, 30, 29, 31, 46]],
+      ['kiki', 18, [33, 30, 32, 45, 3, 31, 46]],
+      ['zmega', 18, [32, 33, 30, 45, 46]],
+      ['rario', 18, [30, 32, 33, 45, 31]],
     ]);
   });
 
@@ -695,11 +787,19 @@ describe('BR Another approved lineups', () => {
     expect(desperationOf('shinz')).toBe(240);
     expect(desperationOf('dora')).toBe(180);
     const times = brAnotherStages('times').stage3;
-    expect(times.slots.map((s) => s?.player)).toEqual([32, 33, 45, 30, 28]);
-    expect(times.slots.map((s) => s?.below)).toEqual([0, 150, 240, 180, 120]);
+    expect(times.slots.map((s) => s?.player)).toEqual([
+      32, 33, 45, 30, 28, 31, 46,
+    ]);
+    expect(times.slots.map((s) => s?.below)).toEqual([
+      0, 150, 240, 180, 120, 120, 120,
+    ]);
     const masa = brAnotherStages('masa').stage3;
-    expect(masa.slots.map((s) => s?.player)).toEqual([45, 33, 32, 30, 29]);
-    expect(masa.slots.map((s) => s?.below)).toEqual([0, 180, 240, 150, 135]);
+    expect(masa.slots.map((s) => s?.player)).toEqual([
+      45, 33, 32, 30, 29, 31, 46,
+    ]);
+    expect(masa.slots.map((s) => s?.below)).toEqual([
+      0, 180, 240, 150, 135, 135, 135,
+    ]);
     for (const who of ELIGIBLE)
       for (const battle of built(brAnotherStages(who))) {
         const enemies = enemySlotsOf(battle);
@@ -721,8 +821,22 @@ describe('BR Another approved lineups', () => {
         finale.slots[6]!,
       ];
       const battles = built(brAnotherStages(who));
+      const immediateSeats = [
+        ROSTER.indexOf('zmega'),
+        ROSTER.indexOf('rario'),
+      ].filter((seat) => seat !== ROSTER.indexOf(who));
       for (const [i, donor] of donors.entries()) {
         const battle = battles[i]!;
+        if (i === 2 && immediateSeats.includes(donor.player)) {
+          // The reciprocal cases: the usual partner is already on stage as
+          // the immediate ally, so no delayed copy seats behind the bosses.
+          const copies = battle.slots.filter(
+            (slot) => isAllySlot(slot) && slot!.player === donor.player,
+          );
+          expect(copies, who).toHaveLength(1);
+          expect((copies[0]!.flags >> 1) & 3, who).toBe(0);
+          continue;
+        }
         // The 0x200-flagged ally seating the donor's player — selected by
         // team and identity, so its original index feeds the oracle.
         const [allyAt, ally] = allyByPartner(battle, donor.player);
@@ -754,8 +868,9 @@ describe('BR Another approved lineups', () => {
       expect(ally.watch).toBe(0);
       expect(ally.below).toBe(desperationOf('sww'));
       expect(ally.enemies).toBe(enemyMask(stage1, allyAt, true));
+      // Stages 2–3 keep seating the finale's partner, never the sentinel.
       for (const battle of [stage2, stage3])
-        expect(battle.slots.at(-1)!.player).toBe(original.player);
+        allyByPartner(battle, original.player);
     } finally {
       opener.slots[6] = original;
     }
@@ -766,8 +881,12 @@ describe('BR Another approved lineups', () => {
       ['times', 'masa'],
       ['ryuko', 'zoma'],
     ] as [Who, Who][]) {
-      for (const battle of built(brAnotherStages(who)))
+      const { stage1, stage2, stage3 } = brAnotherStages(who);
+      for (const battle of [stage1, stage2])
         expect(ROSTER[battle.slots.at(-1)!.player], who).toBe(ally);
+      // On stage 3 the usual partner is the delayed ally — or the one
+      // immediate for the reciprocal pair — selected by team and identity.
+      allyByPartner(stage3, ROSTER.indexOf(ally));
     }
   });
 

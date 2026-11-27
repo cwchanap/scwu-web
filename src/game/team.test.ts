@@ -1261,22 +1261,41 @@ describe('BR Another stages', () => {
   });
 
   it('sends the ally in once the 1P’s life falls below its mark', () => {
-    for (const key of ['stage2', 'stage3'] as const) {
-      const match = Match.story('zmega', brAnotherStages('zmega')[key]);
-      fight(match);
-      const [one] = match.fighters;
-      const ally = match.fighters.at(-1)!;
-      expect(ally.who, key).toBe('rario');
-      expect(ally.present, key).toBe(false);
-      one.hp = desperationOf('zmega');
-      match.step();
-      expect(ally.present, key).toBe(false);
-      one.hp = desperationOf('zmega') - 1;
-      match.step();
-      expect(ally.present, key).toBe(true);
-      for (let t = 0; t < 100 && !ally.shown; t++) match.step();
-      expect(match.lifeBars, key).toEqual([ally]);
-    }
+    const second = Match.story('zmega', brAnotherStages('zmega').stage2);
+    fight(second);
+    const [one] = second.fighters;
+    const ally = second.fighters.at(-1)!;
+    expect(ally.who).toBe('rario');
+    expect(ally.present).toBe(false);
+    one.hp = desperationOf('zmega');
+    second.step();
+    expect(ally.present).toBe(false);
+    one.hp = desperationOf('zmega') - 1;
+    second.step();
+    expect(ally.present).toBe(true);
+    for (let t = 0; t < 100 && !ally.shown; t++) second.step();
+    expect(second.lifeBars).toEqual([ally]);
+    // Stage 3: the usual partner still waits on the 1P's mark while the
+    // immediates stand by with their bars from the first tick.
+    const third = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    fight(third);
+    const [player] = third.fighters;
+    const [zoma, zmega, rario] = third.fighters.slice(5);
+    expect(zoma.who).toBe('zoma');
+    expect([zmega.who, rario.who]).toEqual(['zmega', 'rario']);
+    expect(zoma.present).toBe(false);
+    expect(zmega.present).toBe(true);
+    expect(rario.present).toBe(true);
+    for (let t = 0; t < 100 && !(zmega.shown && rario.shown); t++) third.step();
+    expect(third.lifeBars).toEqual([zmega, rario]);
+    player.hp = desperationOf('ryuko');
+    third.step();
+    expect(zoma.present).toBe(false);
+    player.hp = desperationOf('ryuko') - 1;
+    third.step();
+    expect(zoma.present).toBe(true);
+    for (let t = 0; t < 100 && !zoma.shown; t++) third.step();
+    expect(third.lifeBars).toEqual([zoma, zmega, rario]);
   });
 
   it('names no rival while several stand, then the last left or the one the 1P’s box met', () => {
@@ -1320,9 +1339,25 @@ describe('BR Another stages', () => {
   });
 
   it('enters the stage-3 bosses in their seeded order, each once its watched boss runs low', () => {
-    for (const [who, names, stage] of [
-      ['ryuko', ['shinz', 'alpha', 'dora', 'zenka'], 'boss'],
-      ['zmega', ['alpha', 'shinz', 'zenka', 'dora'], 'streetnight'],
+    for (const [who, names, stage, presence] of [
+      [
+        'ryuko',
+        ['shinz', 'alpha', 'dora', 'zenka'],
+        'boss',
+        [true, true, false, false, false, false, true, true],
+      ],
+      [
+        'zmega',
+        ['alpha', 'shinz', 'zenka', 'dora'],
+        'streetnight',
+        [true, true, false, false, false, true],
+      ],
+      [
+        'rario',
+        ['zenka', 'alpha', 'shinz', 'dora'],
+        'streetnight',
+        [true, true, false, false, false, true],
+      ],
     ] as const) {
       const match = Match.story(who, brAnotherStages(who).stage3);
       expect(match.stage, who).toBe(stage);
@@ -1337,20 +1372,34 @@ describe('BR Another stages', () => {
         match.fighters.slice(1, 5).map((f) => f.who),
         who,
       ).toEqual(names);
-      const all = (1 << 6) - 1;
+      // The 1P and its allies fight exactly the four bosses (bits 1–4);
+      // each boss fights every seat but its own — symmetric either way.
+      const all = (1 << match.fighters.length) - 1;
       expect(
         match.fighters.map((f) => f.enemies),
         who,
       ).toEqual(
         match.fighters.map((_, k) =>
-          k === 0 || k === 5 ? all & ~1 & ~(1 << 5) : all & ~(1 << k),
+          k === 0 || k > 4 ? 0b11110 : all & ~(1 << k),
         ),
       );
+      for (const [i, a] of match.fighters.entries())
+        for (const [j, b] of match.fighters.entries())
+          expect(Boolean(a.enemies & (1 << j)), `${who} ${i}->${j}`).toBe(
+            Boolean(b.enemies & (1 << i)),
+          );
       fight(match);
+      // The first boss and the immediate allies stand from the first
+      // tick; the waiting bosses and a retained usual partner do not.
       expect(
         match.fighters.map((f) => f.present),
         who,
-      ).toEqual([true, true, false, false, false, false]);
+      ).toEqual(presence);
+      // The immediates draw their partner bars once shown.
+      const immediates = match.fighters.slice(5).filter((f) => f.present);
+      for (let t = 0; t < 100 && immediates.some((f) => !f.shown); t++)
+        match.step();
+      expect(match.lifeBars, who).toEqual(immediates);
       for (const [watched, next] of [
         [match.fighters[1]!, match.fighters[2]!],
         [match.fighters[2]!, match.fighters[3]!],
@@ -1385,13 +1434,23 @@ describe('BR Another stages', () => {
     }
   });
 
-  it('wins the stage-3 brawl only once every boss has fallen', () => {
+  it('wins the stage-3 brawl only once every boss has fallen, however the allies fare or whoever strikes', () => {
     const match = Match.story('ryuko', brAnotherStages('ryuko').stage3);
     fight(match);
     const [one] = match.fighters;
+    const [, first] = match.fighters;
+    const zmega = match.fighters[6]!;
+    const rario = match.fighters[7]!;
+    expect([zmega.who, rario.who]).toEqual(['zmega', 'rario']);
+    // An ally's fall is no part of the win: Z-MEGA goes down before any
+    // boss and the brawl still only counts the four hostiles.
+    knockOut(match, zmega, first);
+    match.step();
+    expect(match.winner).toBeNull();
     for (const [i, boss] of match.fighters.slice(1, 5).entries()) {
       expect(boss.present, boss.who).toBe(true);
-      knockOut(match, boss, one);
+      // The final blow may be an ally's — RARIO fells the last boss.
+      knockOut(match, boss, i === 3 ? rario : one);
       match.step();
       if (i < 3) expect(match.winner).toBeNull();
     }
@@ -1399,6 +1458,13 @@ describe('BR Another stages', () => {
     expect(match.winner).toBe('player');
     expect(match).toMatchObject({ wins: [1, 0], lost: 0 });
     expect(match.matchOver).toBe(true);
+    // The 1P's fall loses even with every other ally still standing.
+    const loss = Match.story('ryuko', brAnotherStages('ryuko').stage3);
+    fight(loss);
+    knockOut(loss, loss.fighters[0]!, loss.fighters[1]!);
+    for (let t = 0; t < 3; t++) loss.step();
+    expect(loss.fighters[7]!.hp).toBeGreaterThan(0);
+    expect(loss).toMatchObject({ winner: 'opponent', wins: [0, 1], lost: 1 });
   });
 
   it('loses the stage-2 brawl when the 1P falls, and a continue retries the identical seeded battle', () => {
@@ -1555,6 +1621,8 @@ describe('BR Another stages', () => {
       'alpha',
       'dora',
       'chung',
+      'zmega',
+      'rario',
     ]);
     for (const [i, vm] of match.cpus.entries())
       if (i) vm!.input = i === 4 ? () => ({ ex: true }) : () => ({});
