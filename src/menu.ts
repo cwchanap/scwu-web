@@ -9,14 +9,7 @@ import type { CheatOptions } from './game/cheats';
 import type { DummyBehavior } from './game/dummy';
 import type { Mode } from './game/match';
 import type { Stage, Who } from './game/characters';
-import {
-  GRID,
-  NAMEPLATES,
-  OWN_TILES,
-  ROSTER,
-  XS,
-  YS,
-} from './instructions/fighters';
+import { GRID, NAMEPLATES, ROSTER, XS, YS } from './instructions/fighters';
 
 // The Cheats menu's settings persist as one JSON object under this key,
 // on the device alone (authored, HPA-767).
@@ -355,15 +348,10 @@ export const tileOf = (who: Who): { x: number; y: number } | null => {
   };
 };
 
-// The inline style a face tile takes: the select sheet's origin for a seated
-// fighter, or his own 24 x 60 tile image (`base` is ASSET_BASE).
-export const tileStyle = (who: Who, base: string): string => {
+// The inline style a face tile takes: its origin on the select sheet.
+export const tileStyle = (who: Who): string => {
   const at = tileOf(who);
-  if (at) return `--x: ${at.x}; --y: ${at.y}`;
-  const own = OWN_TILES[who];
-  return own
-    ? `--face-sheet: url(${base}${own}); --x: 0; --y: 0; --sheet-size: 24px 60px`
-    : '';
+  return at ? `--x: ${at.x}; --y: ${at.y}` : '';
 };
 
 // One grid step: WASD or the arrows, over `columns` — the rendered grid's

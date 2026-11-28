@@ -92,8 +92,8 @@ export const FACES: Record<Who, string> = {
   astroman: 'astroman/220.png',
   yinan: 'yinan/132.png',
   aya: 'aya/132.png',
-  // No select portrait yet: his idle drawing stands in.
-  shuwa: 'shuwa/3.png',
+  // His own select portrait (HPA-1306), installed as her 419.
+  shuwa: 'shuwa/419.png',
   dora: 'dora/140.png',
   rario: 'rario/234.png',
   training: 'training/234.png',
@@ -5034,7 +5034,7 @@ export const GUIDES_DATA = {
   },
   shuwa: {
     art: FACES.shuwa,
-    nameplate: '',
+    nameplate: 'shuwa/464.png',
     role: 'New fighter with 480 life',
     tag: 'A new fighter with 480 life, still on RYUKO’s timing and boxes for his normals, chains and throw, with moves borrowed from DoraEmon, ALEX, ZOMA and REMU. His chest lamp holds three shots.',
     ex: false,

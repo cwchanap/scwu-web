@@ -75,7 +75,8 @@ can read them without the raw drawings or the game's files):
   x on a guided pose, his feet plus the donor's feet-to-position offset for y).
 - `game/fx/<donor image>.png`: his effects (saw ring, beam, muzzle bloom, the two wide beams of THREE MINUTES), drawn in
   code by `tools/game_fx.py` at the size of the donor image each one replaces.
-- `game/ui/`: the Menu's 24 x 60 face tile and the HUD's 70 x 21 face, cut from `refs/base.png`.
+- `game/ui/`: his select portrait, select-sheet face tile, HUD face, name lettering and colour schemes (HPA-1306, made by
+  `tools/ui.py`; see `ui/README.md`).
 - `game/spec.json`: his stats, command table, which drawing stands in for each donor image, the images he shows as
   nothing, the frames SWING drops, his chest lamp and the moves grafted from other fighters. The exporter (`export_authored` in `scripts/export_assets.py`) builds
   `generated/shuwa.json` and the `fighter-shuwa` pack from it and the donor's own export.
@@ -100,8 +101,12 @@ cut from the game.
 | `drawings/<n>.png` | His drawings: 8-bit palette PNGs on one shared palette (colour 0 is clear), cropped to the figure  |
 | `anchors.json`     | `{drawing: {anchor: [x, y], size: [w, h]}}`: the pixel of the drawing the game puts on the fighter |
 | `fx/<id>.png`      | His effects, one per donor image they replace, the donor image's exact size (palette PNGs)         |
-| `ui/face-tile.png` | The Menu's 24 x 60 face tile                                                                       |
+| `ui/portrait.png`  | His select portrait (donor image 419) and guide hero                                               |
+| `ui/name.png`      | His name lettering (donor image 464): select screen, HUD, Menu and guide                           |
+| `ui/tile.png`      | His 24 x 60 face, painted over cell 42 of the select sheets                                        |
 | `ui/hud-face.png`  | The HUD face (donor images 2000 to 2002 show it)                                                   |
+| `ui/palettes.json` | His eight colour schemes                                                                           |
+| `sound/<clip>`     | His own sounds, once HPA-1307 adds them (`spec.json` `sounds`)                                     |
 | `spec.json`        | Stats, command table, which drawing stands in for each donor image (below)                         |
 
 `tools/game_art.py` and `tools/game_fx.py` make the PNGs and `anchors.json` from the raw drawings; `spec.json` is written by hand.
@@ -123,15 +128,16 @@ cut from the game.
   (`commands.ts` `KEYS.shuwa`) are the donor's keys for the same numbers, BARRIER on F (her IORI) and RECHARGE on E (her EX).
 - `images`: donor image id -> drawing name. Every image a fighter-owned script, clip, held or idle record shows must be here (or in
   `blank`, `fx`, or `scriptImages`). Objects' images (hit sparks, dust, the super flash) are not listed and stay the donor's.
-  An image he shows is exported as his own: `filename shuwa/<id>.png` (the drawing's bytes), the drawing's width and height,
-  `own: true` (so no palette swap touches it).
+  An image he shows is exported as his own: `filename shuwa/<id>.png` (the drawing's bytes), the drawing's width and height.
+  His drawings and portrait take his colour schemes; effects, blanks, the HUD face and the name are `own: true` (so no palette
+  swap touches them).
 - `scriptImages`: `{script key: {donor image id: drawing}}`. The donor shows one image in two roles (image 10 is her walk step and the
   wind-up of three moves); in the listed scripts (and the scripts they reach) the frames show a new image id (10000 + the donor id, one per
   drawing) that maps to the drawing instead.
 - `fx`: donor image ids he redraws; the file is `fx/<id>.png` and it has the donor image's exact size (the exporter checks), so the
   donor's frame offsets and boxes stay true. Exported as `shuwa/<id>.png`, `own: true`.
 - `blank`: donor image ids he shows as nothing (a transparent PNG of the donor image's size): her giant robot (329 to 336), her emblem (327, 328)
-  and her name plate (464).
+  (his lettering replaces her name plate, 464, through `ui.name`).
 - `drop`: `{action: [image ids]}`. From every script the closure of that action reaches (the fighter's own timeline, not objects), remove the
   frames that show those images together with the events on them (SWING is her Daisetsuzan without the missile volley after the toss).
   The scripts must still end and the throw must still deal its damage.
@@ -139,7 +145,12 @@ cut from the game.
   that jumps to one, and refuses if his own timeline still reaches one. Her intros (30 to 34, 36) jump to Chage Character (37)
   while down is held, which sets variable 0 to 10, her EX mode; he has none, so 37 is cut. Her EX Fire (231, his SPECIUM)
   enters its forward-held charge (its check at age 18 into 237 and 238); one lamp charge is one shot, so both are cut.
-- `ui`: the Menu and HUD stand-ins. `hudFaceImages` take `ui/hud-face.png` (their own width and height).
+- `ui`: his select and HUD art. `portrait` replaces the donor's 419 and `name` her 464 (the select programs' face and
+  lettering; the exporter refuses if they show any other image). `tile` is painted over cell 42 of the CHAR SELECT sheets
+  (`select/13.png`, `select/30.png`). `hudFaceImages` take `hudFace` (their own width and height). `palettes` is his eight
+  schemes: his rows replace the donor's rows for the same colours, and his drawings and portrait take them.
+- `sounds`: `{donor sound index: clip}`, a clip under `sound/` that the export publishes as `sounds/shuwa-<index>.wav` in
+  place of the donor's sound. Empty until HPA-1307.
 - `levels`: `{action: level}` over the donor's (the header byte a cancel window tests). The donor's 231 has none, since she enters it
   only in EX mode; SPECIUM gives it RING's 31.
 - `cpu`: CPU entries (the export's `cpu` shape) added to the donor's table, after the donor's entries for the commands `new` fills are

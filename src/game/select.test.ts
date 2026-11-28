@@ -61,11 +61,13 @@ describe('character select (object type 10, VS single)', () => {
       ],
     });
     // Bit 1 lets VS single rest on a player: not SHIN-Z (story only), nor
-    // the blank templates. DoraEmon (45) has none, but the port lets him
-    // (authored).
+    // the blank templates. DoraEmon (45) has none, but the port lets him,
+    // and SHUWA (42) in VS single alone (authored).
     const locked = ROSTER.flatMap((who, i) => (selectable(i) ? [] : [i]));
-    expect(locked).toEqual([33, 42, 43, 44, 48, 49]);
+    expect(locked).toEqual([33, 43, 44, 48, 49]);
+    expect(ROSTER[42]).toBe('shuwa');
     expect(ROSTER[47]).toBe('training');
+    expect(selectable(42, 2, true)).toBe(false);
   });
 
   it('opens on CHAR SELECT with both cursors on Ryuko, each side showing her select face', () => {
@@ -162,6 +164,17 @@ describe('character select (object type 10, VS single)', () => {
       expect(pixel(file, 146, 370)).toEqual([224, 0, 0, 255]);
       expect(pixel(file, 110, 380)).toEqual([254, 254, 254, 255]);
     }
+    // SHUWA's tile (art/shuwa/game/ui/tile.png, HPA-1308) fills seat 42's
+    // cell in VS single's and story's grids, its (x, y) at the sheet's
+    // (52 + x, 344 + y): his hat, an eye and his cheek. The bar under the
+    // cell stays, and TEAM VS's grid keeps the GATE LOCK lettering.
+    for (const file of ['select/13.png', 'select/30.png']) {
+      expect(pixel(file, 53, 346)).toEqual([184, 184, 200, 255]);
+      expect(pixel(file, 55, 370)).toEqual([24, 24, 32, 255]);
+      expect(pixel(file, 72, 394)).toEqual([248, 216, 192, 255]);
+      expect(pixel(file, 53, 402)).toEqual([238, 238, 238, 255]);
+    }
+    expect(pixel('demo11/13.png', 60, 362)).toEqual([254, 254, 254, 255]);
   });
 
   it('lets VS pick DoraEmon (45), authored', () => {
@@ -185,6 +198,51 @@ describe('character select (object type 10, VS single)', () => {
     run(select, tap({ kick: true }));
     while (!select.done) select.step();
     expect(select.done).toEqual(['dora', 'ryuko']);
+  });
+
+  it('lets VS single pick SHUWA (42), authored (HPA-1308)', () => {
+    const select = new CharacterSelect([
+      [2, 5],
+      [2, 5],
+    ]);
+    select.step();
+    expect(select.hover).toEqual([42, 42]);
+    // Her face (67) slides his portrait (419) in and calls her *NAME (66),
+    // his lettering (464); the 2P side's faces left.
+    for (let t = 0; t < 30; t++) select.step();
+    const faces = select.objects.filter((o) => o.container === 'shuwa');
+    expect(
+      faces.map((o) => [o.owner, o.action, o.frame?.image, o.facing]),
+    ).toEqual([
+      [0, 67, 419, 1],
+      [1, 67, 419, -1],
+      [0, 66, 464, 1],
+      [1, 66, 464, -1],
+    ]);
+    // J chooses him in palette 3, then K the 2P side's in palette 0.
+    run(select, tap({ punch: true }));
+    run(select, tap({ kick: true }));
+    while (!select.done) select.step();
+    expect(select.done).toEqual(['shuwa', 'shuwa']);
+    expect(select.palettes).toEqual([3, 0]);
+  });
+
+  it('keeps SHUWA out of story mode and TEAM VS (HPA-1308)', () => {
+    const story = new CharacterSelect([[2, 5]], true);
+    story.step();
+    expect(story.hover[0]).toBe(-1);
+    const team = new CharacterSelect(
+      [
+        [2, 5],
+        [0, 0],
+      ],
+      false,
+      teamDemo as Demo,
+    );
+    team.step();
+    expect(team.hover[0]).toBe(-1);
+    run(team, tap({ punch: true }));
+    expect(team.members[0]).toEqual([]);
   });
 
   it('lets TEAM VS seat DoraEmon', () => {
@@ -458,8 +516,8 @@ describe('story select (object type 10, story mode)', () => {
       ['shinz', 'shinz'],
       0,
     ]);
-    // Bit 0 locks out the blank templates; DoraEmon (45) is let in
-    // (authored).
+    // Bit 0 locks out the blank templates and SHUWA, whose story waits for
+    // TOPPA; DoraEmon (45) is let in (authored).
     const locked = ROSTER.flatMap((_, i) => (selectable(i, 1) ? [] : [i]));
     expect(locked).toEqual([42, 43, 44, 47, 48, 49]);
   });

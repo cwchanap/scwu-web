@@ -1,24 +1,24 @@
 # SHUWA's select and HUD art
 
-His own select-screen, Menu and HUD art (HPA-1306), drawn for him so nothing here is cut from the game. Putting it
-in the game is the select-screen ticket's job; until then he shows the stand-ins in `../game/ui/`.
+His own select-screen, Menu and HUD art (HPA-1306), drawn for him so nothing here is cut from the game. Since
+HPA-1308 the game's files live in `../game/ui/`, inside the assets fingerprint; only the scheme previews stay here.
 
-| File                    | Size    | What it is                                                                       |
-| ----------------------- | ------- | -------------------------------------------------------------------------------- |
-| `portrait.png`          | 166×450 | Select portrait, beside the grid while his cell is hovered, and his guide's hero |
-| `tile.png`              | 24×60   | Grid face tile, filled edge to edge (his cell and the Menu's fighter cards)      |
-| `hud-face.png`          | 70×21   | HUD face beside his life bar, see-through outside his head                       |
-| `name.png`              | 91×20   | "SHUWA" name lettering                                                           |
-| `palettes.json`         |         | His eight colour schemes: each colour his drawings use, in all eight             |
-| `schemes/base-<n>.png`  | 144×208 | Schemes 2 to 8 on his base key drawing (`../round7/key-master-base.png`)         |
-| `schemes/giant-<n>.png` | 161×205 | Schemes 2 to 8 on his giant key drawing (`../round7/key-master-powered.png`)     |
+| File                       | Size    | What it is                                                                       |
+| -------------------------- | ------- | -------------------------------------------------------------------------------- |
+| `../game/ui/portrait.png`  | 166×450 | Select portrait, beside the grid while his cell is hovered, and his guide's hero |
+| `../game/ui/tile.png`      | 24×60   | Grid face tile, filled edge to edge (his cell on the select sheet)               |
+| `../game/ui/hud-face.png`  | 70×21   | HUD face beside his life bar, see-through outside his head                       |
+| `../game/ui/name.png`      | 91×20   | "SHUWA" name lettering                                                           |
+| `../game/ui/palettes.json` |         | His eight colour schemes: each colour his drawings use, in all eight             |
+| `schemes/base-<n>.png`     | 144×208 | Schemes 2 to 8 on his base key drawing (`../round7/key-master-base.png`)         |
+| `schemes/giant-<n>.png`    | 161×205 | Schemes 2 to 8 on his giant key drawing (`../round7/key-master-powered.png`)     |
 
 All of it is made by `../tools/ui.py` (python3 with numpy, scipy and pillow):
 
 ```sh
 bash art/shuwa/draw.sh ui                  # the drawings, into out/raw/ (OpenAI Images API, as for his sprites)
 python3 art/shuwa/tools/ui.py variants     # every drawing cleaned up, into out/ui/ (not committed)
-python3 art/shuwa/tools/ui.py pick b b     # the picked portrait and face, into ui/
+python3 art/shuwa/tools/ui.py pick b b     # the picked portrait and face, into game/ui/
 python3 art/shuwa/tools/ui.py name schemes # the lettering and the colour schemes, drawn in code
 ```
 
@@ -79,6 +79,6 @@ A scheme recolours whole ramps (light, shadow, line; `SCHEMES` in `ui.py`). The 
 little, and the giant's main silver (200,208,224) is also the reflective bands' shadow. His chest lamp's blues never
 change, nor do his skin, hair, eyes, gloves, boots or lantern.
 
-For the select-screen ticket: the lamp's low-life blink turns its blues into (248,128,136), (232,32,40) and
-(168,16,24), and the last two are the giant's stripe colours, which schemes 2, 3, 5, 6 and 7 recolour. Apply the blink after the
-palette, or the lamp blinks the scheme's stripe colour.
+The lamp's low-life blink turns its blues into (248,128,136), (232,32,40) and (168,16,24), and the last two are the
+giant's stripe colours, which schemes 2, 3, 5, 6 and 7 recolour. So the scene applies the blink after the palette
+(`recolored` in `src/game/scene.ts`), or the lamp would blink the scheme's stripe colour.

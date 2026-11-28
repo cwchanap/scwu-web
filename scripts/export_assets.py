@@ -870,6 +870,56 @@ def paint_dora_cell(grid, width, face):
             grid[at:at + 4] = bytes(colour)
 
 
+# Authored (HPA-1308): SHUWA's seat is 42, the first GATE LOCK cell. CHAR SELECT's grids (VS single's and story's)
+# get his face tile (art/shuwa/game/ui/tile.png) upright in the cell's body, the tile's 24 x 60 on the cell's bounding
+# box from (52, 344), so the sheared cell windows it as the cast's cells window theirs. TEAM VS's grid keeps his
+# GATE LOCK, since TEAM VS keeps his seat shut (select.ts selectable).
+def paint_shuwa_cell(grid, width, tile):
+    x0, y0 = 52, 344
+    for x in range(24):
+        # The cell's body is the column's opaque run through its middle; the bars above and below are not it.
+        top = bottom = y0 + 30
+        while grid[((top - 1) * width + x0 + x) * 4 + 3]:
+            top -= 1
+        while grid[((bottom + 1) * width + x0 + x) * 4 + 3]:
+            bottom += 1
+        for y in range(max(top, y0), min(bottom, y0 + 59) + 1):
+            at = (y * width + x0 + x) * 4
+            r, g, b, _ = grid[at:at + 4]
+            if r + g + b >= 120:
+                grid[at:at + 4] = tile[((y - y0) * 24 + x) * 4:((y - y0) * 24 + x) * 4 + 4]
+
+
+def png_rgba(content):
+    """An 8-bit RGBA, non-interlaced PNG's pixels (the committed art's, as ui.py saves them)."""
+    width, height = png_size(content)
+    if content[24:29] != bytes((8, 6, 0, 0, 0)):
+        sys.exit("A committed PNG is not 8-bit RGBA; refusing to export.")
+    data, at = b"", 8
+    while at < len(content):
+        size = struct.unpack(">I", content[at:at + 4])[0]
+        if content[at + 4:at + 8] == b"IDAT":
+            data += content[at + 8:at + 8 + size]
+        at += size + 12
+    raw, stride, out, prev = zlib.decompress(data), width * 4, bytearray(), bytearray(width * 4)
+    for y in range(height):
+        kind, row = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            a, b, c = row[i - 4] if i >= 4 else 0, prev[i], prev[i - 4] if i >= 4 else 0
+            if kind == 1:
+                row[i] = (row[i] + a) & 255
+            elif kind == 2:
+                row[i] = (row[i] + b) & 255
+            elif kind == 3:
+                row[i] = (row[i] + (a + b) // 2) & 255
+            elif kind == 4:
+                pa, pb, pc = abs(b - c), abs(a - c), abs(a + b - 2 * c)
+                row[i] = (row[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        out += row
+        prev = row
+    return out
+
+
 def export_palettes(c, image_ids):
     """The player's eight palettes (+0x11c, 0x420 bytes apart), which its objects draw with by the
     palette the select chose (0x40ccf2), as each palette's 0xRRGGBB for every colour the images without
@@ -4668,6 +4718,12 @@ def export_authored(ryuko, roots):
         files[image] = (SHUWA / spec["ui"]["hudFace"]).read_bytes()
     for image, d in grafted.items():
         files[image] = (SHUWA / f"drawings/{d}.png").read_bytes()
+    # The select screen (HPA-1308): her select face's portrait (419) and her *NAME's lettering (464, which the HUD shows
+    # too) are his.
+    if clash := sorted({419, 464} & set(files)):
+        sys.exit(f"SHUWA's spec maps {clash}, his select portrait and name; refusing to export.")
+    files[419] = (SHUWA / spec["ui"]["portrait"]).read_bytes()
+    files[464] = (SHUWA / spec["ui"]["name"]).read_bytes()
     # Every image his own timeline, clips, held poses and idle program show is his (images 0 and 8191 are the
     # source's blank displays). The black clip is the super darkening's panel (image 294), an object of hers.
     shown = {f["image"] for k in own for f in scripts[k]["frames"]}
@@ -4679,10 +4735,11 @@ def export_authored(ryuko, roots):
     (PUBLIC / "shuwa").mkdir(exist_ok=True)
     for image, content in files.items():
         write_if_changed(PUBLIC / f"shuwa/{image}.png", content)
-    # The Menu's face tile (src/instructions/fighters.ts OWN_TILES).
-    write_if_changed(PUBLIC / "shuwa/9000.png", (SHUWA / spec["ui"]["faceTile"]).read_bytes())
-    own_images = [dict(index=i, width=png_size(c)[0], height=png_size(c)[1], filename=f"shuwa/{i}.png", own=True)
-                  for i, c in files.items()]
+    # His drawings and portrait take his colour schemes (palettes below); his effects, blanks, HUD face and lettering
+    # keep their own colours.
+    schemed = set(drawings) | set(grafted) | {419}
+    own_images = [dict(index=i, width=png_size(c)[0], height=png_size(c)[1], filename=f"shuwa/{i}.png",
+                       **({} if i in schemed else {"own": True})) for i, c in files.items()]
     data["images"] = sorted([i for i in ryuko["images"] if i["index"] not in files] + own_images + list(graft_images.values()),
                             key=lambda i: i["index"])
     # The lamp (HPA-1305): each shot spends a charge as it leaves, a press with none left plays RECHARGE instead,
@@ -4708,9 +4765,29 @@ def export_authored(ryuko, roots):
                         colors=[[int(a, 16), int(b, 16)] for a, b in lamp["colors"].items()],
                         images=sorted(set(drawings) | set(grafted)))
     data["levels"].update(spec["levels"])
-    # He has no seat on the select sheet, so no select programs and no story (an empty scenario).
-    data.update(spec["stats"], select=dict(ryuko["select"], actions={}), scenario=[], resultScripts={}, aliases={}, counters={},
-                neutralTests={}, twins={str(r): r for r, _ in ZOMA_TWINS.values()})
+    # His eight colour schemes (ui/palettes.json, HPA-1306): each colour his drawings and portrait use, in all eight.
+    # Her rows stay for the images of hers he still shows (her objects); his win where a colour is in both.
+    table = json.loads((SHUWA / spec["ui"]["palettes"]).read_text(encoding="utf8"))["colors"]
+    rows = [[int(c, 16) for c in row] for row in table.values()]
+    data["palettes"] = [r for r in ryuko["palettes"] if r[0] not in {row[0] for row in rows}] + rows
+    # His voice and sounds (HPA-1307): spec.json's `sounds` maps one of her sound numbers to his clip in sound/, which
+    # that number then plays. Until his clips exist the map is empty and he keeps her sounds.
+    for sound in data["sounds"]:
+        if clip := spec["sounds"].get(str(sound["index"])):
+            sound["filename"] = f"sounds/shuwa-{sound['index']}.wav"
+            write_if_changed(PUBLIC / sound["filename"], (SHUWA / "sound" / clip).read_bytes())
+    # His select programs (seat 42, select.ts): her select face (67, the portrait sliding in) and *NAME (66). Her
+    # TEAM VS card (68, images 465 and 466, which her face jumps to at global 3 = 100) is not his: TEAM VS keeps his
+    # seat shut, and the jump is zeroed so nothing reaches it.
+    select = {k: [list(r) for r in v] for k, v in ryuko["select"]["actions"].items() if k != "68"}
+    for r in select["67"]:
+        if r[0] == 0x1f and r[1:3] == [68, 0]:
+            r[1] = 0
+    if shown := {u16(bytes(r), 3) & 8191 for v in select.values() for r in v if r[0] == 0x0c} - {419, 464}:
+        sys.exit(f"SHUWA's select programs show her images {sorted(shown)}; refusing to export.")
+    # No story (an empty scenario): his story and B.R. seats wait for TOPPA.
+    data.update(spec["stats"], select=dict(ryuko["select"], actions=select), scenario=[], resultScripts={}, aliases={},
+                counters={}, neutralTests={}, twins={str(r): r for r, _ in ZOMA_TWINS.values()})
     write_json(GENERATED / "shuwa.json", data)
     write_if_changed(GENERATED / "shuwa.d.json.ts",
                      b"declare const data: import('../characters').FighterData;\nexport default data;\n")
@@ -5296,10 +5373,13 @@ def export_demo(key, name, sha256, out):
     if key in DORA_GRIDS:
         _, dora, _ = player(*FIGHTERS["dora"]["source"])
         face = image_rgba(dora, 266)
+        tile = png_rgba((SHUWA / "ui/tile.png").read_bytes())
         for index in DORA_GRIDS[key]:
             record = c.images[index]
             grid = image_rgba(c, index)
             paint_dora_cell(grid, record.width, face)
+            if key == "select":
+                paint_shuwa_cell(grid, record.width, tile)
             write_if_changed(PUBLIC / f"{key}/{index}.png", rgba_png(record.width, record.height, bytes(grid)))
     write_json(out, dict(source_sha256=sha256, objects=objects, actions=actions, images=images,
                                                sounds=sounds, flags=flags, duration=duration))
@@ -5322,11 +5402,11 @@ def authored_art():
 
 def dom_art():
     """The art the DOM names by path under ASSET_BASE, sorted and unique: App.svelte's pause icon,
-    Menu.svelte's cheat digits and stage thumbnails, fighters.ts's own face tiles, the Instructions sources' select and gauge art,
+    Menu.svelte's cheat digits and stage thumbnails, the Instructions sources' select and gauge art,
     moves.ts's guide art and nameplates, and the shared page.ts backdrop the profile page reuses. The
     literal paths are the one source, so this scans the same text; the regex takes whole nested paths
     (a stage thumbnail is stages/<stage>/<image>.png)."""
-    sources = [ROOT / "src/App.svelte", ROOT / "src/Menu.svelte", ROOT / "src/instructions/fighters.ts",
+    sources = [ROOT / "src/App.svelte", ROOT / "src/Menu.svelte",
                *sorted((ROOT / "src/instructions").glob("*.svelte")),
                ROOT / "src/instructions/moves.ts", ROOT / "src/instructions/page.ts",
                *sorted((ROOT / "src/profile").glob("*.svelte")), *sorted((ROOT / "src/profile").glob("*.ts"))]
