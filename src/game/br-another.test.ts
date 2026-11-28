@@ -155,14 +155,27 @@ const allyByPartner = (battle: Battle, partner: number) => {
   return [index, battle.slots[index]!] as const;
 };
 
-// The ticket's stage-3 immediate partners with their fixed opening x, in
-// seating order — the only seats ever excused from the donor comparison.
-const STAGE3_IMMEDIATES: readonly (readonly [Who, number])[] = [
-  ['zmega', 450],
-  ['rario', 350],
-];
+// The ticket's stage-3 immediate partners in seating order — the only seats
+// ever excused from the donor comparison. Z-MEGA starts 150 source pixels
+// behind the 1P where there is room, RARIO 100 behind him, clamped inside
+// the stage's left wall and below the x 450 reinforcement entries.
+const STAGE3_IMMEDIATES: readonly Who[] = ['zmega', 'rario'];
 const immediatesOf = (who: Who) =>
-  STAGE3_IMMEDIATES.filter(([partner]) => partner !== who);
+  STAGE3_IMMEDIATES.filter((partner) => partner !== who);
+const immediateX = (playerX: number, partner: Who) => {
+  const zmega = Math.min(350, Math.max(150, playerX - 150));
+  return partner === 'zmega' ? zmega : zmega - 100;
+};
+
+const immediateEntry = (slot: Slot | null) =>
+  Boolean(slot && slot.flags & 0x200 && ((slot.flags >> 1) & 3) === 0);
+
+const introX = (who: Who, battle: Battle) => {
+  const match = Match.story(who, battle, 0, undefined, undefined, true);
+  for (const [i, vm] of match.cpus.entries()) if (i) vm!.input = () => ({});
+  while (match.roundTicks <= match.fightTick) match.step();
+  return match.fighters[0]!.x;
+};
 
 // Every slot equals its donor role slot with only the seat details
 // overridden, enemies and allies told apart by the 0x200 flag rather than
@@ -176,17 +189,19 @@ const expectRoles = (
   battle: Battle,
   roles: Battle,
   paired: boolean,
-  immediates: readonly (readonly [Who, number])[] = [],
+  immediates: readonly Who[] = [],
 ) => {
   const ally = roles.slots[6]!;
   const enemies = enemySlotsOf(battle);
   const allies = allySlotsOf(battle);
-  // The fixed x of a seat expected to be an immediate partner, undefined
+  // The expected x of a seat expected to be an immediate partner, undefined
   // for every seat the donor comparison covers in full.
-  const immediateXOf = (slot: Slot) =>
-    immediates.find(
-      ([partner]) => ROSTER.indexOf(partner) === slot.player,
-    )?.[1];
+  const immediateXOf = (slot: Slot) => {
+    const partner = immediates.find(
+      (partner) => ROSTER.indexOf(partner) === slot.player,
+    );
+    return partner && immediateX(battle.x, partner);
+  };
   battle.slots.forEach((slot, i) => {
     const role = isAllySlot(slot)
       ? ally
@@ -214,10 +229,10 @@ const expectRoles = (
       enemyMask(battle, i, paired),
     );
   });
-  expect(
-    battle.slots.map((s) => s!.watch),
-    who,
-  ).toEqual(battle.slots.map((s, i) => (isAllySlot(s) ? 0 : i)));
+  battle.slots.forEach((s, i) => {
+    if (s && immediateXOf(s) !== undefined) return;
+    expect(s!.watch, `${who} watch ${i}`).toBe(isAllySlot(s) ? 0 : i);
+  });
   expect(
     battle.slots.map((s) => s!.x),
     who,
@@ -226,21 +241,19 @@ const expectRoles = (
       i === enemies.length - 1 ? 450 : i % 2 === 0 ? 850 : 450,
     ),
     // A delayed ally keeps its donor's x; the immediates the ticket's
-    // fixed Z-MEGA 450 and RARIO 350.
+    // player-relative pair.
     ...allies.map((s) => immediateXOf(s!) ?? ally.x),
   ]);
-  expect(
-    battle.slots.map((s) => s!.below),
-    who,
-  ).toEqual([
-    0,
-    ...enemies.slice(0, -1).map((s) => desperationOf(ROSTER[s!.player]!)),
-    // A delayed ally watches the 1P's own mark; an immediate preserves its
-    // donor's unused below.
-    ...allies.map((s) =>
-      immediateXOf(s!) !== undefined ? ally.below : desperationOf(who),
-    ),
-  ]);
+  battle.slots.forEach((s, i) => {
+    if (s && immediateXOf(s) !== undefined) return;
+    expect(s!.below, `${who} below ${i}`).toBe(
+      isAllySlot(s)
+        ? desperationOf(who)
+        : i === 0
+          ? 0
+          : desperationOf(ROSTER[battle.slots[i - 1]!.player]!),
+    );
+  });
 };
 
 // The ticket's stage-3 ally layout: the usual partner delayed first when
@@ -258,11 +271,12 @@ const expectStage3Allies = (who: Who, stage3: Battle, finale: Battle) => {
   expect(donor.watch, `${who} donor watch`).toBe(0);
   const immediates = immediatesOf(who);
   const retained = !immediates.some(
-    ([partner]) => ROSTER.indexOf(partner) === donor.player,
+    (partner) => ROSTER.indexOf(partner) === donor.player,
   );
   const expected: (readonly [Who, number])[] = [];
   if (retained) expected.push([ROSTER[donor.player]!, donor.x]);
-  for (const [partner, x] of immediates) expected.push([partner, x]);
+  for (const partner of immediates)
+    expected.push([partner, immediateX(stage3.x, partner)]);
   const seats = stage3.slots.map((s) => s!.player);
   expect(seats, `${who} no self`).not.toContain(self);
   expect(new Set(seats).size, `${who} no duplicate`).toBe(seats.length);
@@ -287,8 +301,6 @@ const expectStage3Allies = (who: Who, stage3: Battle, finale: Battle) => {
     // An immediate partner: entry bits 0, the recipe's 0x301 and its bar.
     expect(slot!.flags, `${who} immediate flags`).toBe(0x301);
     expect(slot!.flags & 1, `${who} immediate bar`).toBe(1);
-    expect(slot!.watch, `${who} immediate watch`).toBe(donor.watch);
-    expect(slot!.below, `${who} immediate below`).toBe(donor.below);
   });
   return expected;
 };
@@ -350,6 +362,17 @@ describe('BR Another approved lineups', () => {
     // the generated data overlaps no other usual partner with the
     // immediates.
     expect([...sixSeat].sort()).toEqual(['rario', 'zmega']);
+  });
+
+  it('leaves every fighter’s opening x unchanged by the immediate allies', () => {
+    for (const who of ELIGIBLE) {
+      const stage3 = brAnotherStages(who).stage3;
+      const withoutImmediates = {
+        ...stage3,
+        slots: stage3.slots.filter((slot) => !immediateEntry(slot)),
+      };
+      expect(introX(who, stage3), who).toBe(introX(who, withoutImmediates));
+    }
   });
 
   // Independent of the typed table: RYUKO's rows straight from the ticket.

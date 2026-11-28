@@ -1530,17 +1530,36 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
   // The chain advances one watch a step; immediate-entry fighters need none.
   const admitThroughWatches = (match: Match, target: Fighter) => {
     const { seats, slots } = seatsOf(match);
+    const chain = new Set<number>();
+    for (
+      let watch = slots[match.fighters.indexOf(target)]?.watch ?? 0;
+      watch && !chain.has(watch);
+      watch = slots[seats.indexOf(watch)]?.watch ?? 0
+    )
+      chain.add(watch);
     for (let t = 0; t < 250 && !target.present; t++) {
-      for (const [i, f] of match.fighters.entries()) {
-        const slot = slots[i];
-        if (!slot || f.present) continue;
-        const watched = match.fighters[seats.indexOf(slot.watch)];
+      for (const seat of chain) {
+        const watched = match.fighters[seats.indexOf(seat)];
         if (watched?.present && watched.hp > 1) watched.hp = 1;
       }
       match.step();
     }
     expect(target.present).toBe(true);
   };
+  it('admits only the target’s watch chain beside a delayed ally', () => {
+    const battle = brAnotherStages('ryuko').stage3;
+    const match = Match.story('ryuko', battle, 0, undefined, undefined, true);
+    quiet(match);
+    toFight(match);
+    const target = match.fighters.find((f) => f.who === 'alpha')!;
+    const delayed = match.fighters.find((f) => f.who === 'zoma')!;
+    const hp = match.fighters[0]!.hp;
+    expect([target.present, delayed.present]).toEqual([false, false]);
+    admitThroughWatches(match, target);
+    expect([target.present, delayed.present]).toEqual([true, false]);
+    expect(match.fighters[0]!.hp).toBe(hp);
+  });
+
   // A waiting seat's arrival starts its opening at age −1. Let that real
   // entrance finish before the scripted KO; the quiet CPUs cannot interfere.
   const settleOpening = (match: Match, target: Fighter) => {
@@ -1555,17 +1574,17 @@ describe('strict B.R. no-revive roles and routes (authored, HPA-1251)', () => {
     const enemySlots = battle.slots.filter(
       (slot): slot is Slot => Boolean(slot) && !(slot!.flags & 0x200),
     );
-    const finalMirror = enemySlots.at(-1)!;
-    // The mirror is points-only; the stimulus must use an earlier bonus slot.
-    expect((finalMirror.flags >> 7) & 3).toBe(0);
-    expect(finalMirror.points).toBe(100);
+    const finalEnemy = enemySlots.at(-1)!;
+    // The final enemy is points-only; the stimulus must use an earlier bonus slot.
+    expect((finalEnemy.flags >> 7) & 3).toBe(0);
+    expect(finalEnemy.points).toBe(100);
     const { slots } = seatsOf(match);
     const index = match.fighters.findIndex((f, i) => {
       if (i === 0 || f === target || !f.present || f.hp <= 0) return false;
       if ((f.enemies & 1) === 0) return false;
       const slot = slots[i];
       return Boolean(
-        slot && slot !== finalMirror && ((slot.flags >> 7) & 3) === 2,
+        slot && slot !== finalEnemy && ((slot.flags >> 7) & 3) === 2,
       );
     });
     expect(index).toBeGreaterThan(0);

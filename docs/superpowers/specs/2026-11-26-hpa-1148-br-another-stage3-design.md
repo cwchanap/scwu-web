@@ -37,7 +37,7 @@ Use the fixed suffix from Linear, no additional RNG call. The original third ene
 
 ### Requirement readings
 
-The ticket contains a “Readings to confirm with the owner” section. The plan follows its written scope: additional immediate partners (not replacements except deduplication), reciprocal-only for Z-MEGA/RARIO, fixed ASTROMAN/TTRO order, hostile mirror, original arena, native strength, no revive, ANOTHER only. The design review agrees with these readings and six-seat correction; no separate explicit owner confirmation of every reading was found. Record any correction/confirmation in this spec before changing those expectations; do not invent an approval or treat human sign-off as a test/acceptance criterion. The fixed spawn coordinates below are proposed implementation details, not owner-provided values.
+The ticket contains a “Readings to confirm with the owner” section. The plan follows its written scope: additional immediate partners (not replacements except deduplication), reciprocal-only for Z-MEGA/RARIO, fixed ASTROMAN/TTRO order, hostile mirror, original arena, native strength, no revive, ANOTHER only. The owner's 26 Nov implementation review expressly kept the six-seat correction for Z-MEGA/RARIO, so the ticket's seven-seat arithmetic is resolved as a ticket arithmetic error. Record any later correction in this spec before changing those expectations; do not invent an approval or treat human sign-off as a test/acceptance criterion. The spawn coordinates below are implementation details, not owner-provided values.
 
 ## 2. Minimal design
 
@@ -62,7 +62,7 @@ const onStageAlly = (base: Slot, partner: Who, x: number): Slot => ({
 
 The entry bits 1–2 become 0, the ally bit 0x200 and life-bar bit 0x1 are set. No cross-fighter donor lookup or neutralizing watch/below/delay/random: the entry-0 path does not use them, and we preserve all other donor fields, including any scorer/award differences between LONG and ANOTHER. LONG calls `onStageAlly(roles.slots[0]!, brLongPartner(who), 450)`, preserving its existing result; stage 3 calls it with `finale.slots[6]!`. The review reports the 34 source finale ally slots have the same role fields aside from player/below/x; use the fighter's own source ally rather than duplicate a foreign template. Stage 3 builds the immediate list from Z-MEGA and RARIO excluding who (the special cases are the same reciprocal pairing as `brLongPartner`). Retain the usual `allyOf(finale)` only if its Who is not already immediate; append delayed ally first when retained, then the immediate ones in Z-MEGA/RARIO order. No new behavior for LONG.
 
-Use fixed starting slot coordinates: Z-MEGA x=450, RARIO x=350 (source scale; Match multiplies by 1.5), also when only one is present. Leave the delayed ally at its donor x. Verify the ordinary opening screenshot for sprite/HP-bar readability; adjust the two constants only if a concrete overlap is found and update tests accordingly. No arena-bounds calculation.
+Use player-relative starting slot coordinates (source scale; Match multiplies by 1.5): Z-MEGA 150 pixels behind the 1P where there is room and RARIO 100 behind him, clamped so the pair stays inside the stage's left wall and below the x=450 reinforcement entries. The same partner coordinate applies when only one is present. Leave the delayed ally at its donor x. Verify the ordinary opening screenshot for sprite/HP-bar readability and pin each fighter's opening x against the same battle without the immediate allies.
 
 ### Boss suffix
 
