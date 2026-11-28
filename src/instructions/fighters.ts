@@ -105,12 +105,12 @@ export const GRID: readonly (Who | null)[] = [
   'training',
 ];
 
-// Tile origins in the 206 x 417 sheet (1x source pixels), derived from the
-// engine's own grid (select.ts LAYOUT: origin (233, 50), step (26, 70))
-// plus the sheet's baked odd-column stagger: 7 x 26 + 24 = 206 wide and
-// 5 x 70 + 60 + 7 = 417 tall, matching the sheet exactly.
+// Tile origins in the 206 x 417 sheet (1x source pixels), measured from the
+// sheet itself: columns step 26 (7 x 26 + 24 = 206), rows start at 0, 68,
+// 137, 206, 275 and 344 (a 69 px step; the engine's LAYOUT step of 70 is its
+// on-screen spacing, not the sheet's), and odd columns sit 7 lower.
 export const XS: readonly number[] = [0, 26, 52, 78, 104, 130, 156, 182];
-export const YS: readonly number[] = [0, 70, 140, 210, 280, 350];
+export const YS: readonly number[] = [0, 68, 137, 206, 275, 344];
 
 // Each fighter's game-drawn name lettering, as the guide's hero shows it;
 // empty (the display name as text) for the two whose file has none. Mirrors

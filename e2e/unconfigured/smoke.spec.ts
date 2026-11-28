@@ -549,7 +549,7 @@ test('guide links SHUWA by his seat on the select sheet and opens his page', asy
   const link = page.getByRole('link', { name: 'SHUWA', exact: true });
   await expect(link).toBeVisible();
   // Seat 42 (HPA-1308): the sheet's third column, sixth row.
-  await expect(link).toHaveAttribute('style', /--x: 52; --y: 350/);
+  await expect(link).toHaveAttribute('style', /--x: 52; --y: 344/);
   await link.click();
   await expect(link).toHaveAttribute('aria-current', 'page');
   await expect(

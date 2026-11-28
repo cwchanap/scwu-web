@@ -314,13 +314,15 @@ describe('summon grid (HPA-972)', () => {
 
   it('places each fighter on its select-sheet tile, SHUWA on seat 42', () => {
     // His tile is painted into the sheet's first GATE LOCK cell (HPA-1308).
-    expect(tileOf('shuwa')).toEqual({ x: 52, y: 350 });
+    expect(tileOf('shuwa')).toEqual({ x: 52, y: 344 });
     expect(tileStyle('ryuko')).toBe('--x: 0; --y: 0');
     for (const entry of summonables) {
       const tile = tileOf(entry.id)!;
       const grid = GRID.indexOf(entry.id);
       expect(tile.x).toBe((grid % 8) * 26);
-      expect(tile.y).toBe(Math.floor(grid / 8) * 70 + (grid % 2 ? 7 : 0));
+      expect(tile.y).toBe(
+        [0, 68, 137, 206, 275, 344][Math.floor(grid / 8)] + (grid % 2 ? 7 : 0),
+      );
       expect(tile.x).toBeLessThanOrEqual(206 - 24);
       expect(tile.y).toBeLessThanOrEqual(417 - 60);
     }
