@@ -303,7 +303,7 @@ Authored throughout: the source has no seat, portrait or colours for him. The ar
 - **Colours.** `ui/palettes.json` gives his eight schemes, one row of eight colours per source colour (row[0], the colour itself, is scheme 1). They replace her rows for his colours; her rows for colours he does not use stay. His drawings and portrait take them (`schemed`, not `own`); effects, blanks, the HUD face and the name keep their colours. The lamp's three blues map to themselves in every scheme, and the low-life blink (`lampLit`) recolours after the scheme, so it shows red in every scheme.
 - **Sounds (hook).** `spec.sounds` maps one of her sound indices to a clip under `art/shuwa/game/sound/`; the export writes it as `sounds/shuwa-<index>.wav`. It is empty until HPA-1307's voice clips land.
 - **Stand-ins gone.** The Menu's own face tiles (`OWN_TILES`, `shuwa/9000.png`), the guide's extra face link and HPA-1304's cropped HUD face are removed: the Menu, the summon grid and the guide read his seat on the sheet like everyone's.
-- **Upload.** The export changed (`art/shuwa/game` is in the fingerprint), so `bun run upload:r2` must run from main after merge.
+- **Upload.** The export changed (`art/shuwa/game` is in the fingerprint), so the PR's checks and the Cloudflare build fail until `bun run upload:r2` runs: from the PR head before merge (main then fails until it merges) or from main after.
 
 ## Strict battle-scoped no-revive (HPA-1251, 2026-11-22)
 
