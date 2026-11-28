@@ -119,7 +119,6 @@ describe('exporter fingerprint', () => {
         ...shuwaArt(),
         'src/App.svelte',
         'src/Menu.svelte',
-        'src/instructions/fighters.ts',
         'src/instructions/Instructions.svelte',
         'src/instructions/moves.ts',
         'src/instructions/page.ts',
@@ -254,9 +253,17 @@ interface Export {
   clips: Record<string, Frame[]>;
   held: Frame[];
   idle: { records: number[][] };
-  images: { index: number; width: number; height: number; own?: boolean }[];
+  images: {
+    index: number;
+    width: number;
+    height: number;
+    filename: string;
+    own?: boolean;
+  }[];
   commands: { entries: Record<'air' | 'near' | 'far' | 'crouch', number>[] };
   responses: number[];
+  select: { actions: Record<string, number[][]> };
+  palettes: number[][];
   start: number;
   jumps: number[];
   walks: number[];
@@ -272,8 +279,15 @@ const spec = json<{
   blank: number[];
   drop: Record<string, number[]>;
   cutInputs: number[];
-  ui: { portrait: string; faceTile: string; hudFace: string };
+  ui: {
+    portrait: string;
+    name: string;
+    tile: string;
+    hudFace: string;
+    palettes: string;
+  };
   grafts: { base: number; images: Record<string, string> }[];
+  lamp: { colors: Record<string, string> };
 }>(`${ART}/spec.json`);
 const anchors = json<
   Record<string, { anchor: [number, number]; size: [number, number] }>
@@ -371,13 +385,13 @@ describe("SHUWA's authored export", () => {
       ),
     ]);
     expect([...shown].filter((image) => !mapped.has(image))).toEqual([]);
-    const ownImages = new Set(
-      shuwa.images.filter((image) => image.own).map(({ index }) => index),
+    const his = new Set(
+      shuwa.images
+        .filter((image) => image.filename.startsWith('shuwa/'))
+        .map(({ index }) => index),
     );
     expect(
-      [...shown].filter(
-        (image) => image && image !== 8191 && !ownImages.has(image),
-      ),
+      [...shown].filter((image) => image && image !== 8191 && !his.has(image)),
     ).toEqual([]);
     // The moves he lacks are left out, and with her intro's input checks to
     // them cut (cutInputs), so is Chage Character (37), her EX mode, and
@@ -399,7 +413,6 @@ describe("SHUWA's authored export", () => {
       ...Object.values(spec.images),
       ...Object.values(spec.scriptImages).flatMap(Object.values),
       ...spec.grafts.flatMap(({ images }) => Object.values(images)),
-      spec.ui.portrait,
     ]);
     for (const name of drawings) {
       const path = `${ART}/drawings/${name}.png`;
@@ -414,8 +427,69 @@ describe("SHUWA's authored export", () => {
       expect(pngSize(`${ART}/fx/${id}.png`), `${id}`).toEqual([width, height]);
     }
     for (const id of spec.blank) expect(donor.has(id), `${id}`).toBe(true);
-    for (const path of [spec.ui.faceTile, spec.ui.hudFace])
+    for (const path of [
+      spec.ui.portrait,
+      spec.ui.name,
+      spec.ui.tile,
+      spec.ui.hudFace,
+      spec.ui.palettes,
+    ])
       expect(existsSync(`${ART}/${path}`), path).toBe(true);
+    expect(pngSize(`${ART}/${spec.ui.tile}`)).toEqual([24, 60]);
+  });
+
+  it('seats his portrait and name in her select programs (HPA-1308)', () => {
+    const images = new Map(shuwa.images.map((image) => [image.index, image]));
+    // Her portrait (419) and *NAME (464) are his own art; the portrait takes
+    // his schemes, the lettering keeps its colours.
+    const size = (path: string) => pngSize(`${ART}/${path}`);
+    expect(images.get(419)).toEqual({
+      index: 419,
+      width: size(spec.ui.portrait)[0],
+      height: size(spec.ui.portrait)[1],
+      filename: 'shuwa/419.png',
+    });
+    expect(images.get(464)).toMatchObject({
+      filename: 'shuwa/464.png',
+      own: true,
+    });
+    // Her face (67) and name (66), without her TEAM VS card (68), which her
+    // face's op 0x1f no longer jumps to.
+    const { actions } = shuwa.select;
+    expect(Object.keys(actions)).toEqual(['66', '67']);
+    expect(actions['67'].slice(0, 2)).toEqual([
+      ryuko.select.actions['67'][0],
+      [31, 0, ...ryuko.select.actions['67'][1].slice(2)],
+    ]);
+    expect(actions['67'].slice(2)).toEqual(ryuko.select.actions['67'].slice(2));
+    expect(actions['66']).toEqual(ryuko.select.actions['66']);
+  });
+
+  it('gives his drawings and portrait his eight colour schemes (HPA-1308)', () => {
+    const { colors } = json<{ colors: Record<string, string[]> }>(
+      `${ART}/${spec.ui.palettes}`,
+    );
+    const rows = Object.values(colors).map((row) =>
+      row.map((c) => parseInt(c, 16)),
+    );
+    expect(rows.length).toBe(31);
+    // His rows, and hers for the colours he does not use (her objects).
+    const mine = new Set(rows.map((row) => row[0]));
+    const byColour = (table: number[][]) =>
+      [...table].sort((a, b) => a[0] - b[0]);
+    expect(byColour(shuwa.palettes)).toEqual(
+      byColour([...ryuko.palettes.filter((row) => !mine.has(row[0])), ...rows]),
+    );
+    // His lamp's blues stay blue in every scheme.
+    for (const blue of Object.keys(spec.lamp.colors))
+      expect(new Set(colors[blue])).toEqual(new Set([blue]));
+    // His drawings take them; his effects, blanks, HUD face and lettering
+    // keep their own colours.
+    const own = new Map(shuwa.images.map((i) => [i.index, i.own === true]));
+    for (const image of [...Object.keys(spec.images), 419])
+      expect(own.get(Number(image)), `${image}`).toBe(false);
+    for (const image of [...spec.fx, ...spec.blank, 2000, 2001, 2002, 464])
+      expect(own.get(image), `${image}`).toBe(true);
   });
 
   it('holds his drawings where her held poses held hers', () => {

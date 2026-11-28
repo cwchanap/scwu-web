@@ -540,22 +540,16 @@ test('profile shows sign-in unavailable when unconfigured', async ({
   expect(errors).toEqual([]);
 });
 
-test('guide links SHUWA by his own face tile and opens his page', async ({
+test('guide links SHUWA by his seat on the select sheet and opens his page', async ({
   page,
 }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.goto('/instructions.html');
   const link = page.getByRole('link', { name: 'SHUWA', exact: true });
-  await expect(link.locator('img')).toBeVisible();
-  await expect(link.locator('img')).toHaveAttribute('src', /shuwa\/9000\.png$/);
-  await expect
-    .poll(() =>
-      link
-        .locator('img')
-        .evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth),
-    )
-    .toBe(24);
+  await expect(link).toBeVisible();
+  // Seat 42 (HPA-1308): the sheet's third column, sixth row.
+  await expect(link).toHaveAttribute('style', /--x: 52; --y: 350/);
   await link.click();
   await expect(link).toHaveAttribute('aria-current', 'page');
   await expect(

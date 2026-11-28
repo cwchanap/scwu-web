@@ -1406,15 +1406,21 @@ export class TrainingScene extends Phaser.Scene {
   }
 
   // A player's objects draw with its palette (0x40ccf2), but for images with
-  // their own; each recoloured image is drawn once and cached.
+  // their own; each recoloured image is drawn once and cached. SHUWA's lamp
+  // lights on top of his scheme (HPA-1308): its reds are the giant's stripe
+  // colours, which some schemes recolour, so the blink comes after.
   private recolored(
     image: number,
     who: Container,
     palette: number,
     lamp = false,
   ) {
+    const key = this.paletted(image, who, palette);
+    return lamp ? this.lampLit(key, image, who as Who) : key;
+  }
+
+  private paletted(image: number, who: Container, palette: number) {
     const key = `${who === 'kgt' ? 'ui' : who}-${image}`;
-    if (lamp) return this.lampLit(key, image, who as Who);
     if (!palette || !(who in CHARACTERS)) return key;
     const recolored = `${key}@${palette}`;
     if (this.textures.exists(recolored)) return recolored;
@@ -1447,8 +1453,8 @@ export class TrainingScene extends Phaser.Scene {
     return recolored;
   }
 
-  // Authored (HPA-1305): SHUWA's lamp lit red, his drawing with each of the
-  // lamp's blues swapped for its red (`${key}@lamp`).
+  // Authored (HPA-1305): SHUWA's lamp lit red, his drawing (in its scheme)
+  // with each of the lamp's blues swapped for its red (`${key}@lamp`).
   private lampLit(key: string, image: number, who: Who) {
     const lamp = lampOf(who);
     if (!lamp?.images.includes(image)) return key;

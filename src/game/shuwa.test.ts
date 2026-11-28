@@ -26,8 +26,12 @@ function duel(who: Who, side = 0, gap = 130) {
   return { match, f, other, step };
 }
 
+// His own drawings and effects are the images he publishes under shuwa/
+// (HPA-1308 recolours his drawings, so `own` no longer marks them all).
 const OWN = new Set(
-  CHARACTERS.shuwa.images.filter((i) => i.own).map(({ index }) => index),
+  CHARACTERS.shuwa.images
+    .filter((i) => i.filename.startsWith('shuwa/'))
+    .map(({ index }) => index),
 );
 // Runs `input` for `ticks` from `hp` life: when each action began, the ticks
 // RYUKO lost life on and how much, the stocks left, how many DST missiles

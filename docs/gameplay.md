@@ -104,7 +104,7 @@ Press J or the Throw touch button to grab an opponent, including one holding bac
 
 ## SHUWA
 
-SHUWA is an authored fighter: he has no original file. He plays Ryuko's moves on her timing with his own drawings, 480 life and three stocks, and five moves borrowed from other fighters. He joins from the Menu's fighter lists and the summon grid; he has no seat on the select sheet and no story. He has Ryuko's chains, jumps and dashes, Hit Up and its chase, Chuck and COUNTER HIT. His specials and supers take these motions, read toward the opponent; BARRIER and RECHARGE also have keys:
+SHUWA is an authored fighter: he has no original file. He plays Ryuko's moves on her timing with his own drawings, 480 life and three stocks, and five moves borrowed from other fighters. He sits at seat 42 of the select sheet, the first GATE LOCK cell after AYA, with his own portrait, name and eight colour schemes, and joins VS single (1P or 2P) and free practice from there, the Menu's fighter lists and the summon grid. He has no story and no TEAM VS card, so those refuse him. He has Ryuko's chains, jumps and dashes, Hit Up and its chase, Chuck and COUNTER HIT. His specials and supers take these motions, read toward the opponent; BARRIER and RECHARGE also have keys:
 
 - **RING**, ↓← G: Ryuko's axe throw (30), for a lamp charge.
 - **SPECIUM**, ↓→ G: her EX Fire, a crossed-arm shot, for a lamp charge. It fires once per press.

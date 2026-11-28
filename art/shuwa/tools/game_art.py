@@ -82,9 +82,6 @@ def source(name, row):
     return int(name.rsplit("-", 1)[1])
 
 
-BG = (40, 88, 156)  # the drawings' flat background, the face crops' fill
-
-
 def save_indexed(rgba, path):
     """An 8-bit palette PNG holding exactly the image's colours; colour 0 is clear when anything is."""
     flat = rgba.reshape(-1, 4)
@@ -97,16 +94,6 @@ def save_indexed(rgba, path):
     im = Image.fromarray(idx.reshape(rgba.shape[:2]), "P")
     im.putpalette([0, 0, 0] * bool(clear.any()) + [v for c in cols for v in c])
     im.save(path, **({"transparency": 0} if clear.any() else {}), optimize=True)
-
-
-def crop_opaque(spr, w, h, x0, y0):
-    """A w x h window of a sprite on the flat background (opaque, so the Menu and HUD can draw it as it is)."""
-    out = np.zeros((h, w, 4), np.uint8)
-    out[...] = (*BG, 255)
-    sub = spr[y0:y0 + h, x0:x0 + w]
-    m = sub[..., 3] > 0
-    out[:sub.shape[0], :sub.shape[1]][m] = sub[m]
-    return out
 
 
 def main(raw, refs_dir, round7, data, assets, out):
@@ -221,11 +208,7 @@ def main(raw, refs_dir, round7, data, assets, out):
     for n, (shape, kw) in FX.items():
         dx, dy, w, h = R[str(n)]
         save_indexed(getattr(game_fx, shape)(w, h, **kw), out / "fx" / f"{n}.png")
-    (out / "ui").mkdir(exist_ok=True)
-    key, _ = pixel(*load(refs_dir, "base"), refs["base"][1])  # the key drawing at the cast's size
-    save_indexed(crop_opaque(key, 24, 60, 58, 34), out / "ui" / "face-tile.png")  # the Menu's 24 x 60 face tile
-    save_indexed(crop_opaque(key, 70, 21, 37, 57), out / "ui" / "hud-face.png")  # image 2001, the HUD face
-    print(f"{len(FX)} effects, 2 face crops")
+    print(f"{len(FX)} effects")  # game/ui/ is the select and HUD art, tools/ui.py's
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
-"""SHUWA's select and HUD art (HPA-1306), written to art/shuwa/ui/.
+"""SHUWA's select and HUD art (HPA-1306): the pieces the game reads go to art/shuwa/game/ui/, the scheme previews to
+art/shuwa/ui/schemes/.
 
     python3 art/shuwa/tools/ui.py name schemes      # drawn in code, no drawings needed
     python3 art/shuwa/tools/ui.py variants          # out/raw/{portrait,face}-<v>.png -> out/ui/ (needs draw.sh ui)
-    python3 art/shuwa/tools/ui.py pick a b          # portrait a and face b -> ui/portrait.png, tile.png, hud-face.png
+    python3 art/shuwa/tools/ui.py pick a b          # portrait a and face b -> game/ui/portrait.png, tile.png, hud-face.png
 
-- name: the "SHUWA" lettering in the cast's nameplate style, 20 px high.
-- schemes: the seven alternate colour schemes: ui/palettes.json (each current colour to its colour in all eight)
+- name: the "SHUWA" lettering in the cast's nameplate style, 20 px high (game/ui/name.png).
+- schemes: the seven alternate colour schemes: game/ui/palettes.json (each current colour to its colour in all eight)
   and each scheme's recoloured key drawings, ui/schemes/{base,giant}-<n>.png.
 - variants: each drawn portrait and face cleaned up to the cast's pixel style (crisp.py), into out/ui/ (not committed)
   FRAMES holds each face drawing's tile and HUD framing.
@@ -23,6 +24,7 @@ sys.path.insert(0, str(HERE))
 import crisp  # noqa: E402
 ART = HERE.parent
 UI = ART / "ui"
+GAME = ART / "game/ui"  # what the exporter reads, so inside the assets fingerprint
 OUT = ART / "out"
 BG = (40, 88, 156)  # the drawings' flat background (refs/base.png)
 
@@ -130,18 +132,17 @@ def schemes():
     rows = scheme_table()
     (UI / "schemes").mkdir(parents=True, exist_ok=True)
     table = {"schemes": [name for name, _ in SCHEMES], "colors": rows}
-    (UI / "palettes.json").write_text(json.dumps(table, indent=2) + "\n")
+    (GAME / "palettes.json").write_text(json.dumps(table, indent=2) + "\n")
     for n in range(1, len(SCHEMES)):
         for form, key in (("base", "key-master-base"), ("giant", "key-master-powered")):
             recolour(ART / f"round7/{key}.png", rows, n).save(UI / f"schemes/{form}-{n + 1}.png", optimize=True)
-    print(f"{len(rows)} colours x {len(SCHEMES)} schemes -> ui/palettes.json, ui/schemes/")
+    print(f"{len(rows)} colours x {len(SCHEMES)} schemes -> game/ui/palettes.json, ui/schemes/")
 
 
 def name():
-    UI.mkdir(exist_ok=True)
     im = lettering()
-    im.save(UI / "name.png", optimize=True)
-    print("ui/name.png", im.size)
+    im.save(GAME / "name.png", optimize=True)
+    print("game/ui/name.png", im.size)
 
 
 # --- Portrait, face tile and HUD face ---------------------------------------------------------------------------
@@ -228,12 +229,11 @@ def variants():
 
 
 def pick(portrait, face):
-    """Copy the owner's picks into ui/ (the committed pieces)."""
-    UI.mkdir(exist_ok=True)
-    Image.open(OUT / f"ui/portrait-{portrait}.png").save(UI / "portrait.png", optimize=True)
+    """Copy the owner's picks into game/ui/ (the committed pieces)."""
+    Image.open(OUT / f"ui/portrait-{portrait}.png").save(GAME / "portrait.png", optimize=True)
     for piece, out in (("tile", "tile"), ("hud", "hud-face")):
-        Image.open(OUT / f"ui/{piece}-{face}.png").save(UI / f"{out}.png", optimize=True)
-    print(f"ui/portrait.png <- {portrait}, ui/tile.png and ui/hud-face.png <- {face}")
+        Image.open(OUT / f"ui/{piece}-{face}.png").save(GAME / f"{out}.png", optimize=True)
+    print(f"game/ui/portrait.png <- {portrait}, game/ui/tile.png and game/ui/hud-face.png <- {face}")
 
 
 if __name__ == "__main__":

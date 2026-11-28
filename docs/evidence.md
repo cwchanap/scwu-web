@@ -249,8 +249,8 @@ SHUWA has no source file. His data is RYUKO's export (`assets.json`, built in `m
   - **Mapping.** `images` maps 159 donor images to 77 drawings: every image his own timeline, clips (all but `black`), held poses and idle program show. `scriptImages` gives image 10 a second id, 10010, in 180, 226, 231, 331 and 332 (her walk step there is a wind-up), so the walks keep theirs.
   - **Placement.** Each drawing sits by the README's placement rule: `dx = (w // 2 − ax) + (dx_f − dx_ref)`, `dy = (h − ay) + (dy_f − dy_ref)`; a frame drawn flipped (`flip_x`, `flip_y`) re-solves the landing for the mirrored anchor and the mirrored reference point, so either facing puts his anchor where her point stands. `ref` is the donor image's first placement in the scripts he was drawn against (`SHUWA_FIRST`), then her other scripts, clips and idle records. Boxes, flips and durations stay hers.
   - **Held poses.** Op `0x07`'s held poses draw from the image's corner (`heldPlacement`, `0x40d6a0`), not its bottom centre. So they keep her corner offsets and move by the anchor: `dx = dx_f + (ax_m − ax)`, `dy = dy_f + (ay_m − ay)`. `(ax_m, ay_m)` is the point of her image that his normal frames put the anchor on, `(w_m // 2 − dx_ref, h_m − dy_ref)`. For image 422, which she shows only held, it is the image's bottom centre. Held records do not feed `ref`. With either holder facing and either flip, his anchor lands where her image's point did.
-  - **Effects and blanks.** `fx` redraws 308–319, 337–342 and 424–428 at the donor images' exact sizes. `blank` empties her emblem and giant robot (327–336) and her name plate (464).
-  - **Publication.** He shows them as his own images (`shuwa/<id>.png`, `own`, no palette swap).
+  - **Effects and blanks.** `fx` redraws 308–319, 337–342 and 424–428 at the donor images' exact sizes. `blank` empties her emblem and giant robot (327–336). Her name plate (464) carries his lettering since HPA-1308.
+  - **Publication.** He shows them as his own images (`shuwa/<id>.png`). Effects and blanks are `own` (no palette swap); since HPA-1308 his drawings take his colour schemes.
 - **Objects (kept).** Hit sparks, dust, the super flash and the super darkening's panel (the `black` clip, image 294) stay RYUKO's objects. His pack (`fighter-shuwa`) therefore also carries the images of hers his drawings do not replace: her objects, and the poses of the moves he lacks, which nothing of his reaches.
 - **SWING (authored).**
   - **What is cut.** `drop` `{214: [235–238]}` removes the missile volley's frames, with their events, from every script DST's timeline reaches. 215 goes from 368 ticks to 283 (65 frames to 59), 216 from 183 to 98 and 222 from 533 to 448.
@@ -262,10 +262,10 @@ SHUWA has no source file. His data is RYUKO's export (`assets.json`, built in `m
 - **Engine tables (authored, following RYUKO's).**
   - **Following RYUKO's.** `BOUNCE_DOWN` (HISA Down lands into 147), the KO round-over value 99, HISA Down's −500 knock-back, `BACK_DASH` 14, and her CPU table and controls.
   - **His keys.** `KEYS` keeps the RYUKO keys whose entries he has.
-  - **Left empty.** No HUD name plate (`NAMES` null), no story scenario (he is no story fighter), no select programs, result scripts, aliases, counters or neutral tests.
+  - **Left empty.** No story scenario (he is no story fighter), result scripts, aliases, counters or neutral tests. HPA-1308 adds his HUD name plate and select programs.
 - **Fingerprint and publication (authored).**
   - **Fingerprint.** `authored_art()` appends `art/shuwa/game`'s files (dotfiles aside, sorted) to `AUTHORED_ART`, and `build.sh` and `fetch-generated.sh` concatenate the same files.
-  - **DOM art.** `dom_art()` also scans `src/instructions/fighters.ts`, for his face tile (`shuwa/9000.png`) and guide portrait (`shuwa/3.png`).
+  - **DOM art.** His guide portrait and nameplate (`shuwa/419.png`, `shuwa/464.png` since HPA-1308) come from `moves.ts`, as every fighter's do.
   - **Upload.** As with any exporter change, `bun run upload:r2` must run before the Cloudflare builds and CI pass.
   - **No game files under `art/`.** A test compares every `art/` PNG with `public/assets`; only the exporter's own copies match.
 
@@ -288,6 +288,22 @@ Authored throughout: SHUWA has no source file. Each new move is a donor fighter'
   - **Blink.** `lampRed` is on for 25 ticks and off for 25 while low. The scene then draws his drawings (`lamp.images`, not the donor effects) with the lamp's three blues (68c8f8, 1870d8, 102868) swapped for reds (f88088, e82028, a81018). Those blues appear only in the chest lamp.
   - **HUD.** None, per the ticket.
 - **Drawings.** New drawings for the grafted moves (`sw-293`, `sw-321`, `sw-125`, `b-235`, `b-236`, `rc-117`, `rc-261`–`rc-263` and `giant-foot`) come from the HPA-1304 art. `game_art.py` places a donor pose against that donor's own frames, scaled by idle height to RYUKO's (`donor_offset`). `sw-328` moved by 1 px because the median now includes the new poses.
+
+## SHUWA on the select screen (HPA-1308, 2026-11-28)
+
+Authored throughout: the source has no seat, portrait or colours for him. The art is HPA-1306's (`art/shuwa/game/ui/`, the contract in `art/shuwa/README.md`).
+
+- **Seat.** He takes seat 42, the first GATE LOCK cell after AYA (`select.ts` `ROSTER`, `fighters.ts` `GRID`); 43 and 44 stay GATE LOCK.
+  - **Sheet.** `paint_shuwa_cell` paints his 24 x 60 tile (`ui/tile.png`) over cell 42 of the CHAR SELECT sheets the select programs show (`select/13.png` and `select/30.png`, both `DORA_GRIDS` "select" entries). Each of the cell's 24 columns keeps the sheet's own sheared outline: only the bright pixels of the opaque run (r + g + b ≥ 120, the GATE LOCK lettering and fill) take the tile's. TEAM VS's sheet (`demo11/13.png`) keeps GATE LOCK.
+  - **Who can pick him.** VS single, 1P or 2P, and so free practice (`selectable`: seat 42 in VS, bit 2, with no TEAM VS). Story mode shows his face but refuses the pick, as VS does SHIN-Z's. TEAM VS refuses him, since its card (RYUKO's 68: images 465 and 466) has no drawing of his.
+- **Select programs.** He takes RYUKO's (66 and 67) less her TEAM VS card (68). 67's jump to 68 under TEAM VS (op `0x1f`, global 3 == 100) goes to 0, which nothing reaches now that TEAM VS refuses him. The export refuses if the programs show any image but 419 and 464.
+  - **Portrait.** `ui/portrait.png` (166 x 450) replaces her 419, the face 67 shows with its dx wobble.
+  - **Name.** `ui/name.png` (91 x 20) replaces her 464, the lettering 66 fades in. The HUD (`NAMES`), the Menu and the guide show it too.
+- **HUD face.** `ui/hud-face.png` replaces 2000–2002 (`hudFaceImages`), as before.
+- **Colours.** `ui/palettes.json` gives his eight schemes, one row of eight colours per source colour (row[0], the colour itself, is scheme 1). They replace her rows for his colours; her rows for colours he does not use stay. His drawings and portrait take them (`schemed`, not `own`); effects, blanks, the HUD face and the name keep their colours. The lamp's three blues map to themselves in every scheme, and the low-life blink (`lampLit`) recolours after the scheme, so it shows red in every scheme.
+- **Sounds (hook).** `spec.sounds` maps one of her sound indices to a clip under `art/shuwa/game/sound/`; the export writes it as `sounds/shuwa-<index>.wav`. It is empty until HPA-1307's voice clips land.
+- **Stand-ins gone.** The Menu's own face tiles (`OWN_TILES`, `shuwa/9000.png`), the guide's extra face link and HPA-1304's cropped HUD face are removed: the Menu, the summon grid and the guide read his seat on the sheet like everyone's.
+- **Upload.** The export changed (`art/shuwa/game` is in the fingerprint), so `bun run upload:r2` must run from main after merge.
 
 ## Strict battle-scoped no-revive (HPA-1251, 2026-11-22)
 

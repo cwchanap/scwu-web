@@ -37,7 +37,8 @@ const s8 = (r: number[], i: number) => (r[i] << 24) >> 24;
 
 export const LAYOUT = ui.select;
 // The players in file order (the KGT's 50 names): 43 B3–45 B5, 49 CPU-ZENKA
-// and 50 CPU-ALPHA hold blank templates.
+// and 50 CPU-ALPHA hold blank templates. Authored: SHUWA (HPA-1308) takes
+// 43 B3's seat (42), the first GATE LOCK cell; 43 and 44 stay GATE LOCK.
 export const ROSTER: readonly (Who | null)[] = [
   'ryuko',
   'zoma',
@@ -81,7 +82,7 @@ export const ROSTER: readonly (Who | null)[] = [
   'astroman',
   'yinan',
   'aya',
-  null,
+  'shuwa',
   null,
   null,
   'dora',
@@ -94,12 +95,16 @@ export const ROSTER: readonly (Who | null)[] = [
 // (0x4079a0); SHIN-Z's has only bit 0 (story), DoraEmon's and the blanks'
 // none. Story mode asks for bit 0 (0x407c5c). Authored: nothing writes
 // those flags (0x4452cc), so the original never offers DoraEmon; the port
-// lets his cell (45) through for both.
-export const selectable = (index: number, bit = 2) =>
+// lets his cell (45) through for both. SHUWA's (42, HPA-1308) opens for VS
+// single alone: TEAM VS has no card of his (her 465/466), and story mode,
+// the only way into B.R., waits for TOPPA.
+export const selectable = (index: number, bit = 2, team = false) =>
   index >= 0 &&
   index < 50 &&
   LAYOUT.named[index] &&
-  (index === 45 || (LAYOUT.flags[index] & bit) !== 0) &&
+  (index === 45 ||
+    (index === 42 && bit === 2 && !team) ||
+    (LAYOUT.flags[index] & bit) !== 0) &&
   ROSTER[index] !== null;
 
 // Authored (HPA-858): the four boss characters, seated at 30, 32, 33 and 45.
@@ -537,7 +542,8 @@ export class CharacterSelect extends Screen {
       this.hover[p] = -1;
       return false;
     }
-    if (!selectable(index, this.story ? 1 : 2)) return false;
+    if (!selectable(index, this.story ? 1 : 2, this.team !== null))
+      return false;
     this.hover[p] = index;
     const who = ROSTER[index]!;
     const [x, y] = LAYOUT.sides[p];

@@ -97,20 +97,13 @@ export const GRID: readonly (Who | null)[] = [
   'astroman',
   'yinan',
   'aya',
-  null,
+  'shuwa',
   null,
   null,
   'dora',
   'rario',
   'training',
 ];
-
-// A fighter with no cell on the select sheet shows his own 24 x 60 face tile
-// in the Menu instead (the sheet has no seat for SHUWA yet; seat 42 stays
-// GATE LOCK). Art path under ASSET_BASE.
-export const OWN_TILES: Partial<Record<Who, string>> = {
-  shuwa: 'shuwa/9000.png',
-};
 
 // Tile origins in the 206 x 417 sheet (1x source pixels), derived from the
 // engine's own grid (select.ts LAYOUT: origin (233, 50), step (26, 70))
@@ -166,7 +159,7 @@ export const NAMEPLATES: Record<Who, string> = {
   astroman: '',
   yinan: 'yinan/349.png',
   aya: 'aya/349.png',
-  shuwa: '',
+  shuwa: 'shuwa/464.png',
   dora: 'dora/247.png',
   rario: 'rario/235.png',
   training: '',

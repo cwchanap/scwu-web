@@ -1,7 +1,7 @@
 <script lang="ts">
   import { ASSET_BASE } from '../game/assetBase';
   import type { Who } from '../game/characters';
-  import { OWN_TILES, ROSTER } from './fighters';
+  import { ROSTER } from './fighters';
   import { GRID, GUIDES_DATA, SHARED, STOCKS, XS, YS } from './moves';
   import { back } from './page';
 
@@ -26,9 +26,6 @@
       },
     ];
   });
-
-  // Fighters with no cell on the sheet link by their own face tile.
-  const ownFaces = Object.entries(OWN_TILES) as [Who, string][];
 
   // Hash routing: #<id> picks the fighter; only that page renders.
   let picked = $state(location.hash.slice(1));
@@ -113,24 +110,6 @@
           ></a>
         {/each}
       </div>
-    </nav>
-    <nav
-      class="also"
-      aria-label="More fighters"
-      onpointerover={show}
-      onfocusin={show}
-      onpointerleave={show}
-      onfocusout={show}
-    >
-      {#each ownFaces as [id, tile] (id)}
-        <a
-          href={'#' + id}
-          aria-label={nameOf(id)}
-          aria-current={id === current ? 'page' : null}
-        >
-          <img src={ASSET_BASE + tile} width="24" height="60" alt="" />
-        </a>
-      {/each}
     </nav>
     <p class="pick" aria-hidden="true">{pick}</p>
   </details>
@@ -368,33 +347,6 @@
     50% {
       opacity: 0.4;
     }
-  }
-  .also {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    margin-top: 12px;
-  }
-  .also a {
-    display: block;
-    filter: brightness(0.74) saturate(0.85);
-    transition:
-      filter 0.12s,
-      transform 0.12s;
-  }
-  .also img {
-    display: block;
-    image-rendering: pixelated;
-  }
-  .also a:hover,
-  .also a:focus-visible {
-    filter: none;
-    transform: translateY(-3px);
-  }
-  .also a[aria-current] {
-    filter: none;
-    outline: 2px solid var(--gold);
-    outline-offset: 2px;
   }
   .pick {
     margin-top: 12px;
@@ -748,8 +700,7 @@
     .faces a[aria-current]::before {
       animation: none;
     }
-    .faces a,
-    .also a {
+    .faces a {
       transition: none;
     }
   }
