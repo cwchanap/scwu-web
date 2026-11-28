@@ -136,7 +136,8 @@ def main(raw, refs_dir, round7, data, assets, out):
 
     found = {}
     for name, row in rows.items():
-        if not (raw / f"{name}.png").exists() or row["batch"] == "b4":
+        # Only the sprite batches: b4 (effects and supers) and ui (select art, tools/ui.py) are built elsewhere.
+        if not (raw / f"{name}.png").exists() or row["batch"] not in ("b1", "b2", "b3"):
             continue
         a, bg = load(raw, name)
         (f, _, _), score = refs[row["form"]][0].find(a, np.arange(0.75, 1.26, 0.01))
