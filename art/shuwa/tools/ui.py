@@ -178,6 +178,8 @@ def skin_and_eyes(rgba):
     navy[:, : box[0]] = navy[:, box[2]:] = False
     # The irises: navy pixels on the face, split into two eyes at the widest gap between their columns.
     ys, xs = np.nonzero(navy)
+    if len(np.unique(xs)) < 2:
+        raise SystemExit("no two irises found on the face: redraw it (FRAMES only moves the crop)")
     order = np.sort(np.unique(xs))
     cut = order[np.argmax(np.diff(order))]
     eyes = [(ys[side].mean(), xs[side].mean()) for side in (xs <= cut, xs > cut)]
@@ -199,14 +201,16 @@ def face_pieces(name):
             w, h = TILE
             left = round((x0 + (x1 - x0) * f["left"]) * k - w / 2)
             top = round(sum(e[0] for e in eyes) / 2 * k - h * f["eyes"])
-            canvas = Image.new("RGBA", spr.shape[1::-1], (*TILE_BG, 255))
-            canvas.alpha_composite(Image.fromarray(spr, "RGBA"))
+            canvas = Image.fromarray(spr, "RGBA")
         else:
             w, h = HUD
             left = round(sum(e[1] for e in eyes) / 2 * k - w / 2)
             top = round(sum(e[0] for e in eyes) / 2 * k - h * 0.6)
             canvas = Image.fromarray(spr, "RGBA")
-        pieces[piece] = canvas.crop((left, top, left + w, top + h))
+        cut = canvas.crop((left, top, left + w, top + h))
+        if piece == "tile":  # on the blue after the cut, so a window past the drawing's edge is blue too
+            cut = Image.alpha_composite(Image.new("RGBA", TILE, (*TILE_BG, 255)), cut)
+        pieces[piece] = cut
     return pieces
 
 
