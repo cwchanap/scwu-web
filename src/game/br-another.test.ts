@@ -298,9 +298,12 @@ const expectStage3Allies = (who: Who, stage3: Battle, finale: Battle) => {
       expect(slot!.below, `${who} delayed below`).toBe(desperationOf(who));
       return;
     }
-    // An immediate partner: entry bits 0, the recipe's 0x301 and its bar.
+    // An immediate partner: entry bits 0, the recipe's 0x301 and its bar,
+    // and the donor's unused watch/below preserved.
     expect(slot!.flags, `${who} immediate flags`).toBe(0x301);
     expect(slot!.flags & 1, `${who} immediate bar`).toBe(1);
+    expect(slot!.watch, `${who} immediate watch`).toBe(donor.watch);
+    expect(slot!.below, `${who} immediate below`).toBe(donor.below);
   });
   return expected;
 };
