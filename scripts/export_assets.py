@@ -5373,7 +5373,8 @@ def export_demo(key, name, sha256, out):
     if key in DORA_GRIDS:
         _, dora, _ = player(*FIGHTERS["dora"]["source"])
         face = image_rgba(dora, 266)
-        tile = png_rgba((SHUWA / "ui/tile.png").read_bytes())
+        ui = json.loads((SHUWA / "spec.json").read_text(encoding="utf8"))["ui"]
+        tile = png_rgba((SHUWA / ui["tile"]).read_bytes())
         for index in DORA_GRIDS[key]:
             record = c.images[index]
             grid = image_rgba(c, index)
