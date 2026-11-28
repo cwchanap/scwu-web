@@ -153,12 +153,15 @@ const assemble = (
   };
 };
 
-// Authored (HPA-1148): stage 3's immediate partners and their fixed
-// opening x, in the order they seat behind the bosses.
-const STAGE3_PARTNERS: readonly (readonly [Who, number])[] = [
-  ['zmega', 450],
-  ['rario', 350],
-];
+// Authored (HPA-1148): stage 3's immediate partners, in seating order.
+// Z-MEGA starts 150 source pixels behind the 1P where there is room, RARIO
+// 100 behind him; the pair stays inside the stage's left wall and clear of
+// the x 450 reinforcement entries.
+const STAGE3_PARTNERS: readonly Who[] = ['zmega', 'rario'];
+const stage3PartnerX = (playerX: number, partner: Who) => {
+  const zmega = Math.min(350, Math.max(150, playerX - 150));
+  return partner === 'zmega' ? zmega : zmega - 100;
+};
 
 // Authored (HPA-1035 §7, owner-approved 16 Nov 2026): every fighter's three
 // ANOTHER stages come from the approved lineup table. Stage 1 seats three of
@@ -175,7 +178,7 @@ const STAGE3_PARTNERS: readonly (readonly [Who, number])[] = [
 // threshold (sww's opener ships below 160). Stage 3 also seats Z-MEGA and
 // RARIO as immediate allies (HPA-1148): each built by the
 // shared onStageAlly recipe from the fighter's own finale ally donor at its
-// fixed x, the player's own excluded; the usual delayed partner is kept
+// opening x, the player's own excluded; the usual delayed partner is kept
 // ahead of them unless it is already one of the immediates — the reciprocal
 // Z-MEGA/RARIO cases, the only overlaps the generated donors ship.
 export const brAnotherStages = (who: Who): BrAnotherStages => {
@@ -204,12 +207,12 @@ export const brAnotherStages = (who: Who): BrAnotherStages => {
   ]);
   const bosses = seats([row.stage3]);
   const donor = finale.slots[6]!;
-  const immediates = STAGE3_PARTNERS.filter(([partner]) => partner !== who);
+  const immediates = STAGE3_PARTNERS.filter((partner) => partner !== who);
   const allies: Slot[] = [];
-  if (!immediates.some(([partner]) => ROSTER.indexOf(partner) === donor.player))
+  if (!immediates.some((partner) => ROSTER.indexOf(partner) === donor.player))
     allies.push(allyOf(finale));
-  for (const [partner, x] of immediates)
-    allies.push(onStageAlly(donor, partner, x));
+  for (const partner of immediates)
+    allies.push(onStageAlly(donor, partner, stage3PartnerX(finale.x, partner)));
   const stage3 = assemble(
     finale,
     finale,

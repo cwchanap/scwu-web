@@ -2046,8 +2046,6 @@ describe("DoraEmon's modes and seats (authored, HPA-858)", () => {
     const x = dora.x;
     kiki.x = x - 90;
     kiki.facing = 1;
-    for (const f of match.fighters)
-      if (f !== kiki && f !== dora && f.present) f.x = x + 1500;
     const ages = [0, 149, 150, 177, 257, 266, 267, 276, 336];
     const poses = new Map<number, [number, number]>();
     const black = new Set<Effect>();
