@@ -1,14 +1,16 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
-// SHUWA (HPA-1304, HPA-1305), the one authored fighter: his pack, drawings and
-// placement are exported apart from the source roster, so this journey
-// proves the production bundle seats and plays him through the Menu's own
-// controls — practice in 1P, then Vs. CPU in 2P. His rules are the Vitest
+// SHUWA (HPA-1304, HPA-1305, HPA-1308), the one authored fighter: his pack,
+// drawings and placement are exported apart from the source roster, so this
+// journey proves the production bundle seats and plays him — picked on the
+// select screen's seat 42 in a non-default scheme for practice in 1P, then
+// through the Menu's own controls as the Vs. CPU 2P. His rules are the Vitest
 // suite's (shuwa.test.ts, exporter.test.ts); here only the browser path.
 
-// Into a practice battle, as smoke.spec.ts boots: buttons skip T2, pick
-// VS single, both cursors rest on Ryuko and start.
-const bootIntoBattle = async (page: Page) => {
+// Into a practice battle, as smoke.spec.ts boots: buttons skip T2 and pick
+// VS single, then `picks` drives the select screen and the battle starts
+// once the health line reads `life`.
+const bootIntoBattle = async (page: Page, picks: string[], life: string) => {
   const menu = page.getByRole('button', { name: 'Menu' });
   const failed = page.getByText('Couldn’t enter the arena.');
   const health = page.locator('[aria-label="Match health"]');
@@ -17,14 +19,47 @@ const bootIntoBattle = async (page: Page) => {
     await expect(menu.and(page.locator(':enabled')).or(failed)).toBeVisible({
       timeout: 30_000,
     });
-    for (const key of ['g', 's', 'g', 'g', 'g']) {
-      await page.keyboard.press(key);
+    for (const key of ['g', 's', 'g', ...picks]) {
+      if (key === 'hover')
+        await page.screenshot({
+          path: test.info().outputPath('shuwa-select.png'),
+        });
+      else await page.keyboard.press(key);
       await page.waitForTimeout(80);
     }
-    await expect(health).toContainText('510 510', { timeout: 10_000 });
+    await expect(health).toContainText(life, { timeout: 10_000 });
   }).toPass({ timeout: 60_000 });
   return { menu, failed, health };
 };
+
+// His scheme 4 (Violet, chosen with J): two of his suit's oranges as it
+// recolours them. Seen on the canvas, the scheme reached the battle; the
+// lamp's blink below then checks it swaps on this recoloured drawing.
+const VIOLETS = [0x7830b0, 0xb868e8];
+const violets = (page: Page) =>
+  page.evaluate(
+    (VIOLETS) =>
+      // A WebGL canvas reads back only while its frame is drawn.
+      new Promise<number>((done) =>
+        requestAnimationFrame(() => {
+          const game = document.querySelector('canvas')!;
+          const copy = document.createElement('canvas');
+          [copy.width, copy.height] = [game.width, game.height];
+          const context = copy.getContext('2d', {
+            willReadFrequently: true,
+          })!;
+          context.drawImage(game, 0, 0);
+          const { data } = context.getImageData(0, 0, copy.width, copy.height);
+          let count = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            const c = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+            if (VIOLETS.includes(c)) count++;
+          }
+          done(count);
+        }),
+      ),
+    VIOLETS,
+  );
 
 // Steps a seat until its card names the fighter. Each step resets the
 // match and the buttons stay disabled while it loads, so the click itself
@@ -137,25 +172,24 @@ test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
     if (message.type() === 'error') errors.push(message.text());
   });
   await page.goto('/');
-  const { menu, failed, health } = await bootIntoBattle(page);
+  // Practice: the 1P cursor leaves Ryuko's cell up, wrapping to the
+  // bottom row, and two right reach seat 42, where his portrait and name
+  // stand (captured). J picks him in scheme 4; G seats Ryuko in 2P. His 480
+  // life (Ryuko's 510 is the other seat) is the sign his own data loaded.
+  const { menu, failed, health } = await bootIntoBattle(
+    page,
+    ['w', 'd', 'd', 'hover', 'j', 'g'],
+    '480 510',
+  );
   const dialog = page.getByRole('dialog', { name: 'Menu' });
   const seats = dialog.locator('.card .pickname');
   const player = page.getByRole('meter', { name: 'Player health' });
   const opponent = page.getByRole('meter', { name: 'Opponent health' });
-
-  // Practice: he sits between AYA and DoraEmon, so stepping back from
-  // Ryuko reaches him in four (TRAINING, RARIO, DoraEmon, SHUWA) — each
-  // one a pack fetch, fewer than the forty-odd forward. His 480 life
-  // (Ryuko's 510 is the other seat) is the sign his own data loaded.
-  await menu.click();
-  await stepTo(
-    seats.nth(0),
-    dialog.getByRole('button', { name: 'Previous 1P fighter' }),
-    'SHUWA',
-  );
-  await expect(player).toHaveText('480', { timeout: 30_000 });
+  await expect(player).toHaveText('480');
   await expect(opponent).toHaveText('510');
   await expect(failed).toBeHidden();
+  await menu.click();
+  await expect(seats.nth(0)).toHaveText('SHUWA');
   await page.screenshot({ path: test.info().outputPath('shuwa-menu.png') });
 
   // A punch from neutral: once he stands idle, G takes him into a move.
@@ -166,6 +200,7 @@ test('SHUWA fights in practice and as the Vs. CPU opponent', async ({
   await dialog.getByRole('button', { name: '◂ Back to game' }).click();
   await expect(dialog).toBeHidden();
   await expect(health).toContainText('Action: idle', { timeout: 20_000 });
+  expect(await violets(page), 'his scheme 4 suit').toBeGreaterThan(0);
   const moved = await health.evaluateHandle((el) => {
     const seen = { yes: false };
     new MutationObserver(() => {
