@@ -106,7 +106,7 @@ cut from the game.
 | `ui/tile.png`      | His 24 x 60 face, painted over cell 42 of the select sheets                                        |
 | `ui/hud-face.png`  | The HUD face (donor images 2000 to 2002 show it)                                                   |
 | `ui/palettes.json` | His eight colour schemes                                                                           |
-| `sound/<clip>`     | His own sounds, once HPA-1307 adds them (`spec.json` `sounds`)                                     |
+| `sound/<clip>`     | His 24 sounds (HPA-1307; `art/shuwa/sound/README.md`), once `spec.json` `sounds` maps them         |
 | `spec.json`        | Stats, command table, which drawing stands in for each donor image (below)                         |
 
 `tools/game_art.py` and `tools/game_fx.py` make the PNGs and `anchors.json` from the raw drawings; `spec.json` is written by hand.
@@ -150,7 +150,7 @@ cut from the game.
   (`select/13.png`, `select/30.png`). `hudFaceImages` take `hudFace` (their own width and height). `palettes` is his eight
   schemes: his rows replace the donor's rows for the same colours, and his drawings and portrait take them.
 - `sounds`: `{donor sound index: clip}`, a clip under `sound/` that the export publishes as `sounds/shuwa-<index>.wav` in
-  place of the donor's sound. Empty until HPA-1307.
+  place of the donor's sound. Empty: HPA-1307 added the clips (`art/shuwa/sound/README.md`), nothing maps them yet.
 - `levels`: `{action: level}` over the donor's (the header byte a cancel window tests). The donor's 231 has none, since she enters it
   only in EX mode; SPECIUM gives it RING's 31.
 - `cpu`: CPU entries (the export's `cpu` shape) added to the donor's table, after the donor's entries for the commands `new` fills are
